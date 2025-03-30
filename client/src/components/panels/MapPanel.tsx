@@ -2,8 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import MapComponent from '@/components/map/MapComponent';
 import PropertyInfoPanel from '@/components/map/PropertyInfoPanel';
+import PropertyFilterPanel from '@/components/filters/PropertyFilterPanel';
 import { Property } from '@shared/schema';
 import { MapLayer, MapOptions } from '@/shared/types';
+import { usePropertyFilter } from '@/contexts/PropertyFilterContext';
 import { 
   Layers, 
   Search, 
@@ -116,14 +118,22 @@ export const MapPanel: React.FC<MapPanelProps> = ({ className }) => {
     setIsFullScreen(!isFullScreen);
   };
   
-  // Filter properties based on search query
-  const filteredProperties = searchQuery 
+  // Get the property filter context
+  const { filters, applyFilters } = usePropertyFilter();
+  
+  // Filter properties based on search query and property filters
+  const searchFilteredProperties = searchQuery 
     ? properties.filter(property => 
         property.address.toLowerCase().includes(searchQuery.toLowerCase()) ||
         property.parcelId.toLowerCase().includes(searchQuery.toLowerCase()) ||
         (property.owner && property.owner.toLowerCase().includes(searchQuery.toLowerCase()))
       )
     : properties;
+    
+  // Apply property filters if they are active
+  const filteredProperties = filters.isActive 
+    ? applyFilters(searchFilteredProperties)
+    : searchFilteredProperties;
   
   return (
     <div className={`flex h-full w-full ${className} ${isFullScreen ? 'fixed inset-0 z-50 bg-white' : ''}`}>
@@ -141,10 +151,13 @@ export const MapPanel: React.FC<MapPanelProps> = ({ className }) => {
             </button>
             <button 
               onClick={() => setShowFilterPanel(!showFilterPanel)}
-              className={`p-2 rounded-md ${showFilterPanel ? 'bg-primary/10 text-primary' : 'text-gray-600 hover:bg-gray-100'}`}
+              className={`p-2 rounded-md relative ${showFilterPanel ? 'bg-primary/10 text-primary' : 'text-gray-600 hover:bg-gray-100'} ${filters.isActive ? 'text-primary' : ''}`}
               title="Toggle filter panel"
             >
               <Filter className="h-5 w-5" />
+              {filters.isActive && (
+                <span className="absolute top-0 right-0 h-2.5 w-2.5 bg-primary rounded-full"></span>
+              )}
             </button>
           </div>
           
@@ -228,66 +241,10 @@ export const MapPanel: React.FC<MapPanelProps> = ({ className }) => {
           </div>
         )}
         
-        {/* Filter panel */}
+        {/* Property Filter Panel */}
         {showFilterPanel && (
-          <div className="absolute top-14 left-4 z-10 bg-white rounded-md shadow-md border border-gray-200 w-64">
-            <div className="p-3 border-b border-gray-200">
-              <h3 className="font-medium text-gray-800">Filter Properties</h3>
-            </div>
-            <div className="p-3 space-y-4">
-              <div>
-                <label htmlFor="value-range" className="block text-sm font-medium text-gray-700 mb-1">Value Range</label>
-                <div className="flex items-center space-x-2">
-                  <input 
-                    type="text" 
-                    placeholder="Min" 
-                    className="w-full p-1.5 text-sm border border-gray-300 rounded-md" 
-                  />
-                  <span className="text-gray-500">-</span>
-                  <input 
-                    type="text" 
-                    placeholder="Max" 
-                    className="w-full p-1.5 text-sm border border-gray-300 rounded-md" 
-                  />
-                </div>
-              </div>
-              
-              <div>
-                <label htmlFor="property-type" className="block text-sm font-medium text-gray-700 mb-1">Property Type</label>
-                <select 
-                  id="property-type" 
-                  className="w-full p-1.5 text-sm border border-gray-300 rounded-md"
-                >
-                  <option value="">All Types</option>
-                  <option value="residential">Residential</option>
-                  <option value="commercial">Commercial</option>
-                  <option value="agricultural">Agricultural</option>
-                </select>
-              </div>
-              
-              <div>
-                <label htmlFor="year-built" className="block text-sm font-medium text-gray-700 mb-1">Year Built</label>
-                <div className="flex items-center space-x-2">
-                  <input 
-                    type="text" 
-                    placeholder="From" 
-                    className="w-full p-1.5 text-sm border border-gray-300 rounded-md" 
-                  />
-                  <span className="text-gray-500">-</span>
-                  <input 
-                    type="text" 
-                    placeholder="To" 
-                    className="w-full p-1.5 text-sm border border-gray-300 rounded-md" 
-                  />
-                </div>
-              </div>
-              
-              <div className="border-t border-gray-200 pt-4 flex justify-end">
-                <button className="px-3 py-1 text-sm bg-primary/90 text-white rounded-md hover:bg-primary">
-                  Apply Filters
-                </button>
-              </div>
-            </div>
+          <div className="absolute top-14 left-4 z-10 w-[350px]">
+            <PropertyFilterPanel className="w-full" />
           </div>
         )}
         
@@ -331,6 +288,11 @@ export const MapPanel: React.FC<MapPanelProps> = ({ className }) => {
           <div className="absolute bottom-4 left-4 z-10 bg-white bg-opacity-90 px-3 py-1.5 rounded-md shadow-sm text-sm">
             <span className="font-medium">{filteredProperties.length}</span> properties found 
             {searchQuery && <span> for <span className="italic">"{searchQuery}"</span></span>}
+            {filters.isActive && (
+              <span className="ml-1 text-primary">
+                ({filters.activeFilterCount} active filter{filters.activeFilterCount !== 1 ? 's' : ''})
+              </span>
+            )}
           </div>
         )}
       </div>

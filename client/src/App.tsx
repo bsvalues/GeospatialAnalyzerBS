@@ -7,6 +7,7 @@ import Dashboard from './components/Dashboard';
 import Header from './components/Header';
 import NotFound from '@/pages/not-found';
 import { MapAccessibilityProvider } from './contexts/MapAccessibilityContext';
+import { PropertyFilterProvider } from './contexts/PropertyFilterContext';
 
 function Router() {
   return (
@@ -23,13 +24,15 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <MapAccessibilityProvider>
-        <div className="flex flex-col h-screen bg-gray-50">
-          <Header taxYear={taxYear} onTaxYearChange={setTaxYear} />
-          <div className="flex-grow overflow-hidden">
-            <Router />
+        <PropertyFilterProvider>
+          <div className="flex flex-col h-screen bg-gray-50">
+            <Header taxYear={taxYear} onTaxYearChange={setTaxYear} />
+            <div className="flex-grow overflow-hidden">
+              <Router />
+            </div>
           </div>
-        </div>
-        <Toaster />
+          <Toaster />
+        </PropertyFilterProvider>
       </MapAccessibilityProvider>
     </QueryClientProvider>
   );

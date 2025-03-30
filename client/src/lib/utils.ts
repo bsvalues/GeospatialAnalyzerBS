@@ -6,6 +6,26 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 /**
+ * Creates a debounced function that delays invoking the provided function
+ * until after the specified wait time has elapsed since the last time it was invoked.
+ * 
+ * @param fn The function to debounce
+ * @param ms The number of milliseconds to delay
+ * @returns Debounced function
+ */
+export function debounce<T extends (...args: any[]) => any>(
+  fn: T,
+  ms = 300
+): (...args: Parameters<T>) => void {
+  let timeoutId: ReturnType<typeof setTimeout>;
+  
+  return function(this: any, ...args: Parameters<T>) {
+    clearTimeout(timeoutId);
+    timeoutId = setTimeout(() => fn.apply(this, args), ms);
+  };
+}
+
+/**
  * Formats a string or number as currency
  * @param value The value to format (e.g. "250000" or 250000)
  * @param locale The locale to use for formatting (default: 'en-US')
