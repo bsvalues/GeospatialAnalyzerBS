@@ -9,6 +9,7 @@ import { formatCurrency } from '@/lib/utils';
 // Import accessibility components
 import { AccessibleMapComponents } from './AccessibleMapComponents';
 import { AccessiblePropertyMarker } from './AccessiblePropertyMarker';
+import MapLegend from './MapLegend';
 
 // Fix Leaflet default icon issue
 import icon from 'leaflet/dist/images/marker-icon.png';
@@ -272,6 +273,9 @@ export const MapComponent: React.FC<MapComponentProps> = ({
             ))
           }
         </LayersControl>
+        
+        {/* Map Legend */}
+        <MapLegend />
       </MapContainer>
     </div>
   );
