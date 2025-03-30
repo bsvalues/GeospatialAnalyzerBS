@@ -1,49 +1,135 @@
-import React from 'react';
-import { Code, Copy, Save } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Play, Save, Terminal, AlertTriangle, Code } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Toggle } from '@/components/ui/toggle';
+import Editor from '@monaco-editor/react';
 
 interface ScriptEditorProps {
-  code: string;
+  initialCode?: string;
+  onRun?: (code: string) => void;
+  onSave?: (code: string) => void;
+  scriptName?: string;
+  readOnly?: boolean;
 }
 
-const ScriptEditor: React.FC<ScriptEditorProps> = ({ code }) => {
+const ScriptEditor: React.FC<ScriptEditorProps> = ({
+  initialCode = '// Write your property valuation script here\n\n// Example: calculate values based on square footage\nproperties.forEach(property => {\n  const valuePerSqFt = 150;\n  results[property.id] = property.squareFeet * valuePerSqFt;\n});\n',
+  onRun,
+  onSave,
+  scriptName = 'Script Editor',
+  readOnly = false
+}) => {
+  const [code, setCode] = useState(initialCode);
+  const [isDarkTheme, setIsDarkTheme] = useState(true);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+
+  useEffect(() => {
+    setCode(initialCode);
+    setHasUnsavedChanges(false);
+  }, [initialCode]);
+
+  const handleEditorChange = (value: string | undefined) => {
+    if (value !== undefined) {
+      setCode(value);
+      setHasUnsavedChanges(value !== initialCode);
+    }
+  };
+
+  const handleRun = () => {
+    if (onRun) {
+      onRun(code);
+    }
+  };
+
+  const handleSave = () => {
+    if (onSave) {
+      onSave(code);
+      setHasUnsavedChanges(false);
+    }
+  };
+
+  const handleThemeToggle = () => {
+    setIsDarkTheme(!isDarkTheme);
+  };
+
   return (
-    <div className="border-r border-gray-700 flex flex-col h-full">
-      <div className="p-3 bg-gray-800 border-b border-gray-700 flex items-center justify-between">
+    <div className="h-full flex flex-col border border-gray-700 rounded-md overflow-hidden">
+      <div className="bg-gray-800 px-4 py-3 border-b border-gray-700 flex justify-between items-center">
         <div className="flex items-center">
-          <Code size={16} className="mr-2 text-blue-400" />
-          <span className="font-medium">Code Editor</span>
+          <Code size={18} className="mr-2 text-blue-500" />
+          <h3 className="font-medium">{scriptName}</h3>
+          {hasUnsavedChanges && (
+            <div className="ml-2 text-xs bg-yellow-800 text-yellow-100 px-2 py-0.5 rounded">
+              Unsaved
+            </div>
+          )}
         </div>
-        <div className="flex items-center space-x-1">
-          <button className="p-1 hover:bg-gray-700 rounded">
-            <Copy size={16} />
-          </button>
-          <button className="p-1 hover:bg-gray-700 rounded">
-            <Save size={16} />
-          </button>
+        <div className="flex space-x-2">
+          <Toggle
+            aria-label="Toggle theme"
+            pressed={isDarkTheme}
+            onPressedChange={handleThemeToggle}
+            className="px-2 h-8"
+          >
+            {isDarkTheme ? "Dark" : "Light"}
+          </Toggle>
+          <Button 
+            variant="outline" 
+            size="sm"
+            className="h-8"
+            onClick={handleSave}
+            disabled={readOnly || !hasUnsavedChanges}
+          >
+            <Save size={14} className="mr-1" /> Save
+          </Button>
+          <Button 
+            variant="default" 
+            size="sm"
+            className="h-8"
+            onClick={handleRun}
+          >
+            <Play size={14} className="mr-1" /> Run
+          </Button>
         </div>
       </div>
-      <div className="flex-1 overflow-auto p-4 bg-gray-850 font-mono">
-        <pre className="text-sm whitespace-pre-wrap">
-          <span className="text-gray-400">' Create a SIZERANGE variable</span>
-          <br />
-          <span className="text-blue-400">If</span> ([SQUAREFEET] &lt; 1500) <span className="text-blue-400">Then</span>
-          <br />
-          &nbsp;&nbsp;&nbsp;&nbsp;<span className="text-blue-400">Return</span> <span className="text-green-400">"Small"</span>
-          <br />
-          <span className="text-blue-400">ElseIf</span> ([SQUAREFEET] &gt;= 1500 <span className="text-blue-400">And</span> [SQUAREFEET] &lt; 2500) <span className="text-blue-400">Then</span>
-          <br />
-          &nbsp;&nbsp;&nbsp;&nbsp;<span className="text-blue-400">Return</span> <span className="text-green-400">"Medium"</span>
-          <br />
-          <span className="text-blue-400">ElseIf</span> ([SQUAREFEET] &gt;= 2500 <span className="text-blue-400">And</span> [SQUAREFEET] &lt; 3500) <span className="text-blue-400">Then</span>
-          <br />
-          &nbsp;&nbsp;&nbsp;&nbsp;<span className="text-blue-400">Return</span> <span className="text-green-400">"Large"</span>
-          <br />
-          <span className="text-blue-400">Else</span>
-          <br />
-          &nbsp;&nbsp;&nbsp;&nbsp;<span className="text-blue-400">Return</span> <span className="text-green-400">"Very Large"</span>
-          <br />
-          <span className="text-blue-400">End If</span>
-        </pre>
+      
+      <div className="flex-1 overflow-hidden">
+        <Editor
+          height="100%"
+          defaultLanguage="javascript"
+          value={code}
+          onChange={handleEditorChange}
+          theme={isDarkTheme ? 'vs-dark' : 'light'}
+          options={{
+            minimap: { enabled: true },
+            scrollBeyondLastLine: false,
+            fontSize: 14,
+            readOnly: readOnly,
+            automaticLayout: true,
+            lineNumbers: 'on',
+            renderLineHighlight: 'all',
+            scrollbar: {
+              useShadows: false,
+              verticalScrollbarSize: 10,
+              horizontalScrollbarSize: 10,
+              verticalHasArrows: false,
+              horizontalHasArrows: false,
+              vertical: 'visible',
+              horizontal: 'visible',
+            }
+          }}
+        />
+      </div>
+      
+      <div className="bg-gray-800 border-t border-gray-700 px-4 py-3 flex items-center">
+        <Terminal size={14} className="text-gray-400 mr-2" />
+        <span className="text-xs text-gray-400">Script context includes: properties (array of Property objects), results (output object)</span>
+        
+        {/* Info note */}
+        <div className="ml-auto flex items-center text-xs text-gray-400">
+          <AlertTriangle size={14} className="text-yellow-400 mr-1" />
+          <span>Scripts run in a controlled environment with access limited to property data</span>
+        </div>
       </div>
     </div>
   );

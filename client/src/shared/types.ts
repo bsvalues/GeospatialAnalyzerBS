@@ -32,6 +32,9 @@ export interface ScriptGroup {
   id: string;
   name: string;
   active: boolean;
+  description?: string;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface ScriptStep {
@@ -40,6 +43,12 @@ export interface ScriptStep {
   status: 'complete' | 'active' | 'pending';
   code?: string;
   type?: 'compute' | 'group' | 'combine';
+  groupId?: string;
+  description?: string;
+  createdAt?: string;
+  updatedAt?: string;
+  runCount?: number;
+  lastRun?: string;
 }
 
 export interface SqlQuery {
