@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Layers, Map as MapIcon, Search, Plus, Minus, X, Locate, Info } from 'lucide-react';
+import { Layers, Map as MapIcon, Search, Plus, Minus, X, Locate, Info, ArrowRightLeft } from 'lucide-react';
 import LayerControl from '../map/LayerControl';
 import PropertyInfoPanel from '../map/PropertyInfoPanel';
 import MapComponent from '../map/MapComponent';
@@ -7,6 +7,9 @@ import MapLegend from '../map/MapLegend';
 import { Property } from '@/shared/types';
 import { LatLngExpression } from 'leaflet';
 import { basemapSources, overlayLayerSources, GisLayerSource } from '../map/layerSources';
+import { Button } from '@/components/ui/button';
+import { usePropertyComparison } from '../comparison/PropertyComparisonContext';
+import PropertySelectionDisplay, { ComparisonCountBadge } from '../comparison/PropertySelectionDisplay';
 
 // Interface for Layer Items
 interface LayerItem {
@@ -18,6 +21,9 @@ interface LayerItem {
 const MapPanel: React.FC = () => {
   // Selected property state
   const [selectedProperty, setSelectedProperty] = useState<Property | null>(null);
+  // Property comparison state
+  const [showPropertySelection, setShowPropertySelection] = useState(false);
+  const { selectedProperties } = usePropertyComparison();
   
   // Sample property data with coordinates from Benton County, Washington
   const [properties, setProperties] = useState<Property[]>([
@@ -228,7 +234,30 @@ const MapPanel: React.FC = () => {
               onClick={handleSearch}
             />
           </div>
+          
+          {/* Comparison Counter Button */}
+          <div className="mt-2 flex justify-between items-center">
+            <Button 
+              variant="outline" 
+              size="sm" 
+              className="text-xs bg-opacity-90 hover:bg-opacity-100"
+              onClick={() => setShowPropertySelection(!showPropertySelection)}
+            >
+              <ArrowRightLeft className="h-3 w-3 mr-1" />
+              Compare Properties
+            </Button>
+            {selectedProperties.length > 0 && (
+              <ComparisonCountBadge onClick={() => setShowPropertySelection(!showPropertySelection)} />
+            )}
+          </div>
         </div>
+        
+        {/* Property Selection Panel */}
+        {showPropertySelection && (
+          <div className="absolute top-24 left-4 z-10">
+            <PropertySelectionDisplay onClose={() => setShowPropertySelection(false)} />
+          </div>
+        )}
         
         {/* Property Info Panel */}
         {selectedProperty && (

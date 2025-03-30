@@ -8,6 +8,8 @@ import {
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { PropertyCompareButton } from '../comparison/PropertySelectionDisplay';
 
 interface PropertyInfoPanelProps {
   property: Property;
@@ -172,8 +174,8 @@ const PropertyInfoPanel: React.FC<PropertyInfoPanelProps> = ({ property, onClose
       </div>
       
       <div className="border-t border-gray-700 px-4 py-3 flex justify-between">
-        <button className="text-xs px-3 py-1 bg-blue-500 hover:bg-blue-600 rounded">View Details</button>
-        <button className="text-xs px-3 py-1 bg-gray-700 hover:bg-gray-600 rounded">Add to Selection</button>
+        <Button variant="default" size="sm" className="text-xs">View Details</Button>
+        <PropertyCompareButton property={property} />
       </div>
     </div>
   );
