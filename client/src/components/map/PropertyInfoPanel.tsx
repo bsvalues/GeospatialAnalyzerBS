@@ -17,7 +17,6 @@ import {
   Tag, 
   Map, 
   FileText, 
-  Scales,
   Scale,
   ArrowRightLeft
 } from 'lucide-react';
