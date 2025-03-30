@@ -1,0 +1,557 @@
+import React, { useState } from 'react';
+import { Map, Layers, Database, Calculator, Building, File, Settings, Activity, Workflow } from 'lucide-react';
+
+const SpatialestDashboard = () => {
+  const [activeTab, setActiveTab] = useState('overview');
+  const [taxYear, setTaxYear] = useState('2024');
+  
+  return (
+    <div className="flex flex-col h-screen bg-gray-900 text-gray-100">
+      {/* Header */}
+      <header className="bg-gradient-to-r from-blue-800 to-indigo-900 text-white p-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-3">
+            <div className="bg-white bg-opacity-20 p-2 rounded-lg">
+              <Map size={24} className="text-blue-200" />
+            </div>
+            <div>
+              <h1 className="text-2xl font-bold">Spatial<span className="text-blue-300">est</span></h1>
+              <p className="text-xs text-blue-200">GIS Property Appraisal Platform</p>
+            </div>
+          </div>
+          <div className="flex items-center space-x-6">
+            <div className="flex items-center space-x-1">
+              <Building size={16} className="text-blue-300" />
+              <span>Benton County Assessment 2024</span>
+            </div>
+            <div className="flex space-x-2">
+              <select 
+                className="bg-gray-800 border border-gray-700 rounded px-2 py-1 text-sm"
+                value={taxYear}
+                onChange={(e) => setTaxYear(e.target.value)}
+              >
+                <option value="2024">2024</option>
+                <option value="2023">2023</option>
+                <option value="2022">2022</option>
+              </select>
+              <button className="bg-blue-600 text-white px-3 py-1 rounded text-sm">
+                Connect
+              </button>
+            </div>
+          </div>
+        </div>
+      </header>
+      
+      {/* Tabs */}
+      <nav className="bg-gray-800 px-4 py-1">
+        <ul className="flex space-x-1">
+          {[
+            { id: 'overview', name: 'Overview', icon: <Activity size={14} className="mr-1" /> },
+            { id: 'map', name: 'Map', icon: <Map size={14} className="mr-1" /> },
+            { id: 'script', name: 'Script', icon: <Workflow size={14} className="mr-1" /> },
+            { id: 'data', name: 'Data', icon: <Database size={14} className="mr-1" /> },
+            { id: 'regression', name: 'Regression', icon: <Calculator size={14} className="mr-1" /> },
+            { id: 'settings', name: 'Settings', icon: <Settings size={14} className="mr-1" /> }
+          ].map(tab => (
+            <li 
+              key={tab.id}
+              className={`px-4 py-2 rounded-t-md cursor-pointer font-medium transition-all flex items-center ${activeTab === tab.id ? 'bg-blue-600 text-white' : 'hover:bg-gray-700'}`}
+              onClick={() => setActiveTab(tab.id)}
+            >
+              {tab.icon} {tab.name}
+            </li>
+          ))}
+        </ul>
+      </nav>
+      
+      {/* Main Content */}
+      <div className="flex-1 overflow-hidden">
+        {activeTab === 'overview' && <OverviewPanel />}
+        {activeTab === 'map' && <MapPanel />}
+        {activeTab === 'script' && <ScriptPanel />}
+        {activeTab === 'data' && <DataPanel />}
+        {activeTab === 'regression' && <RegressionPanel />}
+        {activeTab === 'settings' && <SettingsPanel />}
+      </div>
+    </div>
+  );
+};
+
+// Overview Panel Component
+const OverviewPanel = () => (
+  <div className="p-6">
+    <h2 className="text-xl font-bold mb-6">Spatialest Project Overview</h2>
+    <div className="grid grid-cols-3 gap-6 mb-6">
+      <div className="bg-gray-800 p-4 rounded-xl shadow-md">
+        <h3 className="text-lg font-medium mb-3 flex items-center">
+          <Map size={18} className="mr-2 text-blue-400" />
+          GIS Integration
+        </h3>
+        <p className="text-sm text-gray-300 mb-3">
+          Spatialest is a comprehensive GIS-based appraisal toolset that integrates geographic data with property information for accurate valuations.
+        </p>
+        <div className="flex justify-between text-sm">
+          <span className="text-gray-400">Active Layers:</span>
+          <span>8</span>
+        </div>
+        <div className="flex justify-between text-sm">
+          <span className="text-gray-400">Saved Locations:</span>
+          <span>14</span>
+        </div>
+      </div>
+      
+      <div className="bg-gray-800 p-4 rounded-xl shadow-md">
+        <h3 className="text-lg font-medium mb-3 flex items-center">
+          <Workflow size={18} className="mr-2 text-green-400" />
+          Script-Driven Analysis
+        </h3>
+        <p className="text-sm text-gray-300 mb-3">
+          Projects are built using sequential Script Steps for data cleaning, analysis, model generation, and comparable sales analysis.
+        </p>
+        <div className="flex justify-between text-sm">
+          <span className="text-gray-400">Active Scripts:</span>
+          <span>6</span>
+        </div>
+        <div className="flex justify-between text-sm">
+          <span className="text-gray-400">SQL Queries:</span>
+          <span>8</span>
+        </div>
+      </div>
+      
+      <div className="bg-gray-800 p-4 rounded-xl shadow-md">
+        <h3 className="text-lg font-medium mb-3 flex items-center">
+          <Calculator size={18} className="mr-2 text-purple-400" />
+          Regression Analysis
+        </h3>
+        <p className="text-sm text-gray-300 mb-3">
+          Multiple Regression Analysis (MRA) modeling with variable selection, coefficient interpretation, and model validation.
+        </p>
+        <div className="flex justify-between text-sm">
+          <span className="text-gray-400">Current Model R²:</span>
+          <span>0.892</span>
+        </div>
+        <div className="flex justify-between text-sm">
+          <span className="text-gray-400">PRD Value:</span>
+          <span>1.02</span>
+        </div>
+      </div>
+    </div>
+    
+    <div className="bg-gray-800 p-4 rounded-xl shadow-md">
+      <h3 className="text-lg font-medium mb-3">Project Components</h3>
+      <div className="space-y-3">
+        <div className="flex flex-col">
+          <div className="flex justify-between items-center mb-1">
+            <span className="text-sm">Property Records</span>
+            <span className="text-sm text-gray-400">1,250 records</span>
+          </div>
+          <div className="w-full bg-gray-700 rounded-full h-2">
+            <div className="bg-blue-500 h-2 rounded-full" style={{ width: '100%' }}></div>
+          </div>
+        </div>
+        
+        <div className="flex flex-col">
+          <div className="flex justify-between items-center mb-1">
+            <span className="text-sm">Validated Sales</span>
+            <span className="text-sm text-gray-400">523 records</span>
+          </div>
+          <div className="w-full bg-gray-700 rounded-full h-2">
+            <div className="bg-green-500 h-2 rounded-full" style={{ width: '85%' }}></div>
+          </div>
+        </div>
+        
+        <div className="flex flex-col">
+          <div className="flex justify-between items-center mb-1">
+            <span className="text-sm">Regression Models</span>
+            <span className="text-sm text-gray-400">8 models</span>
+          </div>
+          <div className="w-full bg-gray-700 rounded-full h-2">
+            <div className="bg-purple-500 h-2 rounded-full" style={{ width: '65%' }}></div>
+          </div>
+        </div>
+        
+        <div className="flex flex-col">
+          <div className="flex justify-between items-center mb-1">
+            <span className="text-sm">Comparable Analyses</span>
+            <span className="text-sm text-gray-400">438 analyses</span>
+          </div>
+          <div className="w-full bg-gray-700 rounded-full h-2">
+            <div className="bg-yellow-500 h-2 rounded-full" style={{ width: '75%' }}></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+);
+
+// Map Panel Component
+const MapPanel = () => (
+  <div className="p-1 flex h-full">
+    <div className="w-64 bg-gray-800 border-r border-gray-700 p-4 flex flex-col">
+      <h2 className="font-bold text-lg mb-4 flex items-center">
+        <Layers size={18} className="mr-2 text-blue-500" />
+        Map Layers
+      </h2>
+      
+      <h3 className="text-sm font-medium text-blue-400 mt-2 mb-2">Base Layers</h3>
+      <div className="space-y-2 mb-4">
+        {['Imagery', 'Street Map', 'Topo', 'FEMA Flood', 'USGS Imagery'].map((layer, index) => (
+          <div key={index} className="flex items-center p-2 rounded hover:bg-gray-700">
+            <input type="checkbox" id={`layer-${index}`} className="mr-2" defaultChecked={index < 2} />
+            <label htmlFor={`layer-${index}`} className="cursor-pointer flex-1 text-sm">{layer}</label>
+          </div>
+        ))}
+      </div>
+      
+      <h3 className="text-sm font-medium text-blue-400 mt-4 mb-2">Viewable Layers</h3>
+      <div className="space-y-2 mb-4">
+        {['Parcels', 'Short Plats', 'Long Plats', 'Flood Zones', 'Well Logs', 'Zoning'].map((layer, index) => (
+          <div key={index} className="flex items-center p-2 rounded hover:bg-gray-700">
+            <input type="checkbox" id={`viewlayer-${index}`} className="mr-2" defaultChecked={index === 0} />
+            <label htmlFor={`viewlayer-${index}`} className="cursor-pointer flex-1 text-sm">{layer}</label>
+          </div>
+        ))}
+      </div>
+    </div>
+    
+    <div className="flex-1 relative bg-gradient-to-br from-gray-800 to-gray-900">
+      <div className="absolute inset-0 flex items-center justify-center">
+        <div className="bg-gray-800 bg-opacity-70 px-12 py-6 rounded-lg text-center shadow-lg">
+          <Map size={60} className="mx-auto mb-4 text-blue-400" />
+          <h3 className="text-xl font-semibold mb-2">GIS Map View</h3>
+          <p className="text-gray-300">Interactive property mapping with real-time data integration</p>
+        </div>
+      </div>
+      
+      {/* Property markers */}
+      <div className="absolute top-1/4 left-1/4 h-4 w-4">
+        <div className="absolute inset-0 bg-blue-500 rounded-full opacity-90"></div>
+      </div>
+      <div className="absolute bottom-1/3 right-1/3 h-4 w-4">
+        <div className="absolute inset-0 bg-blue-500 rounded-full opacity-90"></div>
+      </div>
+      
+      {/* Property Info Panel */}
+      <div className="absolute top-4 left-4 bg-gray-800 bg-opacity-90 rounded-lg shadow-xl w-72">
+        <div className="p-3 bg-blue-900 text-white font-medium">
+          Selected Property: 123 Main Street
+        </div>
+        <div className="p-3 space-y-2 text-sm">
+          <div className="flex justify-between">
+            <span className="text-gray-400">Parcel ID:</span>
+            <span>10425-01-29</span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-gray-400">Sale Price:</span>
+            <span>$375,000</span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-gray-400">Square Feet:</span>
+            <span>2,300</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+);
+
+// Script Panel Component
+const ScriptPanel = () => (
+  <div className="flex h-full">
+    <div className="w-64 bg-gray-800 border-r border-gray-700 p-4 overflow-y-auto">
+      <h2 className="font-bold text-lg mb-4 flex items-center">
+        <Workflow size={18} className="mr-2 text-blue-500" />
+        Script Groups
+      </h2>
+      
+      <div className="space-y-1 mb-4">
+        {['Data Review', 'Sales Review', 'Modeling Prep', 'Regression Analysis', 'Comparable Analysis'].map((group, index) => (
+          <button 
+            key={index}
+            className={`w-full text-left px-3 py-2 rounded ${index === 2 ? 'bg-blue-600 text-white' : 'hover:bg-gray-700'}`}
+          >
+            {group}
+          </button>
+        ))}
+      </div>
+      
+      <h2 className="font-bold text-lg mt-4 mb-4 flex items-center">
+        <File size={18} className="mr-2 text-blue-500" />
+        Script Steps
+      </h2>
+      
+      <div className="space-y-1">
+        {[
+          { name: 'Compute BPPSF', status: 'complete' },
+          { name: 'Compute UseableSale', status: 'complete' },
+          { name: 'Compute SIZERANGE', status: 'active' },
+          { name: 'Compute OutlierTag', status: 'pending' },
+          { name: 'Group By Neighborhood', status: 'pending' }
+        ].map((step, index) => (
+          <div 
+            key={index}
+            className={`flex items-center p-2 rounded hover:bg-gray-700 ${
+              step.status === 'complete' 
+                ? 'text-green-400' 
+                : step.status === 'active'
+                  ? 'text-white'
+                  : 'text-gray-500'
+            }`}
+          >
+            <div className={`h-2 w-2 rounded-full ${
+              step.status === 'complete' 
+                ? 'bg-green-500' 
+                : step.status === 'active'
+                  ? 'bg-blue-500'
+                  : 'bg-gray-600'
+            } mr-2`}></div>
+            <span className="text-sm">{step.name}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+    
+    <div className="flex-1 p-6">
+      <div className="flex items-center justify-between mb-6">
+        <h2 className="text-xl font-bold">Script Step: Compute SIZERANGE</h2>
+        <div className="flex space-x-2">
+          <button className="px-3 py-1 bg-blue-600 text-white rounded-md">Run Step</button>
+          <button className="px-3 py-1 bg-gray-700 text-white rounded-md">Configure</button>
+        </div>
+      </div>
+      
+      <div className="bg-gray-800 rounded-lg p-4 mb-6">
+        <h3 className="text-sm font-medium mb-3 text-blue-300">Step Description</h3>
+        <p className="text-sm text-gray-300">
+          This script step creates a new variable "SIZERANGE" that groups properties into size categories based on square footage. 
+          This grouped variable can be used in regression analysis or for filtering comparable properties.
+        </p>
+      </div>
+      
+      <div className="bg-gray-800 rounded-lg p-4 mb-6">
+        <h3 className="text-sm font-medium mb-3 text-blue-300">VB.Net Code</h3>
+        <div className="bg-gray-900 p-3 rounded text-green-300 font-mono text-sm whitespace-pre">
+{`' Create a SIZERANGE variable
+If ([SQUAREFEET] < 1500) Then
+    Return "Small"
+ElseIf ([SQUAREFEET] >= 1500 And [SQUAREFEET] < 2500) Then
+    Return "Medium"
+ElseIf ([SQUAREFEET] >= 2500 And [SQUAREFEET] < 3500) Then
+    Return "Large"
+Else
+    Return "Very Large"
+End If`}
+        </div>
+      </div>
+    </div>
+  </div>
+);
+
+// Data Panel Component
+const DataPanel = () => (
+  <div className="p-6">
+    <div className="flex items-center justify-between mb-6">
+      <h2 className="text-xl font-bold">Data View</h2>
+      <div className="flex space-x-2">
+        <select className="bg-gray-800 border border-gray-700 rounded px-3 py-1 text-sm">
+          <option>Property</option>
+          <option>Sales</option>
+          <option>Permits</option>
+          <option>Land</option>
+          <option>Field Work</option>
+        </select>
+        <button className="px-3 py-1 bg-blue-600 text-white rounded-md">Query</button>
+        <button className="px-3 py-1 bg-gray-700 text-white rounded-md">Export</button>
+      </div>
+    </div>
+    
+    <div className="bg-gray-800 rounded-lg overflow-hidden">
+      <table className="w-full text-sm">
+        <thead>
+          <tr className="bg-gray-900">
+            <th className="text-left p-3">Property ID</th>
+            <th className="text-left p-3">Situs</th>
+            <th className="text-left p-3">Sq Ft</th>
+            <th className="text-left p-3">Year Built</th>
+            <th className="text-left p-3">Bathrooms</th>
+            <th className="text-left p-3">Bedrooms</th>
+            <th className="text-left p-3">UseableSale</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-gray-700">
+          {[
+            { id: '10425-01-29', situs: '123 Main St', sqft: 2300, year: 2001, bath: 2.5, bed: 4, useable: 1 },
+            { id: '10425-01-30', situs: '125 Main St', sqft: 2150, year: 1998, bath: 2.5, bed: 4, useable: 1 },
+            { id: '10425-01-31', situs: '127 Main St', sqft: 2600, year: 2005, bath: 3, bed: 4, useable: 1 },
+            { id: '10425-01-32', situs: '129 Main St', sqft: 1850, year: 1992, bath: 2, bed: 3, useable: 1 },
+            { id: '10425-01-33', situs: '131 Main St', sqft: 3100, year: 2010, bath: 3.5, bed: 5, useable: 1 },
+            { id: '10425-90-01', situs: '133 Main St', sqft: 2800, year: 2015, bath: 3.5, bed: 4, useable: 0 }
+          ].map((property, index) => (
+            <tr key={index} className={`hover:bg-gray-700 ${property.useable === 0 ? 'bg-red-900 bg-opacity-20' : ''}`}>
+              <td className="p-3">{property.id}</td>
+              <td className="p-3">{property.situs}</td>
+              <td className="p-3">{property.sqft.toLocaleString()}</td>
+              <td className="p-3">{property.year}</td>
+              <td className="p-3">{property.bath}</td>
+              <td className="p-3">{property.bed}</td>
+              <td className="p-3">{property.useable}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  </div>
+);
+
+// Regression Panel Component
+const RegressionPanel = () => (
+  <div className="flex h-full">
+    <div className="w-64 bg-gray-800 border-r border-gray-700 p-4">
+      <h2 className="font-bold text-lg mb-4 flex items-center">
+        <Calculator size={18} className="mr-2 text-blue-500" />
+        Variables
+      </h2>
+      
+      <div className="space-y-2">
+        <div className="flex items-center justify-between bg-gray-900 p-2 rounded">
+          <span className="text-sm">SQUAREFEET</span>
+          <button className="text-gray-500 hover:text-red-500">×</button>
+        </div>
+        <div className="flex items-center justify-between bg-gray-900 p-2 rounded">
+          <span className="text-sm">YEARBUILT</span>
+          <button className="text-gray-500 hover:text-red-500">×</button>
+        </div>
+        <div className="flex items-center justify-between bg-gray-900 p-2 rounded">
+          <span className="text-sm">BATHROOMS</span>
+          <button className="text-gray-500 hover:text-red-500">×</button>
+        </div>
+        <div className="flex items-center justify-between bg-gray-900 p-2 rounded">
+          <span className="text-sm">BEDROOMS</span>
+          <button className="text-gray-500 hover:text-red-500">×</button>
+        </div>
+        <button className="w-full mt-2 text-center px-3 py-2 rounded border border-dashed border-gray-600 text-gray-400 hover:bg-gray-700 hover:text-white text-sm">
+          + Add Variable
+        </button>
+      </div>
+      
+      <h3 className="text-sm font-medium mt-6 mb-2 text-blue-400">Settings</h3>
+      <div className="space-y-3">
+        <div>
+          <label className="block text-xs text-gray-400 mb-1">Dependent Variable</label>
+          <select className="w-full p-2 bg-gray-900 border border-gray-700 rounded text-sm">
+            <option>SALEPRICE</option>
+          </select>
+        </div>
+        <div>
+          <label className="block text-xs text-gray-400 mb-1">Filter</label>
+          <select className="w-full p-2 bg-gray-900 border border-gray-700 rounded text-sm">
+            <option>USEABLESALE = 1</option>
+          </select>
+        </div>
+      </div>
+    </div>
+    
+    <div className="flex-1 p-6">
+      <div className="bg-gray-800 rounded-lg p-4 mb-6">
+        <h3 className="text-md font-medium mb-4">Model Results</h3>
+        
+        <div className="grid grid-cols-2 gap-4 mb-4">
+          <div className="bg-gray-900 p-3 rounded">
+            <h4 className="text-xs text-gray-400 mb-2">Model Statistics</h4>
+            <div className="space-y-1 text-sm">
+              <div className="flex justify-between">
+                <span className="text-gray-400">R²:</span>
+                <span>0.892</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-400">Adjusted R²:</span>
+                <span>0.887</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-400">Standard Error:</span>
+                <span>$15,230.45</span>
+              </div>
+            </div>
+          </div>
+          
+          <div className="bg-gray-900 p-3 rounded">
+            <h4 className="text-xs text-gray-400 mb-2">Equity Metrics</h4>
+            <div className="space-y-1 text-sm">
+              <div className="flex justify-between">
+                <span className="text-gray-400">PRD:</span>
+                <span>1.02</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-400">PRB:</span>
+                <span>0.005</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+);
+
+// Settings Panel Component
+const SettingsPanel = () => (
+  <div className="p-6">
+    <h2 className="text-xl font-bold mb-6">System Settings</h2>
+    
+    <div className="grid grid-cols-2 gap-6">
+      <div className="bg-gray-800 p-4 rounded-xl shadow-md">
+        <h3 className="text-lg font-medium mb-4">Map Configuration</h3>
+        
+        <div className="space-y-4">
+          <div>
+            <label className="block text-sm text-gray-400 mb-2">Base Layer</label>
+            <select className="w-full p-2 bg-gray-900 border border-gray-700 rounded text-sm">
+              <option>Imagery</option>
+              <option>Street Map</option>
+              <option>Topo</option>
+              <option>FEMA Flood</option>
+              <option>USGS Imagery</option>
+            </select>
+          </div>
+          
+          <div>
+            <label className="block text-sm text-gray-400 mb-2">Selection Color</label>
+            <div className="flex space-x-2">
+              <div className="w-8 h-8 rounded-full bg-blue-500 cursor-pointer"></div>
+              <div className="w-8 h-8 rounded-full bg-green-500 cursor-pointer"></div>
+              <div className="w-8 h-8 rounded-full bg-purple-500 cursor-pointer"></div>
+              <div className="w-8 h-8 rounded-full bg-yellow-500 cursor-pointer"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <div className="bg-gray-800 p-4 rounded-xl shadow-md">
+        <h3 className="text-lg font-medium mb-4">Database Connection</h3>
+        
+        <div className="space-y-4">
+          <div>
+            <label className="block text-sm text-gray-400 mb-2">Connection String</label>
+            <input 
+              type="text" 
+              className="w-full p-2 bg-gray-900 border border-gray-700 rounded text-sm"
+              value="Data Source=JCHARRISPACS;Initial Catalog=pacs_oltp;Integrated Security=True"
+              readOnly
+            />
+          </div>
+          
+          <div>
+            <label className="block text-sm text-gray-400 mb-2">Tax Year</label>
+            <select className="w-full p-2 bg-gray-900 border border-gray-700 rounded text-sm">
+              <option>2024</option>
+              <option>2023</option>
+              <option>2022</option>
+            </select>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+);
+
+export default SpatialestDashboard;

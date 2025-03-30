@@ -1,0 +1,221 @@
+import React, { useState } from 'react';
+import { Workflow, FileText, ChevronDown, ChevronRight, Code, Play, CheckCircle, Circle, AlertCircle, Sliders, Save, Copy, BarChart2, Database, Table } from 'lucide-react';
+
+// Script data based on XML configuration
+const scriptData = {
+  scriptGroups: [
+    { id: 'data-review', name: 'Data Review', active: false },
+    { id: 'sales-review', name: 'Sales Review', active: false },
+    { id: 'modeling-prep', name: 'Modeling Prep', active: true },
+    { id: 'regression-analysis', name: 'Regression Analysis', active: false },
+    { id: 'comp-analysis', name: 'Comparable Analysis', active: false },
+    { id: 'report-generation', name: 'Report Generation', active: false }
+  ],
+  scriptSteps: [
+    { id: 'compute-bppsf', name: 'Compute BPPSF', status: 'complete', type: 'compute' },
+    { id: 'compute-useablesale', name: 'Compute UseableSale', status: 'complete', type: 'compute' },
+    { id: 'compute-sizerange', name: 'Compute SIZERANGE', status: 'active', type: 'compute' },
+    { id: 'compute-outliertag', name: 'Compute OutlierTag', status: 'pending', type: 'compute' },
+    { id: 'group-by-neighborhood', name: 'Group By Neighborhood', status: 'pending', type: 'group' },
+    { id: 'combine-quality-condition', name: 'Combine Quality & Condition', status: 'pending', type: 'combine' }
+  ],
+  
+  // Sample SQL queries from the XML
+  sqlQueries: [
+    { name: 'Prop Data SQL', description: 'Prop Data SQL' },
+    { name: 'Property', description: 'Property' },
+    { name: 'Permits', description: 'Permits' },
+    { name: 'Land', description: 'Land' },
+    { name: 'Property Links', description: 'Property Links' },
+    { name: 'Field Work', description: 'Field Work' },
+    { name: 'Sales', description: 'Sales' },
+    { name: 'Base Tax Due', description: 'Base Tax Due' }
+  ]
+};
+
+// Current script step code
+const currentStepCode = `' Create a SIZERANGE variable
+If ([SQUAREFEET] < 1500) Then
+    Return "Small"
+ElseIf ([SQUAREFEET] >= 1500 And [SQUAREFEET] < 2500) Then
+    Return "Medium"
+ElseIf ([SQUAREFEET] >= 2500 And [SQUAREFEET] < 3500) Then
+    Return "Large"
+Else
+    Return "Very Large"
+End If`;
+
+const SpatialestScriptModule = () => {
+  const [activeStep, setActiveStep] = useState('compute-sizerange');
+  const [runningScript, setRunningScript] = useState(false);
+  const [scriptsExpanded, setScriptsExpanded] = useState(true);
+  const [stepsExpanded, setStepsExpanded] = useState(true);
+  
+  // Get the active step details
+  const currentStep = scriptData.scriptSteps.find(step => step.id === activeStep);
+  
+  // Function to run the script
+  const runScript = () => {
+    setRunningScript(true);
+    setTimeout(() => {
+      setRunningScript(false);
+      
+      // Update the active step and next step status
+      const currentIndex = scriptData.scriptSteps.findIndex(step => step.id === activeStep);
+      if (currentIndex < scriptData.scriptSteps.length - 1) {
+        scriptData.scriptSteps[currentIndex].status = 'complete';
+        scriptData.scriptSteps[currentIndex + 1].status = 'active';
+        setActiveStep(scriptData.scriptSteps[currentIndex + 1].id);
+      } else {
+        scriptData.scriptSteps[currentIndex].status = 'complete';
+      }
+    }, 2000);
+  };
+  
+  return (
+    <div className="flex h-full bg-gray-900 text-white">
+      {/* Left Sidebar - Script Navigation */}
+      <div className="w-72 bg-gray-800 border-r border-gray-700 flex flex-col">
+        {/* Script Groups Section */}
+        <div className="border-b border-gray-700">
+          <div 
+            className="p-3 flex items-center justify-between cursor-pointer hover:bg-gray-750"
+            onClick={() => setScriptsExpanded(!scriptsExpanded)}
+          >
+            <div className="flex items-center">
+              <Workflow size={16} className="mr-2 text-blue-400" />
+              <h2 className="font-medium">Script Groups</h2>
+            </div>
+            {scriptsExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+          </div>
+          
+          {scriptsExpanded && (
+            <div className="px-2 pb-2">
+              {scriptData.scriptGroups.map((group) => (
+                <button 
+                  key={group.id}
+                  className={`w-full text-left px-3 py-2 rounded text-sm ${group.active ? 'bg-blue-600 text-white' : 'hover:bg-gray-700'}`}
+                >
+                  {group.name}
+                </button>
+              ))}
+              <button className="w-full mt-1 text-center px-3 py-1.5 rounded border border-dashed border-gray-600 text-gray-400 hover:bg-gray-700 hover:text-white text-xs">
+                + Add Script Group
+              </button>
+            </div>
+          )}
+        </div>
+        
+        {/* Script Steps Section */}
+        <div className="flex-1 overflow-y-auto">
+          <div 
+            className="p-3 flex items-center justify-between cursor-pointer hover:bg-gray-750 border-b border-gray-700"
+            onClick={() => setStepsExpanded(!stepsExpanded)}
+          >
+            <div className="flex items-center">
+              <FileText size={16} className="mr-2 text-blue-400" />
+              <h2 className="font-medium">Script Steps</h2>
+            </div>
+            {stepsExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+          </div>
+          
+          {stepsExpanded && (
+            <div className="p-2">
+              {scriptData.scriptSteps.map((step) => (
+                <div 
+                  key={step.id}
+                  className={`flex items-center p-2 rounded text-sm cursor-pointer ${
+                    activeStep === step.id 
+                      ? 'bg-blue-900 bg-opacity-50' 
+                      : 'hover:bg-gray-700'
+                  } ${
+                    step.status === 'complete' 
+                      ? 'text-green-400' 
+                      : step.status === 'active'
+                        ? 'text-white'
+                        : 'text-gray-500'
+                  }`}
+                  onClick={() => setActiveStep(step.id)}
+                >
+                  {step.status === 'complete' ? (
+                    <CheckCircle size={14} className="mr-2 text-green-500" />
+                  ) : step.status === 'active' ? (
+                    <Circle size={14} className="mr-2 text-blue-500" />
+                  ) : (
+                    <Circle size={14} className="mr-2 text-gray-500" />
+                  )}
+                  <span>{step.name}</span>
+                </div>
+              ))}
+              <button className="w-full mt-2 text-center px-3 py-2 rounded border border-dashed border-gray-600 text-gray-400 hover:bg-gray-700 hover:text-white text-xs">
+                + Add Script Step
+              </button>
+              
+              <div className="mt-4 p-3 bg-gray-900 rounded">
+                <h3 className="text-sm font-medium text-blue-400 mb-2">Available Queries</h3>
+                <div className="space-y-1 text-sm max-h-40 overflow-y-auto">
+                  {scriptData.sqlQueries.map((query, index) => (
+                    <div key={index} className="px-2 py-1 rounded hover:bg-gray-700 cursor-pointer">
+                      <Database size={12} className="inline-block mr-1.5 text-gray-400" />
+                      {query.name}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+      
+      {/* Main Content - Script Step Editor */}
+      <div className="flex-1 flex flex-col">
+        {/* Editor Header */}
+        <div className="p-4 border-b border-gray-700 flex justify-between items-center">
+          <div>
+            <h1 className="text-xl font-bold flex items-center">
+              <Code size={20} className="mr-2 text-blue-400" />
+              Script Step: {currentStep?.name}
+            </h1>
+            <p className="text-sm text-gray-400 mt-1">
+              {currentStep?.type === 'compute' && 'Creates a new variable based on existing data'}
+              {currentStep?.type === 'group' && 'Groups records based on a common attribute'}
+              {currentStep?.type === 'combine' && 'Combines multiple attributes into a new attribute'}
+            </p>
+          </div>
+          <div className="flex space-x-2">
+            <button 
+              className={`px-4 py-1.5 rounded flex items-center space-x-1 ${
+                runningScript 
+                  ? 'bg-green-700 text-white cursor-wait' 
+                  : 'bg-blue-600 text-white hover:bg-blue-700'
+              }`}
+              onClick={runScript}
+              disabled={runningScript}
+            >
+              {runningScript ? (
+                <>
+                  <div className="h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-1"></div>
+                  <span>Running...</span>
+                </>
+              ) : (
+                <>
+                  <Play size={16} className="mr-1" />
+                  <span>Run Step</span>
+                </>
+              )}
+            </button>
+            <button className="px-4 py-1.5 bg-gray-700 text-white rounded hover:bg-gray-600 flex items-center">
+              <Sliders size={16} className="mr-1" />
+              <span>Configure</span>
+            </button>
+          </div>
+        </div>
+        
+        {/* Script Content */}
+        <div className="flex-1 p-4 overflow-y-auto">
+          <div className="grid grid-cols-2 gap-6">
+            {/* Left Column - Code Editor */}
+            <div>
+              <div className="bg-gray-800 rounded-lg p-4 mb-4">
+                <div className="flex justify-between items-center mb-3">
+                  <h3 className
