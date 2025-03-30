@@ -1,1229 +1,1222 @@
-import { Property } from '@shared/schema';
-import { calculateDistance } from './spatialAnalysisService';
+import { Property } from '@/shared/schema';
 
 /**
- * Interface for regression model results
- */
-export interface RegressionModel {
-  coefficients: Record<string, number>;
-  intercept: number;
-  rSquared: number;
-  adjustedRSquared: number;
-  fStatistic: number;
-  pValue: number;
-  observations: number;
-  standardErrors: Record<string, number>;
-  tValues: Record<string, number>;
-  pValues: Record<string, number>;
-  usedVariables: string[];
-  targetVariable: string;
-  residuals: number[];
-  predictedValues: number[];
-  actualValues: number[];
-  diagnostics: {
-    collinearity: boolean;
-    vif: Record<string, number>;
-    missingValueCount: number;
-    noSignificantVariables: boolean;
-    heteroskedasticity: boolean;
-    spatialAutocorrelation: boolean;
-  };
-  usedObservations: number;
-  dataMean: number;
-  dataStd: number;
-  modelName?: string;
-  createdAt?: Date;
-}
-
-/**
- * Interface for GWR regression results
- */
-export interface GWRegressionModel extends RegressionModel {
-  localCoefficients: Array<Record<string, number>>;
-  localIntercepts: number[];
-  localRSquared: number[];
-  globalRSquared: number;
-  bandwidth: number;
-  kernel: string;
-  coordinates: Array<[number, number]>;
-}
-
-/**
- * Kernel types for GWR
+ * Kernel type for weighted regression and GWR
  */
 export enum KernelType {
-  GAUSSIAN = 'gaussian',
-  EXPONENTIAL = 'exponential',
-  BISQUARE = 'bisquare',
-  TRICUBE = 'tricube',
-  BOXCAR = 'boxcar'
+  Gaussian = 'gaussian',
+  Bisquare = 'bisquare',
+  Tricube = 'tricube',
+  Exponential = 'exponential'
 }
 
 /**
- * Options for regression calculations
+ * Data transformation types
  */
-export interface RegressionOptions {
-  weighted?: boolean;
-  weights?: number[];
-  robust?: boolean;
-  spatialLag?: boolean;
-  spatialError?: boolean;
-  gwr?: boolean;
-  gwrOptions?: {
-    bandwidth?: number;
-    kernel?: KernelType;
-    adaptive?: boolean;
-  };
+export enum TransformType {
+  None = 'none',
+  Log = 'log',
+  Sqrt = 'sqrt',
+  Square = 'square',
+  Inverse = 'inverse'
 }
 
 /**
- * Transforms a dataset into a design matrix for regression
- * @param properties Array of properties
- * @param variables Array of variable names to include
- * @returns Object containing X matrix, y vector, and column names
+ * Interface for a regression model
  */
-export function createDesignMatrix(
-  properties: Property[],
-  targetVariable: string,
-  variables: string[]
-) {
-  // Filter out properties with missing values in target or any independent variables
-  const validProperties = properties.filter(property => {
-    const targetValue = getPropertyValue(property, targetVariable);
-    if (targetValue === null || targetValue === undefined) return false;
-
-    for (const variable of variables) {
-      const value = getPropertyValue(property, variable);
-      if (value === null || value === undefined) return false;
-    }
-
-    return true;
-  });
-
-  const n = validProperties.length;
-  const p = variables.length + 1; // +1 for intercept
-
-  // Create empty matrices
-  const X = Array(n).fill(0).map(() => Array(p).fill(0));
-  const y = Array(n).fill(0);
-  const columnNames = ['intercept', ...variables];
-
-  // Fill matrices
-  for (let i = 0; i < n; i++) {
-    // Set intercept to 1
-    X[i][0] = 1;
-
-    // Set independent variables
-    for (let j = 0; j < variables.length; j++) {
-      X[i][j + 1] = parseFloat(String(getPropertyValue(validProperties[i], variables[j])));
-    }
-
-    // Set target variable
-    y[i] = parseFloat(String(getPropertyValue(validProperties[i], targetVariable)));
-  }
-
-  return {
-    X,
-    y,
-    columnNames,
-    properties: validProperties
-  };
-}
-
-/**
- * Gets a value from a property by path
- * @param property Property object
- * @param path Path to property (e.g. 'landValue', 'attributes.someProp')
- * @returns Value at path or undefined
- */
-function getPropertyValue(property: Property, path: string): any {
-  const parts = path.split('.');
-  let current: any = property;
-
-  for (const part of parts) {
-    if (current === undefined || current === null) return undefined;
-    current = current[part];
-  }
-
-  return current;
-}
-
-/**
- * Calculates the transpose of a matrix
- * @param matrix Input matrix
- * @returns Transposed matrix
- */
-function transpose(matrix: number[][]): number[][] {
-  const rows = matrix.length;
-  const cols = matrix[0].length;
-  const result = Array(cols).fill(0).map(() => Array(rows).fill(0));
-
-  for (let i = 0; i < rows; i++) {
-    for (let j = 0; j < cols; j++) {
-      result[j][i] = matrix[i][j];
-    }
-  }
-
-  return result;
-}
-
-/**
- * Multiplies two matrices
- * @param a First matrix
- * @param b Second matrix
- * @returns Result of a * b
- */
-function matrixMultiply(a: number[][], b: number[][]): number[][] {
-  const rowsA = a.length;
-  const colsA = a[0].length;
-  const rowsB = b.length;
-  const colsB = b[0].length;
-
-  if (colsA !== rowsB) {
-    throw new Error('Matrix dimensions do not match for multiplication');
-  }
-
-  const result = Array(rowsA).fill(0).map(() => Array(colsB).fill(0));
-
-  for (let i = 0; i < rowsA; i++) {
-    for (let j = 0; j < colsB; j++) {
-      for (let k = 0; k < colsA; k++) {
-        result[i][j] += a[i][k] * b[k][j];
-      }
-    }
-  }
-
-  return result;
-}
-
-/**
- * Matrix-vector multiplication
- * @param matrix Matrix
- * @param vector Vector
- * @returns Result of matrix * vector
- */
-function matrixVectorMultiply(matrix: number[][], vector: number[]): number[] {
-  const rows = matrix.length;
-  const cols = matrix[0].length;
-
-  if (cols !== vector.length) {
-    throw new Error('Matrix dimensions do not match for multiplication');
-  }
-
-  const result = Array(rows).fill(0);
-
-  for (let i = 0; i < rows; i++) {
-    for (let j = 0; j < cols; j++) {
-      result[i] += matrix[i][j] * vector[j];
-    }
-  }
-
-  return result;
-}
-
-/**
- * Inverts a matrix using Gaussian elimination
- * @param matrix Square matrix to invert
- * @returns Inverted matrix
- */
-function invertMatrix(matrix: number[][]): number[][] {
-  const n = matrix.length;
-
-  // Create augmented matrix [A|I]
-  const augmented = [];
-  for (let i = 0; i < n; i++) {
-    augmented[i] = [...matrix[i]];
-    for (let j = 0; j < n; j++) {
-      augmented[i].push(i === j ? 1 : 0);
-    }
-  }
-
-  // Gaussian elimination (forward elimination)
-  for (let i = 0; i < n; i++) {
-    // Find pivot
-    let maxRow = i;
-    for (let j = i + 1; j < n; j++) {
-      if (Math.abs(augmented[j][i]) > Math.abs(augmented[maxRow][i])) {
-        maxRow = j;
-      }
-    }
-
-    // Swap rows
-    [augmented[i], augmented[maxRow]] = [augmented[maxRow], augmented[i]];
-
-    // Check for singularity
-    if (Math.abs(augmented[i][i]) < 1e-10) {
-      throw new Error('Matrix is singular and cannot be inverted');
-    }
-
-    // Scale row i to make pivot 1
-    const pivot = augmented[i][i];
-    for (let j = i; j < 2 * n; j++) {
-      augmented[i][j] /= pivot;
-    }
-
-    // Eliminate other rows
-    for (let j = 0; j < n; j++) {
-      if (j === i) continue;
-      const factor = augmented[j][i];
-      for (let k = i; k < 2 * n; k++) {
-        augmented[j][k] -= factor * augmented[i][k];
-      }
-    }
-  }
-
-  // Extract the inverse
-  const inverse = Array(n).fill(0).map(() => Array(n).fill(0));
-  for (let i = 0; i < n; i++) {
-    for (let j = 0; j < n; j++) {
-      inverse[i][j] = augmented[i][j + n];
-    }
-  }
-
-  return inverse;
-}
-
-/**
- * Calculates the mean of an array
- * @param array Input array
- * @returns Mean value
- */
-function mean(array: number[]): number {
-  return array.reduce((a, b) => a + b, 0) / array.length;
-}
-
-/**
- * Calculates the standard deviation of an array
- * @param array Input array
- * @returns Standard deviation
- */
-function standardDeviation(array: number[]): number {
-  const avg = mean(array);
-  const squareDiffs = array.map(value => Math.pow(value - avg, 2));
-  return Math.sqrt(mean(squareDiffs));
-}
-
-/**
- * Calculates OLS regression
- * @param properties Array of properties
- * @param targetVariable Name of target variable
- * @param variables Array of independent variable names
- * @param options Regression options
- * @returns Regression model results
- */
-export function calculateOLSRegression(
-  properties: Property[],
-  targetVariable: string,
-  variables: string[],
-  options: RegressionOptions = {}
-): RegressionModel {
-  // Check for sufficient observations
-  if (properties.length <= variables.length + 1) {
-    throw new Error('Insufficient observations for regression');
-  }
-
-  // Create design matrix
-  const { X, y, columnNames, properties: validProperties } = createDesignMatrix(
-    properties,
-    targetVariable,
-    variables
-  );
-
-  const n = X.length; // Number of observations
-  const p = X[0].length; // Number of parameters (including intercept)
-
-  if (n <= p) {
-    throw new Error('Insufficient observations for regression');
-  }
-
-  // Calculate regression coefficients: β = (X'X)^-1 X'y
-  const XT = transpose(X);
-  const XTX = matrixMultiply(XT, X);
-  const XTXInv = invertMatrix(XTX);
-  const XTy = matrixVectorMultiply(XT, y);
-  const beta = matrixVectorMultiply(XTXInv, XTy);
-
-  // Extract coefficients
-  const intercept = beta[0];
-  const coefficients: Record<string, number> = {};
-  for (let i = 1; i < columnNames.length; i++) {
-    coefficients[columnNames[i]] = beta[i];
-  }
-
-  // Calculate fitted values
-  const yHat = matrixVectorMultiply(X, beta);
-
-  // Calculate residuals
-  const residuals = y.map((actual, i) => actual - yHat[i]);
-
-  // Calculate total sum of squares
-  const yMean = mean(y);
-  const TSS = y.reduce((sum, val) => sum + Math.pow(val - yMean, 2), 0);
-
-  // Calculate residual sum of squares
-  const RSS = residuals.reduce((sum, val) => sum + Math.pow(val, 2), 0);
-
-  // Calculate explained sum of squares
-  const ESS = TSS - RSS;
-
-  // Calculate R-squared
-  const rSquared = ESS / TSS;
-
-  // Calculate adjusted R-squared
-  const adjustedRSquared = 1 - ((1 - rSquared) * (n - 1) / (n - p));
-
-  // Calculate F-statistic
-  const fStatistic = (ESS / (p - 1)) / (RSS / (n - p));
-
-  // Calculate p-value of F-statistic (approximation)
-  const pValue = 1 - fDistributionCDF(fStatistic, p - 1, n - p);
-
-  // Calculate standard errors of coefficients
-  const MSE = RSS / (n - p); // Mean square error
-  const varBeta = XTXInv.map(row => row.map(val => val * MSE));
-  const standardErrors: Record<string, number> = {};
-  for (let i = 1; i < columnNames.length; i++) {
-    standardErrors[columnNames[i]] = Math.sqrt(varBeta[i][i]);
-  }
-
-  // Calculate t-values
-  const tValues: Record<string, number> = {};
-  for (const variable of variables) {
-    tValues[variable] = coefficients[variable] / standardErrors[variable];
-  }
-
-  // Calculate p-values
-  const pValues: Record<string, number> = {};
-  for (const variable of variables) {
-    const tAbs = Math.abs(tValues[variable]);
-    pValues[variable] = 2 * (1 - tDistributionCDF(tAbs, n - p));
-  }
-
-  // Check for multicollinearity using VIF
-  const vif: Record<string, number> = {};
-  for (let i = 1; i < variables.length + 1; i++) {
-    // Create X matrix without the current variable
-    const Xreduced = X.map(row => [...row.slice(0, i), ...row.slice(i + 1)]);
-    const XReducedT = transpose(Xreduced);
-    const XReducedTXReduced = matrixMultiply(XReducedT, Xreduced);
-    
-    try {
-      const XReducedTXReducedInv = invertMatrix(XReducedTXReduced);
-      const XReduced_i = X.map(row => row[i]);
-      const XReducedTXReduced_i = matrixVectorMultiply(XReducedT, XReduced_i);
-      const result = matrixVectorMultiply(XReducedTXReducedInv, XReducedTXReduced_i);
-      const R2 = matrixVectorMultiply(result, matrixVectorMultiply(XReducedT, XReduced_i)) / matrixVectorMultiply(X.map(row => row[i]), X.map(row => row[i]));
-      vif[variables[i - 1]] = 1 / (1 - R2);
-    } catch (e) {
-      // If matrix is singular, VIF is infinite (perfect multicollinearity)
-      vif[variables[i - 1]] = Infinity;
-    }
-  }
-
-  // Determine if there's collinearity
-  const collinearity = Object.values(vif).some(v => v > 10);
-
-  // Check if any variables are significant
-  const noSignificantVariables = Object.values(pValues).every(p => p > 0.05);
-
-  // Check for heteroskedasticity (Breusch-Pagan test)
-  const residualsSquared = residuals.map(r => r * r);
-  const residualsMean = mean(residualsSquared);
-  const normalizedResiduals = residualsSquared.map(r => r / residualsMean);
+export interface RegressionModel {
+  id?: number;
+  targetVariable: string;
+  usedVariables: string[];
+  coefficients: { [key: string]: number };
+  standardErrors: { [key: string]: number };
+  tValues: { [key: string]: number };
+  pValues: { [key: string]: number };
+  rSquared: number;
+  adjustedRSquared: number;
+  akaikeInformationCriterion: number;
+  rootMeanSquareError: number;
+  meanAbsoluteError: number;
+  meanAbsolutePercentageError: number;
+  actualValues: number[];
+  predictedValues: number[];
+  residuals: number[];
+  regressionType: string;
+  modelName?: string;
+  createdAt?: Date;
+  updatedAt?: Date;
   
-  // Use X matrix for auxiliary regression
-  const auxReg = calculateSimpleRegression(X, normalizedResiduals);
-  const bpStatistic = auxReg.rSquared * n;
-  const bpPvalue = 1 - chiSquareCDF(bpStatistic, p - 1);
-  const heteroskedasticity = bpPvalue < 0.05;
+  // Optional diagnostics
+  diagnostics?: {
+    normality?: {
+      statistic: number;
+      pValue: number;
+      normal: boolean;
+    };
+    heteroscedasticity?: {
+      statistic: number;
+      pValue: number;
+      homoscedastic: boolean;
+    };
+    multicollinearity?: {
+      varianceInflationFactors: { [key: string]: number };
+      hasMulticollinearity: boolean;
+    };
+    spatialAutocorrelation?: {
+      moransI: number;
+      pValue: number;
+      hasAutocorrelation: boolean;
+    };
+  };
+}
 
-  // Check for spatial autocorrelation in residuals (simplified Moran's I)
-  let spatialAutocorrelation = false;
-  if (validProperties.length > 0 && 
-      'latitude' in validProperties[0] && 
-      'longitude' in validProperties[0]) {
-    
-    // Calculate spatial weights matrix (simplified - using inverse distance)
-    const coords = validProperties.map(p => [p.latitude!, p.longitude!]);
-    const W: number[][] = Array(n).fill(0).map(() => Array(n).fill(0));
-    
+/**
+ * Model configuration for regression
+ */
+export interface RegressionModelConfig {
+  modelName?: string;
+  kernelType?: KernelType;
+  distanceMetric?: 'euclidean' | 'manhattan' | 'haversine';
+  bandwidth?: number;
+  adaptiveBandwidth?: boolean;
+  spatialWeights?: boolean;
+  polynomialDegree?: number;
+  includeInteractions?: boolean;
+  weightVariable?: string | null;
+  dataTransforms?: { [key: string]: TransformType };
+  robustStandardErrors?: boolean;
+}
+
+/**
+ * Calculate spatial weights matrix based on property locations
+ */
+function calculateSpatialWeights(
+  properties: Property[],
+  bandwidth = 0.15,
+  adaptiveBandwidth = false,
+  kernelType: KernelType = KernelType.Gaussian,
+  distanceMetric: 'euclidean' | 'manhattan' | 'haversine' = 'euclidean'
+): number[][] {
+  const n = properties.length;
+  const weights: number[][] = Array(n).fill(0).map(() => Array(n).fill(0));
+  
+  // Calculate distances between all properties
+  const distances: number[][] = [];
+  for (let i = 0; i < n; i++) {
+    distances[i] = [];
+    for (let j = 0; j < n; j++) {
+      if (i === j) {
+        distances[i][j] = 0;
+      } else {
+        distances[i][j] = calculateDistance(properties[i], properties[j], distanceMetric);
+      }
+    }
+  }
+  
+  // If adaptive bandwidth, calculate bandwidth for each location
+  const bandwidths: number[] = [];
+  if (adaptiveBandwidth) {
     for (let i = 0; i < n; i++) {
-      for (let j = 0; j < n; j++) {
-        if (i !== j) {
-          const dist = calculateDistance(
-            {lat: coords[i][0], lng: coords[i][1]},
-            {lat: coords[j][0], lng: coords[j][1]}
-          );
-          W[i][j] = 1 / (dist + 0.0001); // Add small constant to avoid division by zero
-        }
-      }
+      // Sort distances for this location
+      const sortedDists = [...distances[i]].sort((a, b) => a - b);
+      // Use the kth nearest neighbor distance as bandwidth
+      const k = Math.max(10, Math.floor(n * bandwidth));
+      bandwidths[i] = sortedDists[Math.min(k, n - 1)];
     }
-    
-    // Row-normalize the weights matrix
-    for (let i = 0; i < n; i++) {
-      const rowSum = W[i].reduce((a, b) => a + b, 0);
-      if (rowSum > 0) {
-        for (let j = 0; j < n; j++) {
-          W[i][j] /= rowSum;
-        }
-      }
-    }
-    
-    // Calculate Moran's I
-    const residualMean = mean(residuals);
-    const numerator = residuals.reduce((sum, ri, i) => {
-      return sum + residuals.reduce((innerSum, rj, j) => {
-        return innerSum + W[i][j] * (ri - residualMean) * (rj - residualMean);
-      }, 0);
-    }, 0);
-    
-    const denominator = residuals.reduce((sum, r) => sum + Math.pow(r - residualMean, 2), 0);
-    const moransI = (n / W.flat().reduce((a, b) => a + b, 0)) * (numerator / denominator);
-    
-    // Expected value of Moran's I under null hypothesis
-    const expectedI = -1 / (n - 1);
-    
-    // Simplified variance calculation
-    const s1 = 0.5 * W.flat().reduce((sum, w) => sum + Math.pow(w + W.flat()[0], 2), 0);
-    const s2 = W.reduce((sum, row, i) => sum + Math.pow(row.reduce((a, b) => a + b, 0) + W.map(r => r[i]).reduce((a, b) => a + b, 0), 2), 0);
-    const s0 = W.flat().reduce((a, b) => a + b, 0);
-    
-    const varI = (n * ((n*n - 3*n + 3)*s1 - n*s2 + 3*s0*s0) - 
-                  (n*n - n)*s1 - 2*n*s2 + 6*s0*s0) / 
-                 ((n - 1)*(n - 2)*(n - 3)*s0*s0);
-    
-    // Z-score
-    const zScore = (moransI - expectedI) / Math.sqrt(varI);
-    
-    // p-value (two-tailed test)
-    const pValueMoransI = 2 * (1 - normalCDF(Math.abs(zScore)));
-    
-    spatialAutocorrelation = pValueMoransI < 0.05;
   }
-
-  // Return regression model
-  return {
-    coefficients,
-    intercept,
-    rSquared,
-    adjustedRSquared,
-    fStatistic,
-    pValue,
-    observations: n,
-    standardErrors,
-    tValues,
-    pValues,
-    usedVariables: variables,
-    targetVariable,
-    residuals,
-    predictedValues: yHat,
-    actualValues: y,
-    diagnostics: {
-      collinearity,
-      vif,
-      missingValueCount: properties.length - validProperties.length,
-      noSignificantVariables,
-      heteroskedasticity,
-      spatialAutocorrelation
-    },
-    usedObservations: validProperties.length,
-    dataMean: yMean,
-    dataStd: standardDeviation(y)
-  };
-}
-
-/**
- * Helper function to calculate simple regression for auxiliary tests
- */
-function calculateSimpleRegression(X: number[][], y: number[]) {
-  const n = X.length;
-  const p = X[0].length;
   
-  // Calculate regression coefficients: β = (X'X)^-1 X'y
-  const XT = transpose(X);
-  const XTX = matrixMultiply(XT, X);
-  const XTXInv = invertMatrix(XTX);
-  const XTy = matrixVectorMultiply(XT, y);
-  const beta = matrixVectorMultiply(XTXInv, XTy);
-  
-  // Calculate fitted values
-  const yHat = matrixVectorMultiply(X, beta);
-  
-  // Calculate residuals
-  const residuals = y.map((actual, i) => actual - yHat[i]);
-  
-  // Calculate total sum of squares
-  const yMean = mean(y);
-  const TSS = y.reduce((sum, val) => sum + Math.pow(val - yMean, 2), 0);
-  
-  // Calculate residual sum of squares
-  const RSS = residuals.reduce((sum, val) => sum + Math.pow(val, 2), 0);
-  
-  // Calculate explained sum of squares
-  const ESS = TSS - RSS;
-  
-  // Calculate R-squared
-  const rSquared = ESS / TSS;
-  
-  return { beta, rSquared };
-}
-
-/**
- * Calculate Geographical Weighted Regression
- * @param properties Array of properties
- * @param targetVariable Name of target variable
- * @param variables Array of independent variable names
- * @param options GWR options
- * @returns GWR model results
- */
-export function calculateGWRRegression(
-  properties: Property[],
-  targetVariable: string,
-  variables: string[],
-  options: {
-    bandwidth?: number;
-    kernel?: KernelType;
-    adaptive?: boolean;
-  } = {}
-): GWRegressionModel {
-  // Create design matrix
-  const { X, y, columnNames, properties: validProperties } = createDesignMatrix(
-    properties,
-    targetVariable,
-    variables
-  );
-
-  const n = X.length; // Number of observations
-  const p = X[0].length; // Number of parameters (including intercept)
-
-  if (n <= p) {
-    throw new Error('Insufficient observations for GWR');
-  }
-
-  // Get coordinates
-  if (!validProperties.every(p => p.latitude !== null && p.longitude !== null)) {
-    throw new Error('All properties must have coordinates for GWR');
-  }
-
-  const coordinates = validProperties.map(p => [p.latitude!, p.longitude!] as [number, number]);
-
-  // Set defaults
-  const bandwidth = options.bandwidth || Math.sqrt(n) * 0.1; // Default 10% of sqrt(n)
-  const kernel = options.kernel || KernelType.GAUSSIAN;
-  const adaptive = options.adaptive !== undefined ? options.adaptive : false;
-
-  // Arrays to store local results
-  const localCoefficients: Array<Record<string, number>> = [];
-  const localIntercepts: number[] = [];
-  const localRSquared: number[] = [];
-
-  // For each point, fit a weighted regression
+  // Calculate weights
   for (let i = 0; i < n; i++) {
-    // Calculate weights for this regression point
-    const weights = calculateGWRWeights(coordinates, i, bandwidth, kernel, adaptive);
-
-    // Apply weights to X and y
-    const weightedX = X.map((row, idx) => row.map(val => val * weights[idx]));
-    const weightedY = y.map((val, idx) => val * weights[idx]);
-
-    // Calculate regression coefficients: β = (X'WX)^-1 X'Wy
-    const XT = transpose(weightedX);
-    const XTX = matrixMultiply(XT, weightedX);
-    const XTXInv = invertMatrix(XTX);
-    const XTy = matrixVectorMultiply(XT, weightedY);
-    const beta = matrixVectorMultiply(XTXInv, XTy);
-
-    // Store local results
-    localIntercepts.push(beta[0]);
-    const coefs: Record<string, number> = {};
-    for (let j = 1; j < columnNames.length; j++) {
-      coefs[columnNames[j]] = beta[j];
+    for (let j = 0; j < n; j++) {
+      const b = adaptiveBandwidth ? bandwidths[i] : bandwidth;
+      weights[i][j] = calculateKernelWeight(distances[i][j], b, kernelType);
     }
-    localCoefficients.push(coefs);
-
-    // Calculate local R-squared
-    const yHat = matrixVectorMultiply(X, beta);
-    const weightedResiduals = y.map((actual, idx) => weights[idx] * Math.pow(actual - yHat[idx], 2));
-    const weightedTSS = y.map((val, idx) => weights[idx] * Math.pow(val - mean(weightedY) / mean(weights), 2));
-    
-    const RSS = weightedResiduals.reduce((a, b) => a + b, 0);
-    const TSS = weightedTSS.reduce((a, b) => a + b, 0);
-    
-    localRSquared.push(1 - (RSS / TSS));
-  }
-
-  // Calculate global model for comparison
-  const globalModel = calculateOLSRegression(
-    validProperties,
-    targetVariable,
-    variables
-  );
-
-  // Return GWR model
-  return {
-    ...globalModel,
-    localCoefficients,
-    localIntercepts,
-    localRSquared,
-    globalRSquared: globalModel.rSquared,
-    bandwidth,
-    kernel,
-    coordinates
-  };
-}
-
-/**
- * Calculate weights for GWR
- * @param coordinates Array of [lat, lng] coordinates
- * @param i Index of the regression point
- * @param bandwidth Bandwidth parameter
- * @param kernel Kernel type
- * @param adaptive Whether to use adaptive bandwidth
- * @returns Array of weights
- */
-function calculateGWRWeights(
-  coordinates: Array<[number, number]>,
-  i: number,
-  bandwidth: number,
-  kernel: KernelType,
-  adaptive: boolean
-): number[] {
-  const n = coordinates.length;
-  const weights = Array(n).fill(0);
-  
-  // Calculate distances from point i to all other points
-  const distances = coordinates.map(coord => 
-    calculateDistance(
-      {lat: coordinates[i][0], lng: coordinates[i][1]},
-      {lat: coord[0], lng: coord[1]}
-    )
-  );
-  
-  // For adaptive bandwidth, use the nth nearest neighbor distance
-  let effectiveBandwidth = bandwidth;
-  if (adaptive) {
-    const sortedDistances = [...distances].sort((a, b) => a - b);
-    effectiveBandwidth = sortedDistances[Math.floor(n * bandwidth)];
-  }
-  
-  // Apply kernel function to each distance
-  for (let j = 0; j < n; j++) {
-    const distance = distances[j];
-    weights[j] = kernelFunction(distance, effectiveBandwidth, kernel);
   }
   
   return weights;
 }
 
 /**
- * Kernel function for GWR
- * @param distance Distance
- * @param bandwidth Bandwidth parameter
- * @param kernel Kernel type
- * @returns Weight
+ * Calculate distance between two properties
  */
-function kernelFunction(
+function calculateDistance(
+  property1: Property,
+  property2: Property,
+  distanceMetric: 'euclidean' | 'manhattan' | 'haversine' = 'euclidean'
+): number {
+  // Need to ensure we have coordinates
+  const lat1 = property1.latitude ? parseFloat(property1.latitude.toString()) : 0;
+  const lon1 = property1.longitude ? parseFloat(property1.longitude.toString()) : 0;
+  const lat2 = property2.latitude ? parseFloat(property2.latitude.toString()) : 0;
+  const lon2 = property2.longitude ? parseFloat(property2.longitude.toString()) : 0;
+  
+  if (distanceMetric === 'euclidean') {
+    return Math.sqrt(Math.pow(lat1 - lat2, 2) + Math.pow(lon1 - lon2, 2));
+  } else if (distanceMetric === 'manhattan') {
+    return Math.abs(lat1 - lat2) + Math.abs(lon1 - lon2);
+  } else if (distanceMetric === 'haversine') {
+    // Haversine formula for calculating distance on a sphere (Earth)
+    const R = 6371; // Earth's radius in km
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+              Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+              Math.sin(dLon / 2) * Math.sin(dLon / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return R * c;
+  }
+  
+  return 0;
+}
+
+/**
+ * Calculate kernel weight based on distance
+ */
+function calculateKernelWeight(
   distance: number,
   bandwidth: number,
-  kernel: KernelType
+  kernelType: KernelType
 ): number {
-  const ratio = distance / bandwidth;
-  
-  if (ratio >= 1 && kernel !== KernelType.GAUSSIAN && kernel !== KernelType.EXPONENTIAL) {
+  if (distance > bandwidth) {
     return 0;
   }
   
-  switch (kernel) {
-    case KernelType.GAUSSIAN:
+  const ratio = distance / bandwidth;
+  
+  switch (kernelType) {
+    case KernelType.Gaussian:
       return Math.exp(-0.5 * Math.pow(ratio, 2));
-    case KernelType.EXPONENTIAL:
-      return Math.exp(-ratio);
-    case KernelType.BISQUARE:
+    case KernelType.Bisquare:
       return Math.pow(1 - Math.pow(ratio, 2), 2);
-    case KernelType.TRICUBE:
-      return Math.pow(1 - Math.pow(ratio, 3), 3);
-    case KernelType.BOXCAR:
-      return 1;
+    case KernelType.Tricube:
+      return Math.pow(1 - Math.pow(Math.abs(ratio), 3), 3);
+    case KernelType.Exponential:
+      return Math.exp(-ratio);
     default:
       return Math.exp(-0.5 * Math.pow(ratio, 2)); // Default to Gaussian
   }
 }
 
 /**
- * Approximate cumulative distribution function (CDF) of F distribution
- * @param x Value
- * @param d1 Degrees of freedom 1
- * @param d2 Degrees of freedom 2
- * @returns Probability
+ * Transform a value using the specified transformation
  */
-function fDistributionCDF(x: number, d1: number, d2: number): number {
-  // Use beta incomplete function approximation
-  const v1 = d1;
-  const v2 = d2;
-  const z = v1 * x / (v1 * x + v2);
-  
-  return betaIncomplete(z, v1/2, v2/2);
-}
-
-/**
- * Approximate incomplete beta function
- * @param x Value
- * @param a Alpha parameter
- * @param b Beta parameter
- * @returns Value of incomplete beta function
- */
-function betaIncomplete(x: number, a: number, b: number): number {
-  // Simple approximation for common cases
-  if (x === 0) return 0;
-  if (x === 1) return 1;
-  
-  // Use continued fraction approximation
-  const maxIterations = 100;
-  const epsilon = 1e-8;
-  
-  const front = Math.pow(x, a) * Math.pow(1 - x, b) / betaFunction(a, b);
-  
-  let C = 1;
-  let D = 1 - (a + b) * x / (a + 1);
-  if (Math.abs(D) < epsilon) D = epsilon;
-  D = 1 / D;
-  let H = D;
-  
-  for (let i = 1; i <= maxIterations; i++) {
-    const m = i >> 1; // integer division by 2
-    const numerator = i * (b - m) * x / ((a + 2*m - 1) * (a + 2*m));
-    const denominator = 1 + numerator * D;
-    
-    if (Math.abs(denominator) < epsilon) {
-      D = epsilon;
-    } else {
-      D = 1 / denominator;
-    }
-    
-    C = 1 + numerator / C;
-    if (Math.abs(C) < epsilon) {
-      C = epsilon;
-    }
-    
-    const delta = C * D;
-    H *= delta;
-    
-    if (Math.abs(delta - 1) < epsilon) {
-      break;
-    }
+function transformValue(value: number, transform: TransformType): number {
+  switch (transform) {
+    case TransformType.Log:
+      return Math.log(Math.max(0.0001, value));
+    case TransformType.Sqrt:
+      return Math.sqrt(Math.max(0, value));
+    case TransformType.Square:
+      return value * value;
+    case TransformType.Inverse:
+      return 1 / (Math.abs(value) < 0.0001 ? 0.0001 : value);
+    case TransformType.None:
+    default:
+      return value;
   }
-  
-  return 1 - front * H / a;
 }
 
 /**
- * Approximate beta function
- * @param a Alpha parameter
- * @param b Beta parameter
- * @returns Value of beta function
+ * Calculate OLS regression model
  */
-function betaFunction(a: number, b: number): number {
-  // Use gamma function approximation
-  return gammaFunction(a) * gammaFunction(b) / gammaFunction(a + b);
+export function calculateOLSRegression(
+  properties: Property[],
+  targetVariable: string,
+  independentVariables: string[],
+  config: RegressionModelConfig = {}
+): RegressionModel {
+  const { X, y } = extractDataArrays(properties, targetVariable, independentVariables, config);
+  
+  // Add intercept to X
+  const XWithIntercept = X.map(row => [1, ...row]);
+  
+  // Calculate coefficients and predictions
+  const betaCoefficients = performOLS(XWithIntercept, y);
+  
+  // Create variable names with intercept
+  const variableNames = ['(Intercept)', ...independentVariables];
+  
+  // Calculate predicted values and residuals
+  const predictedValues = XWithIntercept.map(row => 
+    row.reduce((sum, value, i) => sum + value * betaCoefficients[i], 0)
+  );
+  const residuals = y.map((actual, i) => actual - predictedValues[i]);
+  
+  // Calculate R-squared
+  const yMean = y.reduce((sum, val) => sum + val, 0) / y.length;
+  const totalSS = y.reduce((sum, val) => sum + Math.pow(val - yMean, 2), 0);
+  const residualSS = residuals.reduce((sum, val) => sum + val * val, 0);
+  const rSquared = 1 - (residualSS / totalSS);
+  
+  // Calculate adjusted R-squared
+  const n = y.length;
+  const p = independentVariables.length + 1; // +1 for intercept
+  const adjustedRSquared = 1 - ((1 - rSquared) * (n - 1) / (n - p));
+  
+  // Calculate AIC
+  const akaikeInformationCriterion = n * Math.log(residualSS / n) + 2 * p;
+  
+  // Calculate RMSE, MAE, and MAPE
+  const rootMeanSquareError = Math.sqrt(residualSS / n);
+  const meanAbsoluteError = residuals.reduce((sum, val) => sum + Math.abs(val), 0) / n;
+  const meanAbsolutePercentageError = y.reduce((sum, val, i) => {
+    const pctError = Math.abs(residuals[i] / val) * 100;
+    return sum + (isFinite(pctError) ? pctError : 0);
+  }, 0) / n;
+  
+  // Calculate standard errors, t-values, and p-values
+  const { standardErrors, tValues, pValues } = calculateModelDiagnostics(
+    XWithIntercept, y, betaCoefficients, residuals
+  );
+  
+  // Create coefficient mappings
+  const coefficients: { [key: string]: number } = {};
+  const stdErrorsMap: { [key: string]: number } = {};
+  const tValuesMap: { [key: string]: number } = {};
+  const pValuesMap: { [key: string]: number } = {};
+  
+  variableNames.forEach((name, i) => {
+    coefficients[name] = betaCoefficients[i];
+    stdErrorsMap[name] = standardErrors[i];
+    tValuesMap[name] = tValues[i];
+    pValuesMap[name] = pValues[i];
+  });
+  
+  const model: RegressionModel = {
+    targetVariable,
+    usedVariables: variableNames,
+    coefficients,
+    standardErrors: stdErrorsMap,
+    tValues: tValuesMap,
+    pValues: pValuesMap,
+    rSquared,
+    adjustedRSquared,
+    akaikeInformationCriterion,
+    rootMeanSquareError,
+    meanAbsoluteError,
+    meanAbsolutePercentageError,
+    actualValues: y,
+    predictedValues,
+    residuals,
+    regressionType: 'OLS',
+    modelName: config.modelName || 'OLS Regression Model',
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  };
+  
+  return model;
 }
 
 /**
- * Approximate gamma function using Lanczos approximation
- * @param z Input value
- * @returns Gamma function value
- */
-function gammaFunction(z: number): number {
-  // Coefficients for Lanczos approximation
-  const p = [
-    676.5203681218851,
-    -1259.1392167224028,
-    771.32342877765313,
-    -176.61502916214059,
-    12.507343278686905,
-    -0.13857109526572012,
-    9.9843695780195716e-6,
-    1.5056327351493116e-7
-  ];
-  
-  if (z < 0.5) {
-    // Reflection formula
-    return Math.PI / (Math.sin(Math.PI * z) * gammaFunction(1 - z));
-  }
-  
-  z -= 1;
-  let x = 0.99999999999980993;
-  for (let i = 0; i < p.length; i++) {
-    x += p[i] / (z + i + 1);
-  }
-  
-  const t = z + p.length - 0.5;
-  return Math.sqrt(2 * Math.PI) * Math.pow(t, z + 0.5) * Math.exp(-t) * x;
-}
-
-/**
- * Approximate chi-square CDF
- * @param x Value
- * @param k Degrees of freedom
- * @returns Probability
- */
-function chiSquareCDF(x: number, k: number): number {
-  // Chi-square is related to gamma distribution
-  const halfK = k / 2;
-  
-  // Use lower incomplete gamma function divided by gamma function
-  return lowerIncompleteGamma(halfK, x / 2) / gammaFunction(halfK);
-}
-
-/**
- * Approximate lower incomplete gamma function
- * @param s Shape parameter
- * @param x Upper bound
- * @returns Value of lower incomplete gamma function
- */
-function lowerIncompleteGamma(s: number, x: number): number {
-  // Use series expansion for small x
-  if (x < s + 1) {
-    let sum = 0;
-    let term = 1 / s;
-    
-    for (let i = 0; i < 100; i++) {
-      sum += term;
-      term *= x / (s + i + 1);
-      
-      if (term < 1e-10) break;
-    }
-    
-    return Math.pow(x, s) * Math.exp(-x) * sum;
-  }
-  
-  // Use continued fraction for large x
-  let a = 1 - s;
-  let b = a + x + 1;
-  let pn1 = 1;
-  let pn2 = x;
-  let pn3 = x + 1;
-  let pn4 = x * b;
-  
-  let ratio = pn3 / pn4;
-  
-  for (let i = 0; i < 100; i++) {
-    a++;
-    b += 2;
-    const an = a * (s - 1);
-    
-    pn1 = b * pn1 - an * pn2;
-    pn2 = b * pn2 - an * pn3;
-    pn3 = b * pn3 - an * pn4;
-    pn4 = b * pn4;
-    
-    if (Math.abs(pn3) > 1e10) {
-      pn1 /= pn3;
-      pn2 /= pn3;
-      pn3 = 1;
-      pn4 /= pn3;
-    }
-    
-    if (Math.abs(pn4) > 1e10) {
-      pn1 /= pn4;
-      pn2 /= pn4;
-      pn3 /= pn4;
-      pn4 = 1;
-    }
-    
-    const newRatio = pn3 / pn4;
-    
-    if (Math.abs(ratio - newRatio) < 1e-10) {
-      ratio = newRatio;
-      break;
-    }
-    
-    ratio = newRatio;
-  }
-  
-  return gammaFunction(s) - Math.pow(x, s) * Math.exp(-x) * ratio;
-}
-
-/**
- * Standard normal cumulative distribution function
- * @param z Z-score
- * @returns Probability
- */
-function normalCDF(z: number): number {
-  // Use error function
-  return 0.5 * (1 + erf(z / Math.sqrt(2)));
-}
-
-/**
- * Error function approximation
- * @param x Input value
- * @returns erf(x)
- */
-function erf(x: number): number {
-  // Constants
-  const a1 =  0.254829592;
-  const a2 = -0.284496736;
-  const a3 =  1.421413741;
-  const a4 = -1.453152027;
-  const a5 =  1.061405429;
-  const p  =  0.3275911;
-
-  // Save the sign
-  const sign = x < 0 ? -1 : 1;
-  x = Math.abs(x);
-
-  // Abramowitz and Stegun formula 7.1.26
-  const t = 1.0 / (1.0 + p * x);
-  const y = 1.0 - (((((a5 * t + a4) * t) + a3) * t + a2) * t + a1) * t * Math.exp(-x * x);
-
-  return sign * y;
-}
-
-/**
- * Student's t-distribution cumulative distribution function
- * @param t T-value
- * @param df Degrees of freedom
- * @returns Probability
- */
-function tDistributionCDF(t: number, df: number): number {
-  // Use relationship with beta incomplete function
-  const x = df / (df + t * t);
-  return 1 - 0.5 * betaIncomplete(x, df/2, 0.5);
-}
-
-/**
- * Calculate weighted regression
- * @param properties Array of properties
- * @param targetVariable Name of target variable
- * @param variables Array of independent variable names
- * @param weightFunction Function to calculate weight for each property
- * @returns Regression model results
+ * Calculate weighted regression model
  */
 export function calculateWeightedRegression(
   properties: Property[],
   targetVariable: string,
-  variables: string[],
-  weightFunction: (property: Property) => number
+  independentVariables: string[],
+  config: RegressionModelConfig = {}
 ): RegressionModel {
-  // Create design matrix
-  const { X, y, columnNames, properties: validProperties } = createDesignMatrix(
-    properties,
-    targetVariable,
-    variables
+  const { X, y } = extractDataArrays(properties, targetVariable, independentVariables, config);
+  
+  // Get weights from config or default to equal weights
+  let weights: number[] = [];
+  if (config.weightVariable && properties.length > 0) {
+    const firstProperty = properties[0];
+    if (firstProperty && firstProperty[config.weightVariable as keyof Property]) {
+      // Attempt to use the specified property field as weights
+      weights = properties.map(p => {
+        const value = p[config.weightVariable as keyof Property];
+        if (typeof value === 'number') return value;
+        if (typeof value === 'string') return parseFloat(value) || 1;
+        return 1;
+      });
+    }
+  }
+  
+  // Normalize weights
+  if (weights.length === 0) {
+    weights = new Array(properties.length).fill(1);
+  }
+  const weightSum = weights.reduce((sum, w) => sum + w, 0);
+  weights = weights.map(w => w * (weights.length / weightSum));
+  
+  // Add intercept to X
+  const XWithIntercept = X.map(row => [1, ...row]);
+  
+  // Calculate coefficients with weights
+  const betaCoefficients = performWeightedOLS(XWithIntercept, y, weights);
+  
+  // Create variable names with intercept
+  const variableNames = ['(Intercept)', ...independentVariables];
+  
+  // Calculate predicted values and residuals
+  const predictedValues = XWithIntercept.map(row => 
+    row.reduce((sum, value, i) => sum + value * betaCoefficients[i], 0)
   );
-
-  // Calculate weights
-  const weights = validProperties.map(p => weightFunction(p));
+  const residuals = y.map((actual, i) => actual - predictedValues[i]);
   
-  // Apply square root of weights to X and y
-  const sqrtWeights = weights.map(w => Math.sqrt(w));
-  const weightedX = X.map((row, i) => row.map(val => val * sqrtWeights[i]));
-  const weightedY = y.map((val, i) => val * sqrtWeights[i]);
+  // Calculate weighted R-squared (weighted version of OLS R-squared)
+  const weightedY = y.map((val, i) => val * weights[i]);
+  const weightedYMean = weightedY.reduce((sum, val) => sum + val, 0) / weights.reduce((sum, w) => sum + w, 0);
+  const weightedTotalSS = y.reduce((sum, val, i) => sum + weights[i] * Math.pow(val - weightedYMean, 2), 0);
+  const weightedResidualSS = residuals.reduce((sum, val, i) => sum + weights[i] * val * val, 0);
+  const rSquared = 1 - (weightedResidualSS / weightedTotalSS);
   
-  // Use OLS on weighted data
-  const n = weightedX.length; // Number of observations
-  const p = weightedX[0].length; // Number of parameters (including intercept)
-
-  // Calculate regression coefficients: β = (X'WX)^-1 X'Wy
-  const XT = transpose(weightedX);
-  const XTX = matrixMultiply(XT, weightedX);
-  const XTXInv = invertMatrix(XTX);
-  const XTy = matrixVectorMultiply(XT, weightedY);
-  const beta = matrixVectorMultiply(XTXInv, XTy);
-
-  // Extract coefficients
-  const intercept = beta[0];
-  const coefficients: Record<string, number> = {};
-  for (let i = 1; i < columnNames.length; i++) {
-    coefficients[columnNames[i]] = beta[i];
-  }
-
-  // Calculate fitted values (unweighted)
-  const yHat = matrixVectorMultiply(X, beta);
-
-  // Calculate residuals (unweighted)
-  const residuals = y.map((actual, i) => actual - yHat[i]);
-
-  // Calculate weighted residuals
-  const weightedResiduals = residuals.map((r, i) => r * weights[i]);
-
-  // Calculate total sum of squares (weighted)
-  const weightedYMean = weightedY.reduce((a, b) => a + b, 0) / sqrtWeights.reduce((a, b) => a + b, 0);
-  const TSS = y.map((val, i) => weights[i] * Math.pow(val - weightedYMean, 2)).reduce((a, b) => a + b, 0);
-
-  // Calculate residual sum of squares (weighted)
-  const RSS = weightedResiduals.reduce((sum, val) => sum + Math.pow(val, 2), 0);
-
-  // Calculate explained sum of squares
-  const ESS = TSS - RSS;
-
-  // Calculate R-squared
-  const rSquared = ESS / TSS;
-
   // Calculate adjusted R-squared
+  const n = y.length;
+  const p = independentVariables.length + 1; // +1 for intercept
   const adjustedRSquared = 1 - ((1 - rSquared) * (n - 1) / (n - p));
-
-  // Calculate F-statistic
-  const fStatistic = (ESS / (p - 1)) / (RSS / (n - p));
-
-  // Calculate p-value of F-statistic (approximation)
-  const pValue = 1 - fDistributionCDF(fStatistic, p - 1, n - p);
-
-  // Calculate standard errors of coefficients
-  const MSE = RSS / (n - p); // Mean square error
-  const varBeta = XTXInv.map(row => row.map(val => val * MSE));
-  const standardErrors: Record<string, number> = {};
-  for (let i = 1; i < columnNames.length; i++) {
-    standardErrors[columnNames[i]] = Math.sqrt(varBeta[i][i]);
-  }
-
-  // Calculate t-values
-  const tValues: Record<string, number> = {};
-  for (const variable of variables) {
-    tValues[variable] = coefficients[variable] / standardErrors[variable];
-  }
-
-  // Calculate p-values
-  const pValues: Record<string, number> = {};
-  for (const variable of variables) {
-    const tAbs = Math.abs(tValues[variable]);
-    pValues[variable] = 2 * (1 - tDistributionCDF(tAbs, n - p));
-  }
-
-  // Return regression model (similar to OLS but with weighted calculations)
-  return {
+  
+  // Calculate AIC for weighted regression
+  const akaikeInformationCriterion = n * Math.log(weightedResidualSS / n) + 2 * p;
+  
+  // Calculate weighted RMSE, MAE, and MAPE
+  const rootMeanSquareError = Math.sqrt(weightedResidualSS / n);
+  const meanAbsoluteError = residuals.reduce((sum, val, i) => sum + weights[i] * Math.abs(val), 0) / weights.reduce((sum, w) => sum + w, 0);
+  const meanAbsolutePercentageError = y.reduce((sum, val, i) => {
+    const pctError = Math.abs(residuals[i] / val) * 100;
+    return sum + weights[i] * (isFinite(pctError) ? pctError : 0);
+  }, 0) / weights.reduce((sum, w) => sum + w, 0);
+  
+  // Calculate standard errors, t-values, and p-values for weighted regression
+  const { standardErrors, tValues, pValues } = calculateModelDiagnostics(
+    XWithIntercept, y, betaCoefficients, residuals, weights
+  );
+  
+  // Create coefficient mappings
+  const coefficients: { [key: string]: number } = {};
+  const stdErrorsMap: { [key: string]: number } = {};
+  const tValuesMap: { [key: string]: number } = {};
+  const pValuesMap: { [key: string]: number } = {};
+  
+  variableNames.forEach((name, i) => {
+    coefficients[name] = betaCoefficients[i];
+    stdErrorsMap[name] = standardErrors[i];
+    tValuesMap[name] = tValues[i];
+    pValuesMap[name] = pValues[i];
+  });
+  
+  const model: RegressionModel = {
+    targetVariable,
+    usedVariables: variableNames,
     coefficients,
-    intercept,
+    standardErrors: stdErrorsMap,
+    tValues: tValuesMap,
+    pValues: pValuesMap,
     rSquared,
     adjustedRSquared,
-    fStatistic,
-    pValue,
-    observations: n,
-    standardErrors,
-    tValues,
-    pValues,
-    usedVariables: variables,
-    targetVariable,
-    residuals,
-    predictedValues: yHat,
+    akaikeInformationCriterion,
+    rootMeanSquareError,
+    meanAbsoluteError,
+    meanAbsolutePercentageError,
     actualValues: y,
-    diagnostics: {
-      collinearity: false, // Would need to recalculate VIF with weights
-      vif: {},
-      missingValueCount: properties.length - validProperties.length,
-      noSignificantVariables: Object.values(pValues).every(p => p > 0.05),
-      heteroskedasticity: false, // Would need weighted Breusch-Pagan test
-      spatialAutocorrelation: false // Would need weighted Moran's I
-    },
-    usedObservations: validProperties.length,
-    dataMean: mean(y),
-    dataStd: standardDeviation(y)
+    predictedValues,
+    residuals,
+    regressionType: 'Weighted',
+    modelName: config.modelName || 'Weighted Regression Model',
+    createdAt: new Date(),
+    updatedAt: new Date(),
   };
+  
+  return model;
+}
+
+/**
+ * Calculate geographically weighted regression model
+ */
+export function calculateGWRRegression(
+  properties: Property[],
+  targetVariable: string,
+  independentVariables: string[],
+  config: RegressionModelConfig = {}
+): RegressionModel {
+  const { X, y } = extractDataArrays(properties, targetVariable, independentVariables, config);
+  
+  // Add intercept to X
+  const XWithIntercept = X.map(row => [1, ...row]);
+  
+  // Calculate spatial weights
+  const spatialWeights = calculateSpatialWeights(
+    properties,
+    config.bandwidth || 0.15,
+    config.adaptiveBandwidth || false,
+    config.kernelType || KernelType.Gaussian,
+    config.distanceMetric || 'euclidean'
+  );
+  
+  // For GWR, we need local coefficients for each location
+  const n = properties.length;
+  const p = independentVariables.length + 1; // +1 for intercept
+  
+  // Calculate local coefficients for each location
+  const localCoefficients: number[][] = [];
+  for (let i = 0; i < n; i++) {
+    // Get weights for this location
+    const locationWeights = spatialWeights[i];
+    
+    // Calculate coefficients with these weights
+    const betaCoefficients = performWeightedOLS(XWithIntercept, y, locationWeights);
+    localCoefficients.push(betaCoefficients);
+  }
+  
+  // Calculate predicted values and residuals using local coefficients
+  const predictedValues = XWithIntercept.map((row, i) => 
+    row.reduce((sum, value, j) => sum + value * localCoefficients[i][j], 0)
+  );
+  const residuals = y.map((actual, i) => actual - predictedValues[i]);
+  
+  // Calculate R-squared for the whole model
+  const yMean = y.reduce((sum, val) => sum + val, 0) / y.length;
+  const totalSS = y.reduce((sum, val) => sum + Math.pow(val - yMean, 2), 0);
+  const residualSS = residuals.reduce((sum, val) => sum + val * val, 0);
+  const rSquared = 1 - (residualSS / totalSS);
+  
+  // Calculate adjusted R-squared (GWR adjustment is more complex - this is simplified)
+  const effectiveDOF = p * Math.sqrt(n); // Approximate effective degrees of freedom for GWR
+  const adjustedRSquared = 1 - ((1 - rSquared) * (n - 1) / (n - effectiveDOF));
+  
+  // Calculate AIC for GWR (approximation)
+  const akaikeInformationCriterion = n * Math.log(residualSS / n) + 2 * effectiveDOF;
+  
+  // Calculate RMSE, MAE, and MAPE
+  const rootMeanSquareError = Math.sqrt(residualSS / n);
+  const meanAbsoluteError = residuals.reduce((sum, val) => sum + Math.abs(val), 0) / n;
+  const meanAbsolutePercentageError = y.reduce((sum, val, i) => {
+    const pctError = Math.abs(residuals[i] / val) * 100;
+    return sum + (isFinite(pctError) ? pctError : 0);
+  }, 0) / n;
+  
+  // For simplicity, we'll average the local coefficients to get global estimates
+  const averageCoefficients = new Array(p).fill(0);
+  for (let j = 0; j < p; j++) {
+    for (let i = 0; i < n; i++) {
+      averageCoefficients[j] += localCoefficients[i][j];
+    }
+    averageCoefficients[j] /= n;
+  }
+  
+  // Create variable names with intercept
+  const variableNames = ['(Intercept)', ...independentVariables];
+  
+  // Calculate standard errors and t-values for average coefficients
+  const { standardErrors, tValues, pValues } = calculateModelDiagnostics(
+    XWithIntercept, y, averageCoefficients, residuals
+  );
+  
+  // Create coefficient mappings
+  const coefficients: { [key: string]: number } = {};
+  const stdErrorsMap: { [key: string]: number } = {};
+  const tValuesMap: { [key: string]: number } = {};
+  const pValuesMap: { [key: string]: number } = {};
+  
+  variableNames.forEach((name, i) => {
+    coefficients[name] = averageCoefficients[i];
+    stdErrorsMap[name] = standardErrors[i];
+    tValuesMap[name] = tValues[i];
+    pValuesMap[name] = pValues[i];
+  });
+  
+  const model: RegressionModel = {
+    targetVariable,
+    usedVariables: variableNames,
+    coefficients,
+    standardErrors: stdErrorsMap,
+    tValues: tValuesMap,
+    pValues: pValuesMap,
+    rSquared,
+    adjustedRSquared,
+    akaikeInformationCriterion,
+    rootMeanSquareError,
+    meanAbsoluteError,
+    meanAbsolutePercentageError,
+    actualValues: y,
+    predictedValues,
+    residuals,
+    regressionType: 'GWR',
+    modelName: config.modelName || 'Geographically Weighted Regression Model',
+    createdAt: new Date(),
+    updatedAt: new Date(),
+    
+    // Add spatial diagnostics
+    diagnostics: {
+      spatialAutocorrelation: {
+        moransI: calculateMoransI(residuals, spatialWeights),
+        pValue: 0.05, // Placeholder
+        hasAutocorrelation: false // Placeholder
+      }
+    }
+  };
+  
+  return model;
+}
+
+/**
+ * Extract data arrays from properties for regression
+ */
+function extractDataArrays(
+  properties: Property[],
+  targetVariable: string,
+  independentVariables: string[],
+  config: RegressionModelConfig = {}
+): { X: number[][], y: number[] } {
+  // Prepare arrays for independent (X) and dependent (y) variables
+  const X: number[][] = [];
+  const y: number[] = [];
+  
+  // Get transforms if specified
+  const transforms = config.dataTransforms || {};
+  
+  // Extract values from properties
+  for (const property of properties) {
+    // Extract dependent variable (targetVariable)
+    let yValue = 0;
+    if (property[targetVariable as keyof Property] !== undefined) {
+      const rawValue = property[targetVariable as keyof Property];
+      if (typeof rawValue === 'number') {
+        yValue = rawValue;
+      } else if (typeof rawValue === 'string') {
+        yValue = parseFloat(rawValue) || 0;
+      }
+    }
+    
+    // Apply transform to target variable if specified
+    if (transforms[targetVariable]) {
+      yValue = transformValue(yValue, transforms[targetVariable]);
+    }
+    
+    // Extract independent variables
+    const xRow: number[] = [];
+    for (const varName of independentVariables) {
+      let xValue = 0;
+      if (property[varName as keyof Property] !== undefined) {
+        const rawValue = property[varName as keyof Property];
+        if (typeof rawValue === 'number') {
+          xValue = rawValue;
+        } else if (typeof rawValue === 'string') {
+          xValue = parseFloat(rawValue) || 0;
+        }
+      }
+      
+      // Apply transform if specified
+      if (transforms[varName]) {
+        xValue = transformValue(xValue, transforms[varName]);
+      }
+      
+      xRow.push(xValue);
+    }
+    
+    X.push(xRow);
+    y.push(yValue);
+  }
+  
+  return { X, y };
+}
+
+/**
+ * Build design matrix and response vector for regression
+ */
+function buildDesignMatrix(
+  X: number[][],
+  polynomial = 1,
+  includeInteractions = false
+): number[][] {
+  const n = X.length;
+  const p = X[0].length;
+  const result: number[][] = [];
+  
+  for (let i = 0; i < n; i++) {
+    const row: number[] = [];
+    
+    // Include original variables
+    for (let j = 0; j < p; j++) {
+      row.push(X[i][j]);
+    }
+    
+    // Include polynomial terms up to the specified degree
+    if (polynomial > 1) {
+      for (let power = 2; power <= polynomial; power++) {
+        for (let j = 0; j < p; j++) {
+          row.push(Math.pow(X[i][j], power));
+        }
+      }
+    }
+    
+    // Include interaction terms if requested
+    if (includeInteractions && p > 1) {
+      for (let j = 0; j < p - 1; j++) {
+        for (let k = j + 1; k < p; k++) {
+          row.push(X[i][j] * X[i][k]);
+        }
+      }
+    }
+    
+    result.push(row);
+  }
+  
+  return result;
+}
+
+/**
+ * Perform ordinary least squares regression
+ */
+function performOLS(
+  X: number[][],
+  y: number[]
+): number[] {
+  // Transpose X for matrix operations
+  const Xt = matrixTranspose(X);
+  
+  // Calculate X'X
+  const XtX = matrixMultiply(Xt, X);
+  
+  // Calculate (X'X)^-1
+  const XtXInv = matrixInverse(XtX);
+  
+  // Calculate X'y
+  const Xty = matrixMultiply(Xt, [y])[0];
+  
+  // Calculate (X'X)^-1 X'y
+  return matrixMultiply(XtXInv, [Xty])[0];
+}
+
+/**
+ * Perform weighted least squares regression
+ */
+function performWeightedOLS(
+  X: number[][],
+  y: number[],
+  weights: number[]
+): number[] {
+  const n = X.length;
+  const p = X[0].length;
+  
+  // Create weighted X and y
+  const wX: number[][] = [];
+  const wy: number[] = [];
+  
+  for (let i = 0; i < n; i++) {
+    const sqrtW = Math.sqrt(weights[i]);
+    wX.push(X[i].map(x => x * sqrtW));
+    wy.push(y[i] * sqrtW);
+  }
+  
+  // Perform OLS on weighted data
+  return performOLS(wX, wy);
+}
+
+/**
+ * Calculate model diagnostics for regression model
+ */
+function calculateModelDiagnostics(
+  X: number[][],
+  y: number[],
+  beta: number[],
+  residuals: number[],
+  weights?: number[]
+): {
+  standardErrors: number[];
+  tValues: number[];
+  pValues: number[];
+} {
+  const n = X.length;
+  const p = X[0].length;
+  
+  // Calculate weighted or unweighted X'X
+  let XtX: number[][];
+  if (weights) {
+    // Create weighted X
+    const wX: number[][] = [];
+    for (let i = 0; i < n; i++) {
+      const sqrtW = Math.sqrt(weights[i]);
+      wX.push(X[i].map(x => x * sqrtW));
+    }
+    
+    // Calculate X'X with weights
+    const wXt = matrixTranspose(wX);
+    XtX = matrixMultiply(wXt, wX);
+  } else {
+    // Calculate regular X'X
+    const Xt = matrixTranspose(X);
+    XtX = matrixMultiply(Xt, X);
+  }
+  
+  // Calculate (X'X)^-1
+  const XtXInv = matrixInverse(XtX);
+  
+  // Calculate mean squared error
+  const residualSS = residuals.reduce((sum, r, i) => {
+    if (weights) {
+      return sum + weights[i] * r * r;
+    }
+    return sum + r * r;
+  }, 0);
+  const mse = residualSS / (n - p);
+  
+  // Calculate standard errors
+  const standardErrors = XtXInv.map(row => Math.sqrt(row[XtXInv.indexOf(row)] * mse));
+  
+  // Calculate t-values
+  const tValues = beta.map((b, i) => b / standardErrors[i]);
+  
+  // Calculate p-values (two-tailed t-test)
+  const df = n - p;
+  const pValues = tValues.map(t => 2 * (1 - tCDF(Math.abs(t), df)));
+  
+  return { standardErrors, tValues, pValues };
+}
+
+/**
+ * Calculate Moran's I statistic for spatial autocorrelation
+ */
+function calculateMoransI(values: number[], weights: number[][]): number {
+  const n = values.length;
+  const mean = values.reduce((sum, v) => sum + v, 0) / n;
+  
+  // Calculate deviations from mean
+  const deviations = values.map(v => v - mean);
+  
+  // Calculate numerator (weighted cross-products)
+  let numerator = 0;
+  for (let i = 0; i < n; i++) {
+    for (let j = 0; j < n; j++) {
+      numerator += weights[i][j] * deviations[i] * deviations[j];
+    }
+  }
+  
+  // Calculate denominator (sum of squared deviations)
+  const denominator = deviations.reduce((sum, d) => sum + d * d, 0);
+  
+  // Calculate sum of weights
+  let W = 0;
+  for (let i = 0; i < n; i++) {
+    for (let j = 0; j < n; j++) {
+      W += weights[i][j];
+    }
+  }
+  
+  // Calculate Moran's I
+  return (n / W) * (numerator / denominator);
 }
 
 /**
  * Predict values using a regression model
- * @param model Regression model
- * @param properties Properties to predict for
- * @returns Array of predicted values
  */
 export function predictWithModel(
   model: RegressionModel,
-  properties: Property[]
+  properties: Property[],
+  config: RegressionModelConfig = {}
 ): number[] {
-  return properties.map(property => {
-    let prediction = model.intercept;
+  // Extract values from properties for independent variables
+  const X: number[][] = [];
+  for (const property of properties) {
+    const xRow: number[] = [];
     
-    for (const variable of model.usedVariables) {
-      const value = getPropertyValue(property, variable);
-      if (value !== null && value !== undefined) {
-        prediction += model.coefficients[variable] * parseFloat(String(value));
+    // Add intercept term
+    xRow.push(1);
+    
+    // Add values for each independent variable
+    for (const varName of model.usedVariables.slice(1)) { // Skip the intercept
+      let xValue = 0;
+      if (property[varName as keyof Property] !== undefined) {
+        const rawValue = property[varName as keyof Property];
+        if (typeof rawValue === 'number') {
+          xValue = rawValue;
+        } else if (typeof rawValue === 'string') {
+          xValue = parseFloat(rawValue) || 0;
+        }
       }
+      
+      // Apply transform if specified
+      if (config.dataTransforms && config.dataTransforms[varName]) {
+        xValue = transformValue(xValue, config.dataTransforms[varName]);
+      }
+      
+      xRow.push(xValue);
     }
     
+    X.push(xRow);
+  }
+  
+  // Calculate predictions using the model coefficients
+  const predictions = X.map(row => {
+    let prediction = 0;
+    for (let i = 0; i < model.usedVariables.length; i++) {
+      const varName = model.usedVariables[i];
+      prediction += row[i] * model.coefficients[varName];
+    }
     return prediction;
   });
+  
+  return predictions;
 }
 
 /**
- * Calculate variable importance
- * @param model Regression model
- * @returns Object with variable importance scores
+ * Calculate variable importance for a regression model
  */
-export function calculateVariableImportance(
-  model: RegressionModel
-): Record<string, number> {
-  const importance: Record<string, number> = {};
+export function calculateVariableImportance(model: RegressionModel): { [key: string]: number } {
+  const importance: { [key: string]: number } = {};
   
-  // Calculate absolute standardized coefficients
-  for (const variable of model.usedVariables) {
-    // |t-value| is a simple measure of importance
-    importance[variable] = Math.abs(model.tValues[variable]);
+  // Skip the intercept
+  const variables = model.usedVariables.filter(v => v !== '(Intercept)');
+  
+  // Calculate the absolute t-values
+  const tStats = variables.map(v => Math.abs(model.tValues[v]));
+  const tTotal = tStats.reduce((sum, t) => sum + t, 0);
+  
+  // Normalize by the sum of absolute t-values
+  if (tTotal > 0) {
+    variables.forEach((v, i) => {
+      importance[v] = tStats[i] / tTotal;
+    });
+  } else {
+    // Fallback to equal importance if t-values are all zero
+    variables.forEach(v => {
+      importance[v] = 1 / variables.length;
+    });
   }
   
-  // Normalize to sum to 1
-  const sum = Object.values(importance).reduce((a, b) => a + b, 0);
-  for (const variable of model.usedVariables) {
-    importance[variable] /= sum;
-  }
+  // Add the intercept with zero importance
+  importance['(Intercept)'] = 0;
   
   return importance;
 }
 
 /**
- * Calculate model quality metrics
- * @param model Regression model
- * @returns Object with model quality metrics
+ * Calculate model quality metrics and diagnostics
  */
-export function calculateModelQuality(
-  model: RegressionModel
-): {
-  cod: number; // Coefficient of Dispersion
-  prd: number; // Price-Related Differential
-  prb: number; // Price-Related Bias
-  averageAbsoluteError: number;
-  medianAbsoluteError: number;
-  rootMeanSquaredError: number;
+export function calculateModelQuality(model: RegressionModel): {
+  quality: 'excellent' | 'good' | 'moderate' | 'poor' | 'very poor';
+  strengths: string[];
+  weaknesses: string[];
 } {
-  const n = model.actualValues.length;
+  const strengths: string[] = [];
+  const weaknesses: string[] = [];
   
-  // Calculate ratios
-  const ratios = model.actualValues.map((actual, i) => actual / model.predictedValues[i]);
+  // Check R-squared
+  if (model.rSquared > 0.8) {
+    strengths.push(`High R² (${(model.rSquared * 100).toFixed(1)}%) indicates excellent goodness of fit.`);
+  } else if (model.rSquared > 0.6) {
+    strengths.push(`Good R² (${(model.rSquared * 100).toFixed(1)}%) indicates good explanatory power.`);
+  } else if (model.rSquared > 0.4) {
+    strengths.push(`Moderate R² (${(model.rSquared * 100).toFixed(1)}%) indicates reasonable explanatory power.`);
+  } else if (model.rSquared > 0.2) {
+    weaknesses.push(`Low R² (${(model.rSquared * 100).toFixed(1)}%) indicates poor explanatory power.`);
+  } else {
+    weaknesses.push(`Very low R² (${(model.rSquared * 100).toFixed(1)}%) indicates very poor explanatory power.`);
+  }
   
-  // Calculate median ratio
-  const sortedRatios = [...ratios].sort((a, b) => a - b);
-  const medianRatio = sortedRatios[Math.floor(n / 2)];
+  // Check MAPE
+  if (model.meanAbsolutePercentageError < 5) {
+    strengths.push(`Low MAPE (${model.meanAbsolutePercentageError.toFixed(1)}%) indicates excellent prediction accuracy.`);
+  } else if (model.meanAbsolutePercentageError < 10) {
+    strengths.push(`Good MAPE (${model.meanAbsolutePercentageError.toFixed(1)}%) indicates good prediction accuracy.`);
+  } else if (model.meanAbsolutePercentageError < 20) {
+    weaknesses.push(`Moderate MAPE (${model.meanAbsolutePercentageError.toFixed(1)}%) indicates room for improvement in prediction accuracy.`);
+  } else {
+    weaknesses.push(`High MAPE (${model.meanAbsolutePercentageError.toFixed(1)}%) indicates poor prediction accuracy.`);
+  }
   
-  // Calculate COD
-  const absoluteDeviations = ratios.map(r => Math.abs(r - medianRatio));
-  const cod = 100 * absoluteDeviations.reduce((a, b) => a + b, 0) / (n * medianRatio);
+  // Check significant variables
+  const significantVars = model.usedVariables.filter(v => v !== '(Intercept)' && model.pValues[v] < 0.05);
+  if (significantVars.length > 0) {
+    if (significantVars.length === model.usedVariables.length - 1) { // All variables are significant
+      strengths.push(`All variables are statistically significant (p < 0.05).`);
+    } else {
+      strengths.push(`${significantVars.length} out of ${model.usedVariables.length - 1} variables are statistically significant.`);
+    }
+  } else if (model.usedVariables.length > 1) {
+    weaknesses.push(`No variables are statistically significant (p < 0.05).`);
+  }
   
-  // Calculate PRD
-  const meanRatio = ratios.reduce((a, b) => a + b, 0) / n;
-  const weightedMeanRatio = ratios.reduce((sum, ratio, i) => sum + ratio * model.predictedValues[i], 0) / 
-                           model.predictedValues.reduce((a, b) => a + b, 0);
-  const prd = meanRatio / weightedMeanRatio;
+  // Check multicollinearity if available
+  if (model.diagnostics?.multicollinearity) {
+    if (model.diagnostics.multicollinearity.hasMulticollinearity) {
+      weaknesses.push(`Multicollinearity detected, which can affect coefficient interpretation.`);
+    } else {
+      strengths.push(`No significant multicollinearity issues detected.`);
+    }
+  }
   
-  // Calculate PRB
-  const loggedValues = model.predictedValues.map(v => Math.log(v));
-  const meanLoggedValue = mean(loggedValues);
-  const numerator = ratios.reduce((sum, ratio, i) => sum + (loggedValues[i] - meanLoggedValue) * (ratio - meanRatio), 0);
-  const denominator = loggedValues.reduce((sum, v) => sum + Math.pow(v - meanLoggedValue, 2), 0);
-  const prb = numerator / denominator;
+  // Check spatial autocorrelation if available
+  if (model.diagnostics?.spatialAutocorrelation) {
+    if (model.diagnostics.spatialAutocorrelation.hasAutocorrelation) {
+      weaknesses.push(`Spatial autocorrelation in residuals detected, suggesting spatial patterns not captured by the model.`);
+    } else {
+      strengths.push(`No significant spatial autocorrelation in residuals.`);
+    }
+  }
   
-  // Calculate error metrics
-  const errors = model.actualValues.map((actual, i) => actual - model.predictedValues[i]);
-  const absoluteErrors = errors.map(e => Math.abs(e));
-  const averageAbsoluteError = mean(absoluteErrors);
-  const sortedAbsoluteErrors = [...absoluteErrors].sort((a, b) => a - b);
-  const medianAbsoluteError = sortedAbsoluteErrors[Math.floor(n / 2)];
-  const rootMeanSquaredError = Math.sqrt(mean(errors.map(e => e * e)));
+  // Determine overall quality
+  let quality: 'excellent' | 'good' | 'moderate' | 'poor' | 'very poor';
+  if (model.rSquared > 0.8 && model.meanAbsolutePercentageError < 10) {
+    quality = 'excellent';
+  } else if (model.rSquared > 0.6 && model.meanAbsolutePercentageError < 15) {
+    quality = 'good';
+  } else if (model.rSquared > 0.4 && model.meanAbsolutePercentageError < 20) {
+    quality = 'moderate';
+  } else if (model.rSquared > 0.2) {
+    quality = 'poor';
+  } else {
+    quality = 'very poor';
+  }
   
-  return {
-    cod,
-    prd,
-    prb,
-    averageAbsoluteError,
-    medianAbsoluteError,
-    rootMeanSquaredError
-  };
+  return { quality, strengths, weaknesses };
+}
+
+// Utility functions for matrix operations
+
+function matrixTranspose(A: number[][]): number[][] {
+  const m = A.length;
+  const n = A[0].length;
+  const result: number[][] = [];
+  
+  for (let j = 0; j < n; j++) {
+    result[j] = [];
+    for (let i = 0; i < m; i++) {
+      result[j][i] = A[i][j];
+    }
+  }
+  
+  return result;
+}
+
+/**
+ * Matrix multiplication
+ */
+function matrixMultiply(A: number[][], B: number[][]): number[][] {
+  const m = A.length;
+  const n = A[0].length;
+  const p = B[0].length;
+  const result: number[][] = [];
+  
+  for (let i = 0; i < m; i++) {
+    result[i] = [];
+    for (let j = 0; j < p; j++) {
+      let sum = 0;
+      for (let k = 0; k < n; k++) {
+        sum += A[i][k] * B[k][j];
+      }
+      result[i][j] = sum;
+    }
+  }
+  
+  return result;
+}
+
+/**
+ * Matrix inverse (Gauss-Jordan elimination)
+ */
+function matrixInverse(A: number[][]): number[][] {
+  const n = A.length;
+  
+  // Create augmented matrix [A|I]
+  const augmented: number[][] = [];
+  for (let i = 0; i < n; i++) {
+    augmented[i] = [...A[i]];
+    for (let j = 0; j < n; j++) {
+      augmented[i].push(i === j ? 1 : 0);
+    }
+  }
+  
+  // Forward elimination
+  for (let i = 0; i < n; i++) {
+    // Find pivot
+    let maxRow = i;
+    let maxVal = Math.abs(augmented[i][i]);
+    for (let j = i + 1; j < n; j++) {
+      const absVal = Math.abs(augmented[j][i]);
+      if (absVal > maxVal) {
+        maxRow = j;
+        maxVal = absVal;
+      }
+    }
+    
+    // Swap rows if necessary
+    if (maxRow !== i) {
+      [augmented[i], augmented[maxRow]] = [augmented[maxRow], augmented[i]];
+    }
+    
+    // Scale pivot row
+    const pivot = augmented[i][i];
+    if (Math.abs(pivot) < 1e-10) {
+      throw new Error('Matrix is singular or nearly singular');
+    }
+    
+    for (let j = i; j < 2 * n; j++) {
+      augmented[i][j] /= pivot;
+    }
+    
+    // Eliminate other rows
+    for (let j = 0; j < n; j++) {
+      if (j !== i) {
+        const factor = augmented[j][i];
+        for (let k = i; k < 2 * n; k++) {
+          augmented[j][k] -= factor * augmented[i][k];
+        }
+      }
+    }
+  }
+  
+  // Extract right half of augmented matrix (the inverse)
+  const inverse: number[][] = [];
+  for (let i = 0; i < n; i++) {
+    inverse[i] = augmented[i].slice(n);
+  }
+  
+  return inverse;
+}
+
+// Statistical utility functions
+
+function tCDF(t: number, df: number): number {
+  // Simple approximation of t-distribution CDF
+  if (df <= 0) throw new Error('Degrees of freedom must be positive');
+  
+  // For large df, t-distribution approximates normal distribution
+  if (df > 30) {
+    return normalCDF(t);
+  }
+  
+  // Calculate probability from beta distribution
+  const x = df / (df + t * t);
+  return 1 - 0.5 * incompleteBeta(x, df / 2, 0.5);
+}
+
+/**
+ * Chi-square cumulative distribution function
+ */
+function chiSquareCDF(x: number, k: number): number {
+  if (x <= 0) return 0;
+  // k is degrees of freedom
+  return lowerGamma(k / 2, x / 2) / gamma(k / 2);
+}
+
+/**
+ * Normal cumulative distribution function
+ */
+function normalCDF(z: number): number {
+  // Approximation of the normal CDF
+  const b1 = 0.319381530;
+  const b2 = -0.356563782;
+  const b3 = 1.781477937;
+  const b4 = -1.821255978;
+  const b5 = 1.330274429;
+  const p = 0.2316419;
+  const c = 0.39894228;
+  
+  if (z >= 0) {
+    const t = 1.0 / (1.0 + p * z);
+    return 1.0 - c * Math.exp(-z * z / 2) * t * (t * (t * (t * (t * b5 + b4) + b3) + b2) + b1);
+  } else {
+    const t = 1.0 / (1.0 - p * z);
+    return c * Math.exp(-z * z / 2) * t * (t * (t * (t * (t * b5 + b4) + b3) + b2) + b1);
+  }
+}
+
+/**
+ * Lower incomplete gamma function approximation
+ */
+function lowerGamma(a: number, x: number): number {
+  // Approximation of the lower incomplete gamma function
+  if (x <= 0) return 0;
+  
+  // Series expansion
+  let sum = 0;
+  let term = 1 / a;
+  for (let i = 1; i <= 100; i++) {
+    sum += term;
+    term *= x / (a + i);
+    if (term < 1e-10) break;
+  }
+  
+  return Math.pow(x, a) * Math.exp(-x) * sum;
+}
+
+/**
+ * Gamma function approximation
+ */
+function gamma(z: number): number {
+  // Approximation of the gamma function using Lanczos approximation
+  if (z < 0.5) {
+    return Math.PI / (Math.sin(Math.PI * z) * gamma(1 - z));
+  }
+  
+  z -= 1;
+  const p = [0.99999999999980993, 676.5203681218851, -1259.1392167224028,
+            771.32342877765313, -176.61502916214059, 12.507343278686905,
+            -0.13857109526572012, 9.9843695780195716e-6, 1.5056327351493116e-7];
+  
+  let x = p[0];
+  for (let i = 1; i < p.length; i++) {
+    x += p[i] / (z + i);
+  }
+  
+  const t = z + p.length - 1.5;
+  return Math.sqrt(2 * Math.PI) * Math.pow(t, z + 0.5) * Math.exp(-t) * x;
+}
+
+/**
+ * Incomplete beta function approximation
+ */
+function incompleteBeta(x: number, a: number, b: number): number {
+  // Approximation of the incomplete beta function
+  if (x <= 0) return 0;
+  if (x >= 1) return 1;
+  
+  // Use continued fraction representation
+  const epslon = 1e-10;
+  const maxIterations = 100;
+  
+  const qab = a + b;
+  const qap = a + 1;
+  const qam = a - 1;
+  
+  let m = 0; // Counter for iterations
+  let h = 1.0; // Initial approximation
+  let c = 1.0;
+  let d = 1.0 - qab * x / qap;
+  if (Math.abs(d) < epslon) d = epslon;
+  d = 1.0 / d;
+  
+  // Apply continued fraction
+  for (let i = 1; i <= maxIterations; i++) {
+    m = i;
+    const m2 = 2 * m;
+    
+    // First term
+    const aa = m * (b - m) * x / ((qam + m2) * (a + m2));
+    d = 1.0 + aa * d;
+    if (Math.abs(d) < epslon) d = epslon;
+    c = 1.0 + aa / c;
+    if (Math.abs(c) < epslon) c = epslon;
+    d = 1.0 / d;
+    h *= d * c;
+    
+    // Second term
+    const bb = -(a + m) * (qab + m) * x / ((a + m2) * (qap + m2));
+    d = 1.0 + bb * d;
+    if (Math.abs(d) < epslon) d = epslon;
+    c = 1.0 + bb / c;
+    if (Math.abs(c) < epslon) c = epslon;
+    d = 1.0 / d;
+    const del = d * c;
+    h *= del;
+    
+    // Check for convergence
+    if (Math.abs(del - 1.0) < epslon) break;
+  }
+  
+  // Factor to multiply by
+  const bt = Math.exp(a * Math.log(x) + b * Math.log(1.0 - x) -
+    Math.log(a) - beta(a, b));
+  
+  return bt * h / a;
+}
+
+/**
+ * Beta function approximation
+ */
+function beta(a: number, b: number): number {
+  // Beta function is related to the gamma function
+  return gamma(a) * gamma(b) / gamma(a + b);
 }

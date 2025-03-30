@@ -1,590 +1,576 @@
 import React, { useState, useEffect } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { Property } from '@shared/schema';
-import { RegressionModel, calculateOLSRegression, calculateGWRRegression, KernelType, calculateModelQuality, calculateVariableImportance } from '@/services/regressionService';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Grid, Layers, Calculator, Table as TableIcon, BarChart2, GitMerge } from 'lucide-react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Label } from '@/components/ui/label';
-import { Input } from '@/components/ui/input';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Separator } from '@/components/ui/separator';
+import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { Loader2, BarChart4, Save, Download, MapPin, FileText, BarChart, HelpCircle, AlertTriangle } from 'lucide-react';
-import { formatCurrency } from '@/lib/utils';
-import { VariableSelector } from '@/components/regression/VariableSelector';
+import { 
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow
+} from '@/components/ui/table';
+import { RegressionModel, KernelType, TransformType, calculateOLSRegression, calculateGWRRegression, calculateModelQuality, calculateVariableImportance } from '@/services/regressionService';
 import { ModelResults } from '@/components/regression/ModelResults';
-import { ModelDiagnostics } from '@/components/regression/ModelDiagnostics';
-import { ModelConfiguration } from '@/components/regression/ModelConfiguration';
-import { ResizablePanel, ResizablePanelGroup } from '@/components/ui/resizable';
+import { PredictionScatterPlot } from '@/components/regression/PredictionScatterPlot';
+import { ResidualHistogram } from '@/components/regression/ResidualHistogram';
+import { CoefficientImpactChart } from '@/components/regression/CoefficientImpactChart';
+import { Property } from '@/shared/schema';
+import { apiRequest } from '@/lib/queryClient';
+import { useToast } from '@/hooks/use-toast';
 
-export interface RegressionPanelProps {
-  className?: string;
-}
-
-export function RegressionPanel({ className }: RegressionPanelProps) {
-  // Fetch property data
-  const { data: properties, isLoading: propertiesLoading } = useQuery({
-    queryKey: ['/api/properties'],
-  });
-  
-  // State for regression model configuration
-  const [targetVariable, setTargetVariable] = useState<string>('marketValue');
-  const [independentVariables, setIndependentVariables] = useState<string[]>([]);
-  const [modelType, setModelType] = useState<'ols' | 'weighted' | 'gwr'>('ols');
-  const [gwrConfig, setGwrConfig] = useState({
-    bandwidth: 0.5,
-    kernel: KernelType.GAUSSIAN,
-    adaptive: false
-  });
-  
-  // State for model results
-  const [model, setModel] = useState<RegressionModel | null>(null);
-  const [isCalculating, setIsCalculating] = useState(false);
-  const [modelName, setModelName] = useState('');
-  const [activeTab, setActiveTab] = useState('variables');
-  
-  // State for saved models
+/**
+ * The Regression Panel provides tools for property valuation through regression modeling.
+ * It offers ordinary least squares, weighted, and geographically weighted regression methods.
+ */
+export function RegressionPanel() {
+  const [properties, setProperties] = useState<Property[]>([]);
+  const [activeModel, setActiveModel] = useState<RegressionModel | null>(null);
   const [savedModels, setSavedModels] = useState<RegressionModel[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const { toast } = useToast();
   
-  // Available property variables for selection
-  const [availableVariables, setAvailableVariables] = useState<string[]>([]);
-  
-  // Extract available variables from property data
+  // Fetch properties on component mount
   useEffect(() => {
-    if (properties && properties.length > 0) {
-      const property = properties[0];
-      const variables: string[] = [];
-      
-      // Add basic property fields
-      Object.keys(property).forEach(key => {
-        // Skip non-numeric fields, id, and geo fields
-        if (
-          typeof property[key] === 'number' &&
-          !['id', 'latitude', 'longitude'].includes(key)
-        ) {
-          variables.push(key);
+    const fetchProperties = async () => {
+      try {
+        const response = await apiRequest<Property[]>('/api/properties');
+        if (response) {
+          setProperties(response);
         }
-      });
-      
-      // Add attributes if they exist and are numeric
-      if (property.attributes) {
-        Object.keys(property.attributes).forEach(key => {
-          if (typeof property.attributes[key] === 'number') {
-            variables.push(`attributes.${key}`);
-          }
+      } catch (error) {
+        console.error('Error fetching properties:', error);
+        toast({
+          title: 'Failed to load properties',
+          description: 'Could not retrieve property data. Please try again later.',
+          variant: 'destructive',
         });
       }
-      
-      setAvailableVariables(variables);
-    }
-  }, [properties]);
-  
-  // Calculate regression model
-  const calculateModel = () => {
-    if (!properties || properties.length === 0 || independentVariables.length === 0) return;
-    
-    setIsCalculating(true);
-    
-    // Use setTimeout to prevent UI from freezing during calculation
-    setTimeout(() => {
-      try {
-        let newModel: RegressionModel;
-        
-        switch (modelType) {
-          case 'ols':
-            newModel = calculateOLSRegression(
-              properties,
-              targetVariable,
-              independentVariables
-            );
-            break;
-          case 'gwr':
-            newModel = calculateGWRRegression(
-              properties,
-              targetVariable,
-              independentVariables,
-              gwrConfig
-            );
-            break;
-          case 'weighted':
-            // For now, weight by recency of year built
-            newModel = calculateOLSRegression(
-              properties,
-              targetVariable,
-              independentVariables
-            );
-            break;
-          default:
-            newModel = calculateOLSRegression(
-              properties,
-              targetVariable,
-              independentVariables
-            );
-        }
-        
-        setModel(newModel);
-      } catch (error) {
-        console.error('Error calculating regression model:', error);
-        // Handle error (could set error state and display to user)
-      } finally {
-        setIsCalculating(false);
-      }
-    }, 100);
-  };
-  
-  // Save the current model
-  const saveModel = () => {
-    if (!model) return;
-    
-    const modelToSave = {
-      ...model,
-      modelName: modelName || `${modelType.toUpperCase()} Model ${new Date().toLocaleString()}`,
-      createdAt: new Date()
     };
     
-    setSavedModels([...savedModels, modelToSave]);
-    setModelName(modelToSave.modelName);
-  };
+    fetchProperties();
+  }, [toast]);
   
-  // Load a saved model
-  const loadModel = (savedModel: RegressionModel) => {
-    setModel(savedModel);
-    setTargetVariable(savedModel.targetVariable);
-    setIndependentVariables(savedModel.usedVariables);
-    setModelName(savedModel.modelName || '');
+  // Generate a sample regression model for demonstration purposes
+  const generateDemoModel = () => {
+    setIsLoading(true);
     
-    // Set appropriate model type
-    if ('localCoefficients' in savedModel) {
-      setModelType('gwr');
-    } else {
-      setModelType('ols');
+    try {
+      // For demo, use fixed variable selections
+      const targetVariable = 'value';
+      const independentVariables = [
+        'squareFeet', 'bedrooms', 'bathrooms', 'yearBuilt', 'lotSize'
+      ];
+      
+      // Only proceed if we have property data
+      if (properties.length === 0) {
+        toast({
+          title: 'No property data available',
+          description: 'Please ensure property data is loaded before running a regression model.',
+          variant: 'destructive',
+        });
+        setIsLoading(false);
+        return;
+      }
+      
+      // Generate a model using OLS regression
+      const model = calculateOLSRegression(
+        properties,
+        targetVariable,
+        independentVariables,
+        {
+          modelName: 'Demo Housing Price Model',
+          dataTransforms: {
+            // Apply log transform to the target variable (property values)
+            value: TransformType.Log,
+            // No transforms for other variables in this demo
+          }
+        }
+      );
+      
+      setActiveModel(model);
+      
+      // Add to saved models if it doesn't exist
+      if (!savedModels.find(m => m.modelName === model.modelName)) {
+        setSavedModels(prev => [...prev, model]);
+      }
+      
+      toast({
+        title: 'Regression model generated',
+        description: `Model "${model.modelName}" created with R² of ${model.rSquared.toFixed(3)}`,
+      });
+    } catch (error) {
+      console.error('Error generating regression model:', error);
+      toast({
+        title: 'Model generation failed',
+        description: 'An error occurred while creating the regression model.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsLoading(false);
     }
   };
   
-  // Generate a script from the model
-  const generateScript = () => {
-    // This would navigate to the script panel with a pre-populated script
-    // based on the regression model
-    console.log('Generate script from model:', model);
-    // Implementation would depend on app routing/state management
+  // Generate a sample GWR model for demonstration
+  const generateGWRModel = () => {
+    setIsLoading(true);
+    
+    try {
+      // For demo, use fixed variable selections
+      const targetVariable = 'value';
+      const independentVariables = [
+        'squareFeet', 'bedrooms', 'bathrooms', 'yearBuilt'
+      ];
+      
+      // Only proceed if we have property data
+      if (properties.length === 0) {
+        toast({
+          title: 'No property data available',
+          description: 'Please ensure property data is loaded before running a regression model.',
+          variant: 'destructive',
+        });
+        setIsLoading(false);
+        return;
+      }
+      
+      // Generate a model using GWR regression
+      const model = calculateGWRRegression(
+        properties,
+        targetVariable,
+        independentVariables,
+        {
+          modelName: 'Geographically Weighted Housing Model',
+          kernelType: KernelType.Gaussian,
+          bandwidth: 0.15,
+          adaptiveBandwidth: true,
+          dataTransforms: {
+            // Apply log transform to the target variable
+            value: TransformType.Log,
+          }
+        }
+      );
+      
+      setActiveModel(model);
+      
+      // Add to saved models if it doesn't exist
+      if (!savedModels.find(m => m.modelName === model.modelName)) {
+        setSavedModels(prev => [...prev, model]);
+      }
+      
+      toast({
+        title: 'GWR model generated',
+        description: `Model "${model.modelName}" created with R² of ${model.rSquared.toFixed(3)}`,
+      });
+    } catch (error) {
+      console.error('Error generating GWR model:', error);
+      toast({
+        title: 'Model generation failed',
+        description: 'An error occurred while creating the GWR model.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
-  
-  // Visualize model on map
-  const visualizeOnMap = () => {
-    // This would navigate to the map panel with the regression results visualization
-    console.log('Visualize model on map:', model);
-    // Implementation would depend on app routing/state management
-  };
-  
-  // If properties are loading, show loading state
-  if (propertiesLoading) {
-    return (
-      <div className={`flex items-center justify-center h-full ${className}`}>
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-        <span className="ml-2 text-muted-foreground">Loading property data...</span>
-      </div>
-    );
-  }
   
   return (
-    <div className={`h-full flex flex-col ${className}`}>
-      <div className="flex items-center justify-between p-4 border-b">
+    <div className="p-4 space-y-4 h-full overflow-auto">
+      <div className="flex justify-between items-center">
         <div>
-          <h2 className="text-2xl font-bold">Regression Analysis</h2>
+          <h2 className="text-2xl font-bold tracking-tight">Regression Analysis</h2>
           <p className="text-muted-foreground">
-            Create and analyze property valuation models
+            Build, compare, and validate property valuation models.
           </p>
         </div>
         
-        <div className="flex items-center space-x-2">
-          <Button
-            variant="outline"
-            onClick={() => setSavedModels([])}
-            disabled={savedModels.length === 0}
+        <div className="flex space-x-2">
+          {savedModels.length > 0 && (
+            <Select 
+              value={activeModel?.modelName} 
+              onValueChange={(value) => {
+                const selected = savedModels.find(m => m.modelName === value);
+                if (selected) setActiveModel(selected);
+              }}
+            >
+              <SelectTrigger className="w-[240px]">
+                <SelectValue placeholder="Select a model" />
+              </SelectTrigger>
+              <SelectContent>
+                {savedModels.map((model) => (
+                  <SelectItem key={model.modelName} value={model.modelName || ''}>
+                    {model.modelName} (R² = {model.rSquared.toFixed(3)})
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+          
+          <Button 
+            variant="default" 
+            onClick={generateDemoModel}
+            disabled={isLoading}
           >
-            Clear Saved Models
+            <Calculator className="mr-2 h-4 w-4" />
+            Run OLS Regression
           </Button>
           
-          <Button
-            variant="outline"
-            onClick={saveModel}
-            disabled={!model}
+          <Button 
+            variant="outline" 
+            onClick={generateGWRModel}
+            disabled={isLoading}
           >
-            <Save className="mr-2 h-4 w-4" /> Save Model
-          </Button>
-          
-          <Button
-            variant="outline"
-            onClick={visualizeOnMap}
-            disabled={!model}
-          >
-            <MapPin className="mr-2 h-4 w-4" /> Visualize on Map
-          </Button>
-          
-          <Button
-            variant="outline"
-            onClick={generateScript}
-            disabled={!model}
-          >
-            <FileText className="mr-2 h-4 w-4" /> Generate Script
+            <GitMerge className="mr-2 h-4 w-4" />
+            Run GWR Regression
           </Button>
         </div>
       </div>
       
-      <ResizablePanelGroup direction="horizontal" className="flex-grow">
-        {/* Left panel - Model Configuration */}
-        <ResizablePanel defaultSize={25} minSize={20}>
-          <div className="h-full flex flex-col">
-            <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-              <TabsList className="w-full">
-                <TabsTrigger value="variables" className="flex-1">Variables</TabsTrigger>
-                <TabsTrigger value="configuration" className="flex-1">Configuration</TabsTrigger>
-                <TabsTrigger value="saved" className="flex-1">Saved Models</TabsTrigger>
-              </TabsList>
+      {activeModel ? (
+        <Tabs defaultValue="overview" className="space-y-4">
+          <TabsList>
+            <TabsTrigger value="overview">
+              <Grid className="h-4 w-4 mr-2" />
+              Overview
+            </TabsTrigger>
+            <TabsTrigger value="residuals">
+              <BarChart2 className="h-4 w-4 mr-2" />
+              Residuals
+            </TabsTrigger>
+            <TabsTrigger value="predictions">
+              <Calculator className="h-4 w-4 mr-2" />
+              Predictions
+            </TabsTrigger>
+            <TabsTrigger value="coefficients">
+              <Layers className="h-4 w-4 mr-2" />
+              Coefficients
+            </TabsTrigger>
+            <TabsTrigger value="data">
+              <TableIcon className="h-4 w-4 mr-2" />
+              Model Data
+            </TabsTrigger>
+          </TabsList>
+          
+          <TabsContent value="overview" className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <ModelResults model={activeModel} className="h-full" />
               
-              <TabsContent value="variables" className="flex-grow p-4 overflow-auto">
-                <VariableSelector 
-                  availableVariables={availableVariables}
-                  targetVariable={targetVariable}
-                  independentVariables={independentVariables}
-                  onTargetChange={setTargetVariable}
-                  onIndependentChange={setIndependentVariables}
-                />
-                
-                <div className="mt-8">
-                  <Button 
-                    onClick={calculateModel} 
-                    disabled={isCalculating || independentVariables.length === 0}
-                    className="w-full"
-                  >
-                    {isCalculating ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Calculating...
-                      </>
-                    ) : (
-                      <>
-                        <BarChart4 className="mr-2 h-4 w-4" />
-                        Calculate Model
-                      </>
-                    )}
-                  </Button>
-                </div>
-              </TabsContent>
-              
-              <TabsContent value="configuration" className="flex-grow p-4 overflow-auto">
-                <ModelConfiguration
-                  modelType={modelType}
-                  onModelTypeChange={setModelType}
-                  gwrConfig={gwrConfig}
-                  onGwrConfigChange={setGwrConfig}
-                />
-              </TabsContent>
-              
-              <TabsContent value="saved" className="flex-grow p-4 overflow-auto">
-                {savedModels.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center h-full text-center p-8">
-                    <Save className="h-12 w-12 text-muted-foreground mb-4" />
-                    <h3 className="text-lg font-medium">No saved models</h3>
-                    <p className="text-muted-foreground mt-2">
-                      Save your regression models to compare and reuse them later.
-                    </p>
-                  </div>
-                ) : (
-                  <ScrollArea className="h-[500px]">
-                    {savedModels.map((savedModel, index) => (
-                      <Card key={index} className="mb-4">
-                        <CardHeader className="pb-2">
-                          <CardTitle className="text-base">
-                            {savedModel.modelName || `Model ${index + 1}`}
-                          </CardTitle>
-                          <CardDescription>
-                            {savedModel.createdAt?.toLocaleString() || 'No date'}
-                          </CardDescription>
-                        </CardHeader>
-                        <CardContent className="pb-2">
-                          <div className="grid grid-cols-2 gap-2 text-sm">
-                            <div>Target: {savedModel.targetVariable}</div>
-                            <div>R²: {savedModel.rSquared.toFixed(4)}</div>
-                            <div>Variables: {savedModel.usedVariables.length}</div>
-                            <div>Obs: {savedModel.observations}</div>
-                          </div>
-                        </CardContent>
-                        <CardFooter>
-                          <Button 
-                            variant="outline" 
-                            size="sm" 
-                            className="w-full"
-                            onClick={() => loadModel(savedModel)}
-                          >
-                            Load Model
-                          </Button>
-                        </CardFooter>
-                      </Card>
-                    ))}
-                  </ScrollArea>
-                )}
-              </TabsContent>
-            </Tabs>
-          </div>
-        </ResizablePanel>
-        
-        {/* Right panel - Results */}
-        <ResizablePanel defaultSize={75}>
-          <div className="h-full flex flex-col">
-            {!model ? (
-              <div className="flex flex-col items-center justify-center h-full text-center p-8">
-                <BarChart className="h-16 w-16 text-muted-foreground mb-4" />
-                <h3 className="text-xl font-medium">No regression model calculated</h3>
-                <p className="text-muted-foreground mt-2 max-w-md">
-                  Select a target variable and independent variables, then click "Calculate Model" to generate regression results.
-                </p>
-              </div>
-            ) : (
-              <Tabs defaultValue="results" className="w-full h-full flex flex-col">
-                <TabsList className="w-full">
-                  <TabsTrigger value="results">Results</TabsTrigger>
-                  <TabsTrigger value="diagnostics">Diagnostics</TabsTrigger>
-                  <TabsTrigger value="predictions">Predictions</TabsTrigger>
-                  <TabsTrigger value="quality">Model Quality</TabsTrigger>
-                </TabsList>
-                
-                <div className="p-4 border-b flex items-center justify-between">
-                  <div className="flex items-center">
-                    <h3 className="text-lg font-medium">
-                      {modelType === 'ols' ? 'OLS Regression' : 
-                       modelType === 'gwr' ? 'Geographic Weighted Regression' : 
-                       'Weighted Regression'}
-                    </h3>
-                    <span className="mx-2 text-muted-foreground">•</span>
-                    <span className="text-muted-foreground">
-                      R² = {model.rSquared.toFixed(4)}
-                    </span>
-                    <span className="mx-2 text-muted-foreground">•</span>
-                    <span className="text-muted-foreground">
-                      {model.usedVariables.length} variables
-                    </span>
-                  </div>
-                  
-                  <div className="flex items-center space-x-4">
-                    <div className="flex items-center">
-                      <Label htmlFor="model-name" className="mr-2">Model Name:</Label>
-                      <Input
-                        id="model-name"
-                        value={modelName}
-                        onChange={(e) => setModelName(e.target.value)}
-                        placeholder="Enter model name"
-                        className="w-64"
-                      />
-                    </div>
-                  </div>
-                </div>
-                
-                <TabsContent value="results" className="flex-grow overflow-auto p-4">
-                  <ModelResults model={model} />
-                </TabsContent>
-                
-                <TabsContent value="diagnostics" className="flex-grow overflow-auto p-4">
-                  <ModelDiagnostics model={model} />
-                </TabsContent>
-                
-                <TabsContent value="predictions" className="flex-grow overflow-auto p-4">
-                  <div className="space-y-6">
-                    <div>
-                      <h3 className="text-lg font-medium mb-4">Prediction vs. Actual Values</h3>
-                      <div className="h-80 border rounded-md p-4">
-                        {/* Placeholder for scatter plot of predicted vs actual values */}
-                        <div className="flex items-center justify-center h-full text-muted-foreground">
-                          Scatter plot of predicted vs. actual values would go here
-                        </div>
-                      </div>
-                    </div>
-                    
-                    <div>
-                      <h3 className="text-lg font-medium mb-4">Prediction Table</h3>
-                      <div className="border rounded-md overflow-hidden">
-                        <table className="w-full">
-                          <thead>
-                            <tr className="bg-muted">
-                              <th className="p-2 text-left">Property ID</th>
-                              <th className="p-2 text-left">Address</th>
-                              <th className="p-2 text-right">Actual Value</th>
-                              <th className="p-2 text-right">Predicted Value</th>
-                              <th className="p-2 text-right">Difference</th>
-                              <th className="p-2 text-right">% Difference</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {properties?.slice(0, 10).map((property, index) => {
-                              const actual = model.actualValues[index];
-                              const predicted = model.predictedValues[index];
-                              const diff = actual - predicted;
-                              const pctDiff = (diff / actual) * 100;
-                              
-                              return (
-                                <tr key={property.id} className="border-t">
-                                  <td className="p-2">{property.parcelId}</td>
-                                  <td className="p-2">{property.address}</td>
-                                  <td className="p-2 text-right">{formatCurrency(actual)}</td>
-                                  <td className="p-2 text-right">{formatCurrency(predicted)}</td>
-                                  <td className="p-2 text-right">{formatCurrency(diff)}</td>
-                                  <td className="p-2 text-right">
-                                    <span className={pctDiff < 0 ? 'text-red-500' : 'text-green-500'}>
-                                      {pctDiff.toFixed(2)}%
-                                    </span>
-                                  </td>
-                                </tr>
-                              );
-                            })}
-                          </tbody>
-                        </table>
-                      </div>
-                    </div>
-                  </div>
-                </TabsContent>
-                
-                <TabsContent value="quality" className="flex-grow overflow-auto p-4">
-                  <div className="space-y-6">
-                    <div>
-                      <h3 className="text-lg font-medium mb-4">Model Quality Metrics</h3>
-                      
-                      {(() => {
-                        const quality = calculateModelQuality(model);
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base font-semibold">Model Quality Assessment</CardTitle>
+                  <CardDescription>
+                    Evaluation metrics and diagnostics
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <ModelQualitySummary model={activeModel} />
+                </CardContent>
+              </Card>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <CoefficientImpactChart model={activeModel} />
+              <PredictionScatterPlot model={activeModel} />
+            </div>
+          </TabsContent>
+          
+          <TabsContent value="residuals">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <ResidualHistogram model={activeModel} />
+              <ResidualMapView model={activeModel} properties={properties} />
+            </div>
+          </TabsContent>
+          
+          <TabsContent value="predictions">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <PredictionScatterPlot model={activeModel} />
+              <PredictionTable model={activeModel} properties={properties.slice(0, 5)} />
+            </div>
+          </TabsContent>
+          
+          <TabsContent value="coefficients">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <CoefficientImpactChart model={activeModel} />
+              <VariableImportanceView model={activeModel} />
+            </div>
+          </TabsContent>
+          
+          <TabsContent value="data">
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base font-semibold">Model Dataset</CardTitle>
+                <CardDescription>
+                  Property data used for model training
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="border rounded-md overflow-auto max-h-[500px]">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>ID</TableHead>
+                        <TableHead>Address</TableHead>
+                        <TableHead>Actual Value</TableHead>
+                        <TableHead>Predicted Value</TableHead>
+                        <TableHead>Error</TableHead>
+                        <TableHead>Error %</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {activeModel.actualValues.map((actual, index) => {
+                        const property = properties[index];
+                        const predicted = activeModel.predictedValues[index];
+                        const error = activeModel.residuals[index];
+                        const errorPercent = (error / actual) * 100;
+                        
                         return (
-                          <div className="grid grid-cols-3 gap-4">
-                            <Card>
-                              <CardHeader className="pb-2">
-                                <CardTitle className="text-base">Coefficient of Dispersion</CardTitle>
-                                <CardDescription>
-                                  Measures assessment uniformity
-                                </CardDescription>
-                              </CardHeader>
-                              <CardContent>
-                                <div className="text-3xl font-bold">{quality.cod.toFixed(2)}</div>
-                                <p className="text-sm text-muted-foreground mt-1">
-                                  {quality.cod < 10 ? 'Excellent' : 
-                                   quality.cod < 15 ? 'Good' : 
-                                   quality.cod < 20 ? 'Fair' : 'Poor'} uniformity
-                                </p>
-                              </CardContent>
-                            </Card>
-                            
-                            <Card>
-                              <CardHeader className="pb-2">
-                                <CardTitle className="text-base">Price-Related Differential</CardTitle>
-                                <CardDescription>
-                                  Measures vertical equity (regressivity/progressivity)
-                                </CardDescription>
-                              </CardHeader>
-                              <CardContent>
-                                <div className="text-3xl font-bold">{quality.prd.toFixed(3)}</div>
-                                <p className="text-sm text-muted-foreground mt-1">
-                                  {quality.prd < 0.98 ? 'Progressive' : 
-                                   quality.prd > 1.03 ? 'Regressive' : 'Neutral'} assessment
-                                </p>
-                              </CardContent>
-                            </Card>
-                            
-                            <Card>
-                              <CardHeader className="pb-2">
-                                <CardTitle className="text-base">Root Mean Square Error</CardTitle>
-                                <CardDescription>
-                                  Average prediction error magnitude
-                                </CardDescription>
-                              </CardHeader>
-                              <CardContent>
-                                <div className="text-3xl font-bold">{formatCurrency(quality.rootMeanSquaredError)}</div>
-                                <p className="text-sm text-muted-foreground mt-1">
-                                  {(quality.rootMeanSquaredError / model.dataMean * 100).toFixed(2)}% of mean value
-                                </p>
-                              </CardContent>
-                            </Card>
-                            
-                            <Card>
-                              <CardHeader className="pb-2">
-                                <CardTitle className="text-base">Price-Related Bias</CardTitle>
-                                <CardDescription>
-                                  Correlation between ratio and value
-                                </CardDescription>
-                              </CardHeader>
-                              <CardContent>
-                                <div className="text-3xl font-bold">{quality.prb.toFixed(3)}</div>
-                                <p className="text-sm text-muted-foreground mt-1">
-                                  {Math.abs(quality.prb) < 0.05 ? 'No significant bias' : 
-                                   quality.prb < 0 ? 'Progressive bias' : 'Regressive bias'}
-                                </p>
-                              </CardContent>
-                            </Card>
-                            
-                            <Card>
-                              <CardHeader className="pb-2">
-                                <CardTitle className="text-base">Mean Absolute Error</CardTitle>
-                                <CardDescription>
-                                  Average absolute prediction error
-                                </CardDescription>
-                              </CardHeader>
-                              <CardContent>
-                                <div className="text-3xl font-bold">{formatCurrency(quality.averageAbsoluteError)}</div>
-                                <p className="text-sm text-muted-foreground mt-1">
-                                  {(quality.averageAbsoluteError / model.dataMean * 100).toFixed(2)}% of mean value
-                                </p>
-                              </CardContent>
-                            </Card>
-                            
-                            <Card>
-                              <CardHeader className="pb-2">
-                                <CardTitle className="text-base">Median Absolute Error</CardTitle>
-                                <CardDescription>
-                                  Median absolute prediction error
-                                </CardDescription>
-                              </CardHeader>
-                              <CardContent>
-                                <div className="text-3xl font-bold">{formatCurrency(quality.medianAbsoluteError)}</div>
-                                <p className="text-sm text-muted-foreground mt-1">
-                                  {(quality.medianAbsoluteError / model.dataMean * 100).toFixed(2)}% of mean value
-                                </p>
-                              </CardContent>
-                            </Card>
-                          </div>
+                          <TableRow key={index}>
+                            <TableCell>{property?.id || index}</TableCell>
+                            <TableCell>{property?.address || 'Unknown'}</TableCell>
+                            <TableCell>{formatCurrency(actual)}</TableCell>
+                            <TableCell>{formatCurrency(predicted)}</TableCell>
+                            <TableCell className={error < 0 ? 'text-red-500' : 'text-green-500'}>
+                              {formatCurrency(error)}
+                            </TableCell>
+                            <TableCell className={errorPercent < 0 ? 'text-red-500' : 'text-green-500'}>
+                              {Math.abs(errorPercent).toFixed(2)}%
+                            </TableCell>
+                          </TableRow>
                         );
-                      })()}
-                      
-                      <div className="mt-6">
-                        <h4 className="text-md font-medium mb-2">Variable Importance</h4>
-                        <div className="border rounded-md p-4">
-                          {(() => {
-                            const importance = calculateVariableImportance(model);
-                            return (
-                              <div className="space-y-4">
-                                {Object.entries(importance).map(([variable, value]) => (
-                                  <div key={variable} className="space-y-1">
-                                    <div className="flex justify-between">
-                                      <span>{variable}</span>
-                                      <span>{(value * 100).toFixed(1)}%</span>
-                                    </div>
-                                    <div className="w-full bg-muted rounded-full h-2.5">
-                                      <div 
-                                        className="bg-primary h-2.5 rounded-full" 
-                                        style={{ width: `${value * 100}%` }}
-                                      ></div>
-                                    </div>
-                                  </div>
-                                ))}
-                              </div>
-                            );
-                          })()}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </TabsContent>
-              </Tabs>
-            )}
-          </div>
-        </ResizablePanel>
-      </ResizablePanelGroup>
+                      })}
+                    </TableBody>
+                  </Table>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
+      ) : (
+        <Card className="border-dashed">
+          <CardHeader>
+            <CardTitle>No Regression Model Selected</CardTitle>
+            <CardDescription>
+              Run a regression model to see results and analysis.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="flex flex-col items-center justify-center p-6 space-y-4">
+            <div className="rounded-full bg-muted p-6">
+              <Calculator className="h-12 w-12 text-muted-foreground" />
+            </div>
+            <p className="text-center text-muted-foreground">
+              Create a model by clicking "Run OLS Regression" or "Run GWR Regression" to analyze property data.
+              <br />
+              OLS provides a basic linear model, while GWR accounts for spatial relationships.
+            </p>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
+}
+
+// Helper component to show model quality
+function ModelQualitySummary({ model }: { model: RegressionModel }) {
+  const modelQuality = calculateModelQuality(model);
+  
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center space-x-2">
+        <div className={`text-2xl font-bold rounded-md py-1 px-3 ${
+          modelQuality.quality === 'excellent' ? 'bg-green-100 text-green-800' :
+          modelQuality.quality === 'good' ? 'bg-emerald-100 text-emerald-800' :
+          modelQuality.quality === 'moderate' ? 'bg-yellow-100 text-yellow-800' :
+          modelQuality.quality === 'poor' ? 'bg-orange-100 text-orange-800' :
+          'bg-red-100 text-red-800'
+        }`}>
+          {modelQuality.quality.charAt(0).toUpperCase() + modelQuality.quality.slice(1)}
+        </div>
+        <span className="text-sm text-muted-foreground">Model Quality Assessment</span>
+      </div>
+      
+      <div className="space-y-2">
+        <h4 className="font-medium">Model Strengths</h4>
+        <ul className="list-disc pl-5 space-y-1 text-sm">
+          {modelQuality.strengths.map((strength, i) => (
+            <li key={i} className="text-green-700">{strength}</li>
+          ))}
+          {modelQuality.strengths.length === 0 && (
+            <li className="text-muted-foreground italic">No significant strengths identified</li>
+          )}
+        </ul>
+      </div>
+      
+      <div className="space-y-2">
+        <h4 className="font-medium">Areas for Improvement</h4>
+        <ul className="list-disc pl-5 space-y-1 text-sm">
+          {modelQuality.weaknesses.map((weakness, i) => (
+            <li key={i} className="text-red-700">{weakness}</li>
+          ))}
+          {modelQuality.weaknesses.length === 0 && (
+            <li className="text-muted-foreground italic">No significant weaknesses identified</li>
+          )}
+        </ul>
+      </div>
+      
+      <div className="space-y-2">
+        <h4 className="font-medium">Model Statistics</h4>
+        <div className="grid grid-cols-2 gap-2 text-sm">
+          <div>
+            <span className="text-muted-foreground">R-squared:</span>{' '}
+            <span className="font-medium">{(model.rSquared * 100).toFixed(1)}%</span>
+          </div>
+          <div>
+            <span className="text-muted-foreground">Adj. R-squared:</span>{' '}
+            <span className="font-medium">{(model.adjustedRSquared * 100).toFixed(1)}%</span>
+          </div>
+          <div>
+            <span className="text-muted-foreground">RMSE:</span>{' '}
+            <span className="font-medium">{formatCurrency(model.rootMeanSquareError)}</span>
+          </div>
+          <div>
+            <span className="text-muted-foreground">MAE:</span>{' '}
+            <span className="font-medium">{formatCurrency(model.meanAbsoluteError)}</span>
+          </div>
+          <div>
+            <span className="text-muted-foreground">MAPE:</span>{' '}
+            <span className="font-medium">{model.meanAbsolutePercentageError.toFixed(2)}%</span>
+          </div>
+          <div>
+            <span className="text-muted-foreground">AIC:</span>{' '}
+            <span className="font-medium">{model.akaikeInformationCriterion.toFixed(1)}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Helper component to show residuals on a map
+function ResidualMapView({ model, properties }: { model: RegressionModel; properties: Property[] }) {
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-base font-semibold">Residual Map</CardTitle>
+        <CardDescription>
+          Spatial distribution of model errors
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="h-[350px] flex items-center justify-center bg-muted/30">
+        <div className="text-center text-muted-foreground italic">
+          <p>Residual map visualization would appear here.</p>
+          <p>This component would display property locations on a map, colored by residual magnitude.</p>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+// Helper component to show predictions in a table
+function PredictionTable({ model, properties }: { model: RegressionModel; properties: Property[] }) {
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-base font-semibold">Property Value Predictions</CardTitle>
+        <CardDescription>
+          Sample predictions from the model
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <div className="border rounded-md">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Address</TableHead>
+                <TableHead>Actual Value</TableHead>
+                <TableHead>Predicted</TableHead>
+                <TableHead>Difference</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {properties.map((property, index) => {
+                const actualValue = model.actualValues[index] || 0;
+                const predictedValue = model.predictedValues[index] || 0;
+                const difference = actualValue - predictedValue;
+                const percentDiff = (difference / actualValue) * 100;
+                
+                return (
+                  <TableRow key={property.id}>
+                    <TableCell className="font-medium">{property.address}</TableCell>
+                    <TableCell>{formatCurrency(actualValue)}</TableCell>
+                    <TableCell>{formatCurrency(predictedValue)}</TableCell>
+                    <TableCell className={difference < 0 ? 'text-red-500' : 'text-green-500'}>
+                      {formatCurrency(difference)} ({Math.abs(percentDiff).toFixed(1)}%)
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+// Helper component to show variable importance
+function VariableImportanceView({ model }: { model: RegressionModel }) {
+  const variableImportance = calculateVariableImportance(model);
+  
+  // Format into an array for display
+  const importanceData = Object.entries(variableImportance)
+    .filter(([variable]) => variable !== '(Intercept)')
+    .map(([variable, importance]) => ({
+      variable,
+      importance,
+      coefficient: model.coefficients[variable],
+      pValue: model.pValues[variable]
+    }))
+    .sort((a, b) => b.importance - a.importance);
+  
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-base font-semibold">Variable Importance</CardTitle>
+        <CardDescription>
+          Relative influence of each predictor
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <div className="space-y-4">
+          {importanceData.map(item => (
+            <div key={item.variable} className="space-y-1">
+              <div className="flex justify-between text-sm">
+                <span className="font-medium">{item.variable}</span>
+                <span className={item.pValue < 0.05 ? 'text-green-600' : 'text-muted-foreground'}>
+                  {(item.importance * 100).toFixed(1)}%
+                  {item.pValue < 0.05 ? ' (significant)' : ''}
+                </span>
+              </div>
+              <div className="h-2 bg-muted rounded-full overflow-hidden">
+                <div 
+                  className={`h-full ${
+                    item.coefficient > 0 ? 'bg-green-500' : 'bg-red-500'
+                  } ${
+                    item.pValue < 0.05 ? '' : 'opacity-40'
+                  }`}
+                  style={{ width: `${item.importance * 100}%` }}
+                ></div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+// Helper function to format currency values
+function formatCurrency(value: number): string {
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0
+  }).format(value);
 }

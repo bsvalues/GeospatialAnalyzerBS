@@ -1,252 +1,160 @@
 import React from 'react';
 import { RegressionModel } from '@/services/regressionService';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { HelpCircle, AlertTriangle, Check, X, Baseline } from 'lucide-react';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+} from '@/components/ui/card';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
 import { formatCurrency } from '@/lib/utils';
+import { Badge } from '@/components/ui/badge';
 
-interface ModelResultsProps {
+export interface ModelResultsProps {
   model: RegressionModel;
+  className?: string;
 }
 
-export function ModelResults({ model }: ModelResultsProps) {
-  // Helper to format p-values with appropriate significance stars
-  const formatPValue = (pValue: number) => {
-    const stars = pValue < 0.001 ? '***' : pValue < 0.01 ? '**' : pValue < 0.05 ? '*' : '';
-    return (
-      <div className="flex items-center justify-between">
-        <span>{pValue.toFixed(4)}</span>
-        <span className="text-primary font-bold">{stars}</span>
-      </div>
-    );
-  };
-  
-  // Helper to determine significance
-  const isSignificant = (pValue: number) => pValue < 0.05;
+export function ModelResults({ model, className }: ModelResultsProps) {
+  const topVariables = [...model.usedVariables]
+    .filter(variable => variable !== '(Intercept)')
+    .sort((a, b) => {
+      // Sort by p-value first (more significant variables first)
+      const pValueDiff = model.pValues[a] - model.pValues[b];
+      if (Math.abs(pValueDiff) > 0.001) return pValueDiff;
+      
+      // If p-values are similar, sort by absolute coefficient value (larger effect first)
+      return Math.abs(model.coefficients[b]) - Math.abs(model.coefficients[a]);
+    })
+    .slice(0, 5); // Only show top 5 variables
   
   return (
-    <div className="space-y-6">
-      <div className="grid grid-cols-3 gap-4">
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base">R-squared</CardTitle>
+    <Card className={className}>
+      <CardHeader>
+        <div className="flex justify-between items-start">
+          <div>
+            <CardTitle>{model.modelName || 'Regression Model'}</CardTitle>
             <CardDescription>
-              Proportion of variance explained
+              {model.regressionType} regression • Target: {model.targetVariable}
             </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold">{model.rSquared.toFixed(4)}</div>
-            <div className="text-sm text-muted-foreground mt-1">
-              Adjusted: {model.adjustedRSquared.toFixed(4)}
-            </div>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base">Model Fit</CardTitle>
-            <CardDescription>
-              F-statistic and significance
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold">{model.fStatistic.toFixed(2)}</div>
-            <div className="text-sm mt-1 flex items-center">
-              <span className={model.pValue < 0.05 ? 'text-green-500' : 'text-red-500'}>
-                p = {model.pValue.toExponential(2)}
-              </span>
-              {model.pValue < 0.05 && (
-                <span className="ml-2 text-green-500 flex items-center">
-                  <Check className="h-3 w-3 mr-1" /> Significant
-                </span>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base">Observations</CardTitle>
-            <CardDescription>
-              Sample size and data completeness
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold">{model.usedObservations}</div>
-            {model.diagnostics.missingValueCount > 0 && (
-              <div className="text-sm text-amber-500 mt-1 flex items-center">
-                <AlertTriangle className="h-3 w-3 mr-1" />
-                {model.diagnostics.missingValueCount} values missing
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
-      
-      {/* Coefficients Table */}
-      <div>
-        <h3 className="text-lg font-medium mb-4">Regression Coefficients</h3>
-        <div className="border rounded-md overflow-hidden">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="w-[250px]">Variable</TableHead>
-                <TableHead className="text-right">Coefficient</TableHead>
-                <TableHead className="text-right">Std. Error</TableHead>
-                <TableHead className="text-right">t-value</TableHead>
-                <TableHead className="text-right">p-value</TableHead>
-                <TableHead className="text-center">Significance</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              <TableRow>
-                <TableCell className="font-medium">(Intercept)</TableCell>
-                <TableCell className="text-right">{model.intercept.toFixed(4)}</TableCell>
-                <TableCell className="text-right">-</TableCell>
-                <TableCell className="text-right">-</TableCell>
-                <TableCell className="text-right">-</TableCell>
-                <TableCell className="text-center">-</TableCell>
-              </TableRow>
-              
-              {model.usedVariables.map(variable => (
-                <TableRow key={variable}>
-                  <TableCell className="font-medium">{variable}</TableCell>
-                  <TableCell className="text-right">{model.coefficients[variable].toFixed(4)}</TableCell>
-                  <TableCell className="text-right">{model.standardErrors[variable].toFixed(4)}</TableCell>
-                  <TableCell className="text-right">{model.tValues[variable].toFixed(4)}</TableCell>
-                  <TableCell className="text-right">{formatPValue(model.pValues[variable])}</TableCell>
-                  <TableCell className="text-center">
-                    {isSignificant(model.pValues[variable]) ? (
-                      <span className="text-green-500 flex items-center justify-center">
-                        <Check className="h-4 w-4" />
-                      </span>
-                    ) : (
-                      <span className="text-red-500 flex items-center justify-center">
-                        <X className="h-4 w-4" />
-                      </span>
-                    )}
-                  </TableCell>
+          </div>
+          <Badge variant={model.rSquared > 0.7 ? 'default' : model.rSquared > 0.5 ? 'secondary' : 'outline'}>
+            R² = {model.rSquared.toFixed(3)}
+          </Badge>
+        </div>
+      </CardHeader>
+      <CardContent>
+        <div className="space-y-4">
+          <div>
+            <h3 className="text-sm font-medium mb-2">Key Variables</h3>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Variable</TableHead>
+                  <TableHead>Coefficient</TableHead>
+                  <TableHead className="text-right">p-value</TableHead>
+                  <TableHead className="text-right">Significance</TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
-        
-        <div className="flex justify-end mt-2 text-xs text-muted-foreground">
-          <div className="space-x-2">
-            <span>Significance levels:</span>
-            <span>* p&lt;0.05</span>
-            <span>** p&lt;0.01</span>
-            <span>*** p&lt;0.001</span>
+              </TableHeader>
+              <TableBody>
+                <TableRow>
+                  <TableCell className="font-medium">(Intercept)</TableCell>
+                  <TableCell>{model.coefficients['(Intercept)'].toFixed(4)}</TableCell>
+                  <TableCell className="text-right">{formatPValue(model.pValues['(Intercept)'])}</TableCell>
+                  <TableCell className="text-right">{getSignificanceStars(model.pValues['(Intercept)'])}</TableCell>
+                </TableRow>
+                
+                {topVariables.map(variable => (
+                  <TableRow key={variable}>
+                    <TableCell className="font-medium">{variable}</TableCell>
+                    <TableCell>{model.coefficients[variable].toFixed(4)}</TableCell>
+                    <TableCell className="text-right">{formatPValue(model.pValues[variable])}</TableCell>
+                    <TableCell className="text-right">{getSignificanceStars(model.pValues[variable])}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
           </div>
-        </div>
-      </div>
-      
-      {/* Interpretation */}
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-base">Model Interpretation</CardTitle>
-          <CardDescription>
-            What the model results mean
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4 text-sm">
-            <p>
-              This model explains <span className="font-semibold">{(model.rSquared * 100).toFixed(1)}%</span> of the variation in {model.targetVariable}.
-              {model.pValue < 0.05 
-                ? " The model is statistically significant, suggesting it has good predictive power."
-                : " The model is not statistically significant, which suggests poor predictive power."}
+          
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <h3 className="text-sm font-medium mb-2">Model Information</h3>
+              <dl className="grid grid-cols-[1fr_1fr] gap-2 text-sm">
+                <dt className="text-muted-foreground">Model Type:</dt>
+                <dd>{model.regressionType}</dd>
+                
+                <dt className="text-muted-foreground">Target:</dt>
+                <dd>{model.targetVariable}</dd>
+                
+                <dt className="text-muted-foreground">Sample Size:</dt>
+                <dd>{model.actualValues.length} properties</dd>
+                
+                <dt className="text-muted-foreground">Variables:</dt>
+                <dd>{model.usedVariables.length - 1} predictors</dd>
+              </dl>
+            </div>
+            
+            <div>
+              <h3 className="text-sm font-medium mb-2">Fit Statistics</h3>
+              <dl className="grid grid-cols-[1fr_1fr] gap-2 text-sm">
+                <dt className="text-muted-foreground">R²:</dt>
+                <dd>{model.rSquared.toFixed(4)}</dd>
+                
+                <dt className="text-muted-foreground">Adjusted R²:</dt>
+                <dd>{model.adjustedRSquared.toFixed(4)}</dd>
+                
+                <dt className="text-muted-foreground">RMSE:</dt>
+                <dd>{formatCurrency(model.rootMeanSquareError)}</dd>
+                
+                <dt className="text-muted-foreground">MAPE:</dt>
+                <dd>{model.meanAbsolutePercentageError.toFixed(2)}%</dd>
+              </dl>
+            </div>
+          </div>
+          
+          <div>
+            <h3 className="text-sm font-medium mb-2">Interpretation</h3>
+            <p className="text-sm text-muted-foreground">
+              {generateInterpretation(model)}
             </p>
-            
-            {model.usedVariables.filter(v => isSignificant(model.pValues[v])).length > 0 ? (
-              <div>
-                <p className="font-semibold">Key factors affecting {model.targetVariable}:</p>
-                <ul className="list-disc pl-5 mt-1 space-y-1">
-                  {model.usedVariables
-                    .filter(v => isSignificant(model.pValues[v]))
-                    .sort((a, b) => Math.abs(model.tValues[b]) - Math.abs(model.tValues[a]))
-                    .slice(0, 5)
-                    .map(variable => (
-                      <li key={variable}>
-                        <span className="font-medium">{variable}</span>: 
-                        {model.coefficients[variable] > 0 
-                          ? ` Increases ${model.targetVariable} by ${model.coefficients[variable].toFixed(2)} units per unit increase`
-                          : ` Decreases ${model.targetVariable} by ${Math.abs(model.coefficients[variable]).toFixed(2)} units per unit increase`}
-                      </li>
-                    ))
-                  }
-                </ul>
-              </div>
-            ) : (
-              <Alert variant="destructive">
-                <AlertTriangle className="h-4 w-4" />
-                <AlertTitle>No significant variables</AlertTitle>
-                <AlertDescription>
-                  None of the variables in the model have a statistically significant effect on {model.targetVariable}.
-                  Consider trying different variables or transformations.
-                </AlertDescription>
-              </Alert>
-            )}
-            
-            {model.diagnostics.collinearity && (
-              <Alert variant="warning">
-                <AlertTriangle className="h-4 w-4" />
-                <AlertTitle>Multicollinearity detected</AlertTitle>
-                <AlertDescription>
-                  Some variables are highly correlated, which can make coefficient interpretation difficult.
-                  Consider removing some correlated variables.
-                </AlertDescription>
-              </Alert>
-            )}
-            
-            {model.diagnostics.heteroskedasticity && (
-              <Alert variant="warning">
-                <AlertTriangle className="h-4 w-4" />
-                <AlertTitle>Heteroskedasticity detected</AlertTitle>
-                <AlertDescription>
-                  Error variance is not constant, which may affect statistical tests.
-                  Consider transforming variables or using robust standard errors.
-                </AlertDescription>
-              </Alert>
-            )}
-            
-            {model.diagnostics.spatialAutocorrelation && (
-              <Alert variant="warning">
-                <AlertTriangle className="h-4 w-4" />
-                <AlertTitle>Spatial autocorrelation detected</AlertTitle>
-                <AlertDescription>
-                  Property values are spatially clustered. Consider using Geographic Weighted Regression
-                  or adding spatial variables to account for location effects.
-                </AlertDescription>
-              </Alert>
-            )}
           </div>
-        </CardContent>
-      </Card>
-      
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-base">Prediction Formula</CardTitle>
-          <CardDescription>
-            Use this equation to predict {model.targetVariable}
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="p-4 bg-muted rounded-md font-mono text-sm overflow-auto whitespace-pre">
-            {`${model.targetVariable} = ${model.intercept.toFixed(4)} ${
-              model.usedVariables.map(v => {
-                const coef = model.coefficients[v];
-                return coef >= 0 
-                  ? `+ ${coef.toFixed(4)} × ${v}`
-                  : `- ${Math.abs(coef).toFixed(4)} × ${v}`;
-              }).join(' ')
-            }`}
-          </div>
-        </CardContent>
-      </Card>
-    </div>
+        </div>
+      </CardContent>
+    </Card>
   );
+}
+
+// Helper function to format p-values
+function formatPValue(pValue: number): string {
+  if (pValue < 0.001) return '<0.001';
+  return pValue.toFixed(3);
+}
+
+// Helper function to get significance stars
+function getSignificanceStars(pValue: number): string {
+  if (pValue < 0.001) return '***';
+  if (pValue < 0.01) return '**';
+  if (pValue < 0.05) return '*';
+  if (pValue < 0.1) return '.';
+  return '';
+}
+
+// Helper function to generate model interpretation
+function generateInterpretation(model: RegressionModel): string {
+  const mostSignificantVariable = [...model.usedVariables]
+    .filter(v => v !== '(Intercept)')
+    .sort((a, b) => model.pValues[a] - model.pValues[b])[0];
+  
+  const coefficientSign = model.coefficients[mostSignificantVariable] > 0 ? 'positive' : 'negative';
+  const rSquaredQuality = model.rSquared > 0.7 ? 'strong' : model.rSquared > 0.5 ? 'moderate' : 'weak';
+  
+  return `This ${model.regressionType} model explains ${(model.rSquared * 100).toFixed(1)}% of variation in ${model.targetVariable} (${rSquaredQuality} fit). ${mostSignificantVariable} has the most significant effect with a ${coefficientSign} relationship (p=${formatPValue(model.pValues[mostSignificantVariable])}). For every one unit increase in ${mostSignificantVariable}, ${model.targetVariable} changes by ${Math.abs(model.coefficients[mostSignificantVariable]).toFixed(4)} units, holding other factors constant.`;
 }
