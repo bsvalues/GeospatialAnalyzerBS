@@ -7,6 +7,7 @@ import Dashboard from './components/Dashboard';
 import NotFound from '@/pages/not-found';
 import { PropertyComparisonProvider } from './components/comparison/PropertyComparisonContext';
 import PropertyComparison from './components/comparison/PropertyComparison';
+import { PropertySearchDialogContainer } from './components/comparison/PropertySearchDialogContainer';
 
 function Router() {
   return (
@@ -23,6 +24,7 @@ function App() {
       <PropertyComparisonProvider>
         <Router />
         <PropertyComparison />
+        <PropertySearchDialogContainer />
         <Toaster />
       </PropertyComparisonProvider>
     </QueryClientProvider>

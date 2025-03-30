@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Home, Coins, MapPin, Ruler, CalendarClock, Binary, Layers, ChevronDown, ChevronUp, Map, FileText } from 'lucide-react';
+import { X, Home, Coins, MapPin, Ruler, CalendarClock, Binary, Layers, ChevronDown, ChevronUp, Map, FileText, Search } from 'lucide-react';
 import { Property } from '@/shared/types';
 import { overlayLayerSources } from './layerSources';
 import { 
@@ -10,6 +10,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { PropertyCompareButton } from '../comparison/PropertySelectionDisplay';
+import { FindSimilarPropertiesButton } from '../comparison/FindSimilarPropertiesButton';
 
 interface PropertyInfoPanelProps {
   property: Property;
@@ -173,9 +174,17 @@ const PropertyInfoPanel: React.FC<PropertyInfoPanelProps> = ({ property, onClose
         </div>
       </div>
       
-      <div className="border-t border-gray-700 px-4 py-3 flex justify-between">
-        <Button variant="default" size="sm" className="text-xs">View Details</Button>
-        <PropertyCompareButton property={property} />
+      <div className="border-t border-gray-700 px-4 py-3 flex flex-col gap-2">
+        <div className="flex justify-between">
+          <Button variant="default" size="sm" className="text-xs">View Details</Button>
+          <PropertyCompareButton property={property} />
+        </div>
+        <FindSimilarPropertiesButton 
+          property={property}
+          variant="outline"
+          size="sm"
+          className="w-full mt-1" 
+        />
       </div>
     </div>
   );

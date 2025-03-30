@@ -12,6 +12,13 @@ interface PropertyComparisonContextType {
   removeProperty: (property: Property) => void;
   showComparison: boolean;
   setShowComparison: (show: boolean) => void;
+  
+  // Search and compare functionality
+  isSearchDialogOpen: boolean;
+  openSearchDialog: (referenceProperty: Property) => void;
+  closeSearchDialog: () => void;
+  currentReferenceProperty: Property | null;
+  searchForComparableProperties: (params: any) => Promise<Property[]>;
 }
 
 // Create the context with a default value
@@ -35,6 +42,8 @@ interface PropertyComparisonProviderProps {
 export const PropertyComparisonProvider: React.FC<PropertyComparisonProviderProps> = ({ children }) => {
   const [selectedProperties, setSelectedProperties] = useState<Property[]>([]);
   const [showComparison, setShowComparison] = useState<boolean>(false);
+  const [isSearchDialogOpen, setIsSearchDialogOpen] = useState<boolean>(false);
+  const [currentReferenceProperty, setCurrentReferenceProperty] = useState<Property | null>(null);
   const { toast } = useToast();
 
   // Maximum number of properties that can be compared at once
@@ -91,7 +100,109 @@ export const PropertyComparisonProvider: React.FC<PropertyComparisonProviderProp
       description: "All properties have been removed from the comparison.",
     });
   };
-
+  
+  // Search dialog management
+  const openSearchDialog = (referenceProperty: Property) => {
+    setCurrentReferenceProperty(referenceProperty);
+    setIsSearchDialogOpen(true);
+  };
+  
+  const closeSearchDialog = () => {
+    setIsSearchDialogOpen(false);
+  };
+  
+  // Mock implementation for searching comparable properties
+  // In a real implementation, this would call an API endpoint
+  const searchForComparableProperties = async (params: any): Promise<Property[]> => {
+    // Simulate API call with a delay
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    
+    // Return some mock data for development purposes
+    // In production, this would be replaced with actual API calls
+    const properties: Property[] = [
+      {
+        id: "prop-1",
+        parcelId: "APN123456",
+        address: "125 Main St, Richland, WA",
+        owner: "Jane Smith",
+        value: "$320,000",
+        salePrice: "$305,000",
+        squareFeet: 2100,
+        yearBuilt: 2008,
+        landValue: "$95,000",
+        coordinates: [46.28, -119.28]
+      },
+      {
+        id: "prop-2",
+        parcelId: "APN123457",
+        address: "130 Oak Ave, Kennewick, WA",
+        owner: "John Doe",
+        value: "$350,000",
+        salePrice: "$335,000",
+        squareFeet: 2300,
+        yearBuilt: 2010,
+        landValue: "$105,000",
+        coordinates: [46.21, -119.17]
+      },
+      {
+        id: "prop-3",
+        parcelId: "APN123458",
+        address: "240 Vineyard Dr, Prosser, WA",
+        owner: "Robert Johnson",
+        value: "$290,000",
+        salePrice: "$275,000",
+        squareFeet: 1950,
+        yearBuilt: 2005,
+        landValue: "$85,000",
+        coordinates: [46.24, -119.76]
+      },
+      {
+        id: "prop-4",
+        parcelId: "APN123459",
+        address: "555 Columbia Ave, Richland, WA",
+        owner: "Mary Williams",
+        value: "$380,000",
+        salePrice: "$365,000",
+        squareFeet: 2600,
+        yearBuilt: 2012,
+        landValue: "$120,000",
+        coordinates: [46.29, -119.29]
+      },
+      {
+        id: "prop-5",
+        parcelId: "APN123460",
+        address: "720 Franklin St, Pasco, WA",
+        owner: "Steven Davis",
+        value: "$275,000",
+        salePrice: "$260,000",
+        squareFeet: 1850,
+        yearBuilt: 2003,
+        landValue: "$80,000",
+        coordinates: [46.23, -119.10]
+      }
+    ];
+    
+    // Filter based on search parameters
+    const filteredProperties = properties.filter(property => {
+      // Basic filtering example - in a real implementation this would be more sophisticated
+      if (params.squareFootageMin && property.squareFeet < params.squareFootageMin) return false;
+      if (params.squareFootageMax && property.squareFeet > params.squareFootageMax) return false;
+      if (params.yearBuiltMin && property.yearBuilt && property.yearBuilt < params.yearBuiltMin) return false;
+      if (params.yearBuiltMax && property.yearBuilt && property.yearBuilt > params.yearBuiltMax) return false;
+      
+      // Price filtering
+      if (params.priceMin || params.priceMax) {
+        const propertyValue = property.value ? parseFloat(property.value.replace(/[$,]/g, '')) : 0;
+        if (params.priceMin && propertyValue < params.priceMin) return false;
+        if (params.priceMax && propertyValue > params.priceMax) return false;
+      }
+      
+      return true;
+    });
+    
+    return filteredProperties;
+  };
+  
   // Context value
   const value: PropertyComparisonContextType = {
     selectedProperties,
@@ -102,6 +213,13 @@ export const PropertyComparisonProvider: React.FC<PropertyComparisonProviderProp
     removeProperty,
     showComparison,
     setShowComparison,
+    
+    // Search functionality
+    isSearchDialogOpen,
+    openSearchDialog,
+    closeSearchDialog,
+    currentReferenceProperty,
+    searchForComparableProperties,
   };
 
   return (
