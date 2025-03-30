@@ -10,35 +10,53 @@ const MapPanel: React.FC = () => {
   // Selected property state
   const [selectedProperty, setSelectedProperty] = useState<Property | null>(null);
   
-  // Sample property data with coordinates
+  // Sample property data with coordinates from Benton County, Washington
   const [properties, setProperties] = useState<Property[]>([
     {
       id: "prop1",
-      address: "123 Main Street",
-      parcelId: "10425-01-29",
+      address: "123 Jadwin Ave, Richland",
+      parcelId: "1-0425-100-0129-000",
       salePrice: "$375,000",
       squareFeet: 2300,
       yearBuilt: 2005,
       landValue: "$125,000",
-      coordinates: [47.6062, -122.3321] // Seattle coordinates
+      coordinates: [46.2804, -119.2752] // Richland, Benton County
     },
     {
       id: "prop2",
-      address: "456 Oak Avenue",
-      parcelId: "10425-02-13",
+      address: "456 Columbia Center Blvd, Kennewick",
+      parcelId: "1-0425-200-0213-000",
       salePrice: "$425,000",
       squareFeet: 3150,
       yearBuilt: 2010,
-      coordinates: [47.6092, -122.3150]
+      coordinates: [46.2087, -119.2022] // Kennewick, Benton County
     },
     {
       id: "prop3",
-      address: "789 Pine Road",
-      parcelId: "10426-05-02",
+      address: "789 Edison St, Kennewick",
+      parcelId: "1-0426-500-0052-000",
       salePrice: "$295,000",
       squareFeet: 1320,
       yearBuilt: 1998,
-      coordinates: [47.6152, -122.3255]
+      coordinates: [46.2115, -119.1868] // East Kennewick, Benton County
+    },
+    {
+      id: "prop4",
+      address: "321 9th St, Benton City",
+      parcelId: "1-0427-300-0178-000",
+      salePrice: "$265,000",
+      squareFeet: 1750,
+      yearBuilt: 2001,
+      coordinates: [46.2631, -119.4871] // Benton City, Benton County
+    },
+    {
+      id: "prop5",
+      address: "555 Keene Rd, Richland",
+      parcelId: "1-0425-700-0092-000",
+      salePrice: "$395,000",
+      squareFeet: 2650,
+      yearBuilt: 2008,
+      coordinates: [46.2392, -119.2802] // South Richland, Benton County
     }
   ]);
   
@@ -68,10 +86,10 @@ const MapPanel: React.FC = () => {
     labels: true
   });
   
-  // Map configuration
+  // Map configuration - centered on Benton County, Washington
   const [mapConfig, setMapConfig] = useState({
-    center: [47.6062, -122.3321] as LatLngExpression,
-    zoom: 13
+    center: [46.2400, -119.2800] as LatLngExpression, // Center of Benton County, WA
+    zoom: 11
   });
   
   const [searchText, setSearchText] = useState('');
@@ -140,6 +158,15 @@ const MapPanel: React.FC = () => {
       zoom: Math.max(prev.zoom - 1, 1)
     }));
   };
+  
+  // Reset view to show all properties
+  const handleLocateAllProperties = () => {
+    setMapConfig({
+      center: [46.2400, -119.2800], // Center of Benton County
+      zoom: 11
+    });
+    setSelectedProperty(null);
+  };
 
   return (
     <div className="flex h-full">
@@ -175,7 +202,8 @@ const MapPanel: React.FC = () => {
           <div className="p-1">
             <button 
               className="p-1.5 hover:bg-gray-700 rounded"
-              title="Locate Properties"
+              title="Locate All Properties"
+              onClick={handleLocateAllProperties}
             >
               <Locate size={16} />
             </button>
