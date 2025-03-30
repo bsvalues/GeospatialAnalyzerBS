@@ -267,6 +267,8 @@ export class MemStorage implements IStorage {
         yearBuilt,
         landValue,
         coordinates: [lat, lng],
+        latitude: lat.toString(),
+        longitude: lng.toString(),
         neighborhood,
         propertyType,
         bedrooms,

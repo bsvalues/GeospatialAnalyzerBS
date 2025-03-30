@@ -74,3 +74,36 @@ export interface MapEventHandlers {
 
 // Map bounds
 export type MapBounds = [number, number, number, number]; // [south, west, north, east]
+
+/**
+ * Script module types for property valuation script functionality
+ */
+
+// Script group for organizing script steps
+export interface ScriptGroup {
+  id: string;
+  name: string;
+  active: boolean;
+  order?: number;
+}
+
+// Script step status
+export type ScriptStepStatus = 'pending' | 'active' | 'complete' | 'error';
+
+// Script step type
+export type ScriptStepType = 'compute' | 'group' | 'combine' | 'filter' | 'sort' | 'export';
+
+// Script step for property valuation calculations
+export interface ScriptStep {
+  id: string;
+  name: string;
+  status: ScriptStepStatus;
+  type: ScriptStepType;
+  code?: string;
+  order?: number;
+  groupId?: string;
+  outputField?: string;
+  dependencies?: string[];
+  lastRun?: string;
+  runCount?: number;
+}

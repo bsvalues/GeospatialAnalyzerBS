@@ -1,4 +1,4 @@
-import { pgTable, text, serial, integer, boolean, jsonb } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, boolean, jsonb, numeric } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -24,6 +24,8 @@ export const properties = pgTable("properties", {
   yearBuilt: integer("year_built"),
   landValue: text("land_value"),
   coordinates: jsonb("coordinates"),
+  latitude: numeric("latitude", { precision: 10, scale: 6 }),
+  longitude: numeric("longitude", { precision: 10, scale: 6 }),
   neighborhood: text("neighborhood"),
   propertyType: text("property_type"),
   bedrooms: integer("bedrooms"),
@@ -96,6 +98,8 @@ export const insertPropertySchema = createInsertSchema(properties).pick({
   yearBuilt: true,
   landValue: true,
   coordinates: true,
+  latitude: true,
+  longitude: true,
   neighborhood: true,
   propertyType: true,
   bedrooms: true,

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Home, 
   Map, 
@@ -8,9 +8,14 @@ import {
   Settings,
   BarChart,
   Calendar,
-  AlertCircle
+  AlertCircle,
+  Globe
 } from 'lucide-react';
 import MapPanel from './panels/MapPanel';
+import ScriptPanel from './panels/ScriptPanel';
+import SpatialAnalysisPanel from './panels/SpatialAnalysisPanel';
+import { Property } from '@shared/schema';
+import { useQuery } from '@tanstack/react-query';
 
 export interface DashboardProps {
   className?: string;
@@ -18,6 +23,12 @@ export interface DashboardProps {
 
 const Dashboard: React.FC<DashboardProps> = ({ className }) => {
   const [activeTab, setActiveTab] = useState('map');
+  
+  // Fetch properties data
+  const { data: properties = [] } = useQuery<Property[]>({
+    queryKey: ['/api/properties'],
+    staleTime: 1000 * 60 * 5, // 5 minutes
+  });
   
   return (
     <div className={`h-full flex flex-col ${className}`}>
@@ -58,6 +69,13 @@ const Dashboard: React.FC<DashboardProps> = ({ className }) => {
           >
             <TrendingUp className="h-4 w-4 mr-2" />
             Regression
+          </button>
+          <button
+            className={`px-4 py-3 font-medium text-sm flex items-center ${activeTab === 'spatial' ? 'text-primary border-b-2 border-primary' : 'text-gray-600 hover:text-gray-900'}`}
+            onClick={() => setActiveTab('spatial')}
+          >
+            <Globe className="h-4 w-4 mr-2" />
+            Spatial Analysis
           </button>
           <button
             className={`px-4 py-3 font-medium text-sm flex items-center ${activeTab === 'settings' ? 'text-primary border-b-2 border-primary' : 'text-gray-600 hover:text-gray-900'}`}
@@ -168,19 +186,7 @@ const Dashboard: React.FC<DashboardProps> = ({ className }) => {
         
         {activeTab === 'map' && <MapPanel />}
         
-        {activeTab === 'scripts' && (
-          <div className="h-full p-6 flex items-center justify-center">
-            <div className="text-center max-w-md">
-              <Code className="w-12 h-12 text-gray-300 mx-auto mb-4" />
-              <p className="text-gray-500 mb-2">
-                The Scripts panel will allow you to create and run property valuation scripts.
-              </p>
-              <p className="text-sm text-gray-400">
-                This feature will be implemented in the next phase.
-              </p>
-            </div>
-          </div>
-        )}
+        {activeTab === 'scripts' && <ScriptPanel />}
         
         {activeTab === 'data' && (
           <div className="h-full p-6 flex items-center justify-center">
@@ -208,6 +214,10 @@ const Dashboard: React.FC<DashboardProps> = ({ className }) => {
               </p>
             </div>
           </div>
+        )}
+        
+        {activeTab === 'spatial' && (
+          <SpatialAnalysisPanel properties={properties} />
         )}
         
         {activeTab === 'settings' && (
