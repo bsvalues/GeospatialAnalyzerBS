@@ -1,8 +1,18 @@
-import React, { useState } from 'react';
-import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
+import React, { useState, useEffect } from 'react';
+import { 
+  MapContainer, 
+  TileLayer, 
+  Marker, 
+  Popup, 
+  useMap, 
+  WMSTileLayer, 
+  LayersControl,
+  ZoomControl
+} from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import { Icon, LatLngExpression } from 'leaflet';
 import { Property } from '@/shared/types';
+import { basemapSources, satelliteLabelsLayer, overlayLayerSources, GisLayerSource } from './layerSources';
 
 // Fix for the default marker icons in leaflet
 import markerIcon from 'leaflet/dist/images/marker-icon.png';
@@ -25,9 +35,10 @@ interface MapComponentProps {
   zoom: number;
   properties?: Property[];
   onPropertySelect?: (property: Property) => void;
-  basemapType: 'osm' | 'satellite' | 'topo';
+  basemapType: string;
   opacity: number;
   showLabels: boolean;
+  visibleLayers?: string[]; // IDs of layers that should be visible
 }
 
 const MapComponent: React.FC<MapComponentProps> = ({
@@ -37,30 +48,51 @@ const MapComponent: React.FC<MapComponentProps> = ({
   onPropertySelect,
   basemapType,
   opacity,
-  showLabels
+  showLabels,
+  visibleLayers = []
 }) => {
-  // Define different base tile layers
-  const basemaps = {
-    osm: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
-    satellite: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
-    topo: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}'
-  };
-
-  // Attribution for the tile layers
-  const attributions = {
-    osm: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-    satellite: '&copy; <a href="https://www.arcgis.com/">ArcGIS</a>',
-    topo: '&copy; <a href="https://www.arcgis.com/">ArcGIS</a>'
-  };
+  // Get base layer information from our sources
+  const baseLayer = basemapSources[basemapType] || basemapSources.osm;
 
   // Component that updates the map based on props changes
-  const MapUpdater = ({ basemapType }: { basemapType: 'osm' | 'satellite' | 'topo' }) => {
+  const MapUpdater = ({ zoom, center }: { zoom: number, center: LatLngExpression }) => {
     const map = useMap();
-    React.useEffect(() => {
+    
+    useEffect(() => {
       // Any map updates that need to be applied when props change
       map.invalidateSize();
-    }, [map, basemapType]);
+      
+      // Update view if center or zoom changed externally
+      map.setView(center, zoom);
+    }, [map, center, zoom, baseLayer.id]);
+    
     return null;
+  };
+
+  // Render either WMS or TileLayer based on the layer type
+  const renderLayer = (layer: GisLayerSource) => {
+    if (layer.type === 'wms') {
+      return (
+        <WMSTileLayer
+          key={layer.id}
+          url={layer.url}
+          layers={layer.options?.layers}
+          format={layer.options?.format || 'image/png'}
+          transparent={layer.options?.transparent !== false}
+          opacity={layer.opacity * (opacity / 100)}
+          attribution={layer.attribution}
+        />
+      );
+    } else {
+      return (
+        <TileLayer
+          key={layer.id}
+          url={layer.url}
+          opacity={layer.opacity * (opacity / 100)}
+          attribution={layer.attribution}
+        />
+      );
+    }
   };
 
   return (
@@ -70,19 +102,19 @@ const MapComponent: React.FC<MapComponentProps> = ({
       style={{ height: '100%', width: '100%' }}
       zoomControl={false}
     >
-      <TileLayer
-        attribution={attributions[basemapType]}
-        url={basemaps[basemapType]}
-        opacity={opacity / 100}
-      />
+      {/* Base map layer */}
+      {renderLayer(baseLayer)}
       
-      {showLabels && basemapType === 'satellite' && (
-        <TileLayer
-          url="https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}"
-          opacity={0.8}
-        />
-      )}
+      {/* Show labels on satellite imagery if enabled */}
+      {showLabels && basemapType === 'satellite' && renderLayer(satelliteLabelsLayer)}
       
+      {/* Render all visible GIS overlay layers */}
+      {overlayLayerSources
+        .filter(layer => visibleLayers.includes(layer.id))
+        .map(layer => renderLayer(layer))
+      }
+      
+      {/* Property markers */}
       {properties.map((property) => {
         // Only render markers for properties with coordinates
         if (!property.coordinates) return null;
@@ -112,7 +144,7 @@ const MapComponent: React.FC<MapComponentProps> = ({
         );
       })}
       
-      <MapUpdater basemapType={basemapType} />
+      <MapUpdater zoom={zoom} center={center} />
     </MapContainer>
   );
 };

@@ -1,10 +1,19 @@
-import React, { useState, useEffect } from 'react';
-import { Layers, Map as MapIcon, Search, Plus, Minus, X, Locate } from 'lucide-react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { Layers, Map as MapIcon, Search, Plus, Minus, X, Locate, Info } from 'lucide-react';
 import LayerControl from '../map/LayerControl';
 import PropertyInfoPanel from '../map/PropertyInfoPanel';
 import MapComponent from '../map/MapComponent';
+import MapLegend from '../map/MapLegend';
 import { Property } from '@/shared/types';
 import { LatLngExpression } from 'leaflet';
+import { basemapSources, overlayLayerSources, GisLayerSource } from '../map/layerSources';
+
+// Interface for Layer Items
+interface LayerItem {
+  id: string;
+  name: string;
+  checked: boolean;
+}
 
 const MapPanel: React.FC = () => {
   // Selected property state
@@ -60,25 +69,27 @@ const MapPanel: React.FC = () => {
     }
   ]);
   
-  // Base map configuration
-  const [selectedBasemap, setSelectedBasemap] = useState<'osm' | 'satellite' | 'topo'>('osm');
+  // Base map configuration - using string ID for more flexibility
+  const [selectedBasemap, setSelectedBasemap] = useState<string>('osm');
   
-  // Base map layers
-  const baseLayers = [
-    { id: 'osm', name: 'OpenStreetMap', checked: selectedBasemap === 'osm' },
-    { id: 'satellite', name: 'Satellite Imagery', checked: selectedBasemap === 'satellite' },
-    { id: 'topo', name: 'Topographic', checked: selectedBasemap === 'topo' }
-  ];
+  // Create base map layer items from our sources
+  const baseLayers: LayerItem[] = Object.keys(basemapSources).map(key => ({
+    id: key,
+    name: basemapSources[key].name,
+    checked: key === selectedBasemap
+  }));
   
-  // Viewable property layers
-  const viewableLayers = [
-    { id: 'parcels', name: 'Parcels', checked: true },
-    { id: 'shortplats', name: 'Short Plats', checked: false },
-    { id: 'longplats', name: 'Long Plats', checked: false },
-    { id: 'flood', name: 'Flood Zones', checked: false },
-    { id: 'welllogs', name: 'Well Logs', checked: false },
-    { id: 'zoning', name: 'Zoning', checked: false }
-  ];
+  // Create viewable layer items from our overlay sources
+  const [viewableLayers, setViewableLayers] = useState<LayerItem[]>(
+    overlayLayerSources.map(layer => ({
+      id: layer.id,
+      name: layer.name,
+      checked: layer.id === 'parcels' // Only parcels are checked by default
+    }))
+  );
+  
+  // Track visible layers for the map
+  const [visibleOverlayLayers, setVisibleOverlayLayers] = useState<string[]>(['parcels']);
   
   // Layer options
   const [layerOptions, setLayerOptions] = useState({
@@ -93,14 +104,6 @@ const MapPanel: React.FC = () => {
   });
   
   const [searchText, setSearchText] = useState('');
-  
-  // Update baseLayer selection when changed from layer control
-  useEffect(() => {
-    const checkedLayer = baseLayers.find(layer => layer.checked);
-    if (checkedLayer) {
-      setSelectedBasemap(checkedLayer.id as 'osm' | 'satellite' | 'topo');
-    }
-  }, [baseLayers]);
   
   // Handle searching properties
   const handleSearch = () => {
@@ -122,6 +125,7 @@ const MapPanel: React.FC = () => {
     }
   };
   
+  // Update layer options (opacity, labels)
   const updateLayerOption = (option: 'opacity' | 'labels', value: number | boolean) => {
     setLayerOptions(prev => ({
       ...prev,
@@ -131,8 +135,33 @@ const MapPanel: React.FC = () => {
   
   // Handle base layer selection from the layer control
   const handleBaseLayerChange = (layerId: string, checked: boolean) => {
-    if (checked && (layerId === 'osm' || layerId === 'satellite' || layerId === 'topo')) {
-      setSelectedBasemap(layerId as 'osm' | 'satellite' | 'topo');
+    if (checked && basemapSources[layerId]) {
+      setSelectedBasemap(layerId);
+      
+      // Update baseLayers checked states
+      const updatedBaseLayers = baseLayers.map(layer => ({
+        ...layer,
+        checked: layer.id === layerId
+      }));
+    }
+  };
+  
+  // Handle viewable layer selection from the layer control
+  const handleViewableLayerChange = (layerId: string, checked: boolean) => {
+    // Update the viewableLayers state
+    setViewableLayers(prev => 
+      prev.map(layer => 
+        layer.id === layerId 
+          ? { ...layer, checked } 
+          : layer
+      )
+    );
+    
+    // Update the visible layers for the map
+    if (checked) {
+      setVisibleOverlayLayers(prev => [...prev, layerId]);
+    } else {
+      setVisibleOverlayLayers(prev => prev.filter(id => id !== layerId));
     }
   };
   
@@ -176,6 +205,7 @@ const MapPanel: React.FC = () => {
         layerOptions={layerOptions}
         onUpdateLayerOption={updateLayerOption}
         onBaseLayerChange={handleBaseLayerChange}
+        onViewableLayerChange={handleViewableLayerChange}
       />
       
       <div className="flex-1 relative">
@@ -234,7 +264,7 @@ const MapPanel: React.FC = () => {
           <PropertyInfoPanel property={selectedProperty} onClose={closePropertyInfo} />
         )}
         
-        {/* Real Map Component */}
+        {/* Enhanced Map Component with GIS Layers */}
         <div className="w-full h-full">
           <MapComponent 
             center={mapConfig.center}
@@ -244,7 +274,17 @@ const MapPanel: React.FC = () => {
             basemapType={selectedBasemap}
             opacity={layerOptions.opacity}
             showLabels={layerOptions.labels}
+            visibleLayers={visibleOverlayLayers}
           />
+          
+          {/* Map Legend */}
+          {visibleOverlayLayers.length > 0 && (
+            <MapLegend 
+              visibleLayers={overlayLayerSources.filter(layer => 
+                visibleOverlayLayers.includes(layer.id)
+              )}
+            />
+          )}
         </div>
       </div>
     </div>
