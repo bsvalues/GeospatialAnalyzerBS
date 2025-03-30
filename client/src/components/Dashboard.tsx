@@ -5,7 +5,7 @@ import OverviewPanel from './panels/OverviewPanel';
 import { MapPanel } from './panels/MapPanel';
 import ScriptPanel from './panels/ScriptPanel';
 import DataPanel from './panels/DataPanel';
-import RegressionPanel from './panels/RegressionPanel';
+import RegressionPanel from './regression/RegressionPanel';
 import SettingsPanel from './panels/SettingsPanel';
 
 const Dashboard: React.FC = () => {

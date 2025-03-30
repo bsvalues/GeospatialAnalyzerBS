@@ -137,12 +137,145 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // API routes for regression models
   app.get('/api/regression/models', (req, res) => {
-    res.json({
-      models: [
-        { id: 1, name: 'Residential Model A', r2: 0.892, variables: 8, cov: 10.4, samples: 423, lastRun: 'Today, 11:42 AM' },
-        { id: 2, name: 'Commercial Properties', r2: 0.815, variables: 6, cov: 12.7, samples: 156, lastRun: 'Yesterday, 2:15 PM' },
-        { id: 3, name: 'Agricultural Land', r2: 0.774, variables: 5, cov: 14.2, samples: 98, lastRun: '3 days ago' }
+    res.json([
+      { id: 1, name: 'Residential Model A', r2: 0.892, variables: 8, cov: 10.4, samples: 423, lastRun: '2024-03-30', type: 'multiple_regression' },
+      { id: 2, name: 'Commercial Properties', r2: 0.815, variables: 6, cov: 12.7, samples: 156, lastRun: '2024-03-29', type: 'multiple_regression' },
+      { id: 3, name: 'Agricultural Land', r2: 0.774, variables: 5, cov: 14.2, samples: 98, lastRun: '2024-03-27', type: 'spatial_regression' },
+      { id: 4, name: 'Time Series Value Model', r2: 0.865, variables: 4, cov: 9.8, samples: 312, lastRun: '2024-03-25', type: 'time_series' },
+      { id: 5, name: 'Neighborhood Factor Analysis', r2: 0.825, variables: 7, cov: 11.3, samples: 278, lastRun: '2024-03-22', type: 'geospatial' }
+    ]);
+  });
+  
+  // Get model variables by model ID
+  app.get('/api/regression/models/:id/variables', (req, res) => {
+    const modelId = parseInt(req.params.id);
+    
+    const variablesByModel = {
+      1: [
+        { name: 'squareFeet', coefficient: 105.82, tValue: 9.7, pValue: 0.00001, correlation: 0.84, included: true },
+        { name: 'yearBuilt', coefficient: 524.34, tValue: 6.4, pValue: 0.00012, correlation: 0.72, included: true },
+        { name: 'bathrooms', coefficient: 12500.00, tValue: 5.2, pValue: 0.00034, correlation: 0.68, included: true },
+        { name: 'bedrooms', coefficient: 8750.00, tValue: 3.8, pValue: 0.00291, correlation: 0.64, included: true },
+        { name: 'lotSize', coefficient: 2.15, tValue: 4.1, pValue: 0.00125, correlation: 0.59, included: true },
+        { name: 'garageSpaces', coefficient: 9800.00, tValue: 3.2, pValue: 0.00427, correlation: 0.46, included: true },
+        { name: 'hasBasement', coefficient: 15200.00, tValue: 2.9, pValue: 0.00621, correlation: 0.42, included: true },
+        { name: 'hasPool', coefficient: 18500.00, tValue: 2.1, pValue: 0.03781, correlation: 0.35, included: false },
+        { name: 'distanceToSchool', coefficient: -1250.00, tValue: -1.8, pValue: 0.07253, correlation: -0.32, included: false },
+        { name: 'yearRenovated', coefficient: 210.45, tValue: 1.7, pValue: 0.09124, correlation: 0.28, included: false }
+      ],
+      2: [
+        { name: 'buildingSize', coefficient: 87.45, tValue: 9.1, pValue: 0.00002, correlation: 0.82, included: true },
+        { name: 'yearBuilt', coefficient: 850.23, tValue: 6.8, pValue: 0.00008, correlation: 0.74, included: true },
+        { name: 'parkingSpaces', coefficient: 3500.00, tValue: 5.6, pValue: 0.00021, correlation: 0.69, included: true },
+        { name: 'lotSize', coefficient: 1.85, tValue: 4.5, pValue: 0.00087, correlation: 0.63, included: true },
+        { name: 'trafficCount', coefficient: 25.40, tValue: 3.7, pValue: 0.00243, correlation: 0.56, included: true },
+        { name: 'distanceToCBD', coefficient: -4500.00, tValue: -3.2, pValue: 0.00389, correlation: -0.48, included: true },
+        { name: 'cornerLocation', coefficient: 75000.00, tValue: 2.1, pValue: 0.03815, correlation: 0.36, included: false },
+        { name: 'zoning', coefficient: 28000.00, tValue: 1.8, pValue: 0.07581, correlation: 0.33, included: false }
+      ],
+      3: [
+        { name: 'acreage', coefficient: 2450.00, tValue: 8.7, pValue: 0.00003, correlation: 0.81, included: true },
+        { name: 'soilQuality', coefficient: 18500.00, tValue: 6.9, pValue: 0.00007, correlation: 0.75, included: true },
+        { name: 'irrigationAccess', coefficient: 35000.00, tValue: 5.8, pValue: 0.00018, correlation: 0.72, included: true },
+        { name: 'roadFrontage', coefficient: 125.00, tValue: 4.2, pValue: 0.00098, correlation: 0.62, included: true },
+        { name: 'distanceToMarket', coefficient: -85.00, tValue: -3.5, pValue: 0.00354, correlation: -0.49, included: true },
+        { name: 'floodZone', coefficient: -12500.00, tValue: -2.2, pValue: 0.03124, correlation: -0.38, included: false },
+        { name: 'landUseRestriction', coefficient: -8900.00, tValue: -1.9, pValue: 0.06213, correlation: -0.31, included: false }
+      ],
+      4: [
+        { name: 'monthsSinceSale', coefficient: 950.00, tValue: 8.5, pValue: 0.00002, correlation: 0.83, included: true },
+        { name: 'interestRate', coefficient: -22500.00, tValue: -6.3, pValue: 0.00014, correlation: -0.76, included: true },
+        { name: 'unemploymentRate', coefficient: -8500.00, tValue: -4.8, pValue: 0.00057, correlation: -0.65, included: true },
+        { name: 'medianIncomeChange', coefficient: 12500.00, tValue: 4.2, pValue: 0.00112, correlation: 0.58, included: true },
+        { name: 'housingStarts', coefficient: 850.00, tValue: 2.3, pValue: 0.02687, correlation: 0.41, included: false },
+        { name: 'inflationRate', coefficient: -5500.00, tValue: -1.9, pValue: 0.06124, correlation: -0.35, included: false }
+      ],
+      5: [
+        { name: 'neighborhoodIndex', coefficient: 24500.00, tValue: 7.8, pValue: 0.00004, correlation: 0.77, included: true },
+        { name: 'schoolScore', coefficient: 18500.00, tValue: 6.5, pValue: 0.00010, correlation: 0.73, included: true },
+        { name: 'distanceToAmenities', coefficient: -2800.00, tValue: -5.7, pValue: 0.00023, correlation: -0.68, included: true },
+        { name: 'walkabilityScore', coefficient: 6500.00, tValue: 5.3, pValue: 0.00031, correlation: 0.65, included: true },
+        { name: 'transitAccess', coefficient: 4200.00, tValue: 4.1, pValue: 0.00120, correlation: 0.57, included: true },
+        { name: 'crimeRate', coefficient: -15000.00, tValue: -3.8, pValue: 0.00234, correlation: -0.54, included: true },
+        { name: 'parkProximity', coefficient: 8200.00, tValue: 2.1, pValue: 0.03567, correlation: 0.38, included: true },
+        { name: 'noiseLevel', coefficient: -3500.00, tValue: -1.8, pValue: 0.07342, correlation: -0.29, included: false }
       ]
+    };
+    
+    // Return the variables for the requested model, or an empty array if model not found
+    res.json(variablesByModel[modelId as keyof typeof variablesByModel] || []);
+  });
+  
+  // Get model predictions
+  app.get('/api/regression/models/:id/predictions', (req, res) => {
+    const modelId = parseInt(req.params.id);
+    
+    // Generate realistic prediction data with actual vs predicted values
+    const predictions = Array.from({ length: 40 }, (_, i) => {
+      const actualValue = 200000 + Math.random() * 400000;
+      const error = (Math.random() * 0.2 - 0.1) * actualValue; // ±10% error
+      const predictedValue = actualValue + error;
+      return {
+        id: i + 1,
+        actualValue: Math.round(actualValue),
+        predictedValue: Math.round(predictedValue),
+        absoluteError: Math.round(Math.abs(error)),
+        percentError: Math.round(Math.abs(error / actualValue * 100) * 10) / 10,
+        parcelId: `P${100000 + i}`,
+        address: `${1000 + i} Sample St, Benton County, WA`
+      };
+    });
+    
+    res.json(predictions);
+  });
+  
+  // Get model diagnostics
+  app.get('/api/regression/models/:id/diagnostics', (req, res) => {
+    const modelId = parseInt(req.params.id);
+    
+    // Generate histogram data for residuals
+    const residualBins = [
+      { bin: '-30% to -25%', count: Math.floor(Math.random() * 5) },
+      { bin: '-25% to -20%', count: Math.floor(Math.random() * 8) },
+      { bin: '-20% to -15%', count: Math.floor(Math.random() * 12) },
+      { bin: '-15% to -10%', count: Math.floor(Math.random() * 18) },
+      { bin: '-10% to -5%', count: Math.floor(Math.random() * 25) + 10 },
+      { bin: '-5% to 0%', count: Math.floor(Math.random() * 30) + 25 },
+      { bin: '0% to 5%', count: Math.floor(Math.random() * 30) + 25 },
+      { bin: '5% to 10%', count: Math.floor(Math.random() * 25) + 10 },
+      { bin: '10% to 15%', count: Math.floor(Math.random() * 18) },
+      { bin: '15% to 20%', count: Math.floor(Math.random() * 12) },
+      { bin: '20% to 25%', count: Math.floor(Math.random() * 8) },
+      { bin: '25% to 30%', count: Math.floor(Math.random() * 5) }
+    ];
+    
+    // Generate scatter plot data (predicted vs actual)
+    const scatterData = Array.from({ length: 50 }, () => {
+      const actual = 200000 + Math.random() * 400000;
+      const error = (Math.random() * 0.2 - 0.1) * actual; // ±10% error
+      return {
+        actual: Math.round(actual),
+        predicted: Math.round(actual + error)
+      };
+    });
+    
+    // Model metrics
+    const metrics = {
+      r2: 0.75 + Math.random() * 0.15,
+      adjustedR2: 0.73 + Math.random() * 0.15,
+      standardError: 25000 + Math.random() * 15000,
+      observations: 180 + Math.floor(Math.random() * 70),
+      fStatistic: 45 + Math.random() * 25,
+      pValue: 0.00001 + Math.random() * 0.0001,
+      akaike: 2500 + Math.random() * 500,
+      cov: 8 + Math.random() * 7,
+      prd: 0.95 + Math.random() * 0.1
+    };
+    
+    res.json({
+      residualHistogram: residualBins,
+      scatterPlot: scatterData,
+      metrics: metrics
     });
   });
   
