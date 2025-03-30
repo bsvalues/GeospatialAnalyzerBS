@@ -11,7 +11,7 @@ import {
   ArrowDownToLine, 
   Table, 
   FileJson, 
-  FilePdf, 
+  File as FilePdf, 
   FileSpreadsheet,
   Settings,
 } from 'lucide-react';
@@ -25,6 +25,7 @@ interface ExportButtonProps extends Omit<ButtonProps, 'onClick'> {
   exportType?: 'properties' | 'analysis' | 'comparison';
   showAdvancedOptions?: boolean;
   fileName?: string;
+  trigger?: React.ReactNode;
 }
 
 export function ExportButton({
@@ -33,6 +34,7 @@ export function ExportButton({
   exportType = 'properties',
   showAdvancedOptions = true,
   fileName,
+  trigger,
   ...props
 }: ExportButtonProps) {
   const defaultFileName = fileName || `spatialest-${exportType}-${new Date().toISOString().split('T')[0]}`;
@@ -60,14 +62,16 @@ export function ExportButton({
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button 
-          variant={props.variant || "outline"} 
-          size={props.size || "sm"}
-          className={props.className}
-        >
-          <ArrowDownToLine className="mr-2 h-4 w-4" />
-          Export
-        </Button>
+        {trigger || (
+          <Button 
+            variant={props.variant || "outline"} 
+            size={props.size || "sm"}
+            className={props.className}
+          >
+            <ArrowDownToLine className="mr-2 h-4 w-4" />
+            Export
+          </Button>
+        )}
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
         <DropdownMenuItem onClick={handleExportCSV}>

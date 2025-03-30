@@ -38,7 +38,7 @@ import {
   Table, 
   FileJson, 
   FileSpreadsheet, 
-  FilePdf,
+  File as FilePdf,
   ArrowDownToLine
 } from 'lucide-react';
 

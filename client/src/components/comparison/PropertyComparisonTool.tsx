@@ -26,9 +26,13 @@ import {
   Building,
   Briefcase,
   Clock,
-  Percent
+  Percent,
+  Settings
 } from 'lucide-react';
 import { saveAs } from 'file-saver';
+import { ExportButton } from '../export/ExportButton';
+import { PropertyReportGenerator } from '../export/PropertyReportGenerator';
+import { ExportService } from '@/services/exportService';
 
 interface PropertyComparisonToolProps {
   properties: Property[];
@@ -446,24 +450,24 @@ export const PropertyComparisonTool: React.FC<PropertyComparisonToolProps> = ({ 
             </CardDescription>
           </div>
           <div className="flex gap-2">
-            <Button 
-              variant="outline" 
+            <ExportButton 
+              properties={properties}
+              metrics={comparisonMetrics.map(metric => ({
+                id: metric.id,
+                label: metric.label,
+                format: metric.format
+              }))}
+              exportType="comparison"
+              fileName={`property-comparison-${new Date().toISOString().split('T')[0]}`}
               size="sm"
-              onClick={exportToCSV}
-              title="Export to CSV"
-            >
-              <DownloadCloud className="h-4 w-4 mr-1" />
-              CSV
-            </Button>
-            <Button 
               variant="outline"
-              size="sm"
-              onClick={exportToJSON}
-              title="Export to JSON"
-            >
-              <DownloadCloud className="h-4 w-4 mr-1" />
-              JSON
-            </Button>
+              trigger={
+                <Button variant="outline" size="sm">
+                  <DownloadCloud className="h-4 w-4 mr-1" />
+                  Export
+                </Button>
+              }
+            />
             {onClose && (
               <Button
                 variant="ghost"
@@ -629,8 +633,21 @@ export const PropertyComparisonTool: React.FC<PropertyComparisonToolProps> = ({ 
       </Tabs>
       
       <CardFooter className="border-t pt-4 flex justify-between">
-        <div className="text-xs text-muted-foreground">
-          <span>Click on metric names to sort</span>
+        <div className="text-xs text-muted-foreground flex items-center">
+          <span className="mr-4">Click on metric names to sort</span>
+          <PropertyReportGenerator
+            properties={properties}
+            metrics={comparisonMetrics.map(metric => ({
+              id: metric.id,
+              label: metric.label,
+              format: metric.format
+            }))}
+            trigger={
+              <Button variant="outline" size="xs" className="h-7 text-xs">
+                Generate Detailed Report
+              </Button>
+            }
+          />
         </div>
         
         {onClose && (

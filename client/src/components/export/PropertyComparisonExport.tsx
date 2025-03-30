@@ -20,7 +20,8 @@ import {
   Settings,
   Filter,
   CheckCircle,
-  ChevronDown 
+  ChevronDown,
+  File as FilePdf
 } from 'lucide-react';
 import { formatPropertyValue } from '@/services/exportService';
 
