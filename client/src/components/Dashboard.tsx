@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import Header from './Header';
 import TabNavigation from './TabNavigation';
 import OverviewPanel from './panels/OverviewPanel';
-import MapPanel from './panels/MapPanel';
+import { MapPanel } from './panels/MapPanel';
 import ScriptPanel from './panels/ScriptPanel';
 import DataPanel from './panels/DataPanel';
 import RegressionPanel from './panels/RegressionPanel';

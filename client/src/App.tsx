@@ -8,7 +8,8 @@ import NotFound from '@/pages/not-found';
 import { PropertyComparisonProvider } from './components/comparison/PropertyComparisonContext';
 import PropertyComparison from './components/comparison/PropertyComparison';
 import { PropertySearchDialogContainer } from './components/comparison/PropertySearchDialogContainer';
-import NeighborhoodProvider from './components/neighborhood/NeighborhoodContext';
+import { NeighborhoodProvider } from './components/neighborhood/NeighborhoodContext';
+import { PropertySelectionProvider } from './components/map/PropertySelectionContext';
 
 function Router() {
   return (
@@ -23,12 +24,14 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <NeighborhoodProvider>
-        <PropertyComparisonProvider>
-          <Router />
-          <PropertyComparison />
-          <PropertySearchDialogContainer />
-          <Toaster />
-        </PropertyComparisonProvider>
+        <PropertySelectionProvider>
+          <PropertyComparisonProvider>
+            <Router />
+            <PropertyComparison />
+            <PropertySearchDialogContainer />
+            <Toaster />
+          </PropertyComparisonProvider>
+        </PropertySelectionProvider>
       </NeighborhoodProvider>
     </QueryClientProvider>
   );

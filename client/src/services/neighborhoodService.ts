@@ -1,6 +1,5 @@
 import { Property } from '@/shared/types';
 
-// Types
 export interface NeighborhoodData {
   name: string;
   overview: {
@@ -71,46 +70,67 @@ export interface NeighborhoodSearchParams {
 
 class NeighborhoodService {
   private cache: Map<string, NeighborhoodData> = new Map();
-
+  
   /**
    * Get neighborhood data for a given property
    * @param property The property to retrieve neighborhood data for
    * @returns A promise that resolves to neighborhood data
    */
   async getNeighborhoodData(property: Property): Promise<NeighborhoodData> {
-    // Create a cache key based on property coordinates or address
-    const cacheKey = property.coordinates 
-      ? `${property.coordinates[0]},${property.coordinates[1]}` 
-      : property.address;
+    if (!property) {
+      throw new Error('Property is required');
+    }
     
-    // Check if data is already in cache
+    // Use property ID as cache key
+    const cacheKey = `property_${property.id}`;
+    
+    // Return cached data if available
     if (this.cache.has(cacheKey)) {
       return this.cache.get(cacheKey)!;
     }
-
-    // Fetch neighborhood data (this would be an API call in production)
-    // For now, we'll return mock data
-    const data = await this.fetchNeighborhoodData(property);
     
-    // Cache the result
+    // For demo purposes, add a slight delay
+    await this.simulateNetworkDelay();
+    
+    // Generate unique neighborhood name based on property location
+    const neighborhoodName = property.coordinates 
+      ? `${this.getNeighborhoodNameFromCoordinates(property.coordinates)}`
+      : 'West Richland';
+    
+    // Get mock neighborhood data
+    const data = this.getMockNeighborhoodData();
+    data.name = neighborhoodName;
+    
+    // Cache the response
     this.cache.set(cacheKey, data);
     
     return data;
   }
-
+  
   /**
    * Search for neighborhoods by parameters
    * @param params Search parameters
    * @returns A promise that resolves to an array of neighborhood data
    */
   async searchNeighborhoods(params: NeighborhoodSearchParams): Promise<NeighborhoodData[]> {
-    // This would be an API call in production
-    // For now, we'll return mock data
+    // Simulate network delay
     await this.simulateNetworkDelay();
     
-    return [this.getMockNeighborhoodData()];
+    // Generate mock neighborhoods based on search parameters
+    const neighborhoods: NeighborhoodData[] = [];
+    
+    // Simulate 3-5 neighborhoods
+    const count = Math.floor(Math.random() * 3) + 3;
+    
+    for (let i = 0; i < count; i++) {
+      const data = this.getMockNeighborhoodData();
+      data.name = this.getRandomNeighborhoodName(i);
+      neighborhoods.push(data);
+    }
+    
+    return neighborhoods;
   }
-
+  
   /**
    * Get walkability score for a location
    * @param lat Latitude
@@ -118,111 +138,153 @@ class NeighborhoodService {
    * @returns A promise that resolves to a walkability score
    */
   async getWalkabilityScore(lat: number, lng: number): Promise<number> {
-    // This would be an API call in production
+    // Simulate network delay
     await this.simulateNetworkDelay();
     
     // Return a random score between 50 and 95
     return Math.floor(Math.random() * 45) + 50;
   }
-
+  
   /**
    * Clear the neighborhood data cache
    */
   clearCache(): void {
     this.cache.clear();
   }
-
+  
   /**
    * Remove a specific item from the cache
    * @param cacheKey The cache key to remove
    */
   invalidateCache(cacheKey: string): void {
-    this.cache.delete(cacheKey);
+    if (this.cache.has(cacheKey)) {
+      this.cache.delete(cacheKey);
+    }
   }
-
-  // Private helper methods
-  private async fetchNeighborhoodData(property: Property): Promise<NeighborhoodData> {
-    // Simulate network delay
-    await this.simulateNetworkDelay();
-    
-    // In a real app, this would make an API call to fetch data
-    // For now, return mock data
-    return this.getMockNeighborhoodData();
-  }
-
+  
   private async simulateNetworkDelay(): Promise<void> {
-    return new Promise(resolve => setTimeout(resolve, 800));
+    return new Promise(resolve => setTimeout(resolve, 500 + Math.random() * 500));
   }
-
+  
+  private getNeighborhoodNameFromCoordinates(coordinates: [number, number]): string {
+    // This would typically use reverse geocoding
+    // For demo purposes, create a name based on coordinates
+    const [lat, lng] = coordinates;
+    const latPrefix = lat >= 0 ? 'North' : 'South';
+    const lngPrefix = lng >= 0 ? 'East' : 'West';
+    
+    // Benton County neighborhoods
+    const names = [
+      'Richland Heights',
+      'Kennewick Grove',
+      'West Pasco',
+      'Benton City',
+      'Prosser Valley',
+      'Finley District',
+      'Highland Springs',
+      'Columbia Point',
+      'Badger Mountain',
+      'South Richland'
+    ];
+    
+    // Select a name deterministically based on coordinates
+    const nameIndex = Math.abs(Math.floor((lat * lng * 1000) % names.length));
+    return names[nameIndex];
+  }
+  
+  private getRandomNeighborhoodName(index: number): string {
+    const names = [
+      'Richland Heights',
+      'Kennewick Grove',
+      'West Pasco',
+      'Benton City',
+      'Prosser Valley',
+      'Finley District',
+      'Highland Springs',
+      'Columbia Point',
+      'Badger Mountain',
+      'South Richland',
+      'North Richland',
+      'Horn Rapids',
+      'West Richland',
+      'Queensgate',
+      'Southridge'
+    ];
+    
+    return names[index % names.length];
+  }
+  
   private getMockNeighborhoodData(): NeighborhoodData {
     return {
-      name: 'West Richland',
+      name: 'Richland Heights',
       overview: {
-        description: 'A residential neighborhood in Benton County known for its family-friendly atmosphere and proximity to natural attractions.',
-        type: 'Suburban',
+        description: 'A family-friendly neighborhood with quiet streets, well-maintained parks, and excellent schools. Close to shopping centers and restaurants.',
+        type: 'Residential',
         ratings: {
-          overall: 86,
-          safety: 91,
-          schools: 83,
-          amenities: 72,
-          costOfLiving: 77,
-          outdoorActivities: 88
+          overall: 4.2,
+          safety: 4.5,
+          schools: 4.3,
+          amenities: 3.8,
+          costOfLiving: 3.4,
+          outdoorActivities: 4.6
         }
       },
       demographics: {
-        population: 15750,
-        medianAge: 37.2,
-        households: 5430,
-        homeownership: 71.3,
-        medianIncome: '$76,500',
+        population: 12485,
+        medianAge: 37.5,
+        households: 4930,
+        homeownership: 0.78,
+        medianIncome: '$89,500',
         education: {
-          highSchool: 94.2,
-          bachelors: 37.6,
-          graduate: 12.3
+          highSchool: 0.96,
+          bachelors: 0.42,
+          graduate: 0.18
         }
       },
       housing: {
-        medianHomeValue: '$345,000',
-        medianRent: '$1,450',
+        medianHomeValue: '$375,000',
+        medianRent: '$1,750',
         valueChange: {
-          oneYear: 7.2,
-          fiveYear: 32.8
+          oneYear: 0.08,
+          fiveYear: 0.31
         },
         propertyTypes: {
-          singleFamily: 82.4,
-          condo: 6.7,
-          townhouse: 8.9,
-          apartment: 2.0
+          singleFamily: 0.72,
+          condo: 0.08,
+          townhouse: 0.12,
+          apartment: 0.08
         }
       },
       amenities: {
         groceryStores: [
           { name: 'Yoke\'s Fresh Market', distance: 0.8 },
-          { name: 'Walmart Supercenter', distance: 2.1 }
+          { name: 'Fred Meyer', distance: 1.5 },
+          { name: 'Albertsons', distance: 2.3 }
         ],
         restaurants: [
-          { name: 'Atomic Ale Brewpub', distance: 1.2 },
-          { name: 'Foodies Brick and Mortar', distance: 1.5 },
-          { name: 'Dovetail Joint', distance: 1.7 }
+          { name: 'Porter\'s Real BBQ', distance: 0.7 },
+          { name: 'Olive Garden', distance: 1.2 },
+          { name: 'Bonefish Grill', distance: 1.8 },
+          { name: 'Red Robin', distance: 2.0 }
         ],
         parks: [
-          { name: 'Flat Top Park', distance: 0.4 },
-          { name: 'South Highlands Park', distance: 1.0 },
-          { name: 'Yakima River Greenway', distance: 2.4 }
+          { name: 'Leslie Groves Park', distance: 0.5 },
+          { name: 'Howard Amon Park', distance: 1.1 },
+          { name: 'Columbia Point Golf Course', distance: 2.2 }
         ],
         schools: [
-          { name: 'William Wiley Elementary', distance: 0.6, rating: 8 },
-          { name: 'Enterprise Middle School', distance: 1.3, rating: 7 },
-          { name: 'Richland High School', distance: 3.2, rating: 8 }
+          { name: 'Lewis & Clark Elementary', distance: 0.6, rating: 8.5 },
+          { name: 'Hanford High School', distance: 1.9, rating: 9.0 },
+          { name: 'Enterprise Middle School', distance: 1.1, rating: 7.8 }
         ]
       },
       marketTrends: {
-        avgDaysOnMarket: 18,
-        listToSaleRatio: 98.5,
+        avgDaysOnMarket: 22,
+        listToSaleRatio: 0.98,
         pricePerSqFt: {
-          current: 183,
-          lastYear: 168,
-          change: 8.9
+          current: 195,
+          lastYear: 175,
+          change: 0.114
         },
         inventoryLevel: 'Low',
         competitiveIndex: 'High'
@@ -231,7 +293,4 @@ class NeighborhoodService {
   }
 }
 
-// Create and export a singleton instance
 export const neighborhoodService = new NeighborhoodService();
-
-export default neighborhoodService;

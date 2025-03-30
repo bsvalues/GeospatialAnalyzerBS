@@ -1,193 +1,252 @@
-import React, { useState } from 'react';
-import { X, Home, Coins, MapPin, Ruler, CalendarClock, Binary, Layers, ChevronDown, ChevronUp, Map, FileText, Search } from 'lucide-react';
+import React from 'react';
 import { Property } from '@/shared/types';
-import { overlayLayerSources } from './layerSources';
-import { 
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { PropertyCompareButton } from '../comparison/PropertySelectionDisplay';
-import { FindSimilarPropertiesButton } from '../comparison/FindSimilarPropertiesButton';
+import { usePropertySelection } from './PropertySelectionContext';
+import { useNeighborhood } from '@/components/neighborhood/NeighborhoodContext';
+import { formatCurrency } from '@/lib/utils';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { X, Home, MapPin, Trash, Star, Info, Tag } from 'lucide-react';
 
 interface PropertyInfoPanelProps {
-  property: Property;
-  onClose: () => void;
+  property: Property | null;
+  onClose?: () => void;
 }
 
-const PropertyInfoPanel: React.FC<PropertyInfoPanelProps> = ({ property, onClose }) => {
-  const [showGisInfo, setShowGisInfo] = useState(false);
+export const PropertyInfoPanel: React.FC<PropertyInfoPanelProps> = ({
+  property,
+  onClose,
+}) => {
+  const { selectProperty, selectProperties, isPropertySelected } = usePropertySelection();
+  const unselectProperty = (property: Property) => {
+    // Using selectProperties with an empty array effectively removes the property
+    selectProperties([]);
+  };
+  const { fetchNeighborhoodData, getNeighborhoodDataForProperty, isNeighborhoodLoading } = useNeighborhood();
   
-  // Mock GIS layer data for this property (in a real app, this would be fetched based on property location)
-  const gisInfo = [
-    { 
-      id: 'zoning', 
-      label: 'Zoning', 
-      value: 'R-1 (Residential Single Family)' 
-    },
-    { 
-      id: 'floodZones', 
-      label: 'Flood Zone', 
-      value: 'Zone X (Minimal Risk)' 
-    },
-    { 
-      id: 'schools', 
-      label: 'School District', 
-      value: 'Richland School District' 
+  const handleSelectProperty = () => {
+    if (property) {
+      selectProperty(property);
     }
-  ];
+  };
+  
+  const handleUnselectProperty = () => {
+    if (property) {
+      unselectProperty(property);
+    }
+  };
+  
+  // Get neighborhood data for the property
+  const handleFetchNeighborhoodData = async () => {
+    if (property) {
+      await fetchNeighborhoodData(property);
+    }
+  };
+  
+  if (!property) {
+    return (
+      <div className="h-full flex items-center justify-center bg-muted/20">
+        <div className="text-center text-muted-foreground">
+          <p>No property selected</p>
+          <p className="text-sm">Select a property on the map to view details</p>
+        </div>
+      </div>
+    );
+  }
+  
+  const isSelected = isPropertySelected(property);
+  const neighborhoodData = getNeighborhoodDataForProperty(property.id);
+  const loading = isNeighborhoodLoading(property.id);
   
   return (
-    <div className="absolute top-16 right-4 w-80 bg-gray-800 rounded shadow-lg z-20 border border-gray-700">
-      <div className="p-4">
-        <div className="flex justify-between items-center mb-3">
-          <h3 className="font-bold text-md">Property Details</h3>
-          <button 
-            onClick={onClose}
-            className="hover:bg-gray-700 p-1 rounded-full"
-          >
-            <X size={18} />
-          </button>
-        </div>
-        
-        <div className="space-y-3">
-          <div className="flex items-start">
-            <Home size={16} className="mt-0.5 mr-3 text-blue-400 shrink-0" />
-            <div>
-              <div className="text-xs text-gray-400">Address</div>
-              <div className="text-sm font-medium">{property.address}</div>
-            </div>
-          </div>
-          
-          <div className="flex items-start">
-            <Binary size={16} className="mt-0.5 mr-3 text-blue-400 shrink-0" />
-            <div>
-              <div className="text-xs text-gray-400">Parcel ID</div>
-              <div className="text-sm font-medium">{property.parcelId}</div>
-            </div>
-          </div>
-          
-          {property.salePrice && (
-            <div className="flex items-start">
-              <Coins size={16} className="mt-0.5 mr-3 text-green-400 shrink-0" />
-              <div>
-                <div className="text-xs text-gray-400">Sale Price</div>
-                <div className="text-sm font-medium">{property.salePrice}</div>
-              </div>
-            </div>
+    <div className="h-full flex flex-col overflow-y-auto bg-card">
+      <div className="sticky top-0 z-10 bg-card border-b">
+        <div className="flex items-center justify-between p-4">
+          <h3 className="text-lg font-semibold">Property Details</h3>
+          {onClose && (
+            <Button variant="ghost" size="icon" onClick={onClose}>
+              <X className="h-4 w-4" />
+            </Button>
           )}
-          
-          <div className="flex items-start">
-            <Ruler size={16} className="mt-0.5 mr-3 text-purple-400 shrink-0" />
-            <div>
-              <div className="text-xs text-gray-400">Building Size</div>
-              <div className="text-sm font-medium">{property.squareFeet.toLocaleString()} sq ft</div>
-            </div>
-          </div>
-          
-          {property.yearBuilt && (
-            <div className="flex items-start">
-              <CalendarClock size={16} className="mt-0.5 mr-3 text-yellow-400 shrink-0" />
-              <div>
-                <div className="text-xs text-gray-400">Year Built</div>
-                <div className="text-sm font-medium">{property.yearBuilt}</div>
-              </div>
-            </div>
-          )}
-          
-          {property.landValue && (
-            <div className="flex items-start">
-              <MapPin size={16} className="mt-0.5 mr-3 text-red-400 shrink-0" />
-              <div>
-                <div className="text-xs text-gray-400">Land Value</div>
-                <div className="text-sm font-medium">{property.landValue}</div>
-              </div>
-            </div>
-          )}
-          
-          {property.coordinates && (
-            <div className="flex items-start">
-              <MapPin size={16} className="mt-0.5 mr-3 text-blue-400 shrink-0" />
-              <div>
-                <div className="text-xs text-gray-400">Coordinates</div>
-                <div className="text-sm font-medium">
-                  {property.coordinates[0].toFixed(5)}, {property.coordinates[1].toFixed(5)}
-                </div>
-              </div>
-            </div>
-          )}
-          
-          {/* GIS Information Collapsible Section */}
-          <div className="mt-3">
-            <Collapsible
-              open={showGisInfo}
-              onOpenChange={setShowGisInfo}
-              className="border border-gray-700 rounded overflow-hidden"
-            >
-              <CollapsibleTrigger asChild>
-                <button className="flex items-center justify-between w-full p-2 text-sm font-medium bg-gray-750 hover:bg-gray-700">
-                  <div className="flex items-center">
-                    <Layers size={16} className="text-blue-400 mr-2" />
-                    <span>GIS Layer Data</span>
-                  </div>
-                  <div>
-                    {showGisInfo ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-                  </div>
-                </button>
-              </CollapsibleTrigger>
-              <CollapsibleContent className="p-3 pt-2 bg-gray-750 border-t border-gray-700">
-                <div className="space-y-3">
-                  {gisInfo.map(item => {
-                    // Find the layer source for more details
-                    const layerSource = overlayLayerSources.find(source => source.id === item.id);
-                    
-                    return (
-                      <div key={item.id} className="text-sm">
-                        <div className="flex items-center">
-                          {item.id === 'zoning' ? (
-                            <FileText size={14} className="text-orange-400 mr-1.5 shrink-0" />
-                          ) : item.id === 'floodZones' ? (
-                            <Map size={14} className="text-blue-400 mr-1.5 shrink-0" />
-                          ) : (
-                            <Map size={14} className="text-yellow-400 mr-1.5 shrink-0" />
-                          )}
-                          <span className="text-xs text-gray-400">{item.label}</span>
-                          {layerSource?.category && (
-                            <Badge variant="outline" className="ml-auto text-[10px] h-4 px-1">
-                              {layerSource.category}
-                            </Badge>
-                          )}
-                        </div>
-                        <p className="ml-5 text-xs font-medium">{item.value}</p>
-                      </div>
-                    );
-                  })}
-                  <div className="text-[10px] text-gray-400 mt-2 pt-2 border-t border-gray-700">
-                    GIS data from Benton County. Last updated: March 2024
-                  </div>
-                </div>
-              </CollapsibleContent>
-            </Collapsible>
-          </div>
         </div>
       </div>
       
-      <div className="border-t border-gray-700 px-4 py-3 flex flex-col gap-2">
-        <div className="flex justify-between">
-          <Button variant="default" size="sm" className="text-xs">View Details</Button>
-          <PropertyCompareButton property={property} />
-        </div>
-        <FindSimilarPropertiesButton 
-          property={property}
-          variant="outline"
-          size="sm"
-          className="w-full mt-1" 
-        />
+      <div className="flex-1 p-4">
+        <Card>
+          <CardHeader className="pb-2">
+            <div className="flex items-start justify-between">
+              <div>
+                <CardTitle>{property.address}</CardTitle>
+                <CardDescription>Parcel ID: {property.parcelId}</CardDescription>
+              </div>
+              <Badge variant={isSelected ? "success" : "outline"}>
+                {isSelected ? "Selected" : "Not Selected"}
+              </Badge>
+            </div>
+          </CardHeader>
+          
+          <CardContent className="pb-2">
+            <Tabs defaultValue="details">
+              <TabsList className="grid w-full grid-cols-3">
+                <TabsTrigger value="details">Details</TabsTrigger>
+                <TabsTrigger value="location">Location</TabsTrigger>
+                <TabsTrigger value="neighborhood">Neighborhood</TabsTrigger>
+              </TabsList>
+              
+              <TabsContent value="details" className="space-y-4">
+                <div className="grid grid-cols-2 gap-2 pt-2">
+                  <div className="flex flex-col">
+                    <span className="text-sm font-medium text-muted-foreground">Value</span>
+                    <span className="font-semibold">{formatCurrency(property.value)}</span>
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="text-sm font-medium text-muted-foreground">Land Value</span>
+                    <span className="font-semibold">{formatCurrency(property.landValue)}</span>
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="text-sm font-medium text-muted-foreground">Square Feet</span>
+                    <span className="font-semibold">{property.squareFeet.toLocaleString()}</span>
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="text-sm font-medium text-muted-foreground">Year Built</span>
+                    <span className="font-semibold">{property.yearBuilt || 'Unknown'}</span>
+                  </div>
+                  <div className="flex flex-col col-span-2">
+                    <span className="text-sm font-medium text-muted-foreground">Owner</span>
+                    <span className="font-semibold">{property.owner || 'Unknown'}</span>
+                  </div>
+                </div>
+              </TabsContent>
+              
+              <TabsContent value="location">
+                <div className="pt-2">
+                  <div className="mb-2">
+                    <span className="text-sm font-medium text-muted-foreground">Address</span>
+                    <div className="flex items-center gap-2">
+                      <MapPin className="h-4 w-4 text-muted-foreground" />
+                      <span>{property.address}</span>
+                    </div>
+                  </div>
+                  
+                  {property.coordinates && (
+                    <div className="mb-2">
+                      <span className="text-sm font-medium text-muted-foreground">Coordinates</span>
+                      <div className="text-sm font-mono">
+                        <span>Lat: {property.coordinates[0].toFixed(6)}</span>
+                        <br />
+                        <span>Lng: {property.coordinates[1].toFixed(6)}</span>
+                      </div>
+                    </div>
+                  )}
+                  
+                  <div className="h-32 bg-muted rounded-md flex items-center justify-center">
+                    <span className="text-sm text-muted-foreground">Location preview</span>
+                  </div>
+                </div>
+              </TabsContent>
+              
+              <TabsContent value="neighborhood">
+                <div className="pt-2">
+                  {!neighborhoodData && !loading && (
+                    <div className="flex flex-col items-center justify-center py-4">
+                      <Info className="h-8 w-8 text-muted-foreground mb-2" />
+                      <p className="text-sm text-muted-foreground mb-2">
+                        No neighborhood data available
+                      </p>
+                      <Button 
+                        size="sm" 
+                        onClick={handleFetchNeighborhoodData}
+                        disabled={loading}
+                      >
+                        {loading ? 'Loading...' : 'Load Neighborhood Data'}
+                      </Button>
+                    </div>
+                  )}
+                  
+                  {loading && (
+                    <div className="flex items-center justify-center py-8">
+                      <div className="text-center">
+                        <p className="text-sm text-muted-foreground animate-pulse">
+                          Loading neighborhood data...
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                  
+                  {neighborhoodData && (
+                    <div className="space-y-3">
+                      <div>
+                        <span className="text-sm font-medium text-muted-foreground">Neighborhood</span>
+                        <h4 className="text-base font-semibold">{neighborhoodData.name}</h4>
+                        <p className="text-sm text-muted-foreground">
+                          {neighborhoodData.overview.description.slice(0, 120)}...
+                        </p>
+                      </div>
+                      
+                      <div>
+                        <span className="text-sm font-medium text-muted-foreground">Housing Market</span>
+                        <div className="grid grid-cols-2 gap-2 mt-1">
+                          <div>
+                            <span className="text-xs text-muted-foreground">Median Value</span>
+                            <p className="text-sm font-medium">{neighborhoodData.housing.medianHomeValue}</p>
+                          </div>
+                          <div>
+                            <span className="text-xs text-muted-foreground">1-Year Change</span>
+                            <p className="text-sm font-medium">
+                              {neighborhoodData.housing.valueChange.oneYear > 0 ? '+' : ''}
+                              {neighborhoodData.housing.valueChange.oneYear}%
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                      
+                      <div>
+                        <span className="text-sm font-medium text-muted-foreground">Demographics</span>
+                        <div className="grid grid-cols-2 gap-2 mt-1">
+                          <div>
+                            <span className="text-xs text-muted-foreground">Population</span>
+                            <p className="text-sm font-medium">{neighborhoodData.demographics.population.toLocaleString()}</p>
+                          </div>
+                          <div>
+                            <span className="text-xs text-muted-foreground">Median Income</span>
+                            <p className="text-sm font-medium">{neighborhoodData.demographics.medianIncome}</p>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </TabsContent>
+            </Tabs>
+          </CardContent>
+          
+          <CardFooter className="flex justify-between pt-2">
+            <Button
+              variant={isSelected ? "destructive" : "default"}
+              size="sm"
+              onClick={isSelected ? handleUnselectProperty : handleSelectProperty}
+            >
+              {isSelected ? (
+                <>
+                  <Trash className="h-4 w-4 mr-1" /> Remove from Selection
+                </>
+              ) : (
+                <>
+                  <Star className="h-4 w-4 mr-1" /> Add to Selection
+                </>
+              )}
+            </Button>
+          </CardFooter>
+        </Card>
       </div>
     </div>
   );
 };
-
-export default PropertyInfoPanel;
