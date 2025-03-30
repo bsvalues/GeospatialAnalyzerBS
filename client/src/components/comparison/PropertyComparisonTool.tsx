@@ -2,14 +2,7 @@ import React from 'react';
 import { Property } from '@/shared/types';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { 
-  Card, 
-  CardContent, 
-  CardDescription, 
-  CardFooter, 
-  CardHeader, 
-  CardTitle 
-} from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { ChevronRight, MapPin, Home, X, Calculator, DollarSign, Calendar, Ruler } from 'lucide-react';
@@ -21,55 +14,16 @@ interface PropertyComparisonToolProps {
 
 // The metrics to compare between properties
 const comparisonMetrics = [
-  { 
-    id: 'address', 
-    label: 'Address', 
-    format: 'text',
-    icon: <MapPin className="h-4 w-4 text-muted-foreground" /> 
-  },
-  { 
-    id: 'parcelId', 
-    label: 'Parcel ID', 
-    format: 'text',
-    icon: <ChevronRight className="h-4 w-4 text-muted-foreground" /> 
-  },
-  { 
-    id: 'salePrice', 
-    label: 'Sale Price', 
-    format: 'currency',
-    icon: <DollarSign className="h-4 w-4 text-muted-foreground" /> 
-  },
-  { 
-    id: 'squareFeet', 
-    label: 'Square Feet', 
-    format: 'number',
-    icon: <Ruler className="h-4 w-4 text-muted-foreground" /> 
-  },
-  { 
-    id: 'yearBuilt', 
-    label: 'Year Built', 
-    format: 'number',
-    icon: <Calendar className="h-4 w-4 text-muted-foreground" /> 
-  },
-  { 
-    id: 'landValue', 
-    label: 'Land Value', 
-    format: 'currency',
-    icon: <Calculator className="h-4 w-4 text-muted-foreground" /> 
-  },
-  { 
-    id: 'pricePerSqFt', 
-    label: 'Price per Sq. Ft.', 
-    format: 'currency',
-    icon: <Calculator className="h-4 w-4 text-muted-foreground" />,
-    calculated: true 
-  }
+  { id: 'address', label: 'Address', format: 'text', icon: <MapPin className="h-4 w-4 text-muted-foreground" /> },
+  { id: 'parcelId', label: 'Parcel ID', format: 'text', icon: <ChevronRight className="h-4 w-4 text-muted-foreground" /> },
+  { id: 'salePrice', label: 'Sale Price', format: 'currency', icon: <DollarSign className="h-4 w-4 text-muted-foreground" /> },
+  { id: 'squareFeet', label: 'Square Feet', format: 'number', icon: <Ruler className="h-4 w-4 text-muted-foreground" /> },
+  { id: 'yearBuilt', label: 'Year Built', format: 'number', icon: <Calendar className="h-4 w-4 text-muted-foreground" /> },
+  { id: 'landValue', label: 'Land Value', format: 'currency', icon: <Calculator className="h-4 w-4 text-muted-foreground" /> },
+  { id: 'pricePerSqFt', label: 'Price per Sq. Ft.', format: 'currency', icon: <Calculator className="h-4 w-4 text-muted-foreground" />, calculated: true }
 ];
 
-export const PropertyComparisonTool: React.FC<PropertyComparisonToolProps> = ({ 
-  properties,
-  onClose 
-}) => {
+export const PropertyComparisonTool: React.FC<PropertyComparisonToolProps> = ({ properties, onClose }) => {
   const formatValue = (property: Property, metric: string, format: string): string => {
     if (metric === 'pricePerSqFt') {
       // Calculate price per square foot if we have both values
@@ -179,63 +133,65 @@ export const PropertyComparisonTool: React.FC<PropertyComparisonToolProps> = ({
       <CardContent className="pb-6 px-0">
         <ScrollArea className="h-[500px] w-full">
           <div className="px-6 pb-4">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-[200px]">Metric</TableHead>
-                  {properties.map((property, index) => (
-                    <TableHead key={property.id}>
-                      <div className="flex flex-col items-center">
-                        <Badge variant="outline" className="mb-1">Property {index + 1}</Badge>
-                        <span className="text-xs truncate max-w-[150px]" title={property.address}>
-                          {property.address}
-                        </span>
-                      </div>
-                    </TableHead>
-                  ))}
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {comparisonMetrics.map((metric) => (
-                  <TableRow key={metric.id}>
-                    <TableCell className="font-medium">
-                      <div className="flex items-center gap-2">
-                        {metric.icon}
-                        {metric.label}
-                      </div>
-                    </TableCell>
-                    
-                    {properties.map((property) => {
-                      const value = formatValue(property, metric.id, metric.format);
-                      const numericValue = metric.format === 'currency' || metric.format === 'number'
-                        ? Number(value.replace(/[^0-9.-]+/g, ''))
-                        : NaN;
-                        
-                      let statusClass = '';
-                      
-                      // Only apply highlighting for numeric metrics that have extremes
-                      if (!isNaN(numericValue) && extremeValues[metric.id]) {
-                        if (numericValue === extremeValues[metric.id].max) {
-                          statusClass = metric.id === 'pricePerSqFt' 
-                            ? 'text-red-500 font-medium' // Higher price per sq ft is worse
-                            : 'text-green-500 font-medium'; // Higher is better for other metrics
-                        } else if (numericValue === extremeValues[metric.id].min) {
-                          statusClass = metric.id === 'pricePerSqFt'
-                            ? 'text-green-500 font-medium' // Lower price per sq ft is better
-                            : 'text-orange-500 font-medium'; // Lower is worse for other metrics
-                        }
-                      }
-                      
-                      return (
-                        <TableCell key={`${property.id}-${metric.id}`} className={statusClass}>
-                          {value}
-                        </TableCell>
-                      );
-                    })}
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-[150px] sticky left-0 bg-background z-20">Metric</TableHead>
+                    {properties.map((property, index) => (
+                      <TableHead key={property.id} className={properties.length > 5 ? "min-w-[120px]" : ""}>
+                        <div className="flex flex-col items-center">
+                          <Badge variant="outline" className="mb-1">Property {index + 1}</Badge>
+                          <span className="text-xs truncate max-w-[120px]" title={property.address}>
+                            {property.address}
+                          </span>
+                        </div>
+                      </TableHead>
+                    ))}
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {comparisonMetrics.map((metric) => (
+                    <TableRow key={metric.id}>
+                      <TableCell className="font-medium sticky left-0 bg-background z-20">
+                        <div className="flex items-center gap-2">
+                          {metric.icon}
+                          {metric.label}
+                        </div>
+                      </TableCell>
+                      
+                      {properties.map((property) => {
+                        const value = formatValue(property, metric.id, metric.format);
+                        const numericValue = metric.format === 'currency' || metric.format === 'number'
+                          ? Number(value.replace(/[^0-9.-]+/g, ''))
+                          : NaN;
+                          
+                        let statusClass = '';
+                        
+                        // Only apply highlighting for numeric metrics that have extremes
+                        if (!isNaN(numericValue) && extremeValues[metric.id]) {
+                          if (numericValue === extremeValues[metric.id].max) {
+                            statusClass = metric.id === 'pricePerSqFt' 
+                              ? 'text-red-500 font-medium' // Higher price per sq ft is worse
+                              : 'text-green-500 font-medium'; // Higher is better for other metrics
+                          } else if (numericValue === extremeValues[metric.id].min) {
+                            statusClass = metric.id === 'pricePerSqFt'
+                              ? 'text-green-500 font-medium' // Lower price per sq ft is better
+                              : 'text-orange-500 font-medium'; // Lower is worse for other metrics
+                          }
+                        }
+                        
+                        return (
+                          <TableCell key={`${property.id}-${metric.id}`} className={statusClass}>
+                            {value}
+                          </TableCell>
+                        );
+                      })}
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
           </div>
         </ScrollArea>
       </CardContent>

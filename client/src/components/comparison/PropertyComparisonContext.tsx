@@ -38,7 +38,7 @@ export const PropertyComparisonProvider: React.FC<PropertyComparisonProviderProp
   const { toast } = useToast();
 
   // Maximum number of properties that can be compared at once
-  const MAX_PROPERTIES = 5;
+  const MAX_PROPERTIES = 9;
 
   // Check if a property is already selected
   const isPropertySelected = (property: Property): boolean => {
