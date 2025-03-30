@@ -209,36 +209,7 @@ const MapPanel: React.FC = () => {
       />
       
       <div className="flex-1 relative">
-        {/* Map Controls */}
-        <div className="absolute top-4 right-4 bg-gray-800 rounded shadow-lg z-10">
-          <div className="p-1">
-            <button 
-              className="p-1.5 hover:bg-gray-700 rounded"
-              onClick={handleZoomIn}
-            >
-              <Plus size={16} />
-            </button>
-          </div>
-          <div className="border-t border-gray-700"></div>
-          <div className="p-1">
-            <button 
-              className="p-1.5 hover:bg-gray-700 rounded"
-              onClick={handleZoomOut}
-            >
-              <Minus size={16} />
-            </button>
-          </div>
-          <div className="border-t border-gray-700"></div>
-          <div className="p-1">
-            <button 
-              className="p-1.5 hover:bg-gray-700 rounded"
-              title="Locate All Properties"
-              onClick={handleLocateAllProperties}
-            >
-              <Locate size={16} />
-            </button>
-          </div>
-        </div>
+        {/* Map controls now handled by the CustomMapControls component */}
         
         {/* Map Search */}
         <div className="absolute top-4 left-4 w-72 z-10">
