@@ -24,6 +24,15 @@ export const properties = pgTable("properties", {
   yearBuilt: integer("year_built"),
   landValue: text("land_value"),
   coordinates: jsonb("coordinates"),
+  neighborhood: text("neighborhood"),
+  propertyType: text("property_type"),
+  bedrooms: integer("bedrooms"),
+  bathrooms: integer("bathrooms"),
+  lotSize: integer("lot_size"),
+  zoning: text("zoning"),
+  lastSaleDate: text("last_sale_date"),
+  taxAssessment: text("tax_assessment"),
+  pricePerSqFt: text("price_per_sqft"),
   attributes: jsonb("attributes")
 });
 
@@ -87,6 +96,15 @@ export const insertPropertySchema = createInsertSchema(properties).pick({
   yearBuilt: true,
   landValue: true,
   coordinates: true,
+  neighborhood: true,
+  propertyType: true,
+  bedrooms: true,
+  bathrooms: true,
+  lotSize: true,
+  zoning: true,
+  lastSaleDate: true,
+  taxAssessment: true,
+  pricePerSqFt: true,
   attributes: true
 });
 

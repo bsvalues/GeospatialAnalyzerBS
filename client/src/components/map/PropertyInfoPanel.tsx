@@ -1,252 +1,162 @@
-import React from 'react';
-import { Property } from '@/shared/types';
-import { usePropertySelection } from './PropertySelectionContext';
-import { useNeighborhood } from '@/components/neighborhood/NeighborhoodContext';
+import React, { useState } from 'react';
+import { Property } from '@shared/schema';
 import { formatCurrency } from '@/lib/utils';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { X, Home, MapPin, Trash, Star, Info, Tag } from 'lucide-react';
 
 interface PropertyInfoPanelProps {
   property: Property | null;
   onClose?: () => void;
+  onCompare?: (property: Property) => void;
 }
 
 export const PropertyInfoPanel: React.FC<PropertyInfoPanelProps> = ({
   property,
   onClose,
+  onCompare
 }) => {
-  const { selectProperty, selectProperties, isPropertySelected } = usePropertySelection();
-  const unselectProperty = (property: Property) => {
-    // Using selectProperties with an empty array effectively removes the property
-    selectProperties([]);
-  };
-  const { fetchNeighborhoodData, getNeighborhoodDataForProperty, isNeighborhoodLoading } = useNeighborhood();
-  
-  const handleSelectProperty = () => {
-    if (property) {
-      selectProperty(property);
-    }
-  };
-  
-  const handleUnselectProperty = () => {
-    if (property) {
-      unselectProperty(property);
-    }
-  };
-  
-  // Get neighborhood data for the property
-  const handleFetchNeighborhoodData = async () => {
-    if (property) {
-      await fetchNeighborhoodData(property);
-    }
-  };
+  const [expanded, setExpanded] = useState(false);
   
   if (!property) {
     return (
-      <div className="h-full flex items-center justify-center bg-muted/20">
-        <div className="text-center text-muted-foreground">
-          <p>No property selected</p>
-          <p className="text-sm">Select a property on the map to view details</p>
-        </div>
+      <div className="bg-white border rounded shadow p-4 h-full flex flex-col items-center justify-center text-center">
+        <p className="text-gray-500">Select a property on the map to view its details</p>
       </div>
     );
   }
-  
-  const isSelected = isPropertySelected(property);
-  const neighborhoodData = getNeighborhoodDataForProperty(property.id);
-  const loading = isNeighborhoodLoading(property.id);
+
+  // Calculate price per square foot
+  const pricePerSqFt = property.value 
+    ? formatCurrency(parseFloat(property.value.replace(/[^0-9.-]+/g, '')) / property.squareFeet)
+    : 'N/A';
   
   return (
-    <div className="h-full flex flex-col overflow-y-auto bg-card">
-      <div className="sticky top-0 z-10 bg-card border-b">
-        <div className="flex items-center justify-between p-4">
-          <h3 className="text-lg font-semibold">Property Details</h3>
-          {onClose && (
-            <Button variant="ghost" size="icon" onClick={onClose}>
-              <X className="h-4 w-4" />
-            </Button>
+    <div className="bg-white border rounded shadow p-4 h-full flex flex-col overflow-hidden">
+      <div className="flex justify-between items-start mb-4">
+        <h2 className="text-lg font-semibold">{property.address}</h2>
+        {onClose && (
+          <button 
+            onClick={onClose}
+            className="text-gray-500 hover:text-gray-700"
+            aria-label="Close property info"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+              <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+            </svg>
+          </button>
+        )}
+      </div>
+      
+      <div className="flex flex-col space-y-2 overflow-y-auto flex-grow">
+        <div className="grid grid-cols-2 gap-2 text-sm">
+          <div className="text-gray-600">Parcel ID:</div>
+          <div className="font-medium">{property.parcelId}</div>
+          
+          <div className="text-gray-600">Value:</div>
+          <div className="font-medium">{property.value || 'N/A'}</div>
+          
+          <div className="text-gray-600">Year Built:</div>
+          <div className="font-medium">{property.yearBuilt || 'N/A'}</div>
+          
+          <div className="text-gray-600">Square Feet:</div>
+          <div className="font-medium">{property.squareFeet.toLocaleString()}</div>
+          
+          {property.owner && (
+            <>
+              <div className="text-gray-600">Owner:</div>
+              <div className="font-medium">{property.owner}</div>
+            </>
+          )}
+          
+          {property.landValue && (
+            <>
+              <div className="text-gray-600">Land Value:</div>
+              <div className="font-medium">{property.landValue}</div>
+            </>
+          )}
+          
+          {property.neighborhood && (
+            <>
+              <div className="text-gray-600">Neighborhood:</div>
+              <div className="font-medium">{property.neighborhood}</div>
+            </>
+          )}
+          
+          {expanded && (
+            <>
+              <div className="text-gray-600">Price/Sq. Ft.:</div>
+              <div className="font-medium">{pricePerSqFt}</div>
+              
+              {property.propertyType && (
+                <>
+                  <div className="text-gray-600">Property Type:</div>
+                  <div className="font-medium">{property.propertyType}</div>
+                </>
+              )}
+              
+              {property.bedrooms !== undefined && (
+                <>
+                  <div className="text-gray-600">Bedrooms:</div>
+                  <div className="font-medium">{property.bedrooms}</div>
+                </>
+              )}
+              
+              {property.bathrooms !== undefined && (
+                <>
+                  <div className="text-gray-600">Bathrooms:</div>
+                  <div className="font-medium">{property.bathrooms}</div>
+                </>
+              )}
+              
+              {property.lotSize && (
+                <>
+                  <div className="text-gray-600">Lot Size:</div>
+                  <div className="font-medium">{property.lotSize.toString()} sq ft</div>
+                </>
+              )}
+              
+              {property.zoning && (
+                <>
+                  <div className="text-gray-600">Zoning:</div>
+                  <div className="font-medium">{property.zoning}</div>
+                </>
+              )}
+              
+              {property.lastSaleDate && (
+                <>
+                  <div className="text-gray-600">Last Sale Date:</div>
+                  <div className="font-medium">{property.lastSaleDate}</div>
+                </>
+              )}
+              
+              {property.taxAssessment && (
+                <>
+                  <div className="text-gray-600">Tax Assessment:</div>
+                  <div className="font-medium">{property.taxAssessment}</div>
+                </>
+              )}
+            </>
           )}
         </div>
       </div>
       
-      <div className="flex-1 p-4">
-        <Card>
-          <CardHeader className="pb-2">
-            <div className="flex items-start justify-between">
-              <div>
-                <CardTitle>{property.address}</CardTitle>
-                <CardDescription>Parcel ID: {property.parcelId}</CardDescription>
-              </div>
-              <Badge variant={isSelected ? "success" : "outline"}>
-                {isSelected ? "Selected" : "Not Selected"}
-              </Badge>
-            </div>
-          </CardHeader>
-          
-          <CardContent className="pb-2">
-            <Tabs defaultValue="details">
-              <TabsList className="grid w-full grid-cols-3">
-                <TabsTrigger value="details">Details</TabsTrigger>
-                <TabsTrigger value="location">Location</TabsTrigger>
-                <TabsTrigger value="neighborhood">Neighborhood</TabsTrigger>
-              </TabsList>
-              
-              <TabsContent value="details" className="space-y-4">
-                <div className="grid grid-cols-2 gap-2 pt-2">
-                  <div className="flex flex-col">
-                    <span className="text-sm font-medium text-muted-foreground">Value</span>
-                    <span className="font-semibold">{formatCurrency(property.value)}</span>
-                  </div>
-                  <div className="flex flex-col">
-                    <span className="text-sm font-medium text-muted-foreground">Land Value</span>
-                    <span className="font-semibold">{formatCurrency(property.landValue)}</span>
-                  </div>
-                  <div className="flex flex-col">
-                    <span className="text-sm font-medium text-muted-foreground">Square Feet</span>
-                    <span className="font-semibold">{property.squareFeet.toLocaleString()}</span>
-                  </div>
-                  <div className="flex flex-col">
-                    <span className="text-sm font-medium text-muted-foreground">Year Built</span>
-                    <span className="font-semibold">{property.yearBuilt || 'Unknown'}</span>
-                  </div>
-                  <div className="flex flex-col col-span-2">
-                    <span className="text-sm font-medium text-muted-foreground">Owner</span>
-                    <span className="font-semibold">{property.owner || 'Unknown'}</span>
-                  </div>
-                </div>
-              </TabsContent>
-              
-              <TabsContent value="location">
-                <div className="pt-2">
-                  <div className="mb-2">
-                    <span className="text-sm font-medium text-muted-foreground">Address</span>
-                    <div className="flex items-center gap-2">
-                      <MapPin className="h-4 w-4 text-muted-foreground" />
-                      <span>{property.address}</span>
-                    </div>
-                  </div>
-                  
-                  {property.coordinates && (
-                    <div className="mb-2">
-                      <span className="text-sm font-medium text-muted-foreground">Coordinates</span>
-                      <div className="text-sm font-mono">
-                        <span>Lat: {property.coordinates[0].toFixed(6)}</span>
-                        <br />
-                        <span>Lng: {property.coordinates[1].toFixed(6)}</span>
-                      </div>
-                    </div>
-                  )}
-                  
-                  <div className="h-32 bg-muted rounded-md flex items-center justify-center">
-                    <span className="text-sm text-muted-foreground">Location preview</span>
-                  </div>
-                </div>
-              </TabsContent>
-              
-              <TabsContent value="neighborhood">
-                <div className="pt-2">
-                  {!neighborhoodData && !loading && (
-                    <div className="flex flex-col items-center justify-center py-4">
-                      <Info className="h-8 w-8 text-muted-foreground mb-2" />
-                      <p className="text-sm text-muted-foreground mb-2">
-                        No neighborhood data available
-                      </p>
-                      <Button 
-                        size="sm" 
-                        onClick={handleFetchNeighborhoodData}
-                        disabled={loading}
-                      >
-                        {loading ? 'Loading...' : 'Load Neighborhood Data'}
-                      </Button>
-                    </div>
-                  )}
-                  
-                  {loading && (
-                    <div className="flex items-center justify-center py-8">
-                      <div className="text-center">
-                        <p className="text-sm text-muted-foreground animate-pulse">
-                          Loading neighborhood data...
-                        </p>
-                      </div>
-                    </div>
-                  )}
-                  
-                  {neighborhoodData && (
-                    <div className="space-y-3">
-                      <div>
-                        <span className="text-sm font-medium text-muted-foreground">Neighborhood</span>
-                        <h4 className="text-base font-semibold">{neighborhoodData.name}</h4>
-                        <p className="text-sm text-muted-foreground">
-                          {neighborhoodData.overview.description.slice(0, 120)}...
-                        </p>
-                      </div>
-                      
-                      <div>
-                        <span className="text-sm font-medium text-muted-foreground">Housing Market</span>
-                        <div className="grid grid-cols-2 gap-2 mt-1">
-                          <div>
-                            <span className="text-xs text-muted-foreground">Median Value</span>
-                            <p className="text-sm font-medium">{neighborhoodData.housing.medianHomeValue}</p>
-                          </div>
-                          <div>
-                            <span className="text-xs text-muted-foreground">1-Year Change</span>
-                            <p className="text-sm font-medium">
-                              {neighborhoodData.housing.valueChange.oneYear > 0 ? '+' : ''}
-                              {neighborhoodData.housing.valueChange.oneYear}%
-                            </p>
-                          </div>
-                        </div>
-                      </div>
-                      
-                      <div>
-                        <span className="text-sm font-medium text-muted-foreground">Demographics</span>
-                        <div className="grid grid-cols-2 gap-2 mt-1">
-                          <div>
-                            <span className="text-xs text-muted-foreground">Population</span>
-                            <p className="text-sm font-medium">{neighborhoodData.demographics.population.toLocaleString()}</p>
-                          </div>
-                          <div>
-                            <span className="text-xs text-muted-foreground">Median Income</span>
-                            <p className="text-sm font-medium">{neighborhoodData.demographics.medianIncome}</p>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </TabsContent>
-            </Tabs>
-          </CardContent>
-          
-          <CardFooter className="flex justify-between pt-2">
-            <Button
-              variant={isSelected ? "destructive" : "default"}
-              size="sm"
-              onClick={isSelected ? handleUnselectProperty : handleSelectProperty}
-            >
-              {isSelected ? (
-                <>
-                  <Trash className="h-4 w-4 mr-1" /> Remove from Selection
-                </>
-              ) : (
-                <>
-                  <Star className="h-4 w-4 mr-1" /> Add to Selection
-                </>
-              )}
-            </Button>
-          </CardFooter>
-        </Card>
+      <div className="mt-4 flex justify-between">
+        <button 
+          onClick={() => setExpanded(!expanded)}
+          className="text-blue-600 text-sm hover:text-blue-800"
+        >
+          {expanded ? 'Show less' : 'Show more'}
+        </button>
+        
+        {onCompare && (
+          <button 
+            onClick={() => onCompare(property)}
+            className="px-3 py-1 bg-blue-500 text-white text-sm rounded hover:bg-blue-600"
+          >
+            Compare
+          </button>
+        )}
       </div>
     </div>
   );
 };
+
+export default PropertyInfoPanel;

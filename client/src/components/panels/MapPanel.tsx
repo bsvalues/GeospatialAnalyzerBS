@@ -1,140 +1,104 @@
-import React, { useState } from 'react';
-import { Layers, MapPin } from 'lucide-react';
-import { Card, CardContent } from '@/components/ui/card';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Label } from '@/components/ui/label';
+import React, { useState, useEffect } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import MapComponent from '@/components/map/MapComponent';
+import PropertyInfoPanel from '@/components/map/PropertyInfoPanel';
+import { Property } from '@shared/schema';
+import { MapLayer, MapOptions } from '@/shared/types';
 
-export interface MapLayer {
-  id: string;
-  name: string;
-  type: 'base' | 'viewable';
-  checked: boolean;
+export interface MapPanelProps {
+  className?: string;
 }
 
-export const MapPanel: React.FC = () => {
-  const [baseLayers, setBaseLayers] = useState<MapLayer[]>([
-    { id: 'imagery', name: 'Imagery', type: 'base', checked: true },
-    { id: 'street-map', name: 'Street Map', type: 'base', checked: true },
-    { id: 'topo', name: 'Topo', type: 'base', checked: false },
-    { id: 'fema-flood', name: 'FEMA Flood', type: 'base', checked: false },
-    { id: 'usgs-imagery', name: 'USGS Imagery', type: 'base', checked: false },
-  ]);
+export const MapPanel: React.FC<MapPanelProps> = ({ className }) => {
+  // State for the currently selected property
+  const [selectedProperty, setSelectedProperty] = useState<Property | null>(null);
   
-  const [viewableLayers, setViewableLayers] = useState<MapLayer[]>([
-    { id: 'parcels', name: 'Parcels', type: 'viewable', checked: true },
-    { id: 'short-plats', name: 'Short Plats', type: 'viewable', checked: false },
-    { id: 'long-plats', name: 'Long Plats', type: 'viewable', checked: false },
-    { id: 'flood-zones', name: 'Flood Zones', type: 'viewable', checked: false },
-    { id: 'well-logs', name: 'Well Logs', type: 'viewable', checked: false },
-    { id: 'zoning', name: 'Zoning', type: 'viewable', checked: false },
-  ]);
+  // State for properties to compare
+  const [compareProperties, setCompareProperties] = useState<Property[]>([]);
   
-  const [selectedProperty, setSelectedProperty] = useState({
-    address: '123 Main Street',
-    parcelId: '10425-01-29',
-    salePrice: '$375,000',
-    squareFeet: '2,300',
+  // Fetch properties from the API
+  const { data: properties = [], isLoading, error } = useQuery({
+    queryKey: ['/api/properties'],
+    refetchOnWindowFocus: false,
   });
   
-  const handleBaseLayerChange = (id: string, checked: boolean) => {
-    setBaseLayers(prevLayers => 
-      prevLayers.map(layer => 
-        layer.id === id ? { ...layer, checked } : layer
-      )
-    );
+  // Define map layers
+  const [mapLayers, setMapLayers] = useState<MapLayer[]>([
+    { id: 'osm', name: 'OpenStreetMap', type: 'base', checked: true },
+    { id: 'imagery', name: 'Satellite Imagery', type: 'base', checked: false },
+    { id: 'topo', name: 'USGS Topographic', type: 'base', checked: false },
+    { id: 'parcels', name: 'Property Parcels', type: 'viewable', checked: true },
+    { id: 'zoning', name: 'Zoning Districts', type: 'viewable', checked: false },
+    { id: 'flood', name: 'Flood Zones', type: 'viewable', checked: false },
+    { id: 'heat', name: 'Property Value Heatmap', type: 'analysis', checked: false },
+  ]);
+  
+  // Map options
+  const [mapOptions, setMapOptions] = useState<Partial<MapOptions>>({
+    center: [46.2800, -119.2680], // Default center on Benton County, WA
+    zoom: 11,
+    opacity: 1,
+    labels: true,
+  });
+  
+  // Handler for selecting a property
+  const handlePropertySelect = (property: Property) => {
+    setSelectedProperty(property);
   };
   
-  const handleViewableLayerChange = (id: string, checked: boolean) => {
-    setViewableLayers(prevLayers => 
-      prevLayers.map(layer => 
-        layer.id === id ? { ...layer, checked } : layer
-      )
-    );
+  // Handler for adding a property to comparison
+  const handleAddToCompare = (property: Property) => {
+    // Don't add duplicates
+    if (!compareProperties.some(p => p.id === property.id)) {
+      // Limit to 3 properties for comparison
+      if (compareProperties.length < 3) {
+        setCompareProperties([...compareProperties, property]);
+      } else {
+        alert('You can compare up to 3 properties at a time.');
+      }
+    }
+  };
+  
+  // Handler for closing property info
+  const handleClosePropertyInfo = () => {
+    setSelectedProperty(null);
   };
   
   return (
-    <div className="p-1 flex h-full">
-      {/* Left sidebar - Layer controls */}
-      <div className="w-64 bg-card border-r border-border p-4 flex flex-col">
-        <h2 className="font-bold text-lg mb-4 flex items-center">
-          <Layers size={18} className="mr-2 text-primary" />
-          Map Layers
-        </h2>
-        
-        <h3 className="text-sm font-medium text-primary mt-2 mb-2">Base Layers</h3>
-        <div className="space-y-2 mb-4">
-          {baseLayers.map((layer) => (
-            <div key={layer.id} className="flex items-center p-2 rounded hover:bg-muted">
-              <Checkbox 
-                id={`layer-${layer.id}`} 
-                className="mr-2"
-                checked={layer.checked}
-                onCheckedChange={(checked) => handleBaseLayerChange(layer.id, checked === true)}
-              />
-              <Label htmlFor={`layer-${layer.id}`} className="cursor-pointer flex-1 text-sm">
-                {layer.name}
-              </Label>
-            </div>
-          ))}
-        </div>
-        
-        <h3 className="text-sm font-medium text-primary mt-4 mb-2">Viewable Layers</h3>
-        <div className="space-y-2 mb-4">
-          {viewableLayers.map((layer) => (
-            <div key={layer.id} className="flex items-center p-2 rounded hover:bg-muted">
-              <Checkbox 
-                id={`viewlayer-${layer.id}`} 
-                className="mr-2"
-                checked={layer.checked}
-                onCheckedChange={(checked) => handleViewableLayerChange(layer.id, checked === true)}
-              />
-              <Label htmlFor={`viewlayer-${layer.id}`} className="cursor-pointer flex-1 text-sm">
-                {layer.name}
-              </Label>
-            </div>
-          ))}
-        </div>
+    <div className={`flex h-full w-full ${className}`}>
+      {/* Map container */}
+      <div className="flex-grow h-full">
+        {isLoading ? (
+          <div className="h-full w-full flex items-center justify-center bg-gray-100">
+            <p className="text-gray-500">Loading property data...</p>
+          </div>
+        ) : error ? (
+          <div className="h-full w-full flex items-center justify-center bg-gray-100">
+            <p className="text-red-500">Error loading properties: {error.toString()}</p>
+          </div>
+        ) : (
+          <MapComponent
+            properties={properties}
+            selectedProperty={selectedProperty}
+            onPropertySelect={handlePropertySelect}
+            layers={mapLayers}
+            mapOptions={mapOptions}
+            height="100%"
+            width="100%"
+          />
+        )}
       </div>
       
-      {/* Main map area */}
-      <div className="flex-1 relative bg-gradient-to-br from-muted/50 to-muted/80">
-        <div className="absolute inset-0 flex items-center justify-center">
-          <div className="bg-card bg-opacity-70 px-12 py-6 rounded-lg text-center shadow-lg">
-            <MapPin size={60} className="mx-auto mb-4 text-primary" />
-            <h3 className="text-xl font-semibold mb-2">GIS Map View</h3>
-            <p className="text-muted-foreground">Interactive property mapping with real-time data integration</p>
-          </div>
-        </div>
-        
-        {/* Property markers (illustrative) */}
-        <div className="absolute top-1/4 left-1/4 h-4 w-4">
-          <div className="absolute inset-0 bg-primary rounded-full opacity-90"></div>
-        </div>
-        <div className="absolute bottom-1/3 right-1/3 h-4 w-4">
-          <div className="absolute inset-0 bg-primary rounded-full opacity-90"></div>
-        </div>
-        
-        {/* Property Info Panel */}
-        <Card className="absolute top-4 left-4 w-72">
-          <div className="p-3 bg-primary text-primary-foreground font-medium">
-            Selected Property: {selectedProperty.address}
-          </div>
-          <CardContent className="p-3 space-y-2 text-sm">
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Parcel ID:</span>
-              <span>{selectedProperty.parcelId}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Sale Price:</span>
-              <span>{selectedProperty.salePrice}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Square Feet:</span>
-              <span>{selectedProperty.squareFeet}</span>
-            </div>
-          </CardContent>
-        </Card>
+      {/* Property info sidebar */}
+      <div className="w-96 h-full overflow-hidden border-l border-gray-200">
+        <PropertyInfoPanel
+          property={selectedProperty}
+          onClose={handleClosePropertyInfo}
+          onCompare={handleAddToCompare}
+        />
       </div>
     </div>
   );
 };
+
+export default MapPanel;

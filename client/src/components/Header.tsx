@@ -1,48 +1,100 @@
 import React from 'react';
-import { Map, Building } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { 
+  HelpCircle, 
+  Bell, 
+  Map, 
+  Database, 
+  Calculator, 
+  Building, 
+  FileText 
+} from 'lucide-react';
 
 interface HeaderProps {
   taxYear: string;
   onTaxYearChange: (year: string) => void;
 }
 
-const Header: React.FC<HeaderProps> = ({ taxYear, onTaxYearChange }) => {
+export const Header: React.FC<HeaderProps> = ({ taxYear, onTaxYearChange }) => {
+  const availableYears = ['2023', '2024', '2025'];
+  
   return (
-    <header className="bg-gradient-to-r from-blue-800 to-indigo-900 text-white p-4">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center space-x-3">
-          <div className="bg-white bg-opacity-20 p-2 rounded-lg">
-            <Map size={24} className="text-blue-200" />
+    <header className="bg-primary/5 border-b border-gray-200 px-4 py-3 flex justify-between items-center">
+      <div className="flex items-center">
+        <div className="flex items-center">
+          <Map className="h-6 w-6 text-primary mr-2" />
+          <h1 className="text-xl font-bold text-primary">Spatialest</h1>
+        </div>
+        <span className="ml-2 text-sm text-gray-500">GIS Property Valuation Tool</span>
+      </div>
+      
+      <div className="flex items-center space-x-4">
+        <div className="hidden md:flex items-center space-x-2 text-gray-500">
+          <div className="flex items-center px-3 py-1 rounded-md hover:bg-gray-100 cursor-pointer">
+            <Map className="h-4 w-4 mr-1" />
+            <span className="text-sm">Layers</span>
           </div>
-          <div>
-            <h1 className="text-2xl font-bold">Spatial<span className="text-blue-300">est</span></h1>
-            <p className="text-xs text-blue-200">GIS Property Appraisal Platform</p>
+          <div className="flex items-center px-3 py-1 rounded-md hover:bg-gray-100 cursor-pointer">
+            <Database className="h-4 w-4 mr-1" />
+            <span className="text-sm">Data</span>
+          </div>
+          <div className="flex items-center px-3 py-1 rounded-md hover:bg-gray-100 cursor-pointer">
+            <Calculator className="h-4 w-4 mr-1" />
+            <span className="text-sm">Analysis</span>
+          </div>
+          <div className="flex items-center px-3 py-1 rounded-md hover:bg-gray-100 cursor-pointer">
+            <Building className="h-4 w-4 mr-1" />
+            <span className="text-sm">Properties</span>
+          </div>
+          <div className="flex items-center px-3 py-1 rounded-md hover:bg-gray-100 cursor-pointer">
+            <FileText className="h-4 w-4 mr-1" />
+            <span className="text-sm">Reports</span>
           </div>
         </div>
-        <div className="flex items-center space-x-6">
-          <div className="flex items-center space-x-1">
-            <Building size={16} className="text-blue-300" />
-            <span>Benton County Assessment {taxYear}</span>
-          </div>
-          <div className="flex space-x-2">
-            <Select 
-              value={taxYear}
-              onValueChange={onTaxYearChange}
+        
+        <div className="mr-4 border-r pr-4">
+          <label htmlFor="taxYear" className="block text-xs text-gray-500 mb-1">
+            Tax Year
+          </label>
+          <select
+            id="taxYear"
+            className="border border-gray-300 rounded px-3 py-1 text-sm"
+            value={taxYear}
+            onChange={(e) => onTaxYearChange(e.target.value)}
+          >
+            {availableYears.map((year) => (
+              <option key={year} value={year}>
+                {year}
+              </option>
+            ))}
+          </select>
+        </div>
+        
+        <div className="flex items-center space-x-3">
+          <button
+            className="text-gray-600 hover:text-gray-900 p-1 rounded-full hover:bg-gray-100"
+            aria-label="Help"
+          >
+            <HelpCircle className="h-5 w-5" />
+          </button>
+          
+          <button
+            className="text-gray-600 hover:text-gray-900 p-1 rounded-full hover:bg-gray-100 relative"
+            aria-label="Notifications"
+          >
+            <Bell className="h-5 w-5" />
+            <span className="absolute top-0 right-0 h-2 w-2 bg-red-500 rounded-full"></span>
+          </button>
+          
+          <div className="relative">
+            <button
+              className="flex items-center"
+              aria-label="User menu"
             >
-              <SelectTrigger className="w-[100px] h-9 bg-gray-800 border border-gray-700 text-white">
-                <SelectValue placeholder="Tax Year" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="2024">2024</SelectItem>
-                <SelectItem value="2023">2023</SelectItem>
-                <SelectItem value="2022">2022</SelectItem>
-              </SelectContent>
-            </Select>
-            <Button variant="default" size="sm">
-              Connect
-            </Button>
+              <div className="w-8 h-8 rounded-full bg-primary/80 flex items-center justify-center text-white font-medium">
+                AS
+              </div>
+              <span className="ml-2 text-sm font-medium">Admin</span>
+            </button>
           </div>
         </div>
       </div>

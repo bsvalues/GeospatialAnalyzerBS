@@ -1,101 +1,76 @@
-// Property Types
-export interface Property {
-  id: string;
-  parcelId: string;
-  address: string;
-  owner?: string;
-  value?: string;
-  salePrice?: string;
-  squareFeet: number;
-  yearBuilt?: number;
-  landValue?: string;
-  coordinates?: [number, number]; // Latitude and longitude coordinates
-}
+/**
+ * Map layer types for the GIS application
+ */
 
-// Map Types
+// Type of map layer
+export type MapLayerType = 'base' | 'viewable' | 'overlay' | 'analysis';
+
+// Map layer configuration
 export interface MapLayer {
   id: string;
   name: string;
-  type: 'base' | 'viewable';
-  checked: boolean;
+  type: MapLayerType;
+  url?: string;
+  visible?: boolean;
+  checked?: boolean;
+  opacity?: number;
+  legend?: string;
+  description?: string;
+  attribution?: string;
+  zIndex?: number;
+  minZoom?: number;
+  maxZoom?: number;
 }
 
+// Map options for configuring the map display
 export interface MapOptions {
-  opacity: number;
-  labels: boolean;
-  center: [number, number];
+  center: [number, number]; // [latitude, longitude]
   zoom: number;
+  maxZoom?: number;
+  minZoom?: number;
+  opacity?: number;
+  labels?: boolean;
+  zoomControl?: boolean;
+  attribution?: boolean;
+  basemap?: string;
+  viewableLayers?: string[];
 }
 
-// Script Types
-export interface ScriptGroup {
+// Parcel type for GIS data
+export interface Parcel {
   id: string;
-  name: string;
-  active: boolean;
-  description?: string;
-  createdAt?: string;
-  updatedAt?: string;
-}
-
-export interface ScriptStep {
-  id: string;
-  name: string;
-  status: 'complete' | 'active' | 'pending';
-  code?: string;
-  type?: 'compute' | 'group' | 'combine';
-  groupId?: string;
-  description?: string;
-  createdAt?: string;
-  updatedAt?: string;
-  runCount?: number;
-  lastRun?: string;
-}
-
-export interface SqlQuery {
-  id: string;
-  name: string;
-  description?: string;
-  sql?: string;
-}
-
-// Regression Types
-export interface RegressionModel {
-  id: number;
-  name: string;
-  r2: number;
-  variables: number;
-  cov: number;
-  samples: number;
-  lastRun: string;
-  type?: string;
-}
-
-export interface ModelVariable {
-  name: string;
-  coefficient: number;
-  tValue: number;
-  pValue: number;
-  correlation: number;
-  included: boolean;
-}
-
-// Project Types
-export interface Project {
-  id: string;
-  name: string;
-  year: string;
-  metrics: {
-    activeLayers: number;
-    savedLocations: number;
-    activeScripts: number;
-    sqlQueries: number;
-    modelR2: number;
-    prdValue: number;
-  };
-  records: {
-    properties: number;
-    sales: number;
-    models: number;
-    analyses: number;
+  geometry: any; // GeoJSON geometry object
+  properties: {
+    parcelId: string;
+    address?: string;
+    owner?: string;
+    value?: number;
+    area?: number;
+    zoning?: string;
   };
 }
+
+// GIS feature collection
+export interface GISFeatureCollection {
+  type: 'FeatureCollection';
+  features: Array<{
+    type: 'Feature';
+    geometry: {
+      type: string;
+      coordinates: number[] | number[][] | number[][][];
+    };
+    properties: Record<string, any>;
+  }>;
+}
+
+// Map event handlers
+export interface MapEventHandlers {
+  onClick?: (e: any) => void;
+  onMouseOver?: (e: any) => void;
+  onMouseOut?: (e: any) => void;
+  onZoomEnd?: (e: any) => void;
+  onMoveEnd?: (e: any) => void;
+}
+
+// Map bounds
+export type MapBounds = [number, number, number, number]; // [south, west, north, east]

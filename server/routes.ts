@@ -127,194 +127,177 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   ];
 
-  // API route for retrieving all properties
-  app.get('/api/properties', (req, res) => {
-    // Get filter parameters from query string
-    const minYearBuilt = req.query.minYearBuilt ? parseInt(req.query.minYearBuilt as string) : undefined;
-    const maxYearBuilt = req.query.maxYearBuilt ? parseInt(req.query.maxYearBuilt as string) : undefined;
-    const minValue = req.query.minValue ? parseInt(req.query.minValue as string) : undefined;
-    const maxValue = req.query.maxValue ? parseInt(req.query.maxValue as string) : undefined;
-    const minSquareFeet = req.query.minSquareFeet ? parseInt(req.query.minSquareFeet as string) : undefined;
-    const maxSquareFeet = req.query.maxSquareFeet ? parseInt(req.query.maxSquareFeet as string) : undefined;
-    const neighborhood = req.query.neighborhood as string | undefined;
-    const sortBy = req.query.sortBy as string | undefined;
-    const sortOrder = req.query.sortOrder as 'asc' | 'desc' | undefined;
-    const limit = req.query.limit ? parseInt(req.query.limit as string) : undefined;
-    const offset = req.query.offset ? parseInt(req.query.offset as string) : undefined;
-    
-    // Apply filters
-    let filteredProperties = [...properties];
-    
-    if (minYearBuilt) {
-      filteredProperties = filteredProperties.filter(p => p.yearBuilt && p.yearBuilt >= minYearBuilt);
-    }
-    
-    if (maxYearBuilt) {
-      filteredProperties = filteredProperties.filter(p => p.yearBuilt && p.yearBuilt <= maxYearBuilt);
-    }
-    
-    if (minValue) {
-      filteredProperties = filteredProperties.filter(p => p.value && parseInt(p.value) >= minValue);
-    }
-    
-    if (maxValue) {
-      filteredProperties = filteredProperties.filter(p => p.value && parseInt(p.value) <= maxValue);
-    }
-    
-    if (minSquareFeet) {
-      filteredProperties = filteredProperties.filter(p => p.squareFeet >= minSquareFeet);
-    }
-    
-    if (maxSquareFeet) {
-      filteredProperties = filteredProperties.filter(p => p.squareFeet <= maxSquareFeet);
-    }
-    
-    if (neighborhood) {
-      filteredProperties = filteredProperties.filter(
-        p => p.neighborhood && p.neighborhood.toLowerCase() === neighborhood.toLowerCase()
-      );
-    }
-    
-    // Sort results if requested
-    if (sortBy) {
-      filteredProperties.sort((a, b) => {
-        let aValue = a[sortBy as keyof typeof a];
-        let bValue = b[sortBy as keyof typeof b];
-        
-        // Handle numeric values that are stored as strings
-        if (typeof aValue === 'string' && !isNaN(Number(aValue))) {
-          aValue = Number(aValue);
-        }
-        
-        if (typeof bValue === 'string' && !isNaN(Number(bValue))) {
-          bValue = Number(bValue);
-        }
-        
-        if (aValue < bValue) return sortOrder === 'desc' ? 1 : -1;
-        if (aValue > bValue) return sortOrder === 'desc' ? -1 : 1;
-        return 0;
-      });
-    }
-    
-    // Apply pagination if requested
-    if (offset !== undefined && limit !== undefined) {
-      filteredProperties = filteredProperties.slice(offset, offset + limit);
-    } else if (limit !== undefined) {
-      filteredProperties = filteredProperties.slice(0, limit);
-    }
-    
-    res.json(filteredProperties);
-  });
+  // API routes for property data
   
-  // API route for retrieving a single property by ID
-  app.get('/api/properties/:id', (req, res) => {
-    const propertyId = req.params.id;
-    const property = properties.find(p => p.id === propertyId);
-    
-    if (property) {
-      res.json(property);
-    } else {
-      res.status(404).json({ error: 'Property not found' });
-    }
-  });
-  
-  // API route for searching properties by text
-  app.get('/api/properties/search', (req, res) => {
-    const searchText = (req.query.q as string || '').toLowerCase();
-    
-    if (!searchText) {
-      return res.status(400).json({ error: 'Search query is required' });
-    }
-    
-    const searchResults = properties.filter(property => {
-      return (
-        property.address.toLowerCase().includes(searchText) ||
-        property.parcelId.toLowerCase().includes(searchText) ||
-        (property.owner && property.owner.toLowerCase().includes(searchText)) ||
-        (property.neighborhood && property.neighborhood.toLowerCase().includes(searchText))
-      );
-    });
-    
-    res.json(searchResults);
-  });
-  
-  // API route for finding similar properties
-  app.get('/api/properties/similar', (req, res) => {
-    const referenceId = req.query.referenceId as string;
-    const limit = req.query.limit ? parseInt(req.query.limit as string) : 5;
-    
-    if (!referenceId) {
-      return res.status(400).json({ error: 'Reference property ID is required' });
-    }
-    
-    const referenceProperty = properties.find(p => p.id === referenceId);
-    
-    if (!referenceProperty) {
-      return res.status(404).json({ error: 'Reference property not found' });
-    }
-    
-    // Calculate a simple similarity score based on property attributes
-    const similarProperties = properties
-      .filter(p => p.id !== referenceId) // Exclude the reference property
-      .map(property => {
-        // Calculate similarity based on weighted factors
-        let similarityScore = 0;
-        
-        // Factor: Square footage (30% weight)
-        const sqftDiff = Math.abs(property.squareFeet - referenceProperty.squareFeet);
-        const sqftSimilarity = Math.max(0, 1 - (sqftDiff / 2000)); // Normalize to 0-1
-        similarityScore += sqftSimilarity * 0.3;
-        
-        // Factor: Year built (20% weight)
-        if (property.yearBuilt && referenceProperty.yearBuilt) {
-          const yearDiff = Math.abs(property.yearBuilt - referenceProperty.yearBuilt);
-          const yearSimilarity = Math.max(0, 1 - (yearDiff / 50)); // Normalize to 0-1
-          similarityScore += yearSimilarity * 0.2;
-        }
-        
-        // Factor: Neighborhood (30% weight)
-        if (property.neighborhood && referenceProperty.neighborhood) {
-          const neighborhoodSimilarity = property.neighborhood === referenceProperty.neighborhood ? 1 : 0;
-          similarityScore += neighborhoodSimilarity * 0.3;
-        }
-        
-        // Factor: Value (20% weight)
-        if (property.value && referenceProperty.value) {
-          const propertyValue = parseInt(property.value);
-          const referenceValue = parseInt(referenceProperty.value);
-          const valueDiff = Math.abs(propertyValue - referenceValue);
-          const valueSimilarity = Math.max(0, 1 - (valueDiff / 500000)); // Normalize to 0-1
-          similarityScore += valueSimilarity * 0.2;
-        }
-        
-        return { ...property, similarityScore };
-      })
-      .sort((a, b) => b.similarityScore - a.similarityScore) // Sort by similarity (descending)
-      .slice(0, limit) // Limit the number of results
-      .map(({ similarityScore, ...property }) => property); // Remove the similarity score
-    
-    res.json(similarProperties);
-  });
-  
-  // API route for finding properties within a geographic region
-  app.get('/api/properties/region', (req, res) => {
-    const south = parseFloat(req.query.south as string);
-    const west = parseFloat(req.query.west as string);
-    const north = parseFloat(req.query.north as string);
-    const east = parseFloat(req.query.east as string);
-    
-    if (isNaN(south) || isNaN(west) || isNaN(north) || isNaN(east)) {
-      return res.status(400).json({ error: 'Invalid bounds parameters' });
-    }
-    
-    const propertiesInRegion = properties.filter(property => {
-      if (!property.coordinates) return false;
+  // Get all properties
+  app.get('/api/properties', async (req, res) => {
+    try {
+      // Get filter parameters from query string
+      const minYearBuilt = req.query.minYearBuilt ? parseInt(req.query.minYearBuilt as string) : undefined;
+      const maxYearBuilt = req.query.maxYearBuilt ? parseInt(req.query.maxYearBuilt as string) : undefined;
+      const minValue = req.query.minValue ? parseInt(req.query.minValue as string) : undefined;
+      const maxValue = req.query.maxValue ? parseInt(req.query.maxValue as string) : undefined;
+      const minSquareFeet = req.query.minSquareFeet ? parseInt(req.query.minSquareFeet as string) : undefined;
+      const maxSquareFeet = req.query.maxSquareFeet ? parseInt(req.query.maxSquareFeet as string) : undefined;
+      const propertyType = req.query.propertyType as string | undefined;
+      const neighborhood = req.query.neighborhood as string | undefined;
+      const sortBy = req.query.sortBy as string | undefined;
+      const sortOrder = req.query.sortOrder as 'asc' | 'desc' | undefined;
+      const limit = req.query.limit ? parseInt(req.query.limit as string) : undefined;
+      const offset = req.query.offset ? parseInt(req.query.offset as string) : undefined;
       
-      const [lat, lng] = property.coordinates;
-      return lat >= south && lat <= north && lng >= west && lng <= east;
-    });
-    
-    res.json(propertiesInRegion);
+      // Get filtered properties from storage
+      const properties = await storage.getPropertiesByFilter({
+        minYearBuilt,
+        maxYearBuilt,
+        minValue,
+        maxValue,
+        minSquareFeet,
+        maxSquareFeet,
+        propertyType,
+        neighborhood,
+        sortBy,
+        sortOrder,
+        limit,
+        offset
+      });
+      
+      res.json(properties);
+    } catch (error) {
+      console.error('Error fetching properties:', error);
+      res.status(500).json({ error: 'Failed to fetch properties' });
+    }
+  });
+  
+  // Get a single property by ID
+  app.get('/api/properties/:id', async (req, res) => {
+    try {
+      const propertyId = parseInt(req.params.id);
+      
+      if (isNaN(propertyId)) {
+        return res.status(400).json({ error: 'Invalid property ID' });
+      }
+      
+      const property = await storage.getPropertyById(propertyId);
+      
+      if (property) {
+        res.json(property);
+      } else {
+        res.status(404).json({ error: 'Property not found' });
+      }
+    } catch (error) {
+      console.error('Error fetching property:', error);
+      res.status(500).json({ error: 'Failed to fetch property' });
+    }
+  });
+  
+  // Search properties by text
+  app.get('/api/properties/search', async (req, res) => {
+    try {
+      const searchText = req.query.q as string || '';
+      
+      if (!searchText) {
+        return res.status(400).json({ error: 'Search query is required' });
+      }
+      
+      const properties = await storage.searchProperties(searchText);
+      res.json(properties);
+    } catch (error) {
+      console.error('Error searching properties:', error);
+      res.status(500).json({ error: 'Failed to search properties' });
+    }
+  });
+  
+  // Find similar properties
+  app.get('/api/properties/similar/:id', async (req, res) => {
+    try {
+      const propertyId = parseInt(req.params.id);
+      const limit = req.query.limit ? parseInt(req.query.limit as string) : 5;
+      
+      if (isNaN(propertyId)) {
+        return res.status(400).json({ error: 'Invalid property ID' });
+      }
+      
+      // Get the reference property
+      const referenceProperty = await storage.getPropertyById(propertyId);
+      
+      if (!referenceProperty) {
+        return res.status(404).json({ error: 'Reference property not found' });
+      }
+      
+      // Get all properties
+      const allProperties = await storage.getProperties();
+      
+      // Calculate similarity scores
+      const similarProperties = allProperties
+        .filter(p => p.id !== propertyId) // Exclude the reference property
+        .map(property => {
+          // Calculate similarity based on weighted factors
+          let similarityScore = 0;
+          
+          // Factor: Square footage (30% weight)
+          const sqftDiff = Math.abs(property.squareFeet - referenceProperty.squareFeet);
+          const sqftSimilarity = Math.max(0, 1 - (sqftDiff / 2000)); // Normalize to 0-1
+          similarityScore += sqftSimilarity * 0.3;
+          
+          // Factor: Year built (20% weight)
+          if (property.yearBuilt && referenceProperty.yearBuilt) {
+            const yearDiff = Math.abs(property.yearBuilt - referenceProperty.yearBuilt);
+            const yearSimilarity = Math.max(0, 1 - (yearDiff / 50)); // Normalize to 0-1
+            similarityScore += yearSimilarity * 0.2;
+          }
+          
+          // Factor: Neighborhood (30% weight)
+          if (property.neighborhood && referenceProperty.neighborhood) {
+            const neighborhoodSimilarity = property.neighborhood === referenceProperty.neighborhood ? 1 : 0;
+            similarityScore += neighborhoodSimilarity * 0.3;
+          }
+          
+          // Factor: Property type (10% weight)
+          if (property.propertyType && referenceProperty.propertyType) {
+            const propertyTypeSimilarity = property.propertyType === referenceProperty.propertyType ? 1 : 0;
+            similarityScore += propertyTypeSimilarity * 0.1;
+          }
+          
+          // Factor: Value (10% weight)
+          if (property.value && referenceProperty.value) {
+            const propertyValue = parseFloat(property.value.replace(/[^0-9.-]+/g, ''));
+            const referenceValue = parseFloat(referenceProperty.value.replace(/[^0-9.-]+/g, ''));
+            const valueDiff = Math.abs(propertyValue - referenceValue);
+            const valueSimilarity = Math.max(0, 1 - (valueDiff / 500000)); // Normalize to 0-1
+            similarityScore += valueSimilarity * 0.1;
+          }
+          
+          return { ...property, similarityScore };
+        })
+        .sort((a, b) => b.similarityScore - a.similarityScore) // Sort by similarity (descending)
+        .slice(0, limit); // Limit the number of results
+      
+      res.json(similarProperties.map(({ similarityScore, ...property }) => property));
+    } catch (error) {
+      console.error('Error finding similar properties:', error);
+      res.status(500).json({ error: 'Failed to find similar properties' });
+    }
+  });
+  
+  // Find properties within a geographic region
+  app.get('/api/properties/region', async (req, res) => {
+    try {
+      const south = parseFloat(req.query.south as string);
+      const west = parseFloat(req.query.west as string);
+      const north = parseFloat(req.query.north as string);
+      const east = parseFloat(req.query.east as string);
+      
+      if (isNaN(south) || isNaN(west) || isNaN(north) || isNaN(east)) {
+        return res.status(400).json({ error: 'Invalid bounds parameters' });
+      }
+      
+      const properties = await storage.getPropertiesInRegion([south, west, north, east]);
+      res.json(properties);
+    } catch (error) {
+      console.error('Error fetching properties in region:', error);
+      res.status(500).json({ error: 'Failed to fetch properties in region' });
+    }
   });
 
   // API route for project overview data
