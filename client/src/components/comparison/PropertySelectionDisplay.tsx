@@ -1,7 +1,7 @@
 import React from 'react';
 import { X, Plus, ChevronRight } from 'lucide-react';
 import { usePropertyComparison } from './PropertyComparisonContext';
-import { Property } from '@/shared/types';
+import { Property } from '@shared/schema';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';

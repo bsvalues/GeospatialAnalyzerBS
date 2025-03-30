@@ -1,5 +1,5 @@
 import React, { createContext, useState, useContext, ReactNode } from 'react';
-import { Property } from '@/shared/types';
+import { Property } from '@shared/schema';
 import { useToast } from '@/hooks/use-toast';
 
 // Context type definition
@@ -121,7 +121,7 @@ export const PropertyComparisonProvider: React.FC<PropertyComparisonProviderProp
     // In production, this would be replaced with actual API calls
     const properties: Property[] = [
       {
-        id: "prop-1",
+        id: 101,
         parcelId: "APN123456",
         address: "125 Main St, Richland, WA",
         owner: "Jane Smith",
@@ -133,7 +133,7 @@ export const PropertyComparisonProvider: React.FC<PropertyComparisonProviderProp
         coordinates: [46.28, -119.28]
       },
       {
-        id: "prop-2",
+        id: 102,
         parcelId: "APN123457",
         address: "130 Oak Ave, Kennewick, WA",
         owner: "John Doe",
@@ -145,7 +145,7 @@ export const PropertyComparisonProvider: React.FC<PropertyComparisonProviderProp
         coordinates: [46.21, -119.17]
       },
       {
-        id: "prop-3",
+        id: 103,
         parcelId: "APN123458",
         address: "240 Vineyard Dr, Prosser, WA",
         owner: "Robert Johnson",
@@ -157,7 +157,7 @@ export const PropertyComparisonProvider: React.FC<PropertyComparisonProviderProp
         coordinates: [46.24, -119.76]
       },
       {
-        id: "prop-4",
+        id: 104,
         parcelId: "APN123459",
         address: "555 Columbia Ave, Richland, WA",
         owner: "Mary Williams",
@@ -169,7 +169,7 @@ export const PropertyComparisonProvider: React.FC<PropertyComparisonProviderProp
         coordinates: [46.29, -119.29]
       },
       {
-        id: "prop-5",
+        id: 105,
         parcelId: "APN123460",
         address: "720 Franklin St, Pasco, WA",
         owner: "Steven Davis",

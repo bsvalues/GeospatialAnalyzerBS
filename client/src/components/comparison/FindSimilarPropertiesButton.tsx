@@ -1,7 +1,7 @@
 import React from 'react';
 import { Button } from '@/components/ui/button';
 import { usePropertyComparison } from './PropertyComparisonContext';
-import { Property } from '@/shared/types';
+import { Property } from '@shared/schema';
 import { Search } from 'lucide-react';
 
 interface FindSimilarPropertiesButtonProps {

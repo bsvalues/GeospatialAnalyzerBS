@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { Property } from '@/shared/types';
+import { Property } from '@shared/schema';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
