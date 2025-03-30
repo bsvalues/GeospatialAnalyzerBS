@@ -36,9 +36,10 @@ export function RegressionPanel() {
   useEffect(() => {
     const fetchProperties = async () => {
       try {
-        const response = await apiRequest<Property[]>('/api/properties');
-        if (response) {
-          setProperties(response);
+        const response = await fetch('/api/properties');
+        const properties = await response.json();
+        if (properties) {
+          setProperties(properties);
         }
       } catch (error) {
         console.error('Error fetching properties:', error);
