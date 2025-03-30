@@ -1,5 +1,6 @@
 import React from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { jest, describe, beforeEach, test, expect } from '@jest/globals';
 import RegressionPanel from '@/components/panels/RegressionPanel';
 import { RegressionModel, ModelVariable } from '@/shared/types';
 

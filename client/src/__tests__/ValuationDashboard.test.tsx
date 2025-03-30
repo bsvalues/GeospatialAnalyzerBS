@@ -1,5 +1,6 @@
 import React from 'react';
 import { render, screen, fireEvent } from '@testing-library/react';
+import { jest, describe, beforeEach, test, expect } from '@jest/globals';
 import ValuationDashboard from '@/components/valuation/ValuationDashboard';
 import { Property } from '@/shared/types';
 
