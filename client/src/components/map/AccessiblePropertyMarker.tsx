@@ -1,4 +1,4 @@
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useCallback } from 'react';
 import { Marker, Popup, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import { Property } from '@shared/schema';
@@ -97,24 +97,39 @@ export const AccessiblePropertyMarker: React.FC<AccessiblePropertyMarkerProps> =
           `${propertyType} property at ${property.address}. Value: ${formatCurrency(property.value || 0)}${isSelected ? '. Currently selected' : ''}`
         );
         
-        // Add keyboard event listener for Enter/Space to activate marker
-        markerElement.addEventListener('keydown', (e: KeyboardEvent) => {
+        // Create named handler functions for proper cleanup
+        const handleKeyDown = (e: KeyboardEvent) => {
           if (e.key === 'Enter' || e.key === ' ') {
             e.preventDefault();
             onClick(property);
             marker.openPopup();
           }
-        });
+        };
         
-        // Add focus styles
-        markerElement.addEventListener('focus', () => {
+        const handleFocus = () => {
           markerElement.style.outline = '3px solid #4773AA';
           markerElement.style.outlineOffset = '2px';
-        });
+        };
         
-        markerElement.addEventListener('blur', () => {
+        const handleBlur = () => {
           markerElement.style.outline = 'none';
-        });
+        };
+        
+        // Add keyboard event listener for Enter/Space to activate marker
+        markerElement.addEventListener('keydown', handleKeyDown);
+        
+        // Add focus styles
+        markerElement.addEventListener('focus', handleFocus);
+        markerElement.addEventListener('blur', handleBlur);
+        
+        // Cleanup function to remove event listeners
+        return () => {
+          if (markerElement) {
+            markerElement.removeEventListener('keydown', handleKeyDown);
+            markerElement.removeEventListener('focus', handleFocus);
+            markerElement.removeEventListener('blur', handleBlur);
+          }
+        };
       }
     }
   }, [property, isSelected, propertyType, onClick, focusable]);
@@ -131,25 +146,26 @@ export const AccessiblePropertyMarker: React.FC<AccessiblePropertyMarkerProps> =
   
   // Apply additional styling for hovered state
   useEffect(() => {
-    if (actualMarkerRef.current && isHovered) {
-      const markerElement = actualMarkerRef.current.getElement();
-      if (markerElement) {
-        const markerDiv = markerElement.querySelector('div');
-        if (markerDiv) {
-          markerDiv.style.transform = 'scale(1.1)';
-          markerDiv.style.transition = 'transform 0.2s ease-in-out';
-        }
-      }
-    } else if (actualMarkerRef.current) {
-      const markerElement = actualMarkerRef.current.getElement();
-      if (markerElement) {
-        const markerDiv = markerElement.querySelector('div');
-        if (markerDiv) {
-          markerDiv.style.transform = 'scale(1)';
-        }
-      }
+    if (!actualMarkerRef.current) return;
+    
+    const marker = actualMarkerRef.current;
+    const markerElement = marker.getElement();
+    if (!markerElement) return;
+    
+    const markerDiv = markerElement.querySelector('div');
+    if (!markerDiv) return;
+    
+    // Apply appropriate styling based on hover state
+    if (isHovered) {
+      markerDiv.style.transform = 'scale(1.1)';
+      markerDiv.style.transition = 'transform 0.2s ease-in-out';
+    } else {
+      markerDiv.style.transform = 'scale(1)';
     }
-  }, [isHovered]);
+    
+    // No need for explicit cleanup as React will handle this 
+    // when the component unmounts or when dependencies change
+  }, [isHovered, actualMarkerRef]);
   
   // Different marker styling based on marker type
   const getIcon = () => {
@@ -163,22 +179,36 @@ export const AccessiblePropertyMarker: React.FC<AccessiblePropertyMarkerProps> =
     }
   };
   
+  // Memoize event handlers to maintain consistent references
+  const handleClick = useCallback(() => {
+    onClick(property);
+  }, [onClick, property]);
+  
+  const handleKeyPress = useCallback((e: L.LeafletKeyboardEvent) => {
+    if (e.originalEvent.key === 'Enter') {
+      onClick(property);
+    }
+  }, [onClick, property]);
+  
+  // Create stable handler references for mouseover/mouseout
+  const handleMouseOver = useCallback(() => {
+    if (onMouseOver) onMouseOver();
+  }, [onMouseOver]);
+  
+  const handleMouseOut = useCallback(() => {
+    if (onMouseOut) onMouseOut();
+  }, [onMouseOut]);
+  
   return (
     <Marker
       ref={actualMarkerRef}
       position={coordinates}
       icon={getIcon()}
       eventHandlers={{
-        click: () => {
-          onClick(property);
-        },
-        keypress: (e) => {
-          if (e.originalEvent.key === 'Enter') {
-            onClick(property);
-          }
-        },
-        mouseover: onMouseOver,
-        mouseout: onMouseOut,
+        click: handleClick,
+        keypress: handleKeyPress,
+        mouseover: handleMouseOver,
+        mouseout: handleMouseOut,
       }}
     >
       <Popup>
@@ -201,7 +231,7 @@ export const AccessiblePropertyMarker: React.FC<AccessiblePropertyMarkerProps> =
           {/* Accessible button for selecting the property for analysis */}
           <button
             className="mt-2 px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50"
-            onClick={() => onClick(property)}
+            onClick={handleClick}
             aria-label={`Select ${property.address} for analysis`}
           >
             Select for Analysis
