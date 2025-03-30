@@ -14,6 +14,7 @@ import {
 import MapPanel from './panels/MapPanel';
 import ScriptPanel from './panels/ScriptPanel';
 import SpatialAnalysisPanel from './panels/SpatialAnalysisPanel';
+import { RegressionPanel } from './panels/RegressionPanel';
 import { Property } from '@shared/schema';
 import { useQuery } from '@tanstack/react-query';
 
@@ -202,19 +203,7 @@ const Dashboard: React.FC<DashboardProps> = ({ className }) => {
           </div>
         )}
         
-        {activeTab === 'regression' && (
-          <div className="h-full p-6 flex items-center justify-center">
-            <div className="text-center max-w-md">
-              <TrendingUp className="w-12 h-12 text-gray-300 mx-auto mb-4" />
-              <p className="text-gray-500 mb-2">
-                The Regression panel will offer statistical modeling tools for property valuation.
-              </p>
-              <p className="text-sm text-gray-400">
-                This feature will be implemented in the next phase.
-              </p>
-            </div>
-          </div>
-        )}
+        {activeTab === 'regression' && <RegressionPanel />}
         
         {activeTab === 'spatial' && (
           <SpatialAnalysisPanel properties={properties} />
