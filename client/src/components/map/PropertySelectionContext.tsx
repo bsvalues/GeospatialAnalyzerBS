@@ -1,6 +1,9 @@
-import React, { createContext, useContext, useState, ReactNode } from 'react';
+import React, { createContext, useContext, useState, ReactNode, useCallback } from 'react';
 import { Property } from '@/shared/types';
 import { useToast } from '@/hooks/use-toast';
+
+// Types of bulk operations that can be performed
+type BulkOperationType = 'add' | 'remove' | 'toggle' | 'replace';
 
 interface PropertySelectionContextType {
   selectedProperties: Property[];
@@ -9,6 +12,14 @@ interface PropertySelectionContextType {
   isPropertySelected: (property: Property) => boolean;
   clearSelectedProperties: () => void;
   selectProperties: (properties: Property[]) => void;
+  
+  // Enhanced functionality
+  filterProperties: (filterFn: (property: Property) => boolean) => void;
+  sortProperties: (compareFn: (a: Property, b: Property) => number) => void;
+  bulkOperation: (
+    operation: BulkOperationType, 
+    predicateFn: (property: Property) => boolean
+  ) => void;
 }
 
 const PropertySelectionContext = createContext<PropertySelectionContextType | undefined>(undefined);
@@ -130,6 +141,141 @@ export const PropertySelectionProvider: React.FC<PropertySelectionProviderProps>
     });
   };
   
+  // Filter selected properties based on criteria
+  const filterProperties = useCallback((filterFn: (property: Property) => boolean) => {
+    const filteredProperties = selectedProperties.filter(filterFn);
+    
+    if (filteredProperties.length === 0) {
+      toast({
+        title: "No properties match filter",
+        description: "The filter criteria didn't match any selected properties",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    setSelectedProperties(filteredProperties);
+    
+    toast({
+      title: "Properties filtered",
+      description: `Filtered to ${filteredProperties.length} properties that match criteria`,
+      variant: "default"
+    });
+  }, [selectedProperties, toast]);
+  
+  // Sort selected properties based on comparison function
+  const sortProperties = useCallback((compareFn: (a: Property, b: Property) => number) => {
+    if (selectedProperties.length <= 1) {
+      return; // Nothing to sort
+    }
+    
+    const sortedProperties = [...selectedProperties].sort(compareFn);
+    setSelectedProperties(sortedProperties);
+    
+    toast({
+      title: "Properties sorted",
+      description: "Properties have been reordered based on the sorting criteria",
+      variant: "default"
+    });
+  }, [selectedProperties, toast]);
+  
+  // Perform bulk operations based on criteria
+  const bulkOperation = useCallback((
+    operation: BulkOperationType, 
+    predicateFn: (property: Property) => boolean
+  ) => {
+    switch (operation) {
+      case 'add': {
+        // Not implemented - would require access to all properties, not just selected
+        toast({
+          title: "Operation not supported",
+          description: "Adding properties requires access to all available properties",
+          variant: "destructive"
+        });
+        break;
+      }
+      case 'remove': {
+        const propertiesBeforeRemoval = selectedProperties.length;
+        const newSelectedProperties = selectedProperties.filter(p => !predicateFn(p));
+        
+        if (newSelectedProperties.length === propertiesBeforeRemoval) {
+          toast({
+            title: "No properties matched",
+            description: "No properties were removed as none matched the criteria",
+            variant: "destructive"
+          });
+          return;
+        }
+        
+        setSelectedProperties(newSelectedProperties);
+        
+        toast({
+          title: "Properties removed",
+          description: `Removed ${propertiesBeforeRemoval - newSelectedProperties.length} properties`,
+          variant: "default"
+        });
+        break;
+      }
+      case 'toggle': {
+        // For toggle, we need to separate the predicateFn matches into two groups
+        const matchingProperties = selectedProperties.filter(predicateFn);
+        const nonMatchingProperties = selectedProperties.filter(p => !predicateFn(p));
+        
+        // If all properties matched, we'll remove them all (act like 'remove')
+        if (matchingProperties.length === selectedProperties.length) {
+          setSelectedProperties([]);
+          toast({
+            title: "All properties removed",
+            description: "All properties matched criteria and were removed",
+            variant: "default"
+          });
+          return;
+        }
+        
+        // If no properties matched, do nothing
+        if (matchingProperties.length === 0) {
+          toast({
+            title: "No properties matched",
+            description: "No properties matched the criteria for toggling",
+            variant: "destructive"
+          });
+          return;
+        }
+        
+        // Otherwise, keep only the non-matching properties
+        setSelectedProperties(nonMatchingProperties);
+        
+        toast({
+          title: "Properties toggled",
+          description: `Removed ${matchingProperties.length} matching properties`,
+          variant: "default"
+        });
+        break;
+      }
+      case 'replace': {
+        const matchingProperties = selectedProperties.filter(predicateFn);
+        
+        if (matchingProperties.length === 0) {
+          toast({
+            title: "No properties matched",
+            description: "No properties matched the replacement criteria",
+            variant: "destructive"
+          });
+          return;
+        }
+        
+        setSelectedProperties(matchingProperties);
+        
+        toast({
+          title: "Selection replaced",
+          description: `Now showing only the ${matchingProperties.length} properties that matched criteria`,
+          variant: "default"
+        });
+        break;
+      }
+    }
+  }, [selectedProperties, toast]);
+
   return (
     <PropertySelectionContext.Provider
       value={{
@@ -139,6 +285,9 @@ export const PropertySelectionProvider: React.FC<PropertySelectionProviderProps>
         isPropertySelected,
         clearSelectedProperties,
         selectProperties,
+        filterProperties,
+        sortProperties,
+        bulkOperation
       }}
     >
       {children}
