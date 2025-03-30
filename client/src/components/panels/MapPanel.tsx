@@ -1,135 +1,140 @@
-import React, { useState, useEffect } from 'react';
-import { usePropertySelection } from '@/components/map/PropertySelectionContext';
-import { PropertyInfoPanel } from '@/components/map/PropertyInfoPanel';
-import { MapComponent } from '@/components/map/MapComponent';
-import { Property, MapLayer } from '@/shared/types';
-import { apiRequest } from '@/lib/queryClient';
-import {
-  ResizablePanel,
-  ResizablePanelGroup,
-  ResizableHandle
-} from '@/components/ui/resizable';
+import React, { useState } from 'react';
+import { Layers, MapPin } from 'lucide-react';
+import { Card, CardContent } from '@/components/ui/card';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Label } from '@/components/ui/label';
+
+export interface MapLayer {
+  id: string;
+  name: string;
+  type: 'base' | 'viewable';
+  checked: boolean;
+}
 
 export const MapPanel: React.FC = () => {
-  const [selectedProperty, setSelectedProperty] = useState<Property | null>(null);
-  const [properties, setProperties] = useState<Property[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const { selectedProperties } = usePropertySelection();
-  
-  useEffect(() => {
-    const fetchProperties = async () => {
-      setIsLoading(true);
-      try {
-        // Fetch properties from the API
-        const response = await apiRequest('GET', '/api/properties');
-        const data = await response.json();
-        setProperties(data as Property[]);
-      } catch (error) {
-        console.error('Error fetching properties:', error);
-        
-        // Demo properties for development purposes
-        const demoProperties: Property[] = [
-          {
-            id: '1',
-            parcelId: 'P123456',
-            address: '123 Main St, Richland, WA',
-            owner: 'John Doe',
-            value: '450000',
-            squareFeet: 2500,
-            yearBuilt: 1998,
-            landValue: '120000',
-            coordinates: [46.2804, -119.2752]
-          },
-          {
-            id: '2',
-            parcelId: 'P789012',
-            address: '456 Oak Ave, Kennewick, WA',
-            owner: 'Jane Smith',
-            value: '375000',
-            squareFeet: 2100,
-            yearBuilt: 2004,
-            landValue: '95000',
-            coordinates: [46.2087, -119.1361]
-          },
-          {
-            id: '3',
-            parcelId: 'P345678',
-            address: '789 Pine Ln, Pasco, WA',
-            owner: 'Robert Johnson',
-            value: '525000',
-            squareFeet: 3200,
-            yearBuilt: 2012,
-            landValue: '150000',
-            coordinates: [46.2395, -119.1005]
-          }
-        ];
-        setProperties(demoProperties);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    
-    fetchProperties();
-  }, []);
-  
-  // Automatically select the first property for the info panel
-  useEffect(() => {
-    if (properties.length > 0 && !selectedProperty) {
-      setSelectedProperty(properties[0]);
-    }
-  }, [properties, selectedProperty]);
-  
-  // Show the first selected property in the info panel
-  useEffect(() => {
-    if (selectedProperties.length > 0) {
-      setSelectedProperty(selectedProperties[0]);
-    }
-  }, [selectedProperties]);
-  
-  // Set up map layers
-  const [mapLayers, setMapLayers] = useState<MapLayer[]>([
-    { id: 'imagery', name: 'Imagery', type: 'base', checked: false },
-    { id: 'osm', name: 'OpenStreetMap', type: 'base', checked: true },
-    { id: 'satellite', name: 'Satellite', type: 'base', checked: false },
-    { id: 'parcels', name: 'Parcels', type: 'viewable', checked: true },
-    { id: 'zoning', name: 'Zoning', type: 'viewable', checked: false },
-    { id: 'flood', name: 'Flood Zones', type: 'viewable', checked: false }
+  const [baseLayers, setBaseLayers] = useState<MapLayer[]>([
+    { id: 'imagery', name: 'Imagery', type: 'base', checked: true },
+    { id: 'street-map', name: 'Street Map', type: 'base', checked: true },
+    { id: 'topo', name: 'Topo', type: 'base', checked: false },
+    { id: 'fema-flood', name: 'FEMA Flood', type: 'base', checked: false },
+    { id: 'usgs-imagery', name: 'USGS Imagery', type: 'base', checked: false },
   ]);
   
-  // Set up map center to Benton County, WA
-  const mapCenter: [number, number] = [46.23, -119.16];
-  const mapZoom = 11;
+  const [viewableLayers, setViewableLayers] = useState<MapLayer[]>([
+    { id: 'parcels', name: 'Parcels', type: 'viewable', checked: true },
+    { id: 'short-plats', name: 'Short Plats', type: 'viewable', checked: false },
+    { id: 'long-plats', name: 'Long Plats', type: 'viewable', checked: false },
+    { id: 'flood-zones', name: 'Flood Zones', type: 'viewable', checked: false },
+    { id: 'well-logs', name: 'Well Logs', type: 'viewable', checked: false },
+    { id: 'zoning', name: 'Zoning', type: 'viewable', checked: false },
+  ]);
+  
+  const [selectedProperty, setSelectedProperty] = useState({
+    address: '123 Main Street',
+    parcelId: '10425-01-29',
+    salePrice: '$375,000',
+    squareFeet: '2,300',
+  });
+  
+  const handleBaseLayerChange = (id: string, checked: boolean) => {
+    setBaseLayers(prevLayers => 
+      prevLayers.map(layer => 
+        layer.id === id ? { ...layer, checked } : layer
+      )
+    );
+  };
+  
+  const handleViewableLayerChange = (id: string, checked: boolean) => {
+    setViewableLayers(prevLayers => 
+      prevLayers.map(layer => 
+        layer.id === id ? { ...layer, checked } : layer
+      )
+    );
+  };
   
   return (
-    <div className="h-full w-full">
-      <ResizablePanelGroup direction="horizontal" className="h-full">
-        <ResizablePanel defaultSize={70} minSize={50}>
-          <div className="h-full relative">
-            <MapComponent
-              properties={properties}
-              layers={mapLayers}
-              center={mapCenter}
-              zoom={mapZoom}
-              selectedProperty={selectedProperty}
-              onSelectProperty={setSelectedProperty}
-            />
-            {isLoading && (
-              <div className="absolute inset-0 bg-background/80 flex items-center justify-center">
-                <div className="text-muted-foreground">Loading map data...</div>
-              </div>
-            )}
+    <div className="p-1 flex h-full">
+      {/* Left sidebar - Layer controls */}
+      <div className="w-64 bg-card border-r border-border p-4 flex flex-col">
+        <h2 className="font-bold text-lg mb-4 flex items-center">
+          <Layers size={18} className="mr-2 text-primary" />
+          Map Layers
+        </h2>
+        
+        <h3 className="text-sm font-medium text-primary mt-2 mb-2">Base Layers</h3>
+        <div className="space-y-2 mb-4">
+          {baseLayers.map((layer) => (
+            <div key={layer.id} className="flex items-center p-2 rounded hover:bg-muted">
+              <Checkbox 
+                id={`layer-${layer.id}`} 
+                className="mr-2"
+                checked={layer.checked}
+                onCheckedChange={(checked) => handleBaseLayerChange(layer.id, checked === true)}
+              />
+              <Label htmlFor={`layer-${layer.id}`} className="cursor-pointer flex-1 text-sm">
+                {layer.name}
+              </Label>
+            </div>
+          ))}
+        </div>
+        
+        <h3 className="text-sm font-medium text-primary mt-4 mb-2">Viewable Layers</h3>
+        <div className="space-y-2 mb-4">
+          {viewableLayers.map((layer) => (
+            <div key={layer.id} className="flex items-center p-2 rounded hover:bg-muted">
+              <Checkbox 
+                id={`viewlayer-${layer.id}`} 
+                className="mr-2"
+                checked={layer.checked}
+                onCheckedChange={(checked) => handleViewableLayerChange(layer.id, checked === true)}
+              />
+              <Label htmlFor={`viewlayer-${layer.id}`} className="cursor-pointer flex-1 text-sm">
+                {layer.name}
+              </Label>
+            </div>
+          ))}
+        </div>
+      </div>
+      
+      {/* Main map area */}
+      <div className="flex-1 relative bg-gradient-to-br from-muted/50 to-muted/80">
+        <div className="absolute inset-0 flex items-center justify-center">
+          <div className="bg-card bg-opacity-70 px-12 py-6 rounded-lg text-center shadow-lg">
+            <MapPin size={60} className="mx-auto mb-4 text-primary" />
+            <h3 className="text-xl font-semibold mb-2">GIS Map View</h3>
+            <p className="text-muted-foreground">Interactive property mapping with real-time data integration</p>
           </div>
-        </ResizablePanel>
+        </div>
         
-        <ResizableHandle withHandle />
+        {/* Property markers (illustrative) */}
+        <div className="absolute top-1/4 left-1/4 h-4 w-4">
+          <div className="absolute inset-0 bg-primary rounded-full opacity-90"></div>
+        </div>
+        <div className="absolute bottom-1/3 right-1/3 h-4 w-4">
+          <div className="absolute inset-0 bg-primary rounded-full opacity-90"></div>
+        </div>
         
-        <ResizablePanel defaultSize={30} minSize={25}>
-          <PropertyInfoPanel
-            property={selectedProperty}
-            onClose={() => setSelectedProperty(null)}
-          />
-        </ResizablePanel>
-      </ResizablePanelGroup>
+        {/* Property Info Panel */}
+        <Card className="absolute top-4 left-4 w-72">
+          <div className="p-3 bg-primary text-primary-foreground font-medium">
+            Selected Property: {selectedProperty.address}
+          </div>
+          <CardContent className="p-3 space-y-2 text-sm">
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Parcel ID:</span>
+              <span>{selectedProperty.parcelId}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Sale Price:</span>
+              <span>{selectedProperty.salePrice}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Square Feet:</span>
+              <span>{selectedProperty.squareFeet}</span>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 };

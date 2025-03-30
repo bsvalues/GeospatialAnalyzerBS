@@ -3,66 +3,318 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 
 export async function registerRoutes(app: Express): Promise<Server> {
-  // API routes for property data
+  // Sample property data (simulating database)
+  const properties = [
+    {
+      id: '1',
+      parcelId: 'P123456',
+      address: '123 Main St, Richland, WA',
+      owner: 'John Doe',
+      value: '450000',
+      squareFeet: 2500,
+      yearBuilt: 1998,
+      landValue: '120000',
+      coordinates: [46.2804, -119.2752],
+      neighborhood: 'North Richland',
+      bedrooms: 3,
+      bathrooms: 2.5,
+      lotSize: 8500
+    },
+    {
+      id: '2',
+      parcelId: 'P789012',
+      address: '456 Oak Ave, Kennewick, WA',
+      owner: 'Jane Smith',
+      value: '375000',
+      squareFeet: 2100,
+      yearBuilt: 2004,
+      landValue: '95000',
+      coordinates: [46.2087, -119.1361],
+      neighborhood: 'South Kennewick',
+      bedrooms: 3,
+      bathrooms: 2,
+      lotSize: 7200
+    },
+    {
+      id: '3',
+      parcelId: 'P345678',
+      address: '789 Pine Ln, Pasco, WA',
+      owner: 'Robert Johnson',
+      value: '525000',
+      squareFeet: 3200,
+      yearBuilt: 2012,
+      landValue: '150000',
+      coordinates: [46.2395, -119.1005],
+      neighborhood: 'East Pasco',
+      bedrooms: 4,
+      bathrooms: 3,
+      lotSize: 9800
+    },
+    {
+      id: '4',
+      parcelId: 'P901234',
+      address: '321 Cedar Dr, Richland, WA',
+      owner: 'Mary Williams',
+      value: '625000',
+      squareFeet: 3800,
+      yearBuilt: 2015,
+      landValue: '180000',
+      coordinates: [46.2933, -119.2871],
+      neighborhood: 'North Richland',
+      bedrooms: 4,
+      bathrooms: 3.5,
+      lotSize: 12000
+    },
+    {
+      id: '5',
+      parcelId: 'P567890',
+      address: '987 Maple St, Kennewick, WA',
+      owner: 'David Brown',
+      value: '395000',
+      squareFeet: 2300,
+      yearBuilt: 2001,
+      landValue: '110000',
+      coordinates: [46.2118, -119.1667],
+      neighborhood: 'Central Kennewick',
+      bedrooms: 3,
+      bathrooms: 2,
+      lotSize: 8100
+    },
+    {
+      id: '6',
+      parcelId: 'P246810',
+      address: '654 Birch Rd, Richland, WA',
+      owner: 'Sarah Miller',
+      value: '480000',
+      squareFeet: 2800,
+      yearBuilt: 2008,
+      landValue: '135000',
+      coordinates: [46.2766, -119.2834],
+      neighborhood: 'West Richland',
+      bedrooms: 4,
+      bathrooms: 2.5,
+      lotSize: 9000
+    },
+    {
+      id: '7',
+      parcelId: 'P135790',
+      address: '852 Elm St, Kennewick, WA',
+      owner: 'Michael Wilson',
+      value: '350000',
+      squareFeet: 1950,
+      yearBuilt: 1995,
+      landValue: '90000',
+      coordinates: [46.2055, -119.1532],
+      neighborhood: 'South Kennewick',
+      bedrooms: 3,
+      bathrooms: 1.5,
+      lotSize: 7000
+    },
+    {
+      id: '8',
+      parcelId: 'P802468',
+      address: '159 Spruce Ave, Pasco, WA',
+      owner: 'Lisa Anderson',
+      value: '420000',
+      squareFeet: 2400,
+      yearBuilt: 2005,
+      landValue: '115000',
+      coordinates: [46.2412, -119.0903],
+      neighborhood: 'West Pasco',
+      bedrooms: 3,
+      bathrooms: 2,
+      lotSize: 8200
+    }
+  ];
+
+  // API route for retrieving all properties
   app.get('/api/properties', (req, res) => {
-    // Return properties in Benton County, Washington area with coordinates
-    res.json([
-      {
-        id: '1',
-        parcelId: 'P123456',
-        address: '123 Main St, Richland, WA',
-        owner: 'John Doe',
-        value: '450000',
-        squareFeet: 2500,
-        yearBuilt: 1998,
-        landValue: '120000',
-        coordinates: [46.2804, -119.2752]
-      },
-      {
-        id: '2',
-        parcelId: 'P789012',
-        address: '456 Oak Ave, Kennewick, WA',
-        owner: 'Jane Smith',
-        value: '375000',
-        squareFeet: 2100,
-        yearBuilt: 2004,
-        landValue: '95000',
-        coordinates: [46.2087, -119.1361]
-      },
-      {
-        id: '3',
-        parcelId: 'P345678',
-        address: '789 Pine Ln, Pasco, WA',
-        owner: 'Robert Johnson',
-        value: '525000',
-        squareFeet: 3200,
-        yearBuilt: 2012,
-        landValue: '150000',
-        coordinates: [46.2395, -119.1005]
-      },
-      {
-        id: '4',
-        parcelId: 'P901234',
-        address: '321 Cedar Dr, Richland, WA',
-        owner: 'Mary Williams',
-        value: '625000',
-        squareFeet: 3800,
-        yearBuilt: 2015,
-        landValue: '180000',
-        coordinates: [46.2933, -119.2871]
-      },
-      {
-        id: '5',
-        parcelId: 'P567890',
-        address: '987 Maple St, Kennewick, WA',
-        owner: 'David Brown',
-        value: '395000',
-        squareFeet: 2300,
-        yearBuilt: 2001,
-        landValue: '110000',
-        coordinates: [46.2118, -119.1667]
-      }
-    ]);
+    // Get filter parameters from query string
+    const minYearBuilt = req.query.minYearBuilt ? parseInt(req.query.minYearBuilt as string) : undefined;
+    const maxYearBuilt = req.query.maxYearBuilt ? parseInt(req.query.maxYearBuilt as string) : undefined;
+    const minValue = req.query.minValue ? parseInt(req.query.minValue as string) : undefined;
+    const maxValue = req.query.maxValue ? parseInt(req.query.maxValue as string) : undefined;
+    const minSquareFeet = req.query.minSquareFeet ? parseInt(req.query.minSquareFeet as string) : undefined;
+    const maxSquareFeet = req.query.maxSquareFeet ? parseInt(req.query.maxSquareFeet as string) : undefined;
+    const neighborhood = req.query.neighborhood as string | undefined;
+    const sortBy = req.query.sortBy as string | undefined;
+    const sortOrder = req.query.sortOrder as 'asc' | 'desc' | undefined;
+    const limit = req.query.limit ? parseInt(req.query.limit as string) : undefined;
+    const offset = req.query.offset ? parseInt(req.query.offset as string) : undefined;
+    
+    // Apply filters
+    let filteredProperties = [...properties];
+    
+    if (minYearBuilt) {
+      filteredProperties = filteredProperties.filter(p => p.yearBuilt && p.yearBuilt >= minYearBuilt);
+    }
+    
+    if (maxYearBuilt) {
+      filteredProperties = filteredProperties.filter(p => p.yearBuilt && p.yearBuilt <= maxYearBuilt);
+    }
+    
+    if (minValue) {
+      filteredProperties = filteredProperties.filter(p => p.value && parseInt(p.value) >= minValue);
+    }
+    
+    if (maxValue) {
+      filteredProperties = filteredProperties.filter(p => p.value && parseInt(p.value) <= maxValue);
+    }
+    
+    if (minSquareFeet) {
+      filteredProperties = filteredProperties.filter(p => p.squareFeet >= minSquareFeet);
+    }
+    
+    if (maxSquareFeet) {
+      filteredProperties = filteredProperties.filter(p => p.squareFeet <= maxSquareFeet);
+    }
+    
+    if (neighborhood) {
+      filteredProperties = filteredProperties.filter(
+        p => p.neighborhood && p.neighborhood.toLowerCase() === neighborhood.toLowerCase()
+      );
+    }
+    
+    // Sort results if requested
+    if (sortBy) {
+      filteredProperties.sort((a, b) => {
+        let aValue = a[sortBy as keyof typeof a];
+        let bValue = b[sortBy as keyof typeof b];
+        
+        // Handle numeric values that are stored as strings
+        if (typeof aValue === 'string' && !isNaN(Number(aValue))) {
+          aValue = Number(aValue);
+        }
+        
+        if (typeof bValue === 'string' && !isNaN(Number(bValue))) {
+          bValue = Number(bValue);
+        }
+        
+        if (aValue < bValue) return sortOrder === 'desc' ? 1 : -1;
+        if (aValue > bValue) return sortOrder === 'desc' ? -1 : 1;
+        return 0;
+      });
+    }
+    
+    // Apply pagination if requested
+    if (offset !== undefined && limit !== undefined) {
+      filteredProperties = filteredProperties.slice(offset, offset + limit);
+    } else if (limit !== undefined) {
+      filteredProperties = filteredProperties.slice(0, limit);
+    }
+    
+    res.json(filteredProperties);
+  });
+  
+  // API route for retrieving a single property by ID
+  app.get('/api/properties/:id', (req, res) => {
+    const propertyId = req.params.id;
+    const property = properties.find(p => p.id === propertyId);
+    
+    if (property) {
+      res.json(property);
+    } else {
+      res.status(404).json({ error: 'Property not found' });
+    }
+  });
+  
+  // API route for searching properties by text
+  app.get('/api/properties/search', (req, res) => {
+    const searchText = (req.query.q as string || '').toLowerCase();
+    
+    if (!searchText) {
+      return res.status(400).json({ error: 'Search query is required' });
+    }
+    
+    const searchResults = properties.filter(property => {
+      return (
+        property.address.toLowerCase().includes(searchText) ||
+        property.parcelId.toLowerCase().includes(searchText) ||
+        (property.owner && property.owner.toLowerCase().includes(searchText)) ||
+        (property.neighborhood && property.neighborhood.toLowerCase().includes(searchText))
+      );
+    });
+    
+    res.json(searchResults);
+  });
+  
+  // API route for finding similar properties
+  app.get('/api/properties/similar', (req, res) => {
+    const referenceId = req.query.referenceId as string;
+    const limit = req.query.limit ? parseInt(req.query.limit as string) : 5;
+    
+    if (!referenceId) {
+      return res.status(400).json({ error: 'Reference property ID is required' });
+    }
+    
+    const referenceProperty = properties.find(p => p.id === referenceId);
+    
+    if (!referenceProperty) {
+      return res.status(404).json({ error: 'Reference property not found' });
+    }
+    
+    // Calculate a simple similarity score based on property attributes
+    const similarProperties = properties
+      .filter(p => p.id !== referenceId) // Exclude the reference property
+      .map(property => {
+        // Calculate similarity based on weighted factors
+        let similarityScore = 0;
+        
+        // Factor: Square footage (30% weight)
+        const sqftDiff = Math.abs(property.squareFeet - referenceProperty.squareFeet);
+        const sqftSimilarity = Math.max(0, 1 - (sqftDiff / 2000)); // Normalize to 0-1
+        similarityScore += sqftSimilarity * 0.3;
+        
+        // Factor: Year built (20% weight)
+        if (property.yearBuilt && referenceProperty.yearBuilt) {
+          const yearDiff = Math.abs(property.yearBuilt - referenceProperty.yearBuilt);
+          const yearSimilarity = Math.max(0, 1 - (yearDiff / 50)); // Normalize to 0-1
+          similarityScore += yearSimilarity * 0.2;
+        }
+        
+        // Factor: Neighborhood (30% weight)
+        if (property.neighborhood && referenceProperty.neighborhood) {
+          const neighborhoodSimilarity = property.neighborhood === referenceProperty.neighborhood ? 1 : 0;
+          similarityScore += neighborhoodSimilarity * 0.3;
+        }
+        
+        // Factor: Value (20% weight)
+        if (property.value && referenceProperty.value) {
+          const propertyValue = parseInt(property.value);
+          const referenceValue = parseInt(referenceProperty.value);
+          const valueDiff = Math.abs(propertyValue - referenceValue);
+          const valueSimilarity = Math.max(0, 1 - (valueDiff / 500000)); // Normalize to 0-1
+          similarityScore += valueSimilarity * 0.2;
+        }
+        
+        return { ...property, similarityScore };
+      })
+      .sort((a, b) => b.similarityScore - a.similarityScore) // Sort by similarity (descending)
+      .slice(0, limit) // Limit the number of results
+      .map(({ similarityScore, ...property }) => property); // Remove the similarity score
+    
+    res.json(similarProperties);
+  });
+  
+  // API route for finding properties within a geographic region
+  app.get('/api/properties/region', (req, res) => {
+    const south = parseFloat(req.query.south as string);
+    const west = parseFloat(req.query.west as string);
+    const north = parseFloat(req.query.north as string);
+    const east = parseFloat(req.query.east as string);
+    
+    if (isNaN(south) || isNaN(west) || isNaN(north) || isNaN(east)) {
+      return res.status(400).json({ error: 'Invalid bounds parameters' });
+    }
+    
+    const propertiesInRegion = properties.filter(property => {
+      if (!property.coordinates) return false;
+      
+      const [lat, lng] = property.coordinates;
+      return lat >= south && lat <= north && lng >= west && lng <= east;
+    });
+    
+    res.json(propertiesInRegion);
   });
 
   // API route for project overview data
