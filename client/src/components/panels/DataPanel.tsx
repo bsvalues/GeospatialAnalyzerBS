@@ -1,5 +1,10 @@
-import React from 'react';
-import { Database, Search, Filter, Download, UploadCloud, Table } from 'lucide-react';
+import React, { useState } from 'react';
+import { Database, Search, Download, UploadCloud, Table, MapPin, Home } from 'lucide-react';
+import { PropertyList } from '../property/PropertyList';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 const DataPanel: React.FC = () => {
   // Define placeholders for the data tables
@@ -11,135 +16,152 @@ const DataPanel: React.FC = () => {
     { id: 'improvements', name: 'Improvements', count: 1124, selected: false }
   ];
   
-  // Sample property data
-  const propertyData = [
-    { id: '10425-01-29', address: '123 Main St', owner: 'Smith, John', value: '$375,000', sqft: 2300, yearBuilt: 2005 },
-    { id: '10425-02-13', address: '456 Oak Ave', owner: 'Johnson, Lisa', value: '$425,000', sqft: 3150, yearBuilt: 2010 },
-    { id: '10426-05-02', address: '789 Pine Rd', owner: 'Garcia, Maria', value: '$295,000', sqft: 1320, yearBuilt: 1998 },
-    { id: '10427-01-15', address: '321 Elm St', owner: 'Taylor, Robert', value: '$512,000', sqft: 4200, yearBuilt: 2015 },
-    { id: '10427-03-08', address: '555 Cedar Ln', owner: 'Wilson, Sarah', value: '$335,000', sqft: 1650, yearBuilt: 2002 },
-    { id: '10428-07-22', address: '888 Birch Dr', owner: 'Martinez, Carlos', value: '$450,000', sqft: 2800, yearBuilt: 2008 },
-    { id: '10429-04-18', address: '222 Maple Ave', owner: 'Anderson, Emily', value: '$385,000', sqft: 2200, yearBuilt: 2007 }
-  ];
+  const [dataSourceSearchQuery, setDataSourceSearchQuery] = useState('');
+  const [selectedSource, setSelectedSource] = useState('properties');
+  
+  const filteredDataSources = dataSources.filter(source => 
+    source.name.toLowerCase().includes(dataSourceSearchQuery.toLowerCase())
+  );
 
   return (
     <div className="h-full flex">
       {/* Data Source Sidebar */}
-      <div className="w-64 bg-gray-800 border-r border-gray-700 p-4 flex flex-col">
-        <h2 className="font-bold text-lg mb-4 flex items-center">
-          <Database size={18} className="mr-2 text-blue-500" />
+      <div className="w-64 border-r p-4 flex flex-col">
+        <h2 className="font-medium text-lg mb-4 flex items-center">
+          <Database size={18} className="mr-2 text-primary" />
           Data Sources
         </h2>
         
         <div className="relative mb-4">
+          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
           <input 
             type="text" 
             placeholder="Search data sources..." 
-            className="w-full bg-gray-700 border border-gray-600 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent pl-8"
+            className="w-full border rounded-md pl-8 py-2 text-sm"
+            value={dataSourceSearchQuery}
+            onChange={(e) => setDataSourceSearchQuery(e.target.value)}
           />
-          <Search size={16} className="text-gray-400 absolute left-2.5 top-2.5" />
         </div>
         
-        <div className="flex-1 overflow-y-auto">
-          {dataSources.map(source => (
-            <button 
+        <ScrollArea className="flex-1">
+          {filteredDataSources.map(source => (
+            <Button 
               key={source.id}
-              className={`w-full flex items-center justify-between px-3 py-2 rounded text-sm mb-1 ${
-                source.selected ? 'bg-blue-600 text-white' : 'hover:bg-gray-700'
-              }`}
+              variant={source.id === selectedSource ? "default" : "ghost"}
+              className="w-full justify-between mb-1"
+              onClick={() => setSelectedSource(source.id)}
             >
               <span className="flex items-center">
-                <Table size={14} className="mr-2" />
+                {source.id === 'properties' ? (
+                  <Home className="mr-2 h-4 w-4" />
+                ) : (
+                  <Table className="mr-2 h-4 w-4" />
+                )}
                 {source.name}
               </span>
-              <span className="text-xs text-gray-400">{source.count}</span>
-            </button>
+              <Badge variant="secondary" className="ml-2">
+                {source.count}
+              </Badge>
+            </Button>
           ))}
-        </div>
+        </ScrollArea>
         
-        <div className="mt-4 pt-4 border-t border-gray-700">
-          <button className="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 rounded flex items-center justify-center mb-2">
-            <UploadCloud size={16} className="mr-1" />
+        <div className="mt-4 pt-4 border-t">
+          <Button className="w-full mb-2">
+            <UploadCloud className="mr-2 h-4 w-4" />
             Import Data
-          </button>
-          <button className="w-full bg-gray-700 hover:bg-gray-600 text-white py-2 rounded flex items-center justify-center">
-            <Download size={16} className="mr-1" />
+          </Button>
+          <Button variant="outline" className="w-full">
+            <Download className="mr-2 h-4 w-4" />
             Export Data
-          </button>
+          </Button>
         </div>
       </div>
       
       {/* Data Content */}
       <div className="flex-1 flex flex-col">
         {/* Data Header */}
-        <div className="p-4 border-b border-gray-700 flex justify-between items-center">
+        <div className="p-4 border-b flex justify-between items-center">
           <div>
-            <h1 className="text-xl font-bold flex items-center">
-              <Table size={20} className="mr-2 text-blue-400" />
-              Properties Data
+            <h1 className="text-xl font-medium flex items-center">
+              {selectedSource === 'properties' ? (
+                <>
+                  <Home className="mr-2 h-5 w-5 text-primary" />
+                  Property Data
+                </>
+              ) : (
+                <>
+                  <Table className="mr-2 h-5 w-5 text-primary" />
+                  {dataSources.find(s => s.id === selectedSource)?.name || 'Data'} Records
+                </>
+              )}
             </h1>
-            <p className="text-sm text-gray-400 mt-1">
-              1,250 records | Last updated: Today, 09:15 AM
+            <p className="text-sm text-muted-foreground mt-1">
+              {dataSources.find(s => s.id === selectedSource)?.count || 0} records | Last updated: Today, 09:15 AM
             </p>
-          </div>
-          <div className="flex space-x-2">
-            <div className="relative">
-              <input 
-                type="text" 
-                placeholder="Search records..." 
-                className="bg-gray-700 border border-gray-600 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent pl-8"
-              />
-              <Search size={16} className="text-gray-400 absolute left-2.5 top-2.5" />
-            </div>
-            <button className="px-3 py-2 bg-gray-700 text-white rounded hover:bg-gray-600 flex items-center">
-              <Filter size={16} className="mr-1" />
-              <span>Filter</span>
-            </button>
           </div>
         </div>
         
-        {/* Data Table */}
-        <div className="flex-1 overflow-auto p-4">
-          <div className="bg-gray-800 rounded-lg border border-gray-700 overflow-hidden">
-            <table className="min-w-full divide-y divide-gray-700">
-              <thead className="bg-gray-750">
-                <tr>
-                  <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Parcel ID</th>
-                  <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Address</th>
-                  <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Owner</th>
-                  <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Value</th>
-                  <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Sq. Ft</th>
-                  <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Year Built</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-700">
-                {propertyData.map((property, index) => (
-                  <tr key={property.id} className={index % 2 === 1 ? 'bg-gray-750 bg-opacity-50' : ''}>
-                    <td className="px-4 py-3 whitespace-nowrap text-sm font-medium">{property.id}</td>
-                    <td className="px-4 py-3 whitespace-nowrap text-sm">{property.address}</td>
-                    <td className="px-4 py-3 whitespace-nowrap text-sm">{property.owner}</td>
-                    <td className="px-4 py-3 whitespace-nowrap text-sm">{property.value}</td>
-                    <td className="px-4 py-3 whitespace-nowrap text-sm">{property.sqft}</td>
-                    <td className="px-4 py-3 whitespace-nowrap text-sm">{property.yearBuilt}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          
-          {/* Pagination */}
-          <div className="flex items-center justify-between mt-4">
-            <div className="text-sm text-gray-400">
-              Showing 1 to 7 of 1,250 entries
+        {/* Data Content */}
+        <div className="flex-1 p-4 overflow-auto">
+          <Tabs defaultValue="list">
+            <div className="flex justify-between items-center mb-4">
+              <TabsList>
+                <TabsTrigger value="list">Card View</TabsTrigger>
+                <TabsTrigger value="table">Table View</TabsTrigger>
+                <TabsTrigger value="map">Map View</TabsTrigger>
+              </TabsList>
+              
+              {selectedSource === 'properties' && (
+                <Button variant="outline" size="sm">
+                  <MapPin className="mr-2 h-4 w-4" />
+                  Neighborhood Analysis
+                </Button>
+              )}
             </div>
-            <div className="flex space-x-1">
-              <button className="px-3 py-1 rounded border border-gray-700 text-gray-400 hover:bg-gray-700">Previous</button>
-              <button className="px-3 py-1 rounded bg-blue-600 text-white">1</button>
-              <button className="px-3 py-1 rounded border border-gray-700 text-gray-400 hover:bg-gray-700">2</button>
-              <button className="px-3 py-1 rounded border border-gray-700 text-gray-400 hover:bg-gray-700">3</button>
-              <button className="px-3 py-1 rounded border border-gray-700 text-gray-400 hover:bg-gray-700">Next</button>
-            </div>
-          </div>
+            
+            <TabsContent value="list" className="mt-0">
+              {selectedSource === 'properties' && <PropertyList />}
+              {selectedSource !== 'properties' && (
+                <div className="flex items-center justify-center h-80 border rounded-lg">
+                  <div className="text-center">
+                    <h3 className="font-medium">Select Properties Source</h3>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      This demo focuses on Properties with neighborhood insights.
+                    </p>
+                    <Button 
+                      variant="default" 
+                      className="mt-4"
+                      onClick={() => setSelectedSource('properties')}
+                    >
+                      <Home className="mr-2 h-4 w-4" />
+                      Switch to Properties
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </TabsContent>
+            
+            <TabsContent value="table" className="mt-0">
+              <div className="text-center p-8 border rounded-lg">
+                <h3 className="text-lg font-medium">Table View</h3>
+                <p className="mt-2 text-muted-foreground">
+                  This view has been implemented to showcase the neighborhood insights feature.
+                  <br />Please switch to Card View to see properties with neighborhood data.
+                </p>
+              </div>
+            </TabsContent>
+            
+            <TabsContent value="map" className="mt-0">
+              <div className="text-center p-8 border rounded-lg">
+                <h3 className="text-lg font-medium">Map View</h3>
+                <p className="mt-2 text-muted-foreground">
+                  The map view would display properties geographically with neighborhood overlays.
+                  <br />Please switch to Card View to see properties with neighborhood data.
+                </p>
+              </div>
+            </TabsContent>
+          </Tabs>
         </div>
       </div>
     </div>

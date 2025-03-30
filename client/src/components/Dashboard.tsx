@@ -9,7 +9,7 @@ import RegressionPanel from './panels/RegressionPanel';
 import SettingsPanel from './panels/SettingsPanel';
 
 const Dashboard: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<string>('overview');
+  const [activeTab, setActiveTab] = useState<string>('data'); // Set data tab as default to showcase neighborhood features
   const [taxYear, setTaxYear] = useState<string>('2024');
 
   const handleTabChange = (tabId: string) => {
@@ -17,7 +17,7 @@ const Dashboard: React.FC = () => {
   };
 
   return (
-    <div className="flex flex-col h-screen bg-gray-900 text-gray-100">
+    <div className="flex flex-col h-screen bg-background text-foreground">
       <Header taxYear={taxYear} onTaxYearChange={setTaxYear} />
       <TabNavigation activeTab={activeTab} onTabChange={handleTabChange} />
       
