@@ -9,6 +9,7 @@ export interface Property {
   squareFeet: number;
   yearBuilt?: number;
   landValue?: string;
+  coordinates?: [number, number]; // Latitude and longitude coordinates
 }
 
 // Map Types

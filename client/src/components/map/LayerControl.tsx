@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Layers, Search } from 'lucide-react';
+import { Layers, Search, Globe, MapPin, Map } from 'lucide-react';
 
 interface LayerItem {
   id: string;
@@ -17,13 +17,17 @@ interface LayerControlProps {
   viewableLayers: LayerItem[];
   layerOptions: LayerOptions;
   onUpdateLayerOption: (option: 'opacity' | 'labels', value: number | boolean) => void;
+  onBaseLayerChange?: (layerId: string, checked: boolean) => void;
+  onViewableLayerChange?: (layerId: string, checked: boolean) => void;
 }
 
 const LayerControl: React.FC<LayerControlProps> = ({
   baseLayers,
   viewableLayers,
   layerOptions,
-  onUpdateLayerOption
+  onUpdateLayerOption,
+  onBaseLayerChange,
+  onViewableLayerChange
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   
@@ -35,6 +39,34 @@ const LayerControl: React.FC<LayerControlProps> = ({
   const filteredViewableLayers = viewableLayers.filter(layer => 
     layer.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
+  
+  // Handle base layer change (radio button behavior - only one can be active)
+  const handleBaseLayerChange = (layerId: string, checked: boolean) => {
+    if (onBaseLayerChange) {
+      onBaseLayerChange(layerId, checked);
+    }
+  };
+  
+  // Handle viewable layer change
+  const handleViewableLayerChange = (layerId: string, checked: boolean) => {
+    if (onViewableLayerChange) {
+      onViewableLayerChange(layerId, checked);
+    }
+  };
+  
+  // Get icon for base layer type
+  const getLayerIcon = (layerId: string) => {
+    switch (layerId) {
+      case 'osm':
+        return <Map size={14} className="text-green-400 mr-2" />;
+      case 'satellite':
+        return <Globe size={14} className="text-blue-400 mr-2" />;
+      case 'topo':
+        return <Layers size={14} className="text-purple-400 mr-2" />;
+      default:
+        return <Map size={14} className="text-gray-400 mr-2" />;
+    }
+  };
   
   return (
     <div className="w-64 bg-gray-800 border-r border-gray-700 p-4 flex flex-col overflow-auto">
@@ -61,12 +93,17 @@ const LayerControl: React.FC<LayerControlProps> = ({
         {filteredBaseLayers.map((layer) => (
           <div key={layer.id} className="flex items-center p-2 rounded hover:bg-gray-700">
             <input 
-              type="checkbox" 
+              type="radio" 
               id={`layer-${layer.id}`} 
+              name="baseLayer"
               className="mr-2" 
-              defaultChecked={layer.checked} 
+              checked={layer.checked}
+              onChange={(e) => handleBaseLayerChange(layer.id, e.target.checked)}
             />
-            <label htmlFor={`layer-${layer.id}`} className="cursor-pointer flex-1 text-sm">{layer.name}</label>
+            <label htmlFor={`layer-${layer.id}`} className="cursor-pointer flex-1 text-sm flex items-center">
+              {getLayerIcon(layer.id)}
+              {layer.name}
+            </label>
           </div>
         ))}
       </div>
@@ -80,9 +117,13 @@ const LayerControl: React.FC<LayerControlProps> = ({
               type="checkbox" 
               id={`viewlayer-${layer.id}`} 
               className="mr-2" 
-              defaultChecked={layer.checked} 
+              checked={layer.checked}
+              onChange={(e) => handleViewableLayerChange(layer.id, e.target.checked)}
             />
-            <label htmlFor={`viewlayer-${layer.id}`} className="cursor-pointer flex-1 text-sm">{layer.name}</label>
+            <label htmlFor={`viewlayer-${layer.id}`} className="cursor-pointer flex-1 text-sm flex items-center">
+              <MapPin size={14} className="text-blue-400 mr-2" />
+              {layer.name}
+            </label>
           </div>
         ))}
       </div>
