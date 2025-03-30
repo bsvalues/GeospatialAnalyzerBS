@@ -643,7 +643,7 @@ export const PropertyComparisonTool: React.FC<PropertyComparisonToolProps> = ({ 
               format: metric.format
             }))}
             trigger={
-              <Button variant="outline" size="xs" className="h-7 text-xs">
+              <Button variant="outline" size="sm" className="h-7 text-xs">
                 Generate Detailed Report
               </Button>
             }

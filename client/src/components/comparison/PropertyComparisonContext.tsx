@@ -117,7 +117,7 @@ export const PropertyComparisonProvider: React.FC<PropertyComparisonProviderProp
     // Simulate API call with a delay
     await new Promise(resolve => setTimeout(resolve, 1000));
     
-    // Return some mock data for development purposes
+    // Return mock data for development purposes
     // In production, this would be replaced with actual API calls
     const properties: Property[] = [
       {
@@ -130,7 +130,19 @@ export const PropertyComparisonProvider: React.FC<PropertyComparisonProviderProp
         squareFeet: 2100,
         yearBuilt: 2008,
         landValue: "$95,000",
-        coordinates: [46.28, -119.28]
+        coordinates: [46.28, -119.28],
+        latitude: "46.280000" as unknown as number,
+        longitude: "-119.280000" as unknown as number,
+        neighborhood: "South Richland",
+        propertyType: "Single Family",
+        bedrooms: 3,
+        bathrooms: 2,
+        lotSize: 8500,
+        zoning: "Residential",
+        lastSaleDate: "2020-05-15",
+        taxAssessment: "$315,000",
+        pricePerSqFt: "$145",
+        attributes: {}
       },
       {
         id: 102,
@@ -142,7 +154,19 @@ export const PropertyComparisonProvider: React.FC<PropertyComparisonProviderProp
         squareFeet: 2300,
         yearBuilt: 2010,
         landValue: "$105,000",
-        coordinates: [46.21, -119.17]
+        coordinates: [46.21, -119.17],
+        latitude: "46.210000" as unknown as number,
+        longitude: "-119.170000" as unknown as number,
+        neighborhood: "Southridge",
+        propertyType: "Single Family",
+        bedrooms: 4,
+        bathrooms: 3,
+        lotSize: 9200,
+        zoning: "Residential",
+        lastSaleDate: "2021-03-20",
+        taxAssessment: "$342,000",
+        pricePerSqFt: "$146",
+        attributes: {}
       },
       {
         id: 103,
@@ -154,7 +178,19 @@ export const PropertyComparisonProvider: React.FC<PropertyComparisonProviderProp
         squareFeet: 1950,
         yearBuilt: 2005,
         landValue: "$85,000",
-        coordinates: [46.24, -119.76]
+        coordinates: [46.24, -119.76],
+        latitude: "46.240000" as unknown as number,
+        longitude: "-119.760000" as unknown as number,
+        neighborhood: "Wine Country",
+        propertyType: "Single Family",
+        bedrooms: 3,
+        bathrooms: 2,
+        lotSize: 7800,
+        zoning: "Rural Residential",
+        lastSaleDate: "2019-08-10",
+        taxAssessment: "$282,000",
+        pricePerSqFt: "$141",
+        attributes: {}
       },
       {
         id: 104,
@@ -166,7 +202,19 @@ export const PropertyComparisonProvider: React.FC<PropertyComparisonProviderProp
         squareFeet: 2600,
         yearBuilt: 2012,
         landValue: "$120,000",
-        coordinates: [46.29, -119.29]
+        coordinates: [46.29, -119.29],
+        latitude: "46.290000" as unknown as number,
+        longitude: "-119.290000" as unknown as number,
+        neighborhood: "Horn Rapids",
+        propertyType: "Single Family",
+        bedrooms: 4,
+        bathrooms: 3,
+        lotSize: 10500,
+        zoning: "Residential",
+        lastSaleDate: "2021-11-05",
+        taxAssessment: "$372,000",
+        pricePerSqFt: "$140",
+        attributes: {}
       },
       {
         id: 105,
@@ -178,7 +226,19 @@ export const PropertyComparisonProvider: React.FC<PropertyComparisonProviderProp
         squareFeet: 1850,
         yearBuilt: 2003,
         landValue: "$80,000",
-        coordinates: [46.23, -119.10]
+        coordinates: [46.23, -119.10],
+        latitude: "46.230000" as unknown as number,
+        longitude: "-119.100000" as unknown as number,
+        neighborhood: "West Pasco",
+        propertyType: "Single Family",
+        bedrooms: 3,
+        bathrooms: 2,
+        lotSize: 7200,
+        zoning: "Residential",
+        lastSaleDate: "2018-06-22",
+        taxAssessment: "$268,000",
+        pricePerSqFt: "$141",
+        attributes: {}
       }
     ];
     

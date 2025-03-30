@@ -88,7 +88,7 @@ type SearchFormValues = z.infer<typeof searchFormSchema>;
 
 // Search parameters including reference property
 interface SearchParams extends SearchFormValues {
-  referencePropertyId: string;
+  referencePropertyId: number;
 }
 
 interface PropertySearchDialogProps {
