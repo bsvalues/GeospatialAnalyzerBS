@@ -6,6 +6,7 @@ import { Toaster } from '@/components/ui/toaster';
 import Dashboard from './components/Dashboard';
 import Header from './components/Header';
 import NotFound from '@/pages/not-found';
+import { MapAccessibilityProvider } from './contexts/MapAccessibilityContext';
 
 function Router() {
   return (
@@ -21,13 +22,15 @@ function App() {
   
   return (
     <QueryClientProvider client={queryClient}>
-      <div className="flex flex-col h-screen bg-gray-50">
-        <Header taxYear={taxYear} onTaxYearChange={setTaxYear} />
-        <div className="flex-grow overflow-hidden">
-          <Router />
+      <MapAccessibilityProvider>
+        <div className="flex flex-col h-screen bg-gray-50">
+          <Header taxYear={taxYear} onTaxYearChange={setTaxYear} />
+          <div className="flex-grow overflow-hidden">
+            <Router />
+          </div>
         </div>
-      </div>
-      <Toaster />
+        <Toaster />
+      </MapAccessibilityProvider>
     </QueryClientProvider>
   );
 }

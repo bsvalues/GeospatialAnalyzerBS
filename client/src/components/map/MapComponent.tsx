@@ -1,10 +1,14 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { MapContainer, TileLayer, Marker, Popup, useMap, LayersControl, LayerGroup, ZoomControl, CircleMarker } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Popup, useMap, LayersControl, LayerGroup, CircleMarker, ZoomControl } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { Property } from '@shared/schema';
 import { MapLayer, MapOptions } from '@/shared/types';
 import { formatCurrency } from '@/lib/utils';
+
+// Import accessibility components
+import { AccessibleMapComponents } from './AccessibleMapComponents';
+import { AccessiblePropertyMarker } from './AccessiblePropertyMarker';
 
 // Fix Leaflet default icon issue
 import icon from 'leaflet/dist/images/marker-icon.png';
@@ -153,18 +157,29 @@ export const MapComponent: React.FC<MapComponentProps> = ({
   };
   
   return (
-    <div style={{ height, width, position: 'relative' }} data-testid="map-container">
+    <div 
+      style={{ height, width, position: 'relative' }} 
+      data-testid="map-container"
+      aria-label="Interactive map of properties in Benton County, Washington"
+      role="application"
+    >
       <MapContainer
         center={center}
         zoom={zoom}
         style={{ height: '100%', width: '100%' }}
-        zoomControl={false} // We'll add our own zoom control
+        zoomControl={false} // We'll use our accessible controls instead
         ref={mapRef}
         whenReady={() => {
           console.log('Map is ready');
         }}
       >
-        <ZoomControl position="topright" />
+        {/* Use our custom accessible map controls */}
+        <AccessibleMapComponents 
+          defaultCenter={center}
+          defaultZoom={zoom}
+          enableFullScreen={true}
+          enablePanControls={true}
+        />
         
         <MapController 
           center={center} 
@@ -208,82 +223,18 @@ export const MapComponent: React.FC<MapComponentProps> = ({
           >
             <LayerGroup>
               {properties.map(property => (
-                <CircleMarker
+                <AccessiblePropertyMarker
                   key={property.id}
-                  center={property.coordinates as [number, number]}
-                  radius={
-                    (selectedProperty && selectedProperty.id === property.id) || 
-                    (hoveredPropertyId === property.id) ? 10 : 8
-                  }
-                  pathOptions={{
-                    fillColor: (selectedProperty && selectedProperty.id === property.id) 
-                      ? '#f43f5e' 
-                      : (hoveredPropertyId === property.id)
-                        ? '#7c3aed'
-                        : (property.propertyType?.toLowerCase().includes('residential') 
-                            ? '#4ade80' 
-                            : property.propertyType?.toLowerCase().includes('commercial')
-                              ? '#3b82f6'
-                              : '#6b7280'),
-                    fillOpacity: 0.8,
-                    weight: (selectedProperty && selectedProperty.id === property.id) ||
-                           (hoveredPropertyId === property.id) ? 2 : 1,
-                    color: '#ffffff'
-                  }}
-                  eventHandlers={{
-                    click: () => handleMarkerClick(property),
-                    mouseover: () => setHoveredPropertyId(property.id),
-                    mouseout: () => setHoveredPropertyId(null)
-                  }}
-                  data-testid={
-                    selectedProperty && selectedProperty.id === property.id
-                      ? "property-marker-highlighted"
-                      : "property-marker"
-                  }
-                  data-property-id={property.id}
-                >
-                  <Popup className="property-popup">
-                    <div className="p-1">
-                      <h3 className="text-base font-semibold mb-1 text-gray-800">{property.address}</h3>
-                      <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm mb-2">
-                        <div className="text-gray-600">Parcel:</div>
-                        <div className="font-medium">{property.parcelId}</div>
-                        
-                        {property.value && (
-                          <>
-                            <div className="text-gray-600">Value:</div>
-                            <div className="font-medium text-primary">{property.value}</div>
-                          </>
-                        )}
-                        
-                        <div className="text-gray-600">Size:</div>
-                        <div className="font-medium">{property.squareFeet.toLocaleString()} sq ft</div>
-                        
-                        {property.yearBuilt && (
-                          <>
-                            <div className="text-gray-600">Built:</div>
-                            <div className="font-medium">{property.yearBuilt}</div>
-                          </>
-                        )}
-                        
-                        {property.propertyType && (
-                          <>
-                            <div className="text-gray-600">Type:</div>
-                            <div className="font-medium">{property.propertyType}</div>
-                          </>
-                        )}
-                      </div>
-                      <div className="flex justify-end">
-                        <button 
-                          className="px-3 py-1 bg-primary text-white text-xs rounded-md hover:bg-primary/90 flex items-center"
-                          onClick={() => handleMarkerClick(property)}
-                        >
-                          View Details
-                        </button>
-                      </div>
-                    </div>
-                  </Popup>
-                </CircleMarker>
+                  property={property}
+                  coordinates={property.coordinates as [number, number]}
+                  isSelected={selectedProperty?.id === property.id}
+                  isHovered={hoveredPropertyId === property.id}
+                  onClick={handleMarkerClick}
+                  onMouseOver={() => setHoveredPropertyId(property.id)}
+                  onMouseOut={() => setHoveredPropertyId(null)}
+                  markerType="default"
+                  focusable={true}
+                />
               ))}
             </LayerGroup>
           </LayersControl.Overlay>
@@ -295,32 +246,15 @@ export const MapComponent: React.FC<MapComponentProps> = ({
           >
             <LayerGroup>
               {properties.map(property => (
-                <CircleMarker
+                <AccessiblePropertyMarker
                   key={`heat-${property.id}`}
-                  center={property.coordinates as [number, number]}
-                  radius={12}
-                  pathOptions={{
-                    fillColor: getValueColor(getPropertyValueAsNumber(property)),
-                    fillOpacity: 0.7,
-                    weight: 1,
-                    color: '#ffffff'
-                  }}
-                  eventHandlers={{
-                    click: () => handleMarkerClick(property)
-                  }}
-                >
-                  <Popup>
-                    <div className="p-1">
-                      <h3 className="text-base font-semibold mb-1">{property.address}</h3>
-                      {property.value && (
-                        <p className="text-sm font-bold text-primary">{property.value}</p>
-                      )}
-                      <p className="text-xs text-gray-500">
-                        Click for details
-                      </p>
-                    </div>
-                  </Popup>
-                </CircleMarker>
+                  property={property}
+                  coordinates={property.coordinates as [number, number]}
+                  isSelected={selectedProperty?.id === property.id}
+                  onClick={handleMarkerClick}
+                  markerType="heatmap"
+                  focusable={true}
+                />
               ))}
             </LayerGroup>
           </LayersControl.Overlay>
