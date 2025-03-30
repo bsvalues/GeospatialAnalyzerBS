@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Property } from '@shared/schema';
 import { formatCurrency } from '@/lib/utils';
+import NeighborhoodInsights from '@/components/neighborhood/NeighborhoodInsights';
 import { 
   X, 
   ChevronDown, 
@@ -18,7 +19,9 @@ import {
   Map, 
   FileText, 
   Scale,
-  ArrowRightLeft
+  ArrowRightLeft,
+  Building,
+  TrendingUp
 } from 'lucide-react';
 
 interface PropertyInfoPanelProps {
@@ -34,6 +37,7 @@ export const PropertyInfoPanel: React.FC<PropertyInfoPanelProps> = ({
 }) => {
   const [expanded, setExpanded] = useState(false);
   const [activeTab, setActiveTab] = useState('details');
+  const [showNeighborhoodInsights, setShowNeighborhoodInsights] = useState(false);
   
   if (!property) {
     return (
@@ -49,6 +53,17 @@ export const PropertyInfoPanel: React.FC<PropertyInfoPanelProps> = ({
   const pricePerSqFt = property.value 
     ? formatCurrency(parseFloat(property.value.replace(/[^0-9.-]+/g, '')) / property.squareFeet)
     : 'N/A';
+  
+  // If neighborhood insights modal is shown, render it
+  if (showNeighborhoodInsights) {
+    return (
+      <NeighborhoodInsights 
+        property={property} 
+        onClose={() => setShowNeighborhoodInsights(false)}
+        className="h-full"
+      />
+    );
+  }
   
   return (
     <div className="h-full flex flex-col overflow-hidden">
@@ -140,7 +155,16 @@ export const PropertyInfoPanel: React.FC<PropertyInfoPanelProps> = ({
                 {property.neighborhood && (
                   <>
                     <div className="text-gray-600">Neighborhood:</div>
-                    <div className="font-medium">{property.neighborhood}</div>
+                    <div className="font-medium flex items-center">
+                      {property.neighborhood}
+                      <button 
+                        onClick={() => setShowNeighborhoodInsights(true)}
+                        className="ml-1.5 text-primary hover:text-primary/80"
+                        title="View neighborhood insights"
+                      >
+                        <Building className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
                   </>
                 )}
                 
@@ -151,6 +175,17 @@ export const PropertyInfoPanel: React.FC<PropertyInfoPanelProps> = ({
                   </>
                 )}
               </div>
+              
+              {/* Neighborhood insights button if no neighborhood field */}
+              {!property.neighborhood && (
+                <button
+                  onClick={() => setShowNeighborhoodInsights(true)}
+                  className="w-full mt-3 px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm rounded-md flex items-center justify-center"
+                >
+                  <Building className="h-4 w-4 mr-1.5" />
+                  View Neighborhood Insights
+                </button>
+              )}
             </div>
             
             {/* Building details */}
@@ -225,6 +260,13 @@ export const PropertyInfoPanel: React.FC<PropertyInfoPanelProps> = ({
                     <div className="font-medium">{property.taxAssessment}</div>
                   </>
                 )}
+                
+                {property.zoning && (
+                  <>
+                    <div className="text-gray-600">Zoning:</div>
+                    <div className="font-medium">{property.zoning}</div>
+                  </>
+                )}
               </div>
               
               {/* Assessment history chart placeholder */}
@@ -233,6 +275,15 @@ export const PropertyInfoPanel: React.FC<PropertyInfoPanelProps> = ({
                 <p className="text-xs text-gray-500">Assessment value history chart</p>
               </div>
             </div>
+            
+            {/* Button to view more neighborhood info */}
+            <button
+              onClick={() => setShowNeighborhoodInsights(true)}
+              className="w-full mt-1 px-3 py-2 bg-primary/10 hover:bg-primary/20 text-primary text-sm rounded-md flex items-center justify-center"
+            >
+              <Building className="h-4 w-4 mr-1.5" />
+              View Market Trends & Neighborhood Data
+            </button>
           </div>
         )}
         
@@ -259,6 +310,17 @@ export const PropertyInfoPanel: React.FC<PropertyInfoPanelProps> = ({
               
               <p className="text-sm text-gray-500 text-center py-2">No additional sales history available</p>
             </div>
+            
+            {/* Neighborhood market trends link */}
+            <button
+              onClick={() => {
+                setShowNeighborhoodInsights(true);
+              }}
+              className="w-full mt-3 px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm rounded-md flex items-center justify-center"
+            >
+              <TrendingUp className="h-4 w-4 mr-1.5" />
+              View Neighborhood Market Trends
+            </button>
           </div>
         )}
       </div>
@@ -283,15 +345,25 @@ export const PropertyInfoPanel: React.FC<PropertyInfoPanelProps> = ({
             )}
           </button>
           
-          {onCompare && (
-            <button 
-              onClick={() => onCompare(property)}
-              className="px-3 py-1.5 bg-primary text-white text-sm rounded-md hover:bg-primary/90 flex items-center"
+          <div className="flex space-x-2">
+            <button
+              onClick={() => setShowNeighborhoodInsights(true)}
+              className="px-2 py-1.5 bg-gray-100 text-gray-700 text-sm rounded-md hover:bg-gray-200 flex items-center"
+              title="View neighborhood insights"
             >
-              <ArrowRightLeft className="h-4 w-4 mr-1.5" />
-              Compare
+              <Building className="h-4 w-4" />
             </button>
-          )}
+            
+            {onCompare && (
+              <button 
+                onClick={() => onCompare(property)}
+                className="px-3 py-1.5 bg-primary text-white text-sm rounded-md hover:bg-primary/90 flex items-center"
+              >
+                <ArrowRightLeft className="h-4 w-4 mr-1.5" />
+                Compare
+              </button>
+            )}
+          </div>
         </div>
       </div>
     </div>

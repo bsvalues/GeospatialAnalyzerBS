@@ -1,10 +1,13 @@
-import { Property } from '@/shared/types';
+import { Property } from '@shared/schema';
 
+/**
+ * Interface representing neighborhood data structure
+ */
 export interface NeighborhoodData {
   name: string;
   overview: {
     description: string;
-    type: string;
+    type: string; // Residential, Commercial, Mixed, etc.
     ratings: {
       overall: number;
       safety: number;
@@ -18,47 +21,50 @@ export interface NeighborhoodData {
     population: number;
     medianAge: number;
     households: number;
-    homeownership: number;
+    homeownership: number; // Percentage
     medianIncome: string;
     education: {
-      highSchool: number;
-      bachelors: number;
-      graduate: number;
+      highSchool: number; // Percentage
+      bachelors: number; // Percentage
+      graduate: number; // Percentage
     };
   };
   housing: {
     medianHomeValue: string;
     medianRent: string;
     valueChange: {
-      oneYear: number;
-      fiveYear: number;
+      oneYear: number; // Percentage
+      fiveYear: number; // Percentage
     };
     propertyTypes: {
-      singleFamily: number;
-      condo: number;
-      townhouse: number;
-      apartment: number;
+      singleFamily: number; // Percentage
+      condo: number; // Percentage
+      townhouse: number; // Percentage
+      apartment: number; // Percentage
     };
   };
   amenities: {
-    groceryStores: Array<{ name: string; distance: number }>;
+    groceryStores: Array<{ name: string; distance: number }>; // distance in miles
     restaurants: Array<{ name: string; distance: number }>;
     parks: Array<{ name: string; distance: number }>;
     schools: Array<{ name: string; distance: number; rating: number }>;
   };
   marketTrends: {
     avgDaysOnMarket: number;
-    listToSaleRatio: number;
+    listToSaleRatio: number; // Percentage of list price
     pricePerSqFt: {
       current: number;
       lastYear: number;
-      change: number;
+      change: number; // Percentage
     };
-    inventoryLevel: string;
-    competitiveIndex: string;
+    inventoryLevel: string; // Low, Medium, High
+    competitiveIndex: string; // Low, Medium, High
   };
 }
 
+/**
+ * Search parameters for finding neighborhoods
+ */
 export interface NeighborhoodSearchParams {
   lat?: number;
   lng?: number;
@@ -68,45 +74,48 @@ export interface NeighborhoodSearchParams {
   address?: string;
 }
 
+/**
+ * Service for fetching and managing neighborhood data
+ */
 class NeighborhoodService {
   private cache: Map<string, NeighborhoodData> = new Map();
-  
+
   /**
    * Get neighborhood data for a given property
    * @param property The property to retrieve neighborhood data for
    * @returns A promise that resolves to neighborhood data
    */
   async getNeighborhoodData(property: Property): Promise<NeighborhoodData> {
-    if (!property) {
-      throw new Error('Property is required');
-    }
+    // In a real implementation, this would call an API endpoint
+    // For now, we'll simulate a network request with mock data
     
-    // Use property ID as cache key
-    const cacheKey = `property_${property.id}`;
+    // Check cache first to avoid duplicate requests
+    const cacheKey = `${property.neighborhood || ''}-${property.coordinates?.[0]}-${property.coordinates?.[1]}`;
     
-    // Return cached data if available
     if (this.cache.has(cacheKey)) {
-      return this.cache.get(cacheKey)!;
+      return this.cache.get(cacheKey) as NeighborhoodData;
     }
     
-    // For demo purposes, add a slight delay
+    // Simulate network delay
     await this.simulateNetworkDelay();
     
-    // Generate unique neighborhood name based on property location
-    const neighborhoodName = property.coordinates 
-      ? `${this.getNeighborhoodNameFromCoordinates(property.coordinates)}`
-      : 'West Richland';
+    // Generate mock data for demonstration purposes
+    const neighborhoodData = this.getMockNeighborhoodData();
     
-    // Get mock neighborhood data
-    const data = this.getMockNeighborhoodData();
-    data.name = neighborhoodName;
+    // If property has a neighborhood name, use it
+    if (property.neighborhood) {
+      neighborhoodData.name = property.neighborhood;
+    } else if (property.coordinates) {
+      // Otherwise, generate a name based on coordinates
+      neighborhoodData.name = this.getNeighborhoodNameFromCoordinates(property.coordinates as [number, number]);
+    }
     
-    // Cache the response
-    this.cache.set(cacheKey, data);
+    // Cache the result
+    this.cache.set(cacheKey, neighborhoodData);
     
-    return data;
+    return neighborhoodData;
   }
-  
+
   /**
    * Search for neighborhoods by parameters
    * @param params Search parameters
@@ -116,21 +125,15 @@ class NeighborhoodService {
     // Simulate network delay
     await this.simulateNetworkDelay();
     
-    // Generate mock neighborhoods based on search parameters
-    const neighborhoods: NeighborhoodData[] = [];
-    
-    // Simulate 3-5 neighborhoods
-    const count = Math.floor(Math.random() * 3) + 3;
-    
-    for (let i = 0; i < count; i++) {
-      const data = this.getMockNeighborhoodData();
-      data.name = this.getRandomNeighborhoodName(i);
-      neighborhoods.push(data);
-    }
-    
-    return neighborhoods;
+    // In a real implementation, this would search for neighborhoods based on params
+    // For now, return an array of mock neighborhoods
+    return Array(3).fill(0).map((_, index) => {
+      const mockData = this.getMockNeighborhoodData();
+      mockData.name = this.getRandomNeighborhoodName(index);
+      return mockData;
+    });
   }
-  
+
   /**
    * Get walkability score for a location
    * @param lat Latitude
@@ -141,17 +144,18 @@ class NeighborhoodService {
     // Simulate network delay
     await this.simulateNetworkDelay();
     
-    // Return a random score between 50 and 95
-    return Math.floor(Math.random() * 45) + 50;
+    // In a real implementation, this would call a walkability score API
+    // For now, return a random score between 0 and 100
+    return Math.floor(Math.random() * 100);
   }
-  
+
   /**
    * Clear the neighborhood data cache
    */
   clearCache(): void {
     this.cache.clear();
   }
-  
+
   /**
    * Remove a specific item from the cache
    * @param cacheKey The cache key to remove
@@ -161,134 +165,133 @@ class NeighborhoodService {
       this.cache.delete(cacheKey);
     }
   }
-  
+
+  /**
+   * Simulate a network delay for demonstration purposes
+   */
   private async simulateNetworkDelay(): Promise<void> {
-    return new Promise(resolve => setTimeout(resolve, 500 + Math.random() * 500));
+    return new Promise(resolve => setTimeout(resolve, 500 + Math.random() * 1000));
   }
-  
+
+  /**
+   * Generate a neighborhood name from coordinates
+   * @param coordinates Latitude and longitude
+   * @returns A neighborhood name
+   */
   private getNeighborhoodNameFromCoordinates(coordinates: [number, number]): string {
-    // This would typically use reverse geocoding
-    // For demo purposes, create a name based on coordinates
-    const [lat, lng] = coordinates;
-    const latPrefix = lat >= 0 ? 'North' : 'South';
-    const lngPrefix = lng >= 0 ? 'East' : 'West';
-    
-    // Benton County neighborhoods
-    const names = [
-      'Richland Heights',
-      'Kennewick Grove',
-      'West Pasco',
-      'Benton City',
-      'Prosser Valley',
-      'Finley District',
-      'Highland Springs',
-      'Columbia Point',
-      'Badger Mountain',
-      'South Richland'
-    ];
-    
-    // Select a name deterministically based on coordinates
-    const nameIndex = Math.abs(Math.floor((lat * lng * 1000) % names.length));
-    return names[nameIndex];
-  }
-  
-  private getRandomNeighborhoodName(index: number): string {
-    const names = [
-      'Richland Heights',
-      'Kennewick Grove',
-      'West Pasco',
-      'Benton City',
-      'Prosser Valley',
-      'Finley District',
-      'Highland Springs',
-      'Columbia Point',
-      'Badger Mountain',
-      'South Richland',
-      'North Richland',
-      'Horn Rapids',
+    // In a real implementation, this would reverse geocode the coordinates
+    // For now, use some Benton County neighborhood names
+    const neighborhoods = [
       'West Richland',
-      'Queensgate',
-      'Southridge'
+      'Richland Heights',
+      'Kennewick North',
+      'Prosser Valley',
+      'Benton City',
+      'South Highlands'
     ];
     
-    return names[index % names.length];
+    // Use a deterministic method to choose a neighborhood based on coordinates
+    const index = Math.floor((coordinates[0] * coordinates[1] * 10) % neighborhoods.length);
+    return neighborhoods[Math.abs(index)];
   }
-  
+
+  /**
+   * Get a random neighborhood name
+   * @param index Index to help generate different names
+   * @returns A neighborhood name
+   */
+  private getRandomNeighborhoodName(index: number): string {
+    const neighborhoods = [
+      'West Richland',
+      'Richland Heights',
+      'Kennewick North',
+      'Prosser Valley',
+      'Benton City',
+      'South Highlands'
+    ];
+    
+    return neighborhoods[index % neighborhoods.length];
+  }
+
+  /**
+   * Generate mock neighborhood data for demonstration purposes
+   * @returns A neighborhood data object
+   */
   private getMockNeighborhoodData(): NeighborhoodData {
     return {
-      name: 'Richland Heights',
+      name: 'Sample Neighborhood',
       overview: {
-        description: 'A family-friendly neighborhood with quiet streets, well-maintained parks, and excellent schools. Close to shopping centers and restaurants.',
+        description: 'A charming residential neighborhood with tree-lined streets and a mix of historic and newer homes. Close to downtown and offering various amenities within walking distance.',
         type: 'Residential',
         ratings: {
           overall: 4.2,
-          safety: 4.5,
-          schools: 4.3,
-          amenities: 3.8,
-          costOfLiving: 3.4,
-          outdoorActivities: 4.6
-        }
+          safety: 4.3,
+          schools: 4.1,
+          amenities: 3.9,
+          costOfLiving: 3.5,
+          outdoorActivities: 4.4,
+        },
       },
       demographics: {
-        population: 12485,
-        medianAge: 37.5,
-        households: 4930,
-        homeownership: 0.78,
-        medianIncome: '$89,500',
+        population: 15420,
+        medianAge: 38.5,
+        households: 5840,
+        homeownership: 68.5,
+        medianIncome: '$72,500',
         education: {
-          highSchool: 0.96,
-          bachelors: 0.42,
-          graduate: 0.18
-        }
+          highSchool: 94.2,
+          bachelors: 45.6,
+          graduate: 18.3,
+        },
       },
       housing: {
-        medianHomeValue: '$375,000',
-        medianRent: '$1,750',
+        medianHomeValue: '$385,000',
+        medianRent: '$1,850',
         valueChange: {
-          oneYear: 0.08,
-          fiveYear: 0.31
+          oneYear: 4.7,
+          fiveYear: 22.3,
         },
         propertyTypes: {
-          singleFamily: 0.72,
-          condo: 0.08,
-          townhouse: 0.12,
-          apartment: 0.08
-        }
+          singleFamily: 72.3,
+          condo: 12.5,
+          townhouse: 8.2,
+          apartment: 7.0,
+        },
       },
       amenities: {
         groceryStores: [
-          { name: 'Yoke\'s Fresh Market', distance: 0.8 },
-          { name: 'Fred Meyer', distance: 1.5 },
-          { name: 'Albertsons', distance: 2.3 }
+          { name: 'Safeway', distance: 0.8 },
+          { name: 'Trader Joe\'s', distance: 1.5 },
+          { name: 'Whole Foods', distance: 2.3 },
         ],
         restaurants: [
-          { name: 'Porter\'s Real BBQ', distance: 0.7 },
-          { name: 'Olive Garden', distance: 1.2 },
-          { name: 'Bonefish Grill', distance: 1.8 },
-          { name: 'Red Robin', distance: 2.0 }
+          { name: 'The Local Diner', distance: 0.4 },
+          { name: 'Tuscano\'s Italian', distance: 0.9 },
+          { name: 'Sushi Express', distance: 1.2 },
+          { name: 'Taco Time', distance: 0.6 },
         ],
         parks: [
-          { name: 'Leslie Groves Park', distance: 0.5 },
-          { name: 'Howard Amon Park', distance: 1.1 },
-          { name: 'Columbia Point Golf Course', distance: 2.2 }
+          { name: 'Riverside Park', distance: 0.3 },
+          { name: 'Community Playground', distance: 0.7 },
+          { name: 'City Gardens', distance: 1.1 },
         ],
         schools: [
-          { name: 'Lewis & Clark Elementary', distance: 0.6, rating: 8.5 },
-          { name: 'Hanford High School', distance: 1.9, rating: 9.0 },
-          { name: 'Enterprise Middle School', distance: 1.1, rating: 7.8 }
-        ]
+          { name: 'Washington Elementary', distance: 0.5, rating: 8.2 },
+          { name: 'Richland Middle School', distance: 1.3, rating: 7.8 },
+          { name: 'Benton High School', distance: 1.8, rating: 8.5 },
+        ],
       },
       marketTrends: {
-        avgDaysOnMarket: 22,
-        listToSaleRatio: 0.98,
+        avgDaysOnMarket: 18,
+        listToSaleRatio: 98.5,
         pricePerSqFt: {
-          current: 195,
-          lastYear: 175,
-          change: 0.114
+          current: 225,
+          lastYear: 205,
+          change: 9.7,
         },
         inventoryLevel: 'Low',
-        competitiveIndex: 'High'
-      }
+        competitiveIndex: 'High',
+      },
     };
   }
 }
