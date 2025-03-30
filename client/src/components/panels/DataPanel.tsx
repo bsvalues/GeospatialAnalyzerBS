@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { Database, Search, Download, UploadCloud, Table, MapPin, Home } from 'lucide-react';
+import { Database, Search, Download, UploadCloud, Table, MapPin, Home, BarChart } from 'lucide-react';
 import { PropertyList } from '../property/PropertyList';
+import ValuationDashboard from '../valuation/ValuationDashboard';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -103,24 +104,64 @@ const DataPanel: React.FC = () => {
         </div>
         
         {/* Data Content */}
-        <div className="flex-1 p-4 overflow-auto">
-          <Tabs defaultValue="list">
-            <div className="flex justify-between items-center mb-4">
+        <div className="flex-1 overflow-auto">
+          <Tabs defaultValue="dashboard">
+            <div className="flex justify-between items-center p-4 border-b">
               <TabsList>
-                <TabsTrigger value="list">Card View</TabsTrigger>
-                <TabsTrigger value="table">Table View</TabsTrigger>
-                <TabsTrigger value="map">Map View</TabsTrigger>
+                <TabsTrigger value="dashboard">
+                  <BarChart className="mr-2 h-4 w-4" />
+                  Dashboard
+                </TabsTrigger>
+                <TabsTrigger value="list">
+                  <Home className="mr-2 h-4 w-4" />
+                  Properties
+                </TabsTrigger>
+                <TabsTrigger value="table">
+                  <Table className="mr-2 h-4 w-4" />
+                  Table View
+                </TabsTrigger>
+                <TabsTrigger value="map">
+                  <MapPin className="mr-2 h-4 w-4" />
+                  Map View
+                </TabsTrigger>
               </TabsList>
               
               {selectedSource === 'properties' && (
                 <Button variant="outline" size="sm">
-                  <MapPin className="mr-2 h-4 w-4" />
-                  Neighborhood Analysis
+                  <Download className="mr-2 h-4 w-4" />
+                  Export Data
                 </Button>
               )}
             </div>
             
-            <TabsContent value="list" className="mt-0">
+            {/* Valuation Dashboard Tab - New Interactive Analytics */}
+            <TabsContent value="dashboard" className="m-0 flex-1 h-full">
+              {selectedSource === 'properties' ? (
+                <ValuationDashboard />
+              ) : (
+                <div className="flex items-center justify-center h-80 border rounded-lg m-4">
+                  <div className="text-center">
+                    <BarChart className="h-12 w-12 mx-auto text-muted-foreground mb-2" />
+                    <h3 className="font-medium">Valuation Dashboard</h3>
+                    <p className="text-sm text-muted-foreground mt-1 max-w-md mx-auto">
+                      The valuation dashboard is available for property data analysis. 
+                      It provides interactive filtering, visualization and drill-through 
+                      capabilities for property valuations.
+                    </p>
+                    <Button 
+                      variant="default" 
+                      className="mt-4"
+                      onClick={() => setSelectedSource('properties')}
+                    >
+                      <Home className="mr-2 h-4 w-4" />
+                      Switch to Properties
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </TabsContent>
+            
+            <TabsContent value="list" className="m-0 p-4">
               {selectedSource === 'properties' && <PropertyList />}
               {selectedSource !== 'properties' && (
                 <div className="flex items-center justify-center h-80 border rounded-lg">
@@ -142,23 +183,45 @@ const DataPanel: React.FC = () => {
               )}
             </TabsContent>
             
-            <TabsContent value="table" className="mt-0">
+            <TabsContent value="table" className="m-0 p-4">
               <div className="text-center p-8 border rounded-lg">
                 <h3 className="text-lg font-medium">Table View</h3>
                 <p className="mt-2 text-muted-foreground">
-                  This view has been implemented to showcase the neighborhood insights feature.
-                  <br />Please switch to Card View to see properties with neighborhood data.
+                  Please use the Dashboard tab to view tabular property data with 
+                  interactive filtering and sorting capabilities.
                 </p>
+                <Button 
+                  variant="default" 
+                  className="mt-4"
+                  onClick={() => {
+                    const dashboardTab = document.querySelector('[value="dashboard"]') as HTMLElement;
+                    if (dashboardTab) dashboardTab.click();
+                  }}
+                >
+                  <BarChart className="mr-2 h-4 w-4" />
+                  Go to Dashboard
+                </Button>
               </div>
             </TabsContent>
             
-            <TabsContent value="map" className="mt-0">
+            <TabsContent value="map" className="m-0 p-4">
               <div className="text-center p-8 border rounded-lg">
                 <h3 className="text-lg font-medium">Map View</h3>
                 <p className="mt-2 text-muted-foreground">
                   The map view would display properties geographically with neighborhood overlays.
-                  <br />Please switch to Card View to see properties with neighborhood data.
+                  <br />Please use the Dashboard tab for detailed property analysis.
                 </p>
+                <Button 
+                  variant="default" 
+                  className="mt-4"
+                  onClick={() => {
+                    const dashboardTab = document.querySelector('[value="dashboard"]') as HTMLElement;
+                    if (dashboardTab) dashboardTab.click();
+                  }}
+                >
+                  <BarChart className="mr-2 h-4 w-4" />
+                  Go to Dashboard
+                </Button>
               </div>
             </TabsContent>
           </Tabs>

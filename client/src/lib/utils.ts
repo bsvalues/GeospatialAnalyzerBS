@@ -10,12 +10,14 @@ export function cn(...inputs: ClassValue[]) {
  * @param value The value to format (e.g. "250000" or 250000)
  * @param locale The locale to use for formatting (default: 'en-US')
  * @param currency The currency to use (default: 'USD')
+ * @param decimals The number of decimal places to include (default: 0)
  * @returns Formatted currency string (e.g. "$250,000")
  */
 export function formatCurrency(
   value: string | number | undefined,
   locale = 'en-US',
-  currency = 'USD'
+  currency = 'USD',
+  decimals = 0
 ): string {
   if (value === undefined) return '';
   
@@ -29,6 +31,7 @@ export function formatCurrency(
   return new Intl.NumberFormat(locale, {
     style: 'currency',
     currency,
-    maximumFractionDigits: 0
+    minimumFractionDigits: decimals,
+    maximumFractionDigits: decimals
   }).format(numericValue);
 }
