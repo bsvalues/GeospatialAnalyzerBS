@@ -10,7 +10,6 @@ import { MapAccessibilityProvider } from './contexts/MapAccessibilityContext';
 import { PropertyFilterProvider } from './contexts/PropertyFilterContext';
 import PropertyTrendsDemo from './components/comparison/PropertyTrendsDemo';
 import NeighborhoodTimelineDemo from './components/neighborhood/NeighborhoodTimelineDemo';
-import SpatialAnalyticsPanel from './components/analysis/SpatialAnalyticsPanel';
 
 function Router() {
   return (
@@ -18,7 +17,6 @@ function Router() {
       <Route path="/" component={() => <Dashboard />} />
       <Route path="/trends" component={() => <PropertyTrendsDemo />} />
       <Route path="/neighborhoods" component={() => <NeighborhoodTimelineDemo />} />
-      <Route path="/analytics" component={() => <SpatialAnalyticsPanel />} />
       <Route component={NotFound} />
     </Switch>
   );
