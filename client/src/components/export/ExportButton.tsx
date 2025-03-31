@@ -1,64 +1,163 @@
-import { useState } from 'react';
+import React from 'react';
 import { Button } from '@/components/ui/button';
-import { Download } from 'lucide-react';
-import { 
-  DropdownMenu, 
-  DropdownMenuContent, 
-  DropdownMenuItem, 
-  DropdownMenuLabel, 
-  DropdownMenuSeparator, 
-  DropdownMenuTrigger 
-} from '@/components/ui/dropdown-menu';
+import { ExportDialog } from './ExportDialog';
+import { ExportService, ExportFormat, ExportTemplate } from '@/services/exportService';
+import { Property } from '@/shared/schema';
+import { FileDownIcon } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
 
 interface ExportButtonProps {
-  onExportPDF?: () => void;
-  onExportCSV?: () => void;
-  onExportImage?: () => void;
-  isExporting?: boolean;
+  /**
+   * Properties to export
+   */
+  properties: Property[];
+  
+  /**
+   * Optional button text
+   */
+  text?: string;
+  
+  /**
+   * Whether to include templates in export options
+   */
+  showTemplates?: boolean;
+  
+  /**
+   * Additional fields that can be selected by the user
+   */
+  customizableFields?: string[];
+  
+  /**
+   * Button variant
+   */
+  variant?: 'default' | 'outline' | 'secondary' | 'ghost' | 'link' | 'destructive';
+  
+  /**
+   * Optional CSS class for styling
+   */
   className?: string;
 }
 
-export const ExportButton = ({
-  onExportPDF,
-  onExportCSV,
-  onExportImage,
-  isExporting = false,
-  className
-}: ExportButtonProps) => {
-  const [open, setOpen] = useState(false);
+/**
+ * Export button component with dialog for export options
+ */
+export const ExportButton: React.FC<ExportButtonProps> = ({
+  properties,
+  text = 'Export',
+  showTemplates = true,
+  customizableFields = ['bedrooms', 'bathrooms', 'yearBuilt', 'squareFeet', 'lotSize', 'neighborhood', 'zoning'],
+  variant = 'outline',
+  className,
+}) => {
+  const { toast } = useToast();
+  
+  const handleExport = (format: string, options: any) => {
+    if (!properties || properties.length === 0) {
+      toast({
+        title: 'No data to export',
+        description: 'There are no properties available to export.',
+        variant: 'destructive',
+      });
+      return;
+    }
+    
+    try {
+      if (options.templateName && options.templateName !== ExportTemplate.DEFAULT) {
+        // Use template-based export
+        ExportService.exportWithTemplate(
+          properties,
+          options.templateName,
+          format as ExportFormat,
+          {
+            fileName: options.fileName,
+            title: options.title,
+            description: options.description,
+            dateGenerated: options.dateGenerated,
+            includeHeaders: options.includeHeaders,
+            customFields: options.customFields,
+            pageSize: options.pageSize,
+            orientation: options.orientation,
+            includeImages: options.includeImages,
+          }
+        );
+      } else {
+        // Use format-based export
+        switch (format) {
+          case ExportFormat.CSV:
+            ExportService.exportPropertiesToCSV(properties, {
+              fileName: options.fileName,
+              title: options.title,
+              description: options.description,
+              dateGenerated: options.dateGenerated,
+              includeHeaders: options.includeHeaders,
+              customFields: options.customFields,
+            });
+            break;
+            
+          case ExportFormat.JSON:
+            ExportService.exportPropertiesToJSON(properties, {
+              fileName: options.fileName,
+              title: options.title,
+              description: options.description,
+              dateGenerated: options.dateGenerated,
+              customFields: options.customFields,
+            });
+            break;
+            
+          case ExportFormat.EXCEL:
+            ExportService.exportPropertiesToExcel(properties, {
+              fileName: options.fileName,
+              title: options.title,
+              description: options.description,
+              dateGenerated: options.dateGenerated,
+              includeHeaders: options.includeHeaders,
+              customFields: options.customFields,
+            });
+            break;
+            
+          case ExportFormat.PDF:
+          default:
+            ExportService.exportPropertiesToPDF(properties, {
+              fileName: options.fileName,
+              title: options.title,
+              description: options.description,
+              dateGenerated: options.dateGenerated,
+              pageSize: options.pageSize,
+              orientation: options.orientation,
+              includeImages: options.includeImages,
+            });
+        }
+      }
+      
+      toast({
+        title: 'Export successful',
+        description: `Successfully exported ${properties.length} properties.`,
+      });
+    } catch (error) {
+      console.error('Export error:', error);
+      toast({
+        title: 'Export failed',
+        description: 'There was an error exporting the data. Please try again.',
+        variant: 'destructive',
+      });
+    }
+  };
   
   return (
-    <DropdownMenu open={open} onOpenChange={setOpen}>
-      <DropdownMenuTrigger asChild>
-        <Button 
-          variant="outline" 
-          size="sm" 
-          className={className} 
-          disabled={isExporting}
-        >
-          <Download className="mr-2 h-4 w-4" />
-          Export
+    <ExportDialog
+      title="Export Properties"
+      description="Choose format and options for your property export"
+      onExport={handleExport}
+      showTemplates={showTemplates}
+      customizableFields={customizableFields}
+      trigger={
+        <Button variant={variant} className={className}>
+          <FileDownIcon className="mr-2 h-4 w-4" />
+          {text}
         </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end">
-        <DropdownMenuLabel>Export Options</DropdownMenuLabel>
-        <DropdownMenuSeparator />
-        {onExportPDF && (
-          <DropdownMenuItem onClick={() => { setOpen(false); onExportPDF(); }}>
-            Export as PDF
-          </DropdownMenuItem>
-        )}
-        {onExportCSV && (
-          <DropdownMenuItem onClick={() => { setOpen(false); onExportCSV(); }}>
-            Export as CSV
-          </DropdownMenuItem>
-        )}
-        {onExportImage && (
-          <DropdownMenuItem onClick={() => { setOpen(false); onExportImage(); }}>
-            Export as Image
-          </DropdownMenuItem>
-        )}
-      </DropdownMenuContent>
-    </DropdownMenu>
+      }
+    />
   );
 };
+
+export default ExportButton;
