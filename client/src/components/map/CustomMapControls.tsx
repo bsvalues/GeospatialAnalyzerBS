@@ -9,11 +9,13 @@ import {
   RotateCcw, 
   Locate, 
   Search,
-  Keyboard
+  Keyboard,
+  BarChart3
 } from 'lucide-react';
 import { LatLngExpression } from 'leaflet';
 import { Tooltip } from '@/components/ui/tooltip';
 import { Button } from '@/components/ui/button';
+import DemographicOverlayControl from './DemographicOverlayControl';
 import {
   Dialog,
   DialogContent,
@@ -46,6 +48,7 @@ const CustomMapControls: React.FC<CustomMapControlsProps> = ({
   const [latitudeInput, setLatitudeInput] = useState('');
   const [longitudeInput, setLongitudeInput] = useState('');
   const [keyboardShortcutsOpen, setKeyboardShortcutsOpen] = useState(false);
+  const [demographicOverlayOpen, setDemographicOverlayOpen] = useState(false);
 
   // Zoom controls
   const handleZoomIn = () => {
@@ -135,6 +138,9 @@ const CustomMapControls: React.FC<CustomMapControlsProps> = ({
         case 'g':
           setCoordinatesDialogOpen(true);
           break;
+        case 'd':
+          setDemographicOverlayOpen(prevState => !prevState);
+          break;
         case '?':
           setKeyboardShortcutsOpen(true);
           break;
@@ -200,6 +206,16 @@ const CustomMapControls: React.FC<CustomMapControlsProps> = ({
             ariaLabel="Find my location"
             shortcut="l"
           />
+        </ControlGroup>
+
+        <ControlGroup label="Analysis">
+          <div className="w-full">
+            <DemographicOverlayControl 
+              className="w-full rounded-lg bg-white bg-opacity-90 shadow-md border border-gray-300 p-2 hover:bg-opacity-100 transition-all flex items-center justify-center"
+              isVisible={demographicOverlayOpen}
+              onToggle={() => setDemographicOverlayOpen(prev => !prev)}
+            />
+          </div>
         </ControlGroup>
 
         <ControlGroup label="Tools">
@@ -282,6 +298,7 @@ const CustomMapControls: React.FC<CustomMapControlsProps> = ({
                 <ShortcutRow key="n" shortcut="n" description="Reset north orientation" />
                 <ShortcutRow key="l" shortcut="l" description="Find my location" />
                 <ShortcutRow key="g" shortcut="g" description="Go to coordinates" />
+                <ShortcutRow key="d" shortcut="d" description="Toggle demographic overlay" />
                 <ShortcutRow key="?" shortcut="?" description="Show keyboard shortcuts" />
               </div>
               <DialogFooter className="sm:justify-end">
