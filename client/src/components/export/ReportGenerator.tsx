@@ -1,690 +1,358 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from '@/components/ui/dialog';
-import {
-  Form,
-  FormControl,
-  FormDescription,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from '@/components/ui/form';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
-import { Checkbox } from '@/components/ui/checkbox';
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { useForm } from 'react-hook-form';
-import { z } from 'zod';
-import { Property, RegressionModel } from '@/shared/types';
-import { ExportService, formatPropertyValue } from '@/services/exportService';
-import { saveAs } from 'file-saver';
+import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
+import { Checkbox } from '@/components/ui/checkbox';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import { 
-  FileText, 
-  BarChart, 
-  PieChart, 
-  LineChart,
-  Table,
-  FileJson,
-  Download,
-  FileSpreadsheet,
-  Settings,
-  Plus,
-  Minus,
-  Copy
-} from 'lucide-react';
+  ReportBuilder, 
+  ReportSection, 
+  ReportTemplate,
+  Report,
+  ReportSectionType
+} from '../../services/reporting/reportBuilderService';
 
-// Schema for the report configuration form
-const reportConfigSchema = z.object({
-  reportType: z.enum(['basic', 'detailed', 'custom']),
-  title: z.string().min(1, 'Title is required'),
-  description: z.string().optional(),
-  sections: z.array(
-    z.object({
-      title: z.string(),
-      includeInReport: z.boolean().default(true),
-    })
-  ).optional(),
-  includeProperties: z.boolean().default(true),
-  includeStatistics: z.boolean().default(true),
-  includeCharts: z.boolean().default(true),
-  includeMap: z.boolean().default(false),
-  customNotes: z.string().optional(),
-});
-
-type ReportConfigValues = z.infer<typeof reportConfigSchema>;
-
+/**
+ * Report Generator Component Props
+ */
 interface ReportGeneratorProps {
-  properties: Property[];
-  metrics?: Record<string, any>[];
-  models?: RegressionModel[];
-  trigger?: React.ReactNode;
+  propertyId?: number;
   className?: string;
 }
 
 /**
- * Component for generating comprehensive analytical reports 
- * from property data and metrics
+ * Report Generator Component
+ * Provides UI for creating, customizing, and exporting property reports
  */
-export function ReportGenerator({
-  properties,
-  metrics,
-  models,
-  trigger,
-  className,
-}: ReportGeneratorProps) {
-  const [isOpen, setIsOpen] = useState(false);
+export const ReportGenerator = ({ propertyId, className }: ReportGeneratorProps) => {
+  const [reportTitle, setReportTitle] = useState('Property Report');
+  const [selectedSections, setSelectedSections] = useState<Record<string, boolean>>({
+    'property-summary': true,
+    'valuation-details': true,
+    'tax-breakdown': true,
+    'comparison': false,
+    'neighborhood-analysis': false,
+    'market-trends': false,
+    'property-history': false
+  });
+  const [activeTab, setActiveTab] = useState('sections');
+  const [generatedReport, setGeneratedReport] = useState<Report | null>(null);
   
-  // Default sections for the report
-  const defaultSections = [
-    { title: 'Executive Summary', includeInReport: true },
-    { title: 'Property Overview', includeInReport: true },
-    { title: 'Statistical Analysis', includeInReport: true },
-    { title: 'Comparative Metrics', includeInReport: true },
-    { title: 'Regression Analysis', includeInReport: Boolean(models?.length) },
-    { title: 'Market Trends', includeInReport: false },
-    { title: 'Spatial Analysis', includeInReport: false },
-    { title: 'Recommendations', includeInReport: false },
+  // Available section types with display names
+  const availableSections: Array<{ id: ReportSectionType; name: string; description: string }> = [
+    { 
+      id: 'property-summary', 
+      name: 'Property Summary', 
+      description: 'Basic property information including address, size, and features'
+    },
+    { 
+      id: 'valuation-details', 
+      name: 'Valuation Details', 
+      description: 'Detailed property valuation information and assessment history'
+    },
+    { 
+      id: 'tax-breakdown', 
+      name: 'Tax Breakdown', 
+      description: 'Property tax details showing tax rates, exemptions, and payment information'
+    },
+    { 
+      id: 'comparison', 
+      name: 'Property Comparison', 
+      description: 'Comparative analysis with similar properties in the area'
+    },
+    { 
+      id: 'neighborhood-analysis', 
+      name: 'Neighborhood Analysis', 
+      description: 'Demographic and market data for the surrounding neighborhood'
+    },
+    { 
+      id: 'market-trends', 
+      name: 'Market Trends', 
+      description: 'Historical and projected trends for the local real estate market'
+    },
+    { 
+      id: 'property-history', 
+      name: 'Property History', 
+      description: 'Timeline of ownership, improvements, and value changes'
+    }
   ];
   
-  const form = useForm<ReportConfigValues>({
-    resolver: zodResolver(reportConfigSchema),
-    defaultValues: {
-      reportType: 'detailed',
-      title: `Property Analysis Report - ${new Date().toLocaleDateString()}`,
-      sections: defaultSections,
-      includeProperties: true,
-      includeStatistics: true,
-      includeCharts: true,
-      includeMap: false,
+  // Templates that can be used to generate reports quickly
+  const reportTemplates: ReportTemplate[] = [
+    {
+      id: 'basic',
+      name: 'Basic Property Report',
+      description: 'Essential property information and valuation',
+      sections: [
+        {
+          id: 'summary',
+          title: 'Property Summary',
+          type: 'property-summary',
+          order: 0,
+          content: {}
+        },
+        {
+          id: 'valuation',
+          title: 'Valuation Details',
+          type: 'valuation-details',
+          order: 1,
+          content: {}
+        }
+      ]
     },
-  });
-  
-  const reportType = form.watch('reportType');
-  
-  // Update sections based on report type
-  React.useEffect(() => {
-    switch(reportType) {
-      case 'basic':
-        form.setValue('sections', defaultSections.map(section => ({
-          ...section,
-          includeInReport: ['Executive Summary', 'Property Overview'].includes(section.title)
-        })));
-        form.setValue('includeCharts', false);
-        form.setValue('includeMap', false);
-        break;
-        
-      case 'detailed':
-        form.setValue('sections', defaultSections.map(section => ({
-          ...section,
-          includeInReport: !['Market Trends', 'Spatial Analysis', 'Recommendations'].includes(section.title)
-        })));
-        form.setValue('includeCharts', true);
-        form.setValue('includeMap', false);
-        break;
-        
-      case 'custom':
-        // Keep current selections
-        break;
+    {
+      id: 'comprehensive',
+      name: 'Comprehensive Property Report',
+      description: 'Complete property analysis with all available sections',
+      sections: availableSections.map((section, index) => ({
+        id: section.id,
+        title: section.name,
+        type: section.id,
+        order: index,
+        content: {}
+      }))
+    },
+    {
+      id: 'tax',
+      name: 'Tax Assessment Report',
+      description: 'Focused on property taxes and valuation for tax purposes',
+      sections: [
+        {
+          id: 'summary',
+          title: 'Property Summary',
+          type: 'property-summary',
+          order: 0,
+          content: {}
+        },
+        {
+          id: 'tax',
+          title: 'Tax Breakdown',
+          type: 'tax-breakdown',
+          order: 1,
+          content: {}
+        },
+        {
+          id: 'valuation',
+          title: 'Valuation Details',
+          type: 'valuation-details',
+          order: 2,
+          content: {}
+        }
+      ]
     }
-  }, [reportType]);
+  ];
   
-  // Generate and download the report
-  const onSubmit = (values: ReportConfigValues) => {
-    // Get selected sections
-    const selectedSections = values.sections?.filter(section => section.includeInReport) || [];
+  /**
+   * Handles toggling a section on/off
+   */
+  const handleSectionToggle = (sectionId: string) => {
+    setSelectedSections(prev => ({
+      ...prev,
+      [sectionId]: !prev[sectionId]
+    }));
+  };
+  
+  /**
+   * Loads a template for report generation
+   */
+  const handleLoadTemplate = (template: ReportTemplate) => {
+    // Reset section selections
+    const newSelections: Record<string, boolean> = {};
     
-    // Build a plain text report (more formats could be added later)
-    let reportContent = `${values.title.toUpperCase()}\n`;
-    reportContent += '='.repeat(values.title.length) + '\n\n';
-    
-    if (values.description) {
-      reportContent += `${values.description}\n\n`;
-    }
-    
-    reportContent += `Generated: ${new Date().toLocaleString()}\n`;
-    reportContent += `Properties Analyzed: ${properties.length}\n\n`;
-    
-    // Add each selected section
-    selectedSections.forEach(section => {
-      reportContent += `## ${section.title}\n\n`;
-      
-      switch(section.title) {
-        case 'Executive Summary':
-          reportContent += generateExecutiveSummary(properties, metrics);
-          break;
-          
-        case 'Property Overview':
-          if (values.includeProperties) {
-            reportContent += generatePropertyOverview(properties);
-          }
-          break;
-          
-        case 'Statistical Analysis':
-          if (values.includeStatistics && metrics) {
-            reportContent += generateStatisticalAnalysis(metrics);
-          }
-          break;
-          
-        case 'Comparative Metrics':
-          if (metrics) {
-            reportContent += generateComparativeMetrics(properties, metrics);
-          }
-          break;
-          
-        case 'Regression Analysis':
-          if (models) {
-            reportContent += generateRegressionAnalysis(models);
-          }
-          break;
-          
-        default:
-          reportContent += '[This section will be populated with relevant data in future versions.]\n\n';
-      }
-      
-      reportContent += '\n\n';
+    // Mark all template sections as selected
+    template.sections.forEach(section => {
+      newSelections[section.type] = true;
     });
     
-    // Add custom notes if provided
-    if (values.customNotes) {
-      reportContent += '## Additional Notes\n\n';
-      reportContent += values.customNotes + '\n\n';
-    }
+    // Mark any other sections as unselected
+    availableSections.forEach(section => {
+      if (newSelections[section.id] === undefined) {
+        newSelections[section.id] = false;
+      }
+    });
     
-    // Add appendix with data sources
-    reportContent += '## Appendix: Data Sources\n\n';
-    reportContent += '- Property data from Benton County Assessor\'s Office\n';
-    reportContent += '- Market data analysis performed with Spatialest tools\n';
-    reportContent += `- Report generated on ${new Date().toLocaleString()}\n\n`;
+    setSelectedSections(newSelections);
+    setReportTitle(`${template.name}`);
+  };
+  
+  /**
+   * Generates a report based on current selections
+   */
+  const handleGenerateReport = () => {
+    const reportBuilder = new ReportBuilder();
+    const report = reportBuilder.createReport(reportTitle);
     
-    // Create and save the file
-    const blob = new Blob([reportContent], { type: 'text/plain;charset=utf-8' });
-    const fileName = values.title.replace(/[^a-z0-9]/gi, '-').toLowerCase();
-    saveAs(blob, `${fileName}.txt`);
+    // Add selected sections to the report
+    Object.entries(selectedSections).forEach(([sectionType, isSelected], index) => {
+      if (isSelected) {
+        const sectionInfo = availableSections.find(s => s.id === sectionType);
+        if (sectionInfo) {
+          const section: ReportSection = {
+            id: `section_${sectionType}`,
+            title: sectionInfo.name,
+            type: sectionType as ReportSectionType,
+            order: index,
+            content: { propertyId }
+          };
+          reportBuilder.addSection(report, section);
+        }
+      }
+    });
     
-    setIsOpen(false);
+    setGeneratedReport(report);
+    setActiveTab('preview');
+  };
+  
+  /**
+   * Exports the report (placeholder)
+   */
+  const handleExportReport = () => {
+    // This would be implemented with actual export functionality
+    alert('Report export feature not yet implemented');
   };
   
   return (
-    <Dialog open={isOpen} onOpenChange={setIsOpen}>
-      <DialogTrigger asChild>
-        {trigger || (
-          <Button variant="outline" className={className}>
-            <FileText className="mr-2 h-4 w-4" />
-            Generate Report
-          </Button>
-        )}
-      </DialogTrigger>
-      <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>Generate Analysis Report</DialogTitle>
-          <DialogDescription>
-            Configure your report options and generate a comprehensive property analysis report.
-          </DialogDescription>
-        </DialogHeader>
-        
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-            <Tabs defaultValue="basic" className="w-full">
-              <TabsList className="grid w-full grid-cols-3">
-                <TabsTrigger value="basic">Basic Options</TabsTrigger>
-                <TabsTrigger value="sections">Report Sections</TabsTrigger>
-                <TabsTrigger value="advanced">Advanced</TabsTrigger>
-              </TabsList>
-              
-              <TabsContent value="basic" className="space-y-4 pt-4">
-                <FormField
-                  control={form.control}
-                  name="reportType"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Report Type</FormLabel>
-                      <Select
-                        onValueChange={field.onChange}
-                        defaultValue={field.value}
-                      >
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select report type" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          <SelectItem value="basic">
-                            <div className="flex items-center">
-                              <FileText className="mr-2 h-4 w-4" />
-                              <span>Basic Report</span>
-                            </div>
-                          </SelectItem>
-                          <SelectItem value="detailed">
-                            <div className="flex items-center">
-                              <Table className="mr-2 h-4 w-4" />
-                              <span>Detailed Analysis</span>
-                            </div>
-                          </SelectItem>
-                          <SelectItem value="custom">
-                            <div className="flex items-center">
-                              <Settings className="mr-2 h-4 w-4" />
-                              <span>Custom Report</span>
-                            </div>
-                          </SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <FormDescription>
-                        Choose the type of report to generate.
-                      </FormDescription>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                
-                <FormField
-                  control={form.control}
-                  name="title"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Report Title</FormLabel>
-                      <FormControl>
-                        <Input {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                
-                <FormField
-                  control={form.control}
-                  name="description"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Report Description</FormLabel>
-                      <FormControl>
-                        <Textarea 
-                          {...field} 
-                          placeholder="Enter a description for this report (optional)"
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </TabsContent>
-              
-              <TabsContent value="sections" className="space-y-4 pt-4">
+    <Card className={className}>
+      <CardHeader>
+        <CardTitle>Property Report Generator</CardTitle>
+        <CardDescription>
+          Create customized property reports with the information you need
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <Tabs value={activeTab} onValueChange={setActiveTab}>
+          <TabsList className="grid w-full grid-cols-3">
+            <TabsTrigger value="sections">Report Sections</TabsTrigger>
+            <TabsTrigger value="templates">Templates</TabsTrigger>
+            <TabsTrigger value="preview">Preview</TabsTrigger>
+          </TabsList>
+          
+          <TabsContent value="sections" className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="report-title">Report Title</Label>
+              <Input 
+                id="report-title" 
+                value={reportTitle} 
+                onChange={(e) => setReportTitle(e.target.value)} 
+                placeholder="Enter report title"
+              />
+            </div>
+            
+            <div className="space-y-1">
+              <Label>Select Report Sections</Label>
+              <ScrollArea className="h-[300px] rounded-md border p-4">
                 <div className="space-y-4">
-                  <div className="text-sm font-medium">Select Report Sections</div>
-                  
-                  {form.watch('sections')?.map((section, index) => (
-                    <div key={index} className="flex items-center space-x-2 border-b pb-2">
-                      <Checkbox
-                        checked={section.includeInReport}
-                        onCheckedChange={(checked) => {
-                          const newSections = [...form.getValues('sections') || []];
-                          newSections[index] = {
-                            ...newSections[index],
-                            includeInReport: Boolean(checked),
-                          };
-                          form.setValue('sections', newSections);
-                        }}
-                        id={`section-${index}`}
+                  {availableSections.map((section) => (
+                    <div key={section.id} className="flex items-start space-x-2">
+                      <Checkbox 
+                        id={section.id} 
+                        checked={selectedSections[section.id]} 
+                        onCheckedChange={() => handleSectionToggle(section.id)}
                       />
-                      <label
-                        htmlFor={`section-${index}`}
-                        className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                      >
-                        {section.title}
-                      </label>
+                      <div className="grid gap-1.5 leading-none">
+                        <label
+                          htmlFor={section.id}
+                          className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                        >
+                          {section.name}
+                        </label>
+                        <p className="text-sm text-muted-foreground">
+                          {section.description}
+                        </p>
+                      </div>
                     </div>
                   ))}
                 </div>
-                
-                <div className="grid grid-cols-2 gap-4">
-                  <FormField
-                    control={form.control}
-                    name="includeProperties"
-                    render={({ field }) => (
-                      <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4">
-                        <FormControl>
-                          <Checkbox
-                            checked={field.value}
-                            onCheckedChange={field.onChange}
-                          />
-                        </FormControl>
-                        <div className="space-y-1 leading-none">
-                          <FormLabel>Include Property Details</FormLabel>
-                          <FormDescription>
-                            List all properties with details
-                          </FormDescription>
-                        </div>
-                      </FormItem>
-                    )}
-                  />
+              </ScrollArea>
+            </div>
+          </TabsContent>
+          
+          <TabsContent value="templates" className="space-y-4">
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+              {reportTemplates.map((template) => (
+                <Card key={template.id} className="flex flex-col">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-lg">{template.name}</CardTitle>
+                    <CardDescription>{template.description}</CardDescription>
+                  </CardHeader>
+                  <CardContent className="flex-1">
+                    <div className="space-y-1 text-sm">
+                      <div className="font-medium">Includes:</div>
+                      <ul className="list-disc pl-5">
+                        {template.sections.map((section) => (
+                          <li key={section.id}>{section.title}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  </CardContent>
+                  <CardFooter>
+                    <Button 
+                      variant="outline" 
+                      className="w-full"
+                      onClick={() => handleLoadTemplate(template)}
+                    >
+                      Use Template
+                    </Button>
+                  </CardFooter>
+                </Card>
+              ))}
+            </div>
+          </TabsContent>
+          
+          <TabsContent value="preview" className="space-y-4">
+            {generatedReport ? (
+              <div className="space-y-4">
+                <div className="border rounded-md p-4">
+                  <h3 className="text-lg font-medium">{generatedReport.title}</h3>
+                  <p className="text-sm text-muted-foreground">
+                    Generated on {generatedReport.createdAt.toLocaleDateString()}
+                  </p>
                   
-                  <FormField
-                    control={form.control}
-                    name="includeStatistics"
-                    render={({ field }) => (
-                      <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4">
-                        <FormControl>
-                          <Checkbox
-                            checked={field.value}
-                            onCheckedChange={field.onChange}
-                          />
-                        </FormControl>
-                        <div className="space-y-1 leading-none">
-                          <FormLabel>Include Statistics</FormLabel>
-                          <FormDescription>
-                            Add statistical analysis
-                          </FormDescription>
-                        </div>
-                      </FormItem>
-                    )}
-                  />
+                  <div className="mt-4 space-y-4">
+                    {generatedReport.sections.map((section) => (
+                      <div key={section.id} className="border-t pt-4">
+                        <h4 className="font-medium">{section.title}</h4>
+                        <p className="text-sm text-muted-foreground">
+                          {/* Display section type for demo purposes */}
+                          Section type: {section.type}
+                        </p>
+                        {/* This would display actual property data in the real implementation */}
+                        <p className="mt-2 text-sm">
+                          Content placeholder for {section.title} section.
+                          {section.content.propertyId && 
+                            ` Related to property ID: ${section.content.propertyId}`}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
                 </div>
-              </TabsContent>
-              
-              <TabsContent value="advanced" className="space-y-4 pt-4">
-                <FormField
-                  control={form.control}
-                  name="customNotes"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Custom Notes</FormLabel>
-                      <FormControl>
-                        <Textarea 
-                          {...field} 
-                          placeholder="Enter any additional notes to include in the report"
-                          rows={5}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                
-                <div className="grid grid-cols-2 gap-4">
-                  <FormField
-                    control={form.control}
-                    name="includeCharts"
-                    render={({ field }) => (
-                      <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4">
-                        <FormControl>
-                          <Checkbox
-                            checked={field.value}
-                            onCheckedChange={field.onChange}
-                            disabled={true}
-                          />
-                        </FormControl>
-                        <div className="space-y-1 leading-none">
-                          <FormLabel>Include Chart References</FormLabel>
-                          <FormDescription>
-                            Add chart references (Coming Soon)
-                          </FormDescription>
-                        </div>
-                      </FormItem>
-                    )}
-                  />
-                  
-                  <FormField
-                    control={form.control}
-                    name="includeMap"
-                    render={({ field }) => (
-                      <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4">
-                        <FormControl>
-                          <Checkbox
-                            checked={field.value}
-                            onCheckedChange={field.onChange}
-                            disabled={true}
-                          />
-                        </FormControl>
-                        <div className="space-y-1 leading-none">
-                          <FormLabel>Include Map References</FormLabel>
-                          <FormDescription>
-                            Add map references (Coming Soon)
-                          </FormDescription>
-                        </div>
-                      </FormItem>
-                    )}
-                  />
-                </div>
-              </TabsContent>
-            </Tabs>
-            
-            <DialogFooter className="pt-4">
-              <Button type="submit" className="w-full sm:w-auto">
-                <Download className="mr-2 h-4 w-4" />
-                <span>Generate Report</span>
-              </Button>
-            </DialogFooter>
-          </form>
-        </Form>
-      </DialogContent>
-    </Dialog>
+              </div>
+            ) : (
+              <div className="flex flex-col items-center justify-center py-8 text-center">
+                <p className="text-muted-foreground">
+                  No report generated yet. Select sections and click "Generate Report".
+                </p>
+              </div>
+            )}
+          </TabsContent>
+        </Tabs>
+      </CardContent>
+      <CardFooter className="flex justify-between">
+        <Button 
+          variant="outline" 
+          onClick={() => setActiveTab(activeTab === 'sections' ? 'templates' : 'sections')}
+        >
+          {activeTab === 'preview' ? 'Back to Sections' : 
+            activeTab === 'sections' ? 'View Templates' : 'View Sections'}
+        </Button>
+        {activeTab === 'preview' && generatedReport ? (
+          <Button onClick={handleExportReport}>Export Report</Button>
+        ) : (
+          <Button onClick={handleGenerateReport}>Generate Report</Button>
+        )}
+      </CardFooter>
+    </Card>
   );
-}
-
-// Utility functions for generating different report sections
-
-function generateExecutiveSummary(properties: Property[], metrics?: Record<string, any>[]): string {
-  let summary = 'This report provides an analysis of selected properties in Benton County, Washington. ';
-  
-  if (properties.length > 0) {
-    summary += `The analysis includes ${properties.length} properties with a focus on `;
-    
-    if (metrics && metrics.length > 0) {
-      // Extract key metrics to highlight in summary
-      const metricNames = Object.keys(metrics[0]).slice(0, 3);
-      summary += `metrics such as ${metricNames.join(', ')}. `;
-    } else {
-      summary += 'various valuation and physical characteristics. ';
-    }
-    
-    // Add range of values if available
-    const hasValues = properties.filter(p => p.value).length > 0;
-    if (hasValues) {
-      const values = properties
-        .map(p => p.value ? parseFloat(p.value.replace(/[^0-9.]/g, '')) : 0)
-        .filter(v => v > 0);
-      
-      if (values.length > 0) {
-        const minValue = Math.min(...values);
-        const maxValue = Math.max(...values);
-        summary += `The property values range from ${formatPropertyValue(minValue, 'currency')} to ${formatPropertyValue(maxValue, 'currency')}. `;
-      }
-    }
-  }
-  
-  summary += 'This report is intended for informational purposes and to assist in property valuation and assessment activities.\n\n';
-  
-  return summary;
-}
-
-function generatePropertyOverview(properties: Property[]): string {
-  let overview = `PROPERTY LIST (${properties.length} properties)\n\n`;
-  
-  properties.forEach((property, index) => {
-    overview += `${index + 1}. ${property.address}\n`;
-    overview += `   ID: ${property.id}\n`;
-    overview += `   Parcel ID: ${property.parcelId}\n`;
-    
-    if (property.owner) {
-      overview += `   Owner: ${property.owner}\n`;
-    }
-    
-    if (property.value) {
-      overview += `   Assessed Value: ${property.value}\n`;
-    }
-    
-    if (property.squareFeet) {
-      overview += `   Square Feet: ${property.squareFeet}\n`;
-    }
-    
-    if (property.yearBuilt) {
-      overview += `   Year Built: ${property.yearBuilt}\n`;
-    }
-    
-    overview += '\n';
-  });
-  
-  return overview;
-}
-
-function generateStatisticalAnalysis(metrics: Record<string, any>[]): string {
-  let analysis = 'STATISTICAL SUMMARY\n\n';
-  
-  // Get all metric names
-  const metricNames = Object.keys(metrics[0]);
-  
-  metricNames.forEach(metricName => {
-    // Extract values for this metric across all properties
-    const values = metrics
-      .map(m => m[metricName])
-      .filter(v => v !== undefined && v !== null)
-      .map(v => typeof v === 'string' ? parseFloat(v.replace(/[^0-9.]/g, '')) : v)
-      .filter(v => !isNaN(v));
-    
-    if (values.length > 0) {
-      // Determine metric format for display
-      let format: 'currency' | 'number' | 'text' | 'percent' = 'number';
-      if (metricName.toLowerCase().includes('price') || 
-          metricName.toLowerCase().includes('value') ||
-          metricName.toLowerCase().includes('cost')) {
-        format = 'currency';
-      } else if (metricName.toLowerCase().includes('percent') ||
-                metricName.toLowerCase().includes('ratio')) {
-        format = 'percent';
-      }
-      
-      // Calculate statistics
-      const sum = values.reduce((acc, val) => acc + val, 0);
-      const avg = sum / values.length;
-      const min = Math.min(...values);
-      const max = Math.max(...values);
-      
-      // Calculate median (requires sorting)
-      const sortedValues = [...values].sort((a, b) => a - b);
-      const midIndex = Math.floor(sortedValues.length / 2);
-      const median = sortedValues.length % 2 !== 0
-        ? sortedValues[midIndex]
-        : (sortedValues[midIndex - 1] + sortedValues[midIndex]) / 2;
-      
-      // Calculate standard deviation
-      const meanDifferencesSquared = values.map(val => (val - avg) ** 2);
-      const variance = meanDifferencesSquared.reduce((acc, val) => acc + val, 0) / values.length;
-      const stdDev = Math.sqrt(variance);
-      
-      // Add to analysis
-      analysis += `${metricName}:\n`;
-      analysis += `  Average: ${formatPropertyValue(avg, format)}\n`;
-      analysis += `  Median: ${formatPropertyValue(median, format)}\n`;
-      analysis += `  Minimum: ${formatPropertyValue(min, format)}\n`;
-      analysis += `  Maximum: ${formatPropertyValue(max, format)}\n`;
-      analysis += `  Range: ${formatPropertyValue(max - min, format)}\n`;
-      analysis += `  Standard Deviation: ${formatPropertyValue(stdDev, format)}\n`;
-      analysis += '\n';
-    }
-  });
-  
-  return analysis;
-}
-
-function generateComparativeMetrics(properties: Property[], metrics: Record<string, any>[]): string {
-  let comparative = 'COMPARATIVE ANALYSIS\n\n';
-  
-  // Create a table-like structure with property addresses as rows and metrics as columns
-  const metricNames = Object.keys(metrics[0]).slice(0, 5); // Limit to 5 key metrics
-  
-  // Add header row
-  comparative += 'Property'.padEnd(30);
-  metricNames.forEach(name => {
-    comparative += name.slice(0, 15).padEnd(15);
-  });
-  comparative += '\n';
-  
-  // Add separator
-  comparative += '-'.repeat(30);
-  metricNames.forEach(() => {
-    comparative += '-'.repeat(15);
-  });
-  comparative += '\n';
-  
-  // Add data rows
-  properties.forEach((property, index) => {
-    const shortAddress = property.address.slice(0, 27);
-    comparative += shortAddress.padEnd(30);
-    
-    metricNames.forEach(metricName => {
-      const metricValue = metrics[index]?.[metricName];
-      
-      // Format the value
-      let formattedValue = '';
-      if (metricValue !== undefined && metricValue !== null) {
-        // Simple format detection
-        let format: 'currency' | 'number' | 'text' | 'percent' = 'text';
-        
-        if (typeof metricValue === 'number') {
-          if (metricName.toLowerCase().includes('price') || 
-              metricName.toLowerCase().includes('value') ||
-              metricName.toLowerCase().includes('cost')) {
-            format = 'currency';
-          } else if (metricName.toLowerCase().includes('percent') ||
-              metricName.toLowerCase().includes('ratio')) {
-            format = 'percent';
-          } else {
-            format = 'number';
-          }
-        }
-        
-        formattedValue = formatPropertyValue(metricValue, format).slice(0, 14);
-      }
-      
-      comparative += formattedValue.padEnd(15);
-    });
-    
-    comparative += '\n';
-  });
-  
-  comparative += '\n\nNOTE: This comparison shows key metrics for each property. Detailed analysis is available in other sections of the report.\n';
-  
-  return comparative;
-}
-
-function generateRegressionAnalysis(models: RegressionModel[]): string {
-  let regression = 'REGRESSION MODEL SUMMARY\n\n';
-  
-  if (models.length === 0) {
-    regression += 'No regression models are available for analysis.\n';
-    return regression;
-  }
-  
-  models.forEach((model, index) => {
-    regression += `Model ${index + 1}: ${model.name}\n`;
-    regression += `  R-squared: ${(model.r2 * 100).toFixed(2)}%\n`;
-    regression += `  Variables: ${model.variables}\n`;
-    regression += `  Coefficient of Variation: ${(model.cov * 100).toFixed(2)}%\n`;
-    regression += `  Sample Size: ${model.samples}\n`;
-    regression += `  Type: ${model.type || 'Multiple Regression'}\n`;
-    regression += `  Last Run: ${new Date(model.lastRun).toLocaleDateString()}\n`;
-    regression += '\n';
-  });
-  
-  regression += 'The R-squared value indicates how well the model explains the variation in property values. ';
-  regression += 'A higher R-squared (closer to 100%) indicates a better fit.\n\n';
-  
-  return regression;
-}
+};

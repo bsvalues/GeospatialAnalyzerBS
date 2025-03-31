@@ -10,13 +10,15 @@ import {
   Calendar,
   AlertCircle,
   Globe,
-  Building
+  Building,
+  FileText
 } from 'lucide-react';
 import MapPanel from './panels/MapPanel';
 import ScriptPanel from './panels/ScriptPanel';
 import SpatialAnalysisPanel from './panels/SpatialAnalysisPanel';
 import { RegressionPanel } from './panels/RegressionPanel';
 import PropertyComparisonPanel from './panels/PropertyComparisonPanel';
+import { ReportGenerator } from './export/ReportGenerator';
 import { Property } from '@shared/schema';
 import { useQuery } from '@tanstack/react-query';
 
@@ -86,6 +88,13 @@ const Dashboard: React.FC<DashboardProps> = ({ className }) => {
           >
             <Building className="h-4 w-4 mr-2" />
             Property Comparison
+          </button>
+          <button
+            className={`px-4 py-3 font-medium text-sm flex items-center ${activeTab === 'reports' ? 'text-primary border-b-2 border-primary' : 'text-gray-600 hover:text-gray-900'}`}
+            onClick={() => setActiveTab('reports')}
+          >
+            <FileText className="h-4 w-4 mr-2" />
+            Reports
           </button>
           <button
             className={`px-4 py-3 font-medium text-sm flex items-center ${activeTab === 'settings' ? 'text-primary border-b-2 border-primary' : 'text-gray-600 hover:text-gray-900'}`}
@@ -219,6 +228,18 @@ const Dashboard: React.FC<DashboardProps> = ({ className }) => {
         )}
         
         {activeTab === 'comparison' && <PropertyComparisonPanel />}
+        
+        {activeTab === 'reports' && (
+          <div className="h-full p-6 overflow-auto">
+            <div className="mb-6">
+              <h2 className="text-2xl font-bold text-gray-800 mb-2">Property Reports</h2>
+              <p className="text-gray-600">
+                Create, customize, and export detailed property reports with the information you need.
+              </p>
+            </div>
+            <ReportGenerator />
+          </div>
+        )}
         
         {activeTab === 'settings' && (
           <div className="h-full p-6 flex items-center justify-center">
