@@ -18,6 +18,7 @@ function Router() {
       <Route path="/" component={() => <Dashboard />} />
       <Route path="/trends" component={() => <PropertyTrendsDemo />} />
       <Route path="/neighborhoods" component={() => <NeighborhoodTimelineDemo />} />
+      <Route path="/analytics" component={() => <SpatialAnalyticsPanel />} />
       <Route component={NotFound} />
     </Switch>
   );
