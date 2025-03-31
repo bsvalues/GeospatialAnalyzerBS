@@ -1,6 +1,7 @@
 import React from 'react';
 import { Property } from '../../shared/schema';
 import { Card, CardContent } from '@/components/ui/card';
+import PropertySparkline from './PropertySparkline';
 import { 
   Building,
   Calendar,
@@ -10,7 +11,8 @@ import {
   MapPin,
   Bath,
   Bed,
-  Hash
+  Hash,
+  TrendingUp
 } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
 
@@ -31,7 +33,15 @@ export const PropertySelectionDisplay: React.FC<PropertySelectionDisplayProps> =
   return (
     <div className={`space-y-4 ${className}`}>
       <div className="border-b pb-2">
-        <h3 className="text-lg font-medium">{property.address}</h3>
+        <div className="flex items-center justify-between">
+          <h3 className="text-lg font-medium">{property.address}</h3>
+          <PropertySparkline 
+            property={property} 
+            width={80} 
+            height={24}
+            className="ml-2"
+          />
+        </div>
         <p className="text-sm text-muted-foreground">
           {property.neighborhood || 'Unknown'} • {property.propertyType || 'Unknown'}
         </p>
@@ -84,6 +94,21 @@ export const PropertySelectionDisplay: React.FC<PropertySelectionDisplayProps> =
             <p className="text-sm font-medium">Parcel ID</p>
             <p className="text-sm">{property.parcelId}</p>
           </div>
+        </div>
+      </div>
+      
+      <div className="border-t pt-4">
+        <div className="flex items-center gap-2">
+          <TrendingUp className="h-4 w-4 text-muted-foreground" />
+          <p className="text-sm font-medium">Value Trend</p>
+        </div>
+        <div className="mt-2">
+          <PropertySparkline 
+            property={property}
+            height={40}
+            width={240}
+            showPredicted={true}
+          />
         </div>
       </div>
       
