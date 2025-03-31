@@ -9,6 +9,57 @@ export interface Point {
 }
 
 /**
+ * Interface for a heatmap data point
+ */
+export interface HeatmapPoint {
+  lat: number;
+  lng: number;
+  intensity: number;
+}
+
+/**
+ * Interface for Moran's I statistic result
+ */
+export interface MoransIResult {
+  index: number;
+  zScore: number;
+  pValue: number;
+  pattern: 'clustered' | 'random' | 'dispersed';
+}
+
+/**
+ * Interface for a property cluster
+ */
+export interface PropertyCluster {
+  properties: Property[];
+  centroid: Point;
+  averageValue: number;
+  radius: number;
+}
+
+/**
+ * Interface for a spatial regression model
+ */
+export interface SpatialRegressionResult {
+  coefficients: Record<string, number>;
+  r2: number;
+  adjustedR2: number;
+  standardError: number;
+  predict: (property: any) => number;
+}
+
+/**
+ * Interface for an amenity
+ */
+export interface Amenity {
+  id: number;
+  name: string;
+  type: string;
+  latitude: number;
+  longitude: number;
+}
+
+/**
  * Interface for bounding box coordinates [minLat, minLng, maxLat, maxLng]
  */
 export type BoundingBox = [number, number, number, number];
@@ -633,6 +684,634 @@ function arraysEqual(a: any[], b: any[]): boolean {
   return true;
 }
 
+/**
+ * Calculate neighbor weights based on distance between properties
+ * 
+ * @param properties Array of properties
+ * @param maxDistance Maximum distance to consider for neighbors (in km)
+ * @returns Object with property IDs as keys and neighbor weights as values
+ */
+export function getNeighborWeights(
+  properties: Property[],
+  maxDistance: number = 2
+): Record<string, Record<string, number>> {
+  const weights: Record<string, Record<string, number>> = {};
+  
+  // Filter properties with valid coordinates
+  const validProperties = properties.filter(p => 
+    typeof p.latitude === 'number' && 
+    typeof p.longitude === 'number'
+  );
+  
+  if (validProperties.length < 2) {
+    throw new Error('At least 2 properties with valid coordinates are required');
+  }
+  
+  // Calculate weights based on inverse distance
+  for (const p1 of validProperties) {
+    weights[p1.id.toString()] = {};
+    let totalWeight = 0;
+    
+    for (const p2 of validProperties) {
+      if (p1.id === p2.id) continue;
+      
+      const distance = calculateDistance(
+        p1.latitude as number, p1.longitude as number,
+        p2.latitude as number, p2.longitude as number
+      );
+      
+      // Use inverse distance weighting with cutoff
+      if (distance <= maxDistance) {
+        // Closer properties have higher weights (inverse distance)
+        const weight = 1 / Math.max(distance, 0.01); // Avoid division by zero
+        weights[p1.id.toString()][p2.id.toString()] = weight;
+        totalWeight += weight;
+      }
+    }
+    
+    // Normalize weights to sum to 1
+    if (totalWeight > 0) {
+      for (const neighborId in weights[p1.id.toString()]) {
+        weights[p1.id.toString()][neighborId] /= totalWeight;
+      }
+    }
+  }
+  
+  return weights;
+}
+
+/**
+ * Calculate Moran's I spatial autocorrelation statistic
+ * 
+ * @param properties Array of properties
+ * @param attribute Property attribute to analyze
+ * @param maxDistance Maximum distance to consider for neighbors (in km)
+ * @returns Moran's I result with index, significance, and pattern
+ */
+export function calculateMoranI(
+  properties: Property[],
+  attribute: 'value' | 'squareFeet' | 'yearBuilt' = 'value',
+  maxDistance: number = 2
+): MoransIResult {
+  if (properties.length < 3) {
+    throw new Error('At least 3 properties are required for Moran\'s I calculation');
+  }
+  
+  // Filter properties with valid coordinates and attribute values
+  const validProperties = properties.filter(p => {
+    if (typeof p.latitude !== 'number' || typeof p.longitude !== 'number') {
+      return false;
+    }
+    
+    if (attribute === 'value') {
+      return p.value !== null && p.value !== undefined;
+    } else if (attribute === 'squareFeet') {
+      return p.squareFeet !== null && p.squareFeet !== undefined;
+    } else if (attribute === 'yearBuilt') {
+      return p.yearBuilt !== null && p.yearBuilt !== undefined;
+    }
+    
+    return false;
+  });
+  
+  if (validProperties.length < 3) {
+    throw new Error('At least 3 properties with valid coordinates and attribute values are required');
+  }
+  
+  // Extract attribute values
+  const values: number[] = validProperties.map(p => {
+    if (attribute === 'value') {
+      return parseFloat(p.value || '0');
+    } else if (attribute === 'squareFeet') {
+      return p.squareFeet;
+    } else if (attribute === 'yearBuilt') {
+      return p.yearBuilt || 0;
+    }
+    return 0;
+  });
+  
+  // Calculate mean
+  const mean = values.reduce((sum, val) => sum + val, 0) / values.length;
+  
+  // Center the values by subtracting the mean
+  const centeredValues = values.map(val => val - mean);
+  
+  // Get neighbor weights
+  const weights = getNeighborWeights(validProperties, maxDistance);
+  
+  // Calculate Moran's I
+  let numerator = 0;
+  let denominator = 0;
+  let weightSum = 0;
+  
+  // Calculate numerator
+  for (let i = 0; i < validProperties.length; i++) {
+    const id1 = validProperties[i].id.toString();
+    
+    for (let j = 0; j < validProperties.length; j++) {
+      if (i === j) continue;
+      
+      const id2 = validProperties[j].id.toString();
+      const weight = weights[id1]?.[id2] || 0;
+      
+      if (weight > 0) {
+        numerator += weight * centeredValues[i] * centeredValues[j];
+        weightSum += weight;
+      }
+    }
+    
+    // Calculate denominator (sum of squared deviations)
+    denominator += centeredValues[i] * centeredValues[i];
+  }
+  
+  // Calculate final Moran's I statistic
+  const n = validProperties.length;
+  const I = (n / weightSum) * (numerator / denominator);
+  
+  // Calculate expected value E(I) under the null hypothesis
+  const EI = -1 / (n - 1);
+  
+  // Calculate variance of I
+  let s1 = 0;
+  let s2 = 0;
+  
+  // First moment
+  for (const id1 in weights) {
+    let rowSum = 0;
+    let rowSumSquared = 0;
+    
+    for (const id2 in weights[id1]) {
+      const weight = weights[id1][id2];
+      rowSum += weight;
+      rowSumSquared += weight * weight;
+    }
+    
+    s1 += (rowSum + rowSum) * rowSum;
+    s2 += rowSum * rowSum;
+  }
+  
+  const s0 = weightSum;
+  s1 /= 2; // correct for double counting
+  
+  // Calculate variance
+  const k = (centeredValues.reduce((sum, val) => sum + Math.pow(val, 4), 0) / n) / 
+            Math.pow(denominator / n, 2);
+  
+  const varI = (n * ((n*n - 3*n + 3)*s1 - n*s2 + 3*s0*s0) - 
+                k * (n*n - n)*s1 - 2*n*s0*s0) / 
+               ((n-1)*(n-2)*(n-3)*s0*s0);
+  
+  // Calculate z-score and p-value
+  const zScore = (I - EI) / Math.sqrt(varI);
+  const pValue = 2 * (1 - normalCDF(Math.abs(zScore)));
+  
+  // Determine spatial pattern
+  let pattern: 'clustered' | 'random' | 'dispersed' = 'random';
+  if (pValue < 0.05) {
+    pattern = I > EI ? 'clustered' : 'dispersed';
+  }
+  
+  return {
+    index: I,
+    zScore,
+    pValue,
+    pattern
+  };
+}
+
+/**
+ * Generate heatmap data points from property values
+ * 
+ * @param properties Array of properties
+ * @param attribute Property attribute to use for intensity
+ * @returns Array of heatmap points with lat, lng, and intensity
+ */
+export function generateHeatmapData(
+  properties: Property[],
+  attribute: 'value' | 'squareFeet' | 'yearBuilt' = 'value'
+): HeatmapPoint[] {
+  // Filter properties with valid coordinates
+  const validProperties = properties.filter(p => 
+    typeof p.latitude === 'number' && 
+    typeof p.longitude === 'number'
+  );
+  
+  if (validProperties.length === 0) {
+    return [];
+  }
+  
+  // Extract attribute values
+  const values: number[] = validProperties.map(p => {
+    if (attribute === 'value') {
+      return parseFloat(p.value || '0');
+    } else if (attribute === 'squareFeet') {
+      return p.squareFeet;
+    } else if (attribute === 'yearBuilt') {
+      return p.yearBuilt || 0;
+    }
+    return 0;
+  });
+  
+  // Find min and max values for normalization
+  const minValue = Math.min(...values);
+  const maxValue = Math.max(...values);
+  const valueRange = maxValue - minValue;
+  
+  // Create heatmap points with normalized intensity
+  return validProperties.map((property, index) => {
+    // Normalize intensity to range [0, 1]
+    const normalizedIntensity = valueRange === 0 
+      ? 0.5 // If all properties have the same value
+      : (values[index] - minValue) / valueRange;
+    
+    return {
+      lat: property.latitude as number,
+      lng: property.longitude as number,
+      intensity: normalizedIntensity
+    };
+  });
+}
+
+/**
+ * Identify clusters of similar properties
+ * 
+ * @param properties Array of properties
+ * @param attribute Property attribute to use for clustering
+ * @param distanceThreshold Distance threshold for cluster formation (in degrees)
+ * @returns Array of property clusters
+ */
+export function identifyPropertyClusters(
+  properties: Property[],
+  attribute: 'value' | 'squareFeet' | 'yearBuilt' = 'value',
+  distanceThreshold: number = 0.1
+): PropertyCluster[] {
+  // Filter properties with valid coordinates
+  const validProperties = properties.filter(p => 
+    typeof p.latitude === 'number' && 
+    typeof p.longitude === 'number'
+  );
+  
+  if (validProperties.length === 0) {
+    return [];
+  }
+  
+  // Initialize clusters (each property starts in its own cluster)
+  const clusters: PropertyCluster[] = validProperties.map(property => {
+    const value = attribute === 'value' 
+      ? parseFloat(property.value || '0')
+      : attribute === 'squareFeet'
+        ? property.squareFeet
+        : property.yearBuilt || 0;
+    
+    return {
+      properties: [property],
+      centroid: {
+        lat: property.latitude as number,
+        lng: property.longitude as number
+      },
+      averageValue: value,
+      radius: 0
+    };
+  });
+  
+  // Hierarchical clustering - merge clusters that are close to each other
+  let merged = true;
+  while (merged) {
+    merged = false;
+    
+    for (let i = 0; i < clusters.length; i++) {
+      if (merged) break; // Start over if a merge occurred
+      
+      for (let j = i + 1; j < clusters.length; j++) {
+        // Calculate distance between cluster centroids
+        const distance = calculateDistance(
+          clusters[i].centroid.lat, clusters[i].centroid.lng,
+          clusters[j].centroid.lat, clusters[j].centroid.lng
+        );
+        
+        // Merge clusters if they are close enough
+        if (distance <= distanceThreshold) {
+          // Combine properties from both clusters
+          const combinedProperties = [
+            ...clusters[i].properties,
+            ...clusters[j].properties
+          ];
+          
+          // Calculate new centroid
+          const newCentroid = {
+            lat: combinedProperties.reduce((sum, p) => sum + (p.latitude as number), 0) / combinedProperties.length,
+            lng: combinedProperties.reduce((sum, p) => sum + (p.longitude as number), 0) / combinedProperties.length
+          };
+          
+          // Calculate new average value
+          const newAvgValue = combinedProperties.reduce((sum, p) => {
+            const value = attribute === 'value' 
+              ? parseFloat(p.value || '0')
+              : attribute === 'squareFeet'
+                ? p.squareFeet
+                : p.yearBuilt || 0;
+            return sum + value;
+          }, 0) / combinedProperties.length;
+          
+          // Calculate maximum distance from centroid to any point (radius)
+          const radius = Math.max(
+            ...combinedProperties.map(p => 
+              calculateDistance(
+                newCentroid.lat, newCentroid.lng,
+                p.latitude as number, p.longitude as number
+              )
+            )
+          );
+          
+          // Create merged cluster
+          clusters[i] = {
+            properties: combinedProperties,
+            centroid: newCentroid,
+            averageValue: newAvgValue,
+            radius
+          };
+          
+          // Remove the second cluster
+          clusters.splice(j, 1);
+          
+          merged = true;
+          break;
+        }
+      }
+    }
+  }
+  
+  return clusters;
+}
+
+/**
+ * Generate a spatial regression model to predict property values
+ * 
+ * @param properties Array of properties to use for model training
+ * @param amenities Array of amenities to consider as factors
+ * @returns Spatial regression model with coefficients and prediction function
+ */
+export function generateSpatialRegressionModel(
+  properties: Property[],
+  amenities: Amenity[]
+): SpatialRegressionResult {
+  // Filter properties with valid coordinates and values
+  const validProperties = properties.filter(p => 
+    typeof p.latitude === 'number' && 
+    typeof p.longitude === 'number' &&
+    p.value !== null && p.value !== undefined
+  );
+  
+  if (validProperties.length < 10) {
+    throw new Error('At least 10 properties with valid coordinates and values are required');
+  }
+  
+  // Prepare input variables
+  interface RegressionObservation {
+    y: number; // Dependent variable (property value)
+    squareFeet: number;
+    yearBuilt: number;
+    distanceToPark?: number;
+    distanceToSchool?: number;
+    distanceToShopping?: number;
+    neighborhoodFactor?: number;
+    [key: string]: number | undefined;
+  }
+  
+  // Generate observations with property characteristics and distances to amenities
+  const observations: RegressionObservation[] = validProperties.map(property => {
+    const observation: RegressionObservation = {
+      y: parseFloat(property.value || '0'),
+      squareFeet: property.squareFeet,
+      yearBuilt: property.yearBuilt || 0,
+    };
+    
+    // Calculate distances to different types of amenities
+    const parkAmenities = amenities.filter(a => a.type === 'park');
+    const schoolAmenities = amenities.filter(a => a.type === 'school');
+    const shoppingAmenities = amenities.filter(a => a.type === 'shopping');
+    
+    if (parkAmenities.length > 0) {
+      observation.distanceToPark = Math.min(
+        ...parkAmenities.map(a => 
+          calculateDistance(
+            property.latitude as number, property.longitude as number,
+            a.latitude, a.longitude
+          )
+        )
+      );
+    }
+    
+    if (schoolAmenities.length > 0) {
+      observation.distanceToSchool = Math.min(
+        ...schoolAmenities.map(a => 
+          calculateDistance(
+            property.latitude as number, property.longitude as number,
+            a.latitude, a.longitude
+          )
+        )
+      );
+    }
+    
+    if (shoppingAmenities.length > 0) {
+      observation.distanceToShopping = Math.min(
+        ...shoppingAmenities.map(a => 
+          calculateDistance(
+            property.latitude as number, property.longitude as number,
+            a.latitude, a.longitude
+          )
+        )
+      );
+    }
+    
+    // Add neighborhood factor (if available)
+    if (property.neighborhood) {
+      // Calculate average value in the neighborhood
+      const neighborhoodProperties = validProperties.filter(p => 
+        p.neighborhood === property.neighborhood
+      );
+      
+      if (neighborhoodProperties.length > 1) {
+        const avgNeighborhoodValue = neighborhoodProperties.reduce(
+          (sum, p) => sum + parseFloat(p.value || '0'), 0
+        ) / neighborhoodProperties.length;
+        
+        observation.neighborhoodFactor = avgNeighborhoodValue;
+      }
+    }
+    
+    return observation;
+  });
+  
+  // Simple multiple linear regression (ordinary least squares)
+  // First, get a list of all variables
+  const variables = Object.keys(observations[0]).filter(key => key !== 'y');
+  
+  // Calculate means
+  const means: Record<string, number> = { y: 0 };
+  variables.forEach(variable => {
+    means[variable] = 0;
+  });
+  
+  // Sum values for each variable
+  observations.forEach(obs => {
+    means.y += obs.y;
+    
+    variables.forEach(variable => {
+      if (obs[variable] !== undefined) {
+        means[variable] += obs[variable] as number;
+      }
+    });
+  });
+  
+  // Divide by number of observations to get means
+  const n = observations.length;
+  
+  means.y /= n;
+  variables.forEach(variable => {
+    means[variable] /= n;
+  });
+  
+  // Calculate coefficient matrix
+  const coefficients: Record<string, number> = {};
+  
+  // Calculate covariance and variance for each variable
+  variables.forEach(variable => {
+    let covariance = 0;
+    let variance = 0;
+    
+    observations.forEach(obs => {
+      if (obs[variable] !== undefined) {
+        const x = obs[variable] as number;
+        covariance += (obs.y - means.y) * (x - means[variable]);
+        variance += Math.pow(x - means[variable], 2);
+      }
+    });
+    
+    // Calculate coefficient
+    if (variance !== 0) {
+      coefficients[variable] = covariance / variance;
+    } else {
+      coefficients[variable] = 0;
+    }
+  });
+  
+  // Calculate intercept
+  const intercept = means.y - variables.reduce(
+    (sum, variable) => sum + coefficients[variable] * means[variable], 0
+  );
+  
+  // Calculate predicted values and residuals
+  const predictions = observations.map(obs => {
+    let predicted = intercept;
+    
+    variables.forEach(variable => {
+      if (obs[variable] !== undefined) {
+        predicted += coefficients[variable] * (obs[variable] as number);
+      }
+    });
+    
+    return predicted;
+  });
+  
+  const residuals = observations.map((obs, i) => obs.y - predictions[i]);
+  
+  // Calculate R-squared
+  const sst = observations.reduce((sum, obs) => sum + Math.pow(obs.y - means.y, 2), 0);
+  const sse = residuals.reduce((sum, residual) => sum + Math.pow(residual, 2), 0);
+  const r2 = 1 - (sse / sst);
+  
+  // Calculate adjusted R-squared
+  const k = variables.length;
+  const adjustedR2 = 1 - ((1 - r2) * (n - 1) / (n - k - 1));
+  
+  // Calculate standard error
+  const standardError = Math.sqrt(sse / (n - k - 1));
+  
+  // Create prediction function
+  const predict = (property: {
+    squareFeet?: number;
+    yearBuilt?: number;
+    latitude?: number;
+    longitude?: number;
+    neighborhood?: string;
+  }) => {
+    let predicted = intercept;
+    
+    if (property.squareFeet !== undefined && coefficients.squareFeet !== undefined) {
+      predicted += coefficients.squareFeet * property.squareFeet;
+    }
+    
+    if (property.yearBuilt !== undefined && coefficients.yearBuilt !== undefined) {
+      predicted += coefficients.yearBuilt * property.yearBuilt;
+    }
+    
+    if (property.latitude !== undefined && property.longitude !== undefined) {
+      // Calculate distances to amenities
+      if (coefficients.distanceToPark !== undefined && amenities.some(a => a.type === 'park')) {
+        const distanceToPark = Math.min(
+          ...amenities.filter(a => a.type === 'park').map(a => 
+            calculateDistance(
+              property.latitude as number, property.longitude as number,
+              a.latitude, a.longitude
+            )
+          )
+        );
+        predicted += coefficients.distanceToPark * distanceToPark;
+      }
+      
+      if (coefficients.distanceToSchool !== undefined && amenities.some(a => a.type === 'school')) {
+        const distanceToSchool = Math.min(
+          ...amenities.filter(a => a.type === 'school').map(a => 
+            calculateDistance(
+              property.latitude as number, property.longitude as number,
+              a.latitude, a.longitude
+            )
+          )
+        );
+        predicted += coefficients.distanceToSchool * distanceToSchool;
+      }
+      
+      if (coefficients.distanceToShopping !== undefined && amenities.some(a => a.type === 'shopping')) {
+        const distanceToShopping = Math.min(
+          ...amenities.filter(a => a.type === 'shopping').map(a => 
+            calculateDistance(
+              property.latitude as number, property.longitude as number,
+              a.latitude, a.longitude
+            )
+          )
+        );
+        predicted += coefficients.distanceToShopping * distanceToShopping;
+      }
+    }
+    
+    if (property.neighborhood !== undefined && coefficients.neighborhoodFactor !== undefined) {
+      // Find average value for the neighborhood
+      const neighborhoodProperties = validProperties.filter(p => 
+        p.neighborhood === property.neighborhood
+      );
+      
+      if (neighborhoodProperties.length > 0) {
+        const avgNeighborhoodValue = neighborhoodProperties.reduce(
+          (sum, p) => sum + parseFloat(p.value || '0'), 0
+        ) / neighborhoodProperties.length;
+        
+        predicted += coefficients.neighborhoodFactor * avgNeighborhoodValue;
+      }
+    }
+    
+    return predicted;
+  };
+  
+  return {
+    coefficients,
+    r2,
+    adjustedR2,
+    standardError,
+    predict
+  };
+}
+
 export default {
   calculateDistance,
   isPointWithinRadius,
@@ -641,5 +1320,10 @@ export default {
   filterProperties,
   sortProperties,
   performHotspotAnalysis,
-  clusterProperties
+  clusterProperties,
+  getNeighborWeights,
+  calculateMoranI,
+  generateHeatmapData,
+  identifyPropertyClusters,
+  generateSpatialRegressionModel
 };
