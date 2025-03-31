@@ -1,11 +1,13 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useMap } from 'react-leaflet';
 import L from 'leaflet';
 import { 
   getDemographicGeoJSON, 
+  getDemographicData,
   demographicMetrics, 
   colorSchemes, 
-  DemographicOverlayOptions
+  DemographicOverlayOptions,
+  DemographicData
 } from '@/services/neighborhoodDemographicService';
 import { 
   Card, 
@@ -22,11 +24,24 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "@/components/ui/tabs";
+import {
+  Sheet,
+  SheetContent,
+  SheetTrigger,
+} from "@/components/ui/sheet";
 import { Label } from '@/components/ui/label';
 import { Slider } from '@/components/ui/slider';
-import { Info, BarChart3 } from 'lucide-react';
+import { Info, BarChart3, Filter, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import { Checkbox } from '@/components/ui/checkbox';
+import DemographicLegend from './DemographicLegend';
 
 interface NeighborhoodDemographicOverlayProps {
   visible: boolean;
@@ -47,6 +62,38 @@ export const NeighborhoodDemographicOverlay: React.FC<NeighborhoodDemographicOve
   });
   const [geoJSONLayer, setGeoJSONLayer] = useState<L.GeoJSON | null>(null);
   const [selectedNeighborhood, setSelectedNeighborhood] = useState<string | null>(null);
+  const [showLegend, setShowLegend] = useState(false);
+  const [metricRanges, setMetricRanges] = useState<Record<string, [number, number]>>({});
+  const [activeTab, setActiveTab] = useState("display");
+  const [filteredNeighborhoods, setFilteredNeighborhoods] = useState<string[]>([]);
+  const allNeighborhoods = useRef<DemographicData[]>([]);
+  const [minMaxValues, setMinMaxValues] = useState<{min: number, max: number}>({ min: 0, max: 100 });
+
+  // Load neighborhood data when component initializes
+  useEffect(() => {
+    const neighborhoods = getDemographicData();
+    allNeighborhoods.current = neighborhoods;
+    
+    // Initialize with all neighborhoods selected
+    setFilteredNeighborhoods(neighborhoods.map(n => n.id));
+    
+    // Calculate min/max values for all metrics
+    const ranges: Record<string, [number, number]> = {};
+    demographicMetrics.forEach(metric => {
+      const values = neighborhoods.map(n => n[metric.id as keyof DemographicData] as number);
+      ranges[metric.id] = [Math.min(...values), Math.max(...values)];
+    });
+    
+    setMetricRanges(ranges);
+    
+    // Set initial min/max for the selected metric
+    if (ranges[overlayOptions.metric]) {
+      setMinMaxValues({
+        min: ranges[overlayOptions.metric][0],
+        max: ranges[overlayOptions.metric][1]
+      });
+    }
+  }, []);
 
   // Add GeoJSON layer to map when overlay becomes visible
   useEffect(() => {
@@ -65,7 +112,17 @@ export const NeighborhoodDemographicOverlay: React.FC<NeighborhoodDemographicOve
         geoJSONLayer.removeFrom(map);
       }
     };
-  }, [visible, map, overlayOptions]);
+  }, [visible, map, overlayOptions, filteredNeighborhoods]);
+
+  // Update min/max values when metric changes
+  useEffect(() => {
+    if (metricRanges[overlayOptions.metric]) {
+      setMinMaxValues({
+        min: metricRanges[overlayOptions.metric][0],
+        max: metricRanges[overlayOptions.metric][1]
+      });
+    }
+  }, [overlayOptions.metric, metricRanges]);
 
   const updateOverlay = () => {
     // Remove existing layer if any
@@ -73,14 +130,22 @@ export const NeighborhoodDemographicOverlay: React.FC<NeighborhoodDemographicOve
       geoJSONLayer.removeFrom(map);
     }
     
-    // Generate new GeoJSON with current options
+    // Generate new GeoJSON with current options and filtered neighborhoods
     const geoJSON = getDemographicGeoJSON(
       overlayOptions.metric, 
       overlayOptions.colorScheme
     );
     
+    // Filter features to only include selected neighborhoods
+    const filteredGeoJSON = {
+      ...geoJSON,
+      features: geoJSON.features.filter(feature => 
+        filteredNeighborhoods.includes(feature.properties.id)
+      )
+    };
+    
     // Create new layer with styling and interaction
-    const layer = L.geoJSON(geoJSON as any, {
+    const layer = L.geoJSON(filteredGeoJSON as any, {
       style: (feature) => ({
         fillColor: feature?.properties?.color || '#cccccc',
         weight: 2,
@@ -184,7 +249,28 @@ export const NeighborhoodDemographicOverlay: React.FC<NeighborhoodDemographicOve
     setOverlayOptions(prev => ({ ...prev, opacity: value[0] }));
   };
 
+  const toggleNeighborhood = (id: string, checked: boolean) => {
+    setFilteredNeighborhoods(prev => {
+      if (checked) {
+        return [...prev, id];
+      } else {
+        return prev.filter(n => n !== id);
+      }
+    });
+  };
+
+  const selectAllNeighborhoods = () => {
+    setFilteredNeighborhoods(allNeighborhoods.current.map(n => n.id));
+  };
+
+  const clearAllNeighborhoods = () => {
+    setFilteredNeighborhoods([]);
+  };
+
   if (!visible) return null;
+
+  const metricInfo = demographicMetrics.find(m => m.id === overlayOptions.metric);
+  const metricRange = metricRanges[overlayOptions.metric] || [0, 100];
 
   return (
     <Card className={cn("w-80 absolute z-10 top-20 right-4 shadow-lg", className)}>
@@ -194,95 +280,218 @@ export const NeighborhoodDemographicOverlay: React.FC<NeighborhoodDemographicOve
           Demographic Overlay
         </CardTitle>
         <CardDescription>
-          View neighborhood demographics
+          View and filter neighborhood demographics
         </CardDescription>
       </CardHeader>
-      <CardContent className="space-y-4">
-        <div className="space-y-2">
-          <Label htmlFor="metric">Demographic Metric</Label>
-          <Select 
-            value={overlayOptions.metric} 
-            onValueChange={handleMetricChange}
-          >
-            <SelectTrigger id="metric">
-              <SelectValue placeholder="Select metric" />
-            </SelectTrigger>
-            <SelectContent>
-              {demographicMetrics.map(metric => (
-                <SelectItem key={metric.id} value={metric.id}>
-                  {metric.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-
-        <div className="space-y-2">
-          <Label htmlFor="colorScheme">Color Scheme</Label>
-          <Select 
-            value={overlayOptions.colorScheme} 
-            onValueChange={handleColorSchemeChange}
-          >
-            <SelectTrigger id="colorScheme">
-              <SelectValue placeholder="Select color scheme" />
-            </SelectTrigger>
-            <SelectContent>
-              {colorSchemes.map(scheme => (
-                <SelectItem key={scheme.id} value={scheme.id}>
-                  {scheme.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-
-        <div className="space-y-2">
-          <div className="flex justify-between">
-            <Label htmlFor="opacity">Opacity</Label>
-            <span className="text-sm text-muted-foreground">
-              {Math.round(overlayOptions.opacity * 100)}%
-            </span>
-          </div>
-          <Slider
-            id="opacity"
-            min={0.1}
-            max={1}
-            step={0.1}
-            value={[overlayOptions.opacity]}
-            onValueChange={handleOpacityChange}
-          />
-        </div>
-
-        <div className="flex items-center justify-center mt-2">
-          <Button 
-            variant="outline" 
-            size="sm" 
-            className="w-full"
-            onClick={updateOverlay}
-          >
-            Update Overlay
-          </Button>
-        </div>
-      </CardContent>
-      <CardFooter className="flex justify-between pt-0">
-        <Button 
-          variant="ghost" 
-          size="sm"
-          className="flex items-center gap-1"
-        >
-          <Info className="h-4 w-4" />
-          <span>Legend</span>
-        </Button>
+      
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
+        <TabsList className="mx-4 mb-2">
+          <TabsTrigger value="display">Display</TabsTrigger>
+          <TabsTrigger value="filter">Filter</TabsTrigger>
+        </TabsList>
         
-        {onClose && (
+        <TabsContent value="display" className="mt-0">
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="metric">Demographic Metric</Label>
+              <Select 
+                value={overlayOptions.metric} 
+                onValueChange={handleMetricChange}
+              >
+                <SelectTrigger id="metric">
+                  <SelectValue placeholder="Select metric" />
+                </SelectTrigger>
+                <SelectContent>
+                  {demographicMetrics.map(metric => (
+                    <SelectItem key={metric.id} value={metric.id}>
+                      {metric.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="colorScheme">Color Scheme</Label>
+              <Select 
+                value={overlayOptions.colorScheme} 
+                onValueChange={handleColorSchemeChange}
+              >
+                <SelectTrigger id="colorScheme">
+                  <SelectValue placeholder="Select color scheme" />
+                </SelectTrigger>
+                <SelectContent>
+                  {colorSchemes.map(scheme => (
+                    <SelectItem key={scheme.id} value={scheme.id}>
+                      {scheme.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <div className="flex justify-between">
+                <Label htmlFor="opacity">Opacity</Label>
+                <span className="text-sm text-muted-foreground">
+                  {Math.round(overlayOptions.opacity * 100)}%
+                </span>
+              </div>
+              <Slider
+                id="opacity"
+                min={0.1}
+                max={1}
+                step={0.1}
+                value={[overlayOptions.opacity]}
+                onValueChange={handleOpacityChange}
+                aria-label="Adjust overlay opacity"
+              />
+            </div>
+          </CardContent>
+        </TabsContent>
+        
+        <TabsContent value="filter" className="mt-0">
+          <CardContent className="space-y-4 max-h-72 overflow-y-auto">
+            <div className="flex justify-between items-center mb-2">
+              <Label className="text-sm font-medium">Neighborhoods</Label>
+              <div className="flex gap-2">
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={selectAllNeighborhoods}
+                  className="text-xs h-7"
+                >
+                  All
+                </Button>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={clearAllNeighborhoods}
+                  className="text-xs h-7"
+                >
+                  None
+                </Button>
+              </div>
+            </div>
+            
+            <div className="space-y-2">
+              {allNeighborhoods.current.map((neighborhood) => (
+                <div key={neighborhood.id} className="flex items-center space-x-2">
+                  <Checkbox 
+                    id={`neighborhood-${neighborhood.id}`}
+                    checked={filteredNeighborhoods.includes(neighborhood.id)}
+                    onCheckedChange={(checked) => 
+                      toggleNeighborhood(neighborhood.id, checked === true)
+                    }
+                  />
+                  <Label 
+                    htmlFor={`neighborhood-${neighborhood.id}`}
+                    className="text-sm font-normal cursor-pointer"
+                  >
+                    {neighborhood.name}
+                  </Label>
+                </div>
+              ))}
+            </div>
+            
+            <div className="pt-2">
+              <Label className="text-sm font-medium mb-2 block">
+                Value Range: {metricInfo && metricInfo.format === 'currency' 
+                  ? `$${minMaxValues.min.toLocaleString()} - $${minMaxValues.max.toLocaleString()}`
+                  : `${minMaxValues.min} - ${minMaxValues.max}`
+                }
+              </Label>
+              <Slider
+                min={metricRange[0]}
+                max={metricRange[1]}
+                step={(metricRange[1] - metricRange[0]) / 100}
+                value={[minMaxValues.min, minMaxValues.max]}
+                onValueChange={(values) => {
+                  setMinMaxValues({ min: values[0], max: values[1] });
+                }}
+                className="mt-2"
+                aria-label="Filter by value range"
+              />
+            </div>
+          </CardContent>
+        </TabsContent>
+      </Tabs>
+      
+      <CardFooter className="flex justify-between pt-2 pb-3">
+        <Sheet>
+          <SheetTrigger asChild>
+            <Button 
+              variant="ghost" 
+              size="sm"
+              className="flex items-center gap-1"
+              onClick={() => setShowLegend(true)}
+            >
+              <Info className="h-4 w-4" />
+              <span>Legend</span>
+            </Button>
+          </SheetTrigger>
+          <SheetContent side="right" className="w-80 sm:w-96">
+            <div className="flex flex-col h-full">
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-lg font-semibold">
+                  {metricInfo?.label} Legend
+                </h3>
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  onClick={() => setShowLegend(false)}
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+              
+              <DemographicLegend
+                metric={overlayOptions.metric}
+                colorScheme={overlayOptions.colorScheme}
+                minValue={metricRange[0]}
+                maxValue={metricRange[1]}
+                className="w-full"
+              />
+              
+              <div className="mt-8">
+                <h4 className="text-md font-medium mb-2">About This Metric</h4>
+                <p className="text-sm text-muted-foreground">
+                  {metricInfo?.id === 'medianIncome' && "Median household income represents the middle value of income distribution in a neighborhood."}
+                  {metricInfo?.id === 'medianHomeValue' && "Median home value shows the middle value of all home prices in the neighborhood."}
+                  {metricInfo?.id === 'percentOwnerOccupied' && "This shows the percentage of homes that are occupied by their owners rather than renters."}
+                  {metricInfo?.id === 'percentRenterOccupied' && "This represents the percentage of homes that are occupied by renters."}
+                  {metricInfo?.id === 'medianAge' && "The median age of residents living in this neighborhood."}
+                  {metricInfo?.id === 'percentBachelor' && "Percentage of residents who have attained at least a bachelor's degree."}
+                  {metricInfo?.id === 'unemploymentRate' && "The percentage of the labor force that is unemployed."}
+                  {metricInfo?.id === 'povertyRate' && "The percentage of residents living below the poverty line."}
+                  {metricInfo?.id === 'crimeIndex' && "A relative measure of crime incidents per 1,000 residents."}
+                  {metricInfo?.id === 'schoolRating' && "Average rating of schools in the area on a scale of 1-10."}
+                </p>
+              </div>
+            </div>
+          </SheetContent>
+        </Sheet>
+        
+        <div>
           <Button 
-            variant="ghost" 
+            variant="default" 
             size="sm"
-            onClick={onClose}
+            onClick={updateOverlay}
+            className="mr-2"
           >
-            Close
+            Update
           </Button>
-        )}
+          
+          {onClose && (
+            <Button 
+              variant="ghost" 
+              size="sm"
+              onClick={onClose}
+            >
+              Close
+            </Button>
+          )}
+        </div>
       </CardFooter>
     </Card>
   );
