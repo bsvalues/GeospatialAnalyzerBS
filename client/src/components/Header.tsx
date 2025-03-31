@@ -7,8 +7,10 @@ import {
   Calculator, 
   Building, 
   FileText,
-  Accessibility
+  Accessibility,
+  TrendingUp
 } from 'lucide-react';
+import { Link } from 'wouter';
 import { useMapAccessibility } from '@/contexts/MapAccessibilityContext';
 import { useToast } from '@/hooks/use-toast';
 
@@ -103,6 +105,12 @@ export const Header: React.FC<HeaderProps> = ({ taxYear, onTaxYearChange }) => {
             <FileText className="h-4 w-4 mr-1" />
             <span className="text-sm">Reports</span>
           </div>
+          <Link href="/trends">
+            <div className="flex items-center px-3 py-1 rounded-md hover:bg-gray-100 cursor-pointer">
+              <TrendingUp className="h-4 w-4 mr-1" />
+              <span className="text-sm">Trends</span>
+            </div>
+          </Link>
         </div>
         
         <div className="mr-4 border-r pr-4">

@@ -8,11 +8,13 @@ import Header from './components/Header';
 import NotFound from '@/pages/not-found';
 import { MapAccessibilityProvider } from './contexts/MapAccessibilityContext';
 import { PropertyFilterProvider } from './contexts/PropertyFilterContext';
+import PropertyTrendsDemo from './components/comparison/PropertyTrendsDemo';
 
 function Router() {
   return (
     <Switch>
       <Route path="/" component={() => <Dashboard />} />
+      <Route path="/trends" component={() => <PropertyTrendsDemo />} />
       <Route component={NotFound} />
     </Switch>
   );
