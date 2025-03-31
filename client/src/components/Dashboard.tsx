@@ -9,12 +9,14 @@ import {
   BarChart,
   Calendar,
   AlertCircle,
-  Globe
+  Globe,
+  Building
 } from 'lucide-react';
 import MapPanel from './panels/MapPanel';
 import ScriptPanel from './panels/ScriptPanel';
 import SpatialAnalysisPanel from './panels/SpatialAnalysisPanel';
 import { RegressionPanel } from './panels/RegressionPanel';
+import PropertyComparisonPanel from './panels/PropertyComparisonPanel';
 import { Property } from '@shared/schema';
 import { useQuery } from '@tanstack/react-query';
 
@@ -77,6 +79,13 @@ const Dashboard: React.FC<DashboardProps> = ({ className }) => {
           >
             <Globe className="h-4 w-4 mr-2" />
             Spatial Analysis
+          </button>
+          <button
+            className={`px-4 py-3 font-medium text-sm flex items-center ${activeTab === 'comparison' ? 'text-primary border-b-2 border-primary' : 'text-gray-600 hover:text-gray-900'}`}
+            onClick={() => setActiveTab('comparison')}
+          >
+            <Building className="h-4 w-4 mr-2" />
+            Property Comparison
           </button>
           <button
             className={`px-4 py-3 font-medium text-sm flex items-center ${activeTab === 'settings' ? 'text-primary border-b-2 border-primary' : 'text-gray-600 hover:text-gray-900'}`}
@@ -208,6 +217,8 @@ const Dashboard: React.FC<DashboardProps> = ({ className }) => {
         {activeTab === 'spatial' && (
           <SpatialAnalysisPanel properties={properties} />
         )}
+        
+        {activeTab === 'comparison' && <PropertyComparisonPanel />}
         
         {activeTab === 'settings' && (
           <div className="h-full p-6 flex items-center justify-center">
