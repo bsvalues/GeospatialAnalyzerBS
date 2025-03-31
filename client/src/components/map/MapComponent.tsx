@@ -11,6 +11,10 @@ import { AccessibleMapComponents } from './AccessibleMapComponents';
 import { AccessiblePropertyMarker } from './AccessiblePropertyMarker';
 import MapLegend from './MapLegend';
 
+// Import new map tools
+import MeasurementTools from './MeasurementTools';
+import MiniMap from './MiniMap';
+
 // Fix Leaflet default icon issue
 import icon from 'leaflet/dist/images/marker-icon.png';
 import iconShadow from 'leaflet/dist/images/marker-shadow.png';
@@ -276,6 +280,12 @@ export const MapComponent: React.FC<MapComponentProps> = ({
         
         {/* Map Legend */}
         <MapLegend />
+        
+        {/* Measurement Tools */}
+        <MeasurementTools />
+        
+        {/* Mini Map */}
+        <MiniMap position="bottomright" width={200} height={150} />
       </MapContainer>
     </div>
   );
