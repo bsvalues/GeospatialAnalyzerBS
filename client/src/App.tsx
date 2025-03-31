@@ -10,6 +10,7 @@ import { MapAccessibilityProvider } from './contexts/MapAccessibilityContext';
 import { PropertyFilterProvider } from './contexts/PropertyFilterContext';
 import PropertyTrendsDemo from './components/comparison/PropertyTrendsDemo';
 import NeighborhoodTimelineDemo from './components/neighborhood/NeighborhoodTimelineDemo';
+import SpatialAnalyticsPanel from './components/analysis/SpatialAnalyticsPanel';
 
 function Router() {
   return (
