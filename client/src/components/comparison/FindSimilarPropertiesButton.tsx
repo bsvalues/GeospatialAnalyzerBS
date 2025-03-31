@@ -1,43 +1,41 @@
 import React from 'react';
 import { Button } from '@/components/ui/button';
-import { usePropertyComparison } from './PropertyComparisonContext';
-import { Property } from '@shared/schema';
+import { Property } from '../../shared/schema';
 import { Search } from 'lucide-react';
 
 interface FindSimilarPropertiesButtonProps {
-  property: Property;
-  variant?: 'default' | 'outline' | 'secondary';
-  size?: 'default' | 'sm' | 'lg' | 'icon';
+  property?: Property | null;
+  onFindSimilar: (property: Property) => void;
   className?: string;
+  variant?: "default" | "destructive" | "outline" | "secondary" | "ghost" | "link";
+  size?: "default" | "sm" | "lg" | "icon";
+  disabled?: boolean;
 }
 
-/**
- * A button component that opens the property search dialog with
- * the specified property as the reference point.
- */
 export const FindSimilarPropertiesButton: React.FC<FindSimilarPropertiesButtonProps> = ({
   property,
-  variant = 'default',
-  size = 'default', 
-  className = ''
+  onFindSimilar,
+  className,
+  variant = "default",
+  size = "sm",
+  disabled = false
 }) => {
-  const { openSearchDialog } = usePropertyComparison();
-  
   const handleClick = () => {
-    openSearchDialog(property);
+    if (property) {
+      onFindSimilar(property);
+    }
   };
-  
+
   return (
     <Button
+      className={className}
       variant={variant}
       size={size}
       onClick={handleClick}
-      className={className}
+      disabled={disabled || !property}
     >
       <Search className="h-4 w-4 mr-2" />
       Find Similar Properties
     </Button>
   );
 };
-
-export default FindSimilarPropertiesButton;

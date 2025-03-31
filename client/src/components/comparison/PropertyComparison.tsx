@@ -1,29 +1,42 @@
-import React from 'react';
-import { Dialog, DialogContent } from '@/components/ui/dialog';
+import React, { useState } from 'react';
+import { Property } from '../../shared/schema';
+import { PropertyComparisonTool } from './PropertyComparisonTool';
+import { PropertySearchDialogContainer } from './PropertySearchDialogContainer';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 import { usePropertyComparison } from './PropertyComparisonContext';
-import PropertyComparisonTool from './PropertyComparisonTool';
 
-export const PropertyComparison: React.FC = () => {
-  const { selectedProperties, showComparison, setShowComparison } = usePropertyComparison();
+interface PropertyComparisonProps {
+  className?: string;
+}
 
-  // Close handler
-  const handleClose = () => {
-    setShowComparison(false);
+export const PropertyComparison: React.FC<PropertyComparisonProps> = ({ className }) => {
+  const { properties, selectedPropertyId, setSelectedProperty, findSimilarProperties } = usePropertyComparison();
+  
+  const handleSelectProperty = (property: Property) => {
+    setSelectedProperty(property);
   };
-
-  // Only render if there are at least 2 properties and showComparison is true
-  const shouldShow = selectedProperties.length >= 2 && showComparison;
-
+  
+  const handleFindSimilarProperties = (property: Property, count: number) => {
+    findSimilarProperties(property, count);
+  };
+  
   return (
-    <Dialog open={shouldShow} onOpenChange={setShowComparison}>
-      <DialogContent className="sm:max-w-4xl p-0 overflow-hidden border-none">
-        <PropertyComparisonTool 
-          properties={selectedProperties} 
-          onClose={handleClose}
+    <div className={className}>
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="text-2xl font-bold">Property Comparison</h2>
+        <PropertySearchDialogContainer 
+          buttonText="Search Properties"
+          onSelectProperty={handleSelectProperty}
         />
-      </DialogContent>
-    </Dialog>
+      </div>
+      
+      <PropertyComparisonTool 
+        properties={properties} 
+        selectedPropertyId={selectedPropertyId}
+        onSelectProperty={handleSelectProperty}
+        onFindSimilarProperties={handleFindSimilarProperties}
+      />
+    </div>
   );
 };
-
-export default PropertyComparison;

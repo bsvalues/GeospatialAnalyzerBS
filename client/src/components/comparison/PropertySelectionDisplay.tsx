@@ -1,174 +1,60 @@
 import React from 'react';
-import { X, Plus, ChevronRight } from 'lucide-react';
-import { usePropertyComparison } from './PropertyComparisonContext';
-import { Property } from '@shared/schema';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { Card, CardContent, CardHeader } from '@/components/ui/card';
+import { Card } from '@/components/ui/card';
+import { Property } from '../../shared/schema';
+import { formatCurrency } from '@/lib/utils';
 
 interface PropertySelectionDisplayProps {
-  onClose?: () => void;
-  className?: string;
+  property: Property;
 }
 
-export const PropertySelectionDisplay: React.FC<PropertySelectionDisplayProps> = ({ 
-  onClose,
-  className = ""
-}) => {
-  const { 
-    selectedProperties, 
-    removeProperty, 
-    clearSelectedProperties,
-    setShowComparison
-  } = usePropertyComparison();
-
-  // Helper to format address to be more concise
-  const formatAddress = (address: string) => {
-    return address.length > 25 ? `${address.substring(0, 22)}...` : address;
-  };
-
-  const handleCompare = () => {
-    setShowComparison(true);
-    if (onClose) onClose();
-  };
+export const PropertySelectionDisplay: React.FC<PropertySelectionDisplayProps> = ({ property }) => {
+  // Format property value for display
+  const formattedValue = property.value 
+    ? formatCurrency(parseFloat(property.value.replace(/[$,]/g, '') || '0'))
+    : 'N/A';
 
   return (
-    <Card className={`w-72 shadow-lg ${className}`}>
-      <CardHeader className="flex flex-row items-center justify-between py-3 px-4">
-        <div>
-          <h3 className="text-sm font-medium">Selected Properties</h3>
-          <p className="text-xs text-muted-foreground">{selectedProperties.length} properties selected</p>
+    <Card className="p-4">
+      <div className="space-y-2">
+        <div className="flex justify-between">
+          <h4 className="font-medium">{property.address}</h4>
+          <span className="font-semibold">{formattedValue}</span>
         </div>
         
-        <div className="flex items-center space-x-2">
-          {selectedProperties.length > 0 && (
-            <Button 
-              variant="ghost" 
-              size="sm" 
-              onClick={clearSelectedProperties}
-              className="h-7 px-2 text-xs"
-            >
-              Clear
-            </Button>
-          )}
-          {onClose && (
-            <Button 
-              variant="ghost" 
-              size="sm" 
-              onClick={onClose}
-              className="h-7 w-7 p-0"
-            >
-              <X className="h-4 w-4" />
-            </Button>
-          )}
-        </div>
-      </CardHeader>
-      
-      <CardContent className="px-0 pb-3">
-        {selectedProperties.length === 0 ? (
-          <div className="flex flex-col items-center justify-center p-4 text-center">
-            <div className="mb-2 rounded-full bg-muted p-2">
-              <Plus className="h-4 w-4" />
-            </div>
-            <p className="text-sm text-muted-foreground">No properties selected yet</p>
-            <p className="text-xs text-muted-foreground mt-1">
-              Select properties from the map to compare them
-            </p>
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-x-4 gap-y-2 text-sm">
+          <div>
+            <span className="text-muted-foreground">Parcel ID:</span> {property.parcelId}
           </div>
-        ) : (
-          <>
-            <ScrollArea className="h-[200px] px-4">
-              <div className="space-y-2">
-                {selectedProperties.map((property) => (
-                  <div 
-                    key={property.id}
-                    className="flex items-center justify-between bg-muted/50 rounded-md p-2"
-                  >
-                    <div>
-                      <p className="text-xs font-medium">{formatAddress(property.address)}</p>
-                      <p className="text-[10px] text-muted-foreground">{property.parcelId}</p>
-                    </div>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => removeProperty(property)}
-                      className="h-6 w-6 p-0"
-                    >
-                      <X className="h-3 w-3" />
-                    </Button>
-                  </div>
-                ))}
-              </div>
-            </ScrollArea>
-            
-            <div className="mt-4 px-4">
-              <Button 
-                variant="default" 
-                size="sm" 
-                onClick={handleCompare} 
-                className="w-full"
-                disabled={selectedProperties.length < 2}
-              >
-                <ChevronRight className="h-4 w-4 mr-1" />
-                Compare Properties
-              </Button>
-              {selectedProperties.length < 2 && (
-                <p className="text-[10px] text-muted-foreground text-center mt-1">
-                  Select at least 2 properties to compare
-                </p>
-              )}
-            </div>
-          </>
-        )}
-      </CardContent>
+          <div>
+            <span className="text-muted-foreground">Year Built:</span> {property.yearBuilt || 'N/A'}
+          </div>
+          <div>
+            <span className="text-muted-foreground">Square Feet:</span> {property.squareFeet?.toLocaleString() || 'N/A'}
+          </div>
+          <div>
+            <span className="text-muted-foreground">Property Type:</span> {property.propertyType || 'N/A'}
+          </div>
+          <div>
+            <span className="text-muted-foreground">Bedrooms:</span> {property.bedrooms || 'N/A'}
+          </div>
+          <div>
+            <span className="text-muted-foreground">Bathrooms:</span> {property.bathrooms || 'N/A'}
+          </div>
+          <div>
+            <span className="text-muted-foreground">Neighborhood:</span> {property.neighborhood || 'N/A'}
+          </div>
+          <div>
+            <span className="text-muted-foreground">Land Value:</span> {
+              property.landValue 
+                ? formatCurrency(parseFloat(property.landValue.replace(/[$,]/g, '') || '0'))
+                : 'N/A'
+            }
+          </div>
+          <div>
+            <span className="text-muted-foreground">Last Sale:</span> {property.lastSaleDate || 'N/A'}
+          </div>
+        </div>
+      </div>
     </Card>
   );
 };
-
-export const PropertyCompareButton: React.FC<{ property: Property, className?: string }> = ({ 
-  property, 
-  className = "" 
-}) => {
-  const { isPropertySelected, togglePropertySelection } = usePropertyComparison();
-  const selected = isPropertySelected(property);
-  
-  return (
-    <Button
-      size="sm"
-      variant={selected ? "default" : "outline"}
-      onClick={() => togglePropertySelection(property)}
-      className={`h-7 px-3 text-xs ${className}`}
-    >
-      {selected ? (
-        <>
-          <X className="h-3 w-3 mr-1" />
-          Remove from Comparison
-        </>
-      ) : (
-        <>
-          <Plus className="h-3 w-3 mr-1" />
-          Add to Comparison
-        </>
-      )}
-    </Button>
-  );
-};
-
-export const ComparisonCountBadge: React.FC<{ onClick?: () => void }> = ({ onClick }) => {
-  const { selectedProperties } = usePropertyComparison();
-  
-  if (selectedProperties.length === 0) return null;
-  
-  return (
-    <Badge 
-      variant="secondary" 
-      className="cursor-pointer"
-      onClick={onClick}
-    >
-      {selectedProperties.length} selected
-    </Badge>
-  );
-};
-
-export default PropertySelectionDisplay;
