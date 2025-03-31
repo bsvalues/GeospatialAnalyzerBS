@@ -8,7 +8,8 @@ import {
   Building, 
   FileText,
   Accessibility,
-  TrendingUp
+  TrendingUp,
+  Home
 } from 'lucide-react';
 import { Link } from 'wouter';
 import { useMapAccessibility } from '@/contexts/MapAccessibilityContext';
@@ -109,6 +110,12 @@ export const Header: React.FC<HeaderProps> = ({ taxYear, onTaxYearChange }) => {
             <div className="flex items-center px-3 py-1 rounded-md hover:bg-gray-100 cursor-pointer">
               <TrendingUp className="h-4 w-4 mr-1" />
               <span className="text-sm">Trends</span>
+            </div>
+          </Link>
+          <Link href="/neighborhoods">
+            <div className="flex items-center px-3 py-1 rounded-md hover:bg-gray-100 cursor-pointer">
+              <Home className="h-4 w-4 mr-1" />
+              <span className="text-sm">Neighborhoods</span>
             </div>
           </Link>
         </div>

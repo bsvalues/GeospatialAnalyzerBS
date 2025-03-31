@@ -9,12 +9,14 @@ import NotFound from '@/pages/not-found';
 import { MapAccessibilityProvider } from './contexts/MapAccessibilityContext';
 import { PropertyFilterProvider } from './contexts/PropertyFilterContext';
 import PropertyTrendsDemo from './components/comparison/PropertyTrendsDemo';
+import NeighborhoodTimelineDemo from './components/neighborhood/NeighborhoodTimelineDemo';
 
 function Router() {
   return (
     <Switch>
       <Route path="/" component={() => <Dashboard />} />
       <Route path="/trends" component={() => <PropertyTrendsDemo />} />
+      <Route path="/neighborhoods" component={() => <NeighborhoodTimelineDemo />} />
       <Route component={NotFound} />
     </Switch>
   );
