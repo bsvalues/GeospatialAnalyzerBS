@@ -1,41 +1,28 @@
 import React from 'react';
-import { Button } from '@/components/ui/button';
 import { Property } from '../../shared/schema';
+import { Button } from '@/components/ui/button';
 import { Search } from 'lucide-react';
 
 interface FindSimilarPropertiesButtonProps {
-  property?: Property | null;
-  onFindSimilar: (property: Property) => void;
+  property: Property;
+  count?: number;
+  onFindSimilar: (property: Property, count: number) => void;
   className?: string;
-  variant?: "default" | "destructive" | "outline" | "secondary" | "ghost" | "link";
-  size?: "default" | "sm" | "lg" | "icon";
-  disabled?: boolean;
 }
 
 export const FindSimilarPropertiesButton: React.FC<FindSimilarPropertiesButtonProps> = ({
   property,
+  count = 5,
   onFindSimilar,
-  className,
-  variant = "default",
-  size = "sm",
-  disabled = false
+  className
 }) => {
-  const handleClick = () => {
-    if (property) {
-      onFindSimilar(property);
-    }
-  };
-
   return (
-    <Button
-      className={className}
-      variant={variant}
-      size={size}
-      onClick={handleClick}
-      disabled={disabled || !property}
+    <Button 
+      className={`w-full ${className}`}
+      onClick={() => onFindSimilar(property, count)}
     >
-      <Search className="h-4 w-4 mr-2" />
-      Find Similar Properties
+      <Search className="mr-2 h-4 w-4" />
+      Find {count} Similar Properties
     </Button>
   );
 };

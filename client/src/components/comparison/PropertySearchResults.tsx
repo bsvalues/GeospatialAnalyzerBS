@@ -1,55 +1,91 @@
 import React from 'react';
 import { Property } from '../../shared/schema';
 import { formatCurrency } from '@/lib/utils';
-import { ScrollArea } from '@/components/ui/scroll-area';
+import { 
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandItem,
+  CommandList
+} from '@/components/ui/command';
+import { 
+  Home,
+  DollarSign,
+  Calendar,
+  MapPin,
+  SquareDot
+} from 'lucide-react';
 
 interface PropertySearchResultsProps {
-  results: Property[];
+  properties: Property[];
+  searchText: string;
   onSelectProperty: (property: Property) => void;
+  className?: string;
 }
 
 export const PropertySearchResults: React.FC<PropertySearchResultsProps> = ({
-  results,
+  properties,
+  searchText,
   onSelectProperty,
+  className
 }) => {
-  if (results.length === 0) {
-    return (
-      <div className="text-center py-8 text-muted-foreground">
-        No properties found. Try a different search term.
-      </div>
-    );
-  }
-
   return (
-    <ScrollArea className="max-h-[300px]">
-      <div className="space-y-2">
-        {results.map(property => (
-          <div
-            key={property.id}
-            className="p-3 border rounded-md cursor-pointer hover:bg-muted transition-colors"
-            onClick={() => onSelectProperty(property)}
-          >
-            <div className="flex justify-between items-start">
-              <div className="font-medium">{property.address}</div>
-              <div className="text-sm font-medium">
-                {property.value && formatCurrency(parseFloat(property.value.replace(/[$,]/g, '') || '0'))}
+    <Command className={`rounded-lg border shadow-md ${className}`}>
+      <CommandList className="max-h-[400px] overflow-auto">
+        {searchText.trim() === '' && (
+          <CommandEmpty>Start typing to search properties...</CommandEmpty>
+        )}
+        
+        {searchText.trim() !== '' && properties.length === 0 && (
+          <CommandEmpty>No properties found for "{searchText}"</CommandEmpty>
+        )}
+        
+        <CommandGroup heading={`${properties.length} properties found`}>
+          {properties.map((property) => (
+            <CommandItem
+              key={property.id}
+              value={property.address}
+              onSelect={() => onSelectProperty(property)}
+              className="flex flex-col items-start py-3 cursor-pointer"
+            >
+              <div className="flex flex-col w-full gap-1">
+                <div className="flex items-center gap-2">
+                  <Home className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                  <span className="font-medium truncate">{property.address}</span>
+                </div>
+                
+                <div className="flex flex-wrap gap-x-4 gap-y-1 mt-1 text-sm text-muted-foreground">
+                  <div className="flex items-center gap-1">
+                    <DollarSign className="h-3 w-3" />
+                    <span>{formatCurrency(property.value || '0')}</span>
+                  </div>
+                  
+                  {property.yearBuilt && (
+                    <div className="flex items-center gap-1">
+                      <Calendar className="h-3 w-3" />
+                      <span>{property.yearBuilt}</span>
+                    </div>
+                  )}
+                  
+                  {property.squareFeet && (
+                    <div className="flex items-center gap-1">
+                      <SquareDot className="h-3 w-3" />
+                      <span>{property.squareFeet.toLocaleString()} sq.ft</span>
+                    </div>
+                  )}
+                  
+                  {property.neighborhood && (
+                    <div className="flex items-center gap-1">
+                      <MapPin className="h-3 w-3" />
+                      <span>{property.neighborhood}</span>
+                    </div>
+                  )}
+                </div>
               </div>
-            </div>
-            <div className="text-sm text-muted-foreground mt-1">
-              <div className="flex gap-2">
-                <span>{property.propertyType}</span>
-                {property.squareFeet && <span>{property.squareFeet.toLocaleString()} sq.ft.</span>}
-                {property.bedrooms && <span>{property.bedrooms} bed</span>}
-                {property.bathrooms && <span>{property.bathrooms} bath</span>}
-              </div>
-              <div className="flex gap-2 mt-1">
-                <span>Parcel ID: {property.parcelId}</span>
-                {property.neighborhood && <span>Area: {property.neighborhood}</span>}
-              </div>
-            </div>
-          </div>
-        ))}
-      </div>
-    </ScrollArea>
+            </CommandItem>
+          ))}
+        </CommandGroup>
+      </CommandList>
+    </Command>
   );
 };

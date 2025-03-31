@@ -1,179 +1,170 @@
-import { calculateSimilarityScore, normalizePropertyValue } from '../PropertyScoring';
+import { 
+  calculateSimilarityScore, 
+  parsePropertyValue, 
+  calculateDistance, 
+  normalizeWeights,
+  DEFAULT_WEIGHTS
+} from '../PropertyScoring';
 import { Property } from '../../../shared/schema';
 
-describe('Property Scoring System', () => {
-  // Mock property data
-  const baseProperty: Partial<Property> = {
-    id: 1,
-    value: '$300,000',
-    yearBuilt: 2000,
-    squareFeet: 2000,
-    bedrooms: 3,
-    bathrooms: 2,
-    propertyType: 'Residential',
-    neighborhood: 'Central Benton'
-  };
-
-  const similarProperty: Partial<Property> = {
-    id: 2,
-    value: '$320,000',
-    yearBuilt: 2002,
-    squareFeet: 1900,
-    bedrooms: 3,
-    bathrooms: 2,
-    propertyType: 'Residential',
-    neighborhood: 'Central Benton'
-  };
-
-  const differentProperty: Partial<Property> = {
-    id: 3,
-    value: '$500,000',
-    yearBuilt: 2020,
-    squareFeet: 3500,
-    bedrooms: 5,
-    bathrooms: 3,
-    propertyType: 'Residential',
-    neighborhood: 'North Richland'
-  };
-
-  test('normalizePropertyValue extracts numeric values correctly', () => {
-    expect(normalizePropertyValue('$300,000')).toBe(300000);
-    expect(normalizePropertyValue('$1,234,567')).toBe(1234567);
-    expect(normalizePropertyValue('$0')).toBe(0);
-    expect(normalizePropertyValue(undefined)).toBe(0);
-    expect(normalizePropertyValue(null)).toBe(0);
+describe('PropertyScoring', () => {
+  describe('parsePropertyValue', () => {
+    it('should parse currency strings correctly', () => {
+      expect(parsePropertyValue('$250,000')).toBe(250000);
+      expect(parsePropertyValue('$1,000,000')).toBe(1000000);
+      expect(parsePropertyValue('250000')).toBe(250000);
+      expect(parsePropertyValue('$0')).toBe(0);
+    });
+    
+    it('should handle null values', () => {
+      expect(parsePropertyValue(null)).toBe(0);
+    });
+    
+    it('should handle invalid values', () => {
+      expect(parsePropertyValue('Invalid')).toBe(0);
+      expect(parsePropertyValue('')).toBe(0);
+    });
   });
-
-  test('calculateSimilarityScore returns a value between 0 and 1', () => {
-    const weights = {
-      value: 0.3,
-      yearBuilt: 0.2,
-      squareFeet: 0.2,
-      bedrooms: 0.1,
-      bathrooms: 0.1,
-      propertyType: 0.05,
-      neighborhood: 0.05
-    };
-
-    const score1 = calculateSimilarityScore(baseProperty as Property, similarProperty as Property, weights);
-    const score2 = calculateSimilarityScore(baseProperty as Property, differentProperty as Property, weights);
-
-    expect(score1).toBeGreaterThanOrEqual(0);
-    expect(score1).toBeLessThanOrEqual(1);
-    expect(score2).toBeGreaterThanOrEqual(0);
-    expect(score2).toBeLessThanOrEqual(1);
+  
+  describe('calculateDistance', () => {
+    it('should calculate the distance between two points', () => {
+      // Approximately 1 km apart
+      const distance = calculateDistance(
+        47.6062, -122.3321, // Seattle coordinates
+        47.6152, -122.3447 // About 1 km northwest
+      );
+      
+      // Should be approximately 1 km with some error margin
+      expect(distance).toBeGreaterThan(0.9);
+      expect(distance).toBeLessThan(1.1);
+    });
+    
+    it('should return 0 for identical coordinates', () => {
+      const distance = calculateDistance(
+        47.6062, -122.3321,
+        47.6062, -122.3321
+      );
+      
+      expect(distance).toBeCloseTo(0);
+    });
   });
-
-  test('calculateSimilarityScore gives higher score to more similar properties', () => {
-    const weights = {
-      value: 0.3,
-      yearBuilt: 0.2,
-      squareFeet: 0.2,
-      bedrooms: 0.1,
-      bathrooms: 0.1,
-      propertyType: 0.05,
-      neighborhood: 0.05
-    };
-
-    const score1 = calculateSimilarityScore(baseProperty as Property, similarProperty as Property, weights);
-    const score2 = calculateSimilarityScore(baseProperty as Property, differentProperty as Property, weights);
-
-    expect(score1).toBeGreaterThan(score2);
-    expect(score1).toBeGreaterThan(0.8); // High similarity
-    expect(score2).toBeLessThan(0.6); // Lower similarity
+  
+  describe('normalizeWeights', () => {
+    it('should normalize weights to sum to 1', () => {
+      const weights = {
+        value: 2,
+        yearBuilt: 1,
+        squareFeet: 1,
+        bedrooms: 1,
+        bathrooms: 1,
+        propertyType: 1,
+        neighborhood: 1
+      };
+      
+      const normalized = normalizeWeights(weights);
+      
+      // Sum should be 1
+      const sum = Object.values(normalized).reduce((a, b) => a + b, 0);
+      expect(sum).toBeCloseTo(1);
+      
+      // Relative weights should be maintained
+      expect(normalized.value).toBeCloseTo(2/8);
+      expect(normalized.yearBuilt).toBeCloseTo(1/8);
+    });
+    
+    it('should handle zero weights by returning default weights', () => {
+      const weights = {
+        value: 0,
+        yearBuilt: 0,
+        squareFeet: 0,
+        bedrooms: 0,
+        bathrooms: 0,
+        propertyType: 0,
+        neighborhood: 0
+      };
+      
+      const normalized = normalizeWeights(weights);
+      
+      // Should return default weights
+      expect(normalized).toEqual(DEFAULT_WEIGHTS);
+    });
   });
-
-  test('calculateSimilarityScore weighs factors according to provided weights', () => {
-    // Weights emphasizing value
-    const valueWeights = {
-      value: 0.6,
-      yearBuilt: 0.1,
-      squareFeet: 0.1,
-      bedrooms: 0.1,
-      bathrooms: 0.05,
-      propertyType: 0.025,
-      neighborhood: 0.025
-    };
-
-    // Weights emphasizing physical characteristics
-    const physicalWeights = {
-      value: 0.1,
-      yearBuilt: 0.2,
-      squareFeet: 0.3,
-      bedrooms: 0.2,
-      bathrooms: 0.1,
-      propertyType: 0.05,
-      neighborhood: 0.05
-    };
-
-    const scoreWithValueEmphasis = calculateSimilarityScore(
-      baseProperty as Property, 
-      differentProperty as Property, 
-      valueWeights
-    );
-
-    const scoreWithPhysicalEmphasis = calculateSimilarityScore(
-      baseProperty as Property, 
-      differentProperty as Property, 
-      physicalWeights
-    );
-
-    // Scores should be different based on the weighting
-    expect(scoreWithValueEmphasis).not.toEqual(scoreWithPhysicalEmphasis);
-  });
-
-  test('calculateSimilarityScore handles missing properties', () => {
-    const weights = {
-      value: 0.3,
-      yearBuilt: 0.2,
-      squareFeet: 0.2,
-      bedrooms: 0.1,
-      bathrooms: 0.1,
-      propertyType: 0.05,
-      neighborhood: 0.05
-    };
-
-    const incompleteProperty: Partial<Property> = {
-      id: 4,
-      value: '$310,000',
-      // Missing yearBuilt
-      squareFeet: 2100,
-      // Missing bedrooms
+  
+  describe('calculateSimilarityScore', () => {
+    // Define some test properties
+    const property1: Partial<Property> = {
+      id: 1,
+      address: '123 Main St',
+      value: '$300000',
+      yearBuilt: 2000,
+      squareFeet: 2000,
+      bedrooms: 3,
       bathrooms: 2,
       propertyType: 'Residential',
-      // Missing neighborhood
+      neighborhood: 'Downtown'
     };
-
-    const score = calculateSimilarityScore(
-      baseProperty as Property, 
-      incompleteProperty as Property, 
-      weights
-    );
-
-    // Should still calculate a score even with missing properties
-    expect(score).toBeGreaterThanOrEqual(0);
-    expect(score).toBeLessThanOrEqual(1);
-    // Score should be reasonable despite missing data
-    expect(score).toBeGreaterThan(0.4);
-  });
-
-  test('calculateSimilarityScore returns perfect score for identical properties', () => {
-    const weights = {
-      value: 0.3,
-      yearBuilt: 0.2,
-      squareFeet: 0.2,
-      bedrooms: 0.1,
-      bathrooms: 0.1,
-      propertyType: 0.05,
-      neighborhood: 0.05
+    
+    const property2: Partial<Property> = {
+      id: 2,
+      address: '456 Oak St',
+      value: '$350000',
+      yearBuilt: 2005,
+      squareFeet: 2200,
+      bedrooms: 3,
+      bathrooms: 2,
+      propertyType: 'Residential',
+      neighborhood: 'Downtown'
     };
-
-    const score = calculateSimilarityScore(
-      baseProperty as Property, 
-      baseProperty as Property, 
-      weights
-    );
-
-    expect(score).toEqual(1);
+    
+    const property3: Partial<Property> = {
+      id: 3,
+      address: '789 Pine St',
+      value: '$600000',
+      yearBuilt: 1980,
+      squareFeet: 3000,
+      bedrooms: 4,
+      bathrooms: 3,
+      propertyType: 'Commercial',
+      neighborhood: 'Suburbs'
+    };
+    
+    it('should return a higher score for more similar properties', () => {
+      const score12 = calculateSimilarityScore(property1 as Property, property2 as Property);
+      const score13 = calculateSimilarityScore(property1 as Property, property3 as Property);
+      
+      // Property 1 and 2 should be more similar than 1 and 3
+      expect(score12).toBeGreaterThan(score13);
+    });
+    
+    it('should weight attributes according to provided weights', () => {
+      // Create weights that only care about property type
+      const typeOnlyWeights = {
+        value: 0,
+        yearBuilt: 0,
+        squareFeet: 0,
+        bedrooms: 0,
+        bathrooms: 0,
+        propertyType: 1,
+        neighborhood: 0
+      };
+      
+      // Score with default weights
+      const defaultScore = calculateSimilarityScore(
+        property1 as Property, 
+        property3 as Property
+      );
+      
+      // Score with type-only weights
+      const typeScore = calculateSimilarityScore(
+        property1 as Property, 
+        property3 as Property, 
+        typeOnlyWeights
+      );
+      
+      // Since properties have different types, the type-only score should be 0
+      expect(typeScore).toBe(0);
+      // The default score should consider other factors
+      expect(defaultScore).toBeGreaterThan(0);
+    });
   });
 });

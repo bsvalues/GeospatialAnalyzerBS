@@ -1,60 +1,99 @@
 import React from 'react';
-import { Card } from '@/components/ui/card';
 import { Property } from '../../shared/schema';
+import { Card, CardContent } from '@/components/ui/card';
+import { 
+  Building,
+  Calendar,
+  Home,
+  SquareDot,
+  DollarSign,
+  MapPin,
+  Bath,
+  Bed,
+  Hash
+} from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
 
 interface PropertySelectionDisplayProps {
   property: Property;
+  className?: string;
 }
 
-export const PropertySelectionDisplay: React.FC<PropertySelectionDisplayProps> = ({ property }) => {
-  // Format property value for display
+export const PropertySelectionDisplay: React.FC<PropertySelectionDisplayProps> = ({
+  property,
+  className
+}) => {
+  // Format property value
   const formattedValue = property.value 
-    ? formatCurrency(parseFloat(property.value.replace(/[$,]/g, '') || '0'))
+    ? formatCurrency(property.value) 
     : 'N/A';
-
+  
   return (
-    <Card className="p-4">
-      <div className="space-y-2">
-        <div className="flex justify-between">
-          <h4 className="font-medium">{property.address}</h4>
-          <span className="font-semibold">{formattedValue}</span>
+    <div className={`space-y-4 ${className}`}>
+      <div className="border-b pb-2">
+        <h3 className="text-lg font-medium">{property.address}</h3>
+        <p className="text-sm text-muted-foreground">
+          {property.neighborhood || 'Unknown'} • {property.propertyType || 'Unknown'}
+        </p>
+      </div>
+      
+      <div className="grid grid-cols-2 gap-4">
+        <div className="flex items-start gap-2">
+          <DollarSign className="h-4 w-4 mt-0.5 text-muted-foreground" />
+          <div>
+            <p className="text-sm font-medium">Value</p>
+            <p className="text-sm">{formattedValue}</p>
+          </div>
         </div>
         
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-x-4 gap-y-2 text-sm">
+        <div className="flex items-start gap-2">
+          <SquareDot className="h-4 w-4 mt-0.5 text-muted-foreground" />
           <div>
-            <span className="text-muted-foreground">Parcel ID:</span> {property.parcelId}
+            <p className="text-sm font-medium">Square Feet</p>
+            <p className="text-sm">{property.squareFeet?.toLocaleString() || 'N/A'}</p>
           </div>
+        </div>
+        
+        <div className="flex items-start gap-2">
+          <Calendar className="h-4 w-4 mt-0.5 text-muted-foreground" />
           <div>
-            <span className="text-muted-foreground">Year Built:</span> {property.yearBuilt || 'N/A'}
+            <p className="text-sm font-medium">Year Built</p>
+            <p className="text-sm">{property.yearBuilt || 'N/A'}</p>
           </div>
+        </div>
+        
+        <div className="flex items-start gap-2">
+          <Bed className="h-4 w-4 mt-0.5 text-muted-foreground" />
           <div>
-            <span className="text-muted-foreground">Square Feet:</span> {property.squareFeet?.toLocaleString() || 'N/A'}
+            <p className="text-sm font-medium">Bedrooms</p>
+            <p className="text-sm">{property.bedrooms || 'N/A'}</p>
           </div>
+        </div>
+        
+        <div className="flex items-start gap-2">
+          <Bath className="h-4 w-4 mt-0.5 text-muted-foreground" />
           <div>
-            <span className="text-muted-foreground">Property Type:</span> {property.propertyType || 'N/A'}
+            <p className="text-sm font-medium">Bathrooms</p>
+            <p className="text-sm">{property.bathrooms || 'N/A'}</p>
           </div>
+        </div>
+        
+        <div className="flex items-start gap-2">
+          <Hash className="h-4 w-4 mt-0.5 text-muted-foreground" />
           <div>
-            <span className="text-muted-foreground">Bedrooms:</span> {property.bedrooms || 'N/A'}
-          </div>
-          <div>
-            <span className="text-muted-foreground">Bathrooms:</span> {property.bathrooms || 'N/A'}
-          </div>
-          <div>
-            <span className="text-muted-foreground">Neighborhood:</span> {property.neighborhood || 'N/A'}
-          </div>
-          <div>
-            <span className="text-muted-foreground">Land Value:</span> {
-              property.landValue 
-                ? formatCurrency(parseFloat(property.landValue.replace(/[$,]/g, '') || '0'))
-                : 'N/A'
-            }
-          </div>
-          <div>
-            <span className="text-muted-foreground">Last Sale:</span> {property.lastSaleDate || 'N/A'}
+            <p className="text-sm font-medium">Parcel ID</p>
+            <p className="text-sm">{property.parcelId}</p>
           </div>
         </div>
       </div>
-    </Card>
+      
+      {/* Description section - Note: uncomment if property.description exists in your schema
+      {property.attributes?.description && (
+        <div className="border-t pt-2">
+          <p className="text-sm text-muted-foreground">{property.attributes.description}</p>
+        </div>
+      )}
+      */}
+    </div>
   );
 };

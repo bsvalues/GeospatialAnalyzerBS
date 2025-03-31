@@ -1,246 +1,307 @@
-import React, { useState, useMemo } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Slider } from '@/components/ui/slider';
-import { Toggle } from '@/components/ui/toggle';
-import { Label } from '@/components/ui/label';
+import React, { useState } from 'react';
 import { Property } from '../../shared/schema';
+import { FindSimilarPropertiesButton } from './FindSimilarPropertiesButton';
 import { PropertySelectionDisplay } from './PropertySelectionDisplay';
-import { PropertyWeights, calculateSimilarityScore, DEFAULT_WEIGHTS } from './PropertyScoring';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { 
+  PropertyWeights, 
+  DEFAULT_WEIGHTS, 
+  normalizeWeights,
+  VALUE_FOCUSED_WEIGHTS,
+  PHYSICAL_FOCUSED_WEIGHTS,
+  LOCATION_FOCUSED_WEIGHTS
+} from './PropertyScoring';
+import { Slider } from '@/components/ui/slider';
+import { Button } from '@/components/ui/button';
 import { formatCurrency } from '@/lib/utils';
+import { 
+  Table,
+  TableBody,
+  TableCaption,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { 
+  BarChart,
+  Building,
+  Calendar,
+  Home,
+  SquareDot,
+  DollarSign,
+  MapPin,
+  Bath,
+  Bed
+} from 'lucide-react';
 
-export interface PropertyComparisonToolProps {
+interface PropertyComparisonToolProps {
   properties: Property[];
-  selectedPropertyId?: number;
-  onSelectProperty?: (property: Property) => void;
-  onFindSimilarProperties?: (property: Property, count: number) => void;
+  selectedPropertyId?: number | null;
+  onSelectProperty: (property: Property) => void;
+  onFindSimilarProperties: (property: Property, count: number) => void;
+  className?: string;
 }
 
 export const PropertyComparisonTool: React.FC<PropertyComparisonToolProps> = ({
   properties,
   selectedPropertyId,
   onSelectProperty,
-  onFindSimilarProperties
+  onFindSimilarProperties,
+  className
 }) => {
+  // State for weight configuration
   const [weights, setWeights] = useState<PropertyWeights>({ ...DEFAULT_WEIGHTS });
-  const [compareCount, setCompareCount] = useState(5);
-  const [selectedProperty, setSelectedProperty] = useState<Property | null>(null);
-  const [similarProperties, setSimilarProperties] = useState<Array<Property & { score: number }>>([]);
-
-  // Find the selected property from the properties array when selectedPropertyId changes
-  React.useEffect(() => {
-    if (selectedPropertyId) {
-      const property = properties.find(p => p.id === selectedPropertyId);
-      if (property) {
-        setSelectedProperty(property);
-      }
-    }
-  }, [selectedPropertyId, properties]);
-
-  // Calculate similar properties when selectedProperty or weights change
-  const findSimilarProperties = useMemo(() => {
-    if (!selectedProperty) return [];
-
-    // Calculate similarity scores for all properties
-    const propertiesWithScores = properties
-      .filter(property => property.id !== selectedProperty.id)
-      .map(property => ({
-        ...property,
-        score: calculateSimilarityScore(selectedProperty, property, weights)
-      }))
-      .sort((a, b) => b.score - a.score)
-      .slice(0, compareCount);
-
-    return propertiesWithScores;
-  }, [selectedProperty, properties, weights, compareCount]);
-
-  // Update similar properties when findSimilarProperties changes
-  React.useEffect(() => {
-    setSimilarProperties(findSimilarProperties);
-  }, [findSimilarProperties]);
-
-  // Handle weight change
-  const handleWeightChange = (property: keyof PropertyWeights, value: number) => {
-    setWeights(prevWeights => {
-      const newWeights = { ...prevWeights, [property]: value / 100 };
-      
-      // Normalize weights to ensure they sum to 1
-      const sum = Object.values(newWeights).reduce((acc, val) => acc + val, 0);
-      const normalizedWeights = Object.entries(newWeights).reduce((acc, [key, val]) => {
-        acc[key as keyof PropertyWeights] = val / sum;
-        return acc;
-      }, {} as PropertyWeights);
-      
-      return normalizedWeights;
-    });
+  
+  // State for the number of similar properties to find
+  const [similarCount, setSimilarCount] = useState(5);
+  
+  // State for active weight preset
+  const [activePreset, setActivePreset] = useState<string | null>(null);
+  
+  // Find the selected property
+  const selectedProperty = selectedPropertyId 
+    ? properties.find(p => p.id === selectedPropertyId) 
+    : null;
+  
+  // Handle weight slider changes
+  const handleWeightChange = (attribute: keyof PropertyWeights, value: number) => {
+    const newWeights = { ...weights, [attribute]: value / 100 };
+    setWeights(normalizeWeights(newWeights));
+    setActivePreset(null);
   };
-
-  // Handle property selection
-  const handlePropertySelect = (property: Property) => {
-    setSelectedProperty(property);
-    if (onSelectProperty) {
-      onSelectProperty(property);
-    }
+  
+  // Apply weight preset
+  const applyWeightPreset = (preset: PropertyWeights, presetName: string) => {
+    setWeights({ ...preset });
+    setActivePreset(presetName);
   };
-
-  // Handle find similar properties
-  const handleFindSimilarProperties = () => {
-    if (selectedProperty && onFindSimilarProperties) {
-      onFindSimilarProperties(selectedProperty, compareCount);
-    }
+  
+  // Reset weights to default
+  const resetWeights = () => {
+    setWeights({ ...DEFAULT_WEIGHTS });
+    setActivePreset('default');
   };
-
+  
   return (
-    <div className="flex flex-col gap-4">
-      <Card>
-        <CardHeader>
-          <CardTitle>Property Comparison</CardTitle>
-          <CardDescription>
-            Compare properties and find similar ones based on customizable factors
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {selectedProperty ? (
-            <div>
-              <h3 className="text-lg font-semibold mb-2">Selected Property</h3>
+    <div className={`flex flex-col gap-4 ${className}`}>
+      {/* Selected property card */}
+      {selectedProperty ? (
+        <div className="grid md:grid-cols-2 gap-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center justify-between">
+                <span>Selected Property</span>
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
               <PropertySelectionDisplay property={selectedProperty} />
               
-              <div className="mt-6">
-                <h3 className="text-lg font-semibold mb-4">Comparison Factors</h3>
-                <div className="space-y-4">
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <Label htmlFor="value-weight">Property Value</Label>
-                      <span className="text-sm">{Math.round(weights.value * 100)}%</span>
-                    </div>
-                    <Slider
-                      id="value-weight"
-                      defaultValue={[weights.value * 100]}
-                      max={100}
-                      step={5}
-                      onValueChange={(values) => handleWeightChange('value', values[0])}
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <Label htmlFor="year-weight">Year Built</Label>
-                      <span className="text-sm">{Math.round(weights.yearBuilt * 100)}%</span>
-                    </div>
-                    <Slider
-                      id="year-weight"
-                      defaultValue={[weights.yearBuilt * 100]}
-                      max={100}
-                      step={5}
-                      onValueChange={(values) => handleWeightChange('yearBuilt', values[0])}
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <Label htmlFor="sqft-weight">Square Footage</Label>
-                      <span className="text-sm">{Math.round(weights.squareFeet * 100)}%</span>
-                    </div>
-                    <Slider
-                      id="sqft-weight"
-                      defaultValue={[weights.squareFeet * 100]}
-                      max={100}
-                      step={5}
-                      onValueChange={(values) => handleWeightChange('squareFeet', values[0])}
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <Label htmlFor="bedroom-weight">Bedrooms</Label>
-                      <span className="text-sm">{Math.round(weights.bedrooms * 100)}%</span>
-                    </div>
-                    <Slider
-                      id="bedroom-weight"
-                      defaultValue={[weights.bedrooms * 100]}
-                      max={100}
-                      step={5}
-                      onValueChange={(values) => handleWeightChange('bedrooms', values[0])}
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <Label htmlFor="bathroom-weight">Bathrooms</Label>
-                      <span className="text-sm">{Math.round(weights.bathrooms * 100)}%</span>
-                    </div>
-                    <Slider
-                      id="bathroom-weight"
-                      defaultValue={[weights.bathrooms * 100]}
-                      max={100}
-                      step={5}
-                      onValueChange={(values) => handleWeightChange('bathrooms', values[0])}
-                    />
-                  </div>
-
-                  <div className="flex justify-between gap-2 mt-4">
-                    <Button 
-                      variant="outline" 
-                      onClick={() => setWeights({ ...DEFAULT_WEIGHTS })}
-                    >
-                      Reset Weights
-                    </Button>
-                    <Button 
-                      onClick={handleFindSimilarProperties}
-                    >
-                      Find Similar Properties
-                    </Button>
-                  </div>
-                </div>
+              <div className="mt-4">
+                <FindSimilarPropertiesButton 
+                  property={selectedProperty}
+                  count={similarCount}
+                  onFindSimilar={(property, count) => onFindSimilarProperties(property, count)}
+                />
               </div>
-            </div>
-          ) : (
-            <div className="py-8 text-center">
-              <p className="text-muted-foreground">Select a property from the map or search to start comparison</p>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      {similarProperties.length > 0 && (
+            </CardContent>
+          </Card>
+          
+          {/* Weight configuration card */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center justify-between">
+                <span>Comparison Settings</span>
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <Tabs defaultValue="weights" className="w-full">
+                <TabsList className="w-full mb-4">
+                  <TabsTrigger value="weights" className="flex-1">Weights</TabsTrigger>
+                  <TabsTrigger value="presets" className="flex-1">Presets</TabsTrigger>
+                </TabsList>
+                
+                <TabsContent value="weights" className="space-y-4">
+                  {/* Weight sliders */}
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-[25px_1fr_50px] items-center gap-2">
+                      <DollarSign className="h-4 w-4 text-muted-foreground" />
+                      <Slider 
+                        value={[weights.value * 100]} 
+                        min={0} 
+                        max={100} 
+                        step={5}
+                        onValueChange={(value) => handleWeightChange('value', value[0])}
+                      />
+                      <span className="text-sm text-muted-foreground text-right">
+                        {Math.round(weights.value * 100)}%
+                      </span>
+                    </div>
+                    
+                    <div className="grid grid-cols-[25px_1fr_50px] items-center gap-2">
+                      <Calendar className="h-4 w-4 text-muted-foreground" />
+                      <Slider 
+                        value={[weights.yearBuilt * 100]} 
+                        min={0} 
+                        max={100} 
+                        step={5}
+                        onValueChange={(value) => handleWeightChange('yearBuilt', value[0])}
+                      />
+                      <span className="text-sm text-muted-foreground text-right">
+                        {Math.round(weights.yearBuilt * 100)}%
+                      </span>
+                    </div>
+                    
+                    <div className="grid grid-cols-[25px_1fr_50px] items-center gap-2">
+                      <SquareDot className="h-4 w-4 text-muted-foreground" />
+                      <Slider 
+                        value={[weights.squareFeet * 100]} 
+                        min={0} 
+                        max={100} 
+                        step={5}
+                        onValueChange={(value) => handleWeightChange('squareFeet', value[0])}
+                      />
+                      <span className="text-sm text-muted-foreground text-right">
+                        {Math.round(weights.squareFeet * 100)}%
+                      </span>
+                    </div>
+                    
+                    <div className="grid grid-cols-[25px_1fr_50px] items-center gap-2">
+                      <Bed className="h-4 w-4 text-muted-foreground" />
+                      <Slider 
+                        value={[weights.bedrooms * 100]} 
+                        min={0} 
+                        max={100} 
+                        step={5}
+                        onValueChange={(value) => handleWeightChange('bedrooms', value[0])}
+                      />
+                      <span className="text-sm text-muted-foreground text-right">
+                        {Math.round(weights.bedrooms * 100)}%
+                      </span>
+                    </div>
+                    
+                    <div className="grid grid-cols-[25px_1fr_50px] items-center gap-2">
+                      <Bath className="h-4 w-4 text-muted-foreground" />
+                      <Slider 
+                        value={[weights.bathrooms * 100]} 
+                        min={0} 
+                        max={100} 
+                        step={5}
+                        onValueChange={(value) => handleWeightChange('bathrooms', value[0])}
+                      />
+                      <span className="text-sm text-muted-foreground text-right">
+                        {Math.round(weights.bathrooms * 100)}%
+                      </span>
+                    </div>
+                    
+                    <div className="grid grid-cols-[25px_1fr_50px] items-center gap-2">
+                      <Home className="h-4 w-4 text-muted-foreground" />
+                      <Slider 
+                        value={[weights.propertyType * 100]} 
+                        min={0} 
+                        max={100} 
+                        step={5}
+                        onValueChange={(value) => handleWeightChange('propertyType', value[0])}
+                      />
+                      <span className="text-sm text-muted-foreground text-right">
+                        {Math.round(weights.propertyType * 100)}%
+                      </span>
+                    </div>
+                    
+                    <div className="grid grid-cols-[25px_1fr_50px] items-center gap-2">
+                      <MapPin className="h-4 w-4 text-muted-foreground" />
+                      <Slider 
+                        value={[weights.neighborhood * 100]} 
+                        min={0} 
+                        max={100} 
+                        step={5}
+                        onValueChange={(value) => handleWeightChange('neighborhood', value[0])}
+                      />
+                      <span className="text-sm text-muted-foreground text-right">
+                        {Math.round(weights.neighborhood * 100)}%
+                      </span>
+                    </div>
+                    
+                    <div className="pt-2">
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        onClick={resetWeights} 
+                        className="w-full"
+                      >
+                        Reset to Default
+                      </Button>
+                    </div>
+                  </div>
+                </TabsContent>
+                
+                <TabsContent value="presets">
+                  <div className="grid gap-2">
+                    <Button 
+                      variant={activePreset === 'default' ? 'default' : 'outline'} 
+                      className="justify-start"
+                      onClick={() => applyWeightPreset(DEFAULT_WEIGHTS, 'default')}
+                    >
+                      <BarChart className="mr-2 h-4 w-4" />
+                      Balanced (Default)
+                    </Button>
+                    
+                    <Button 
+                      variant={activePreset === 'value' ? 'default' : 'outline'} 
+                      className="justify-start"
+                      onClick={() => applyWeightPreset(VALUE_FOCUSED_WEIGHTS, 'value')}
+                    >
+                      <DollarSign className="mr-2 h-4 w-4" />
+                      Value Focused
+                    </Button>
+                    
+                    <Button 
+                      variant={activePreset === 'physical' ? 'default' : 'outline'} 
+                      className="justify-start"
+                      onClick={() => applyWeightPreset(PHYSICAL_FOCUSED_WEIGHTS, 'physical')}
+                    >
+                      <Building className="mr-2 h-4 w-4" />
+                      Physical Characteristics
+                    </Button>
+                    
+                    <Button 
+                      variant={activePreset === 'location' ? 'default' : 'outline'} 
+                      className="justify-start"
+                      onClick={() => applyWeightPreset(LOCATION_FOCUSED_WEIGHTS, 'location')}
+                    >
+                      <MapPin className="mr-2 h-4 w-4" />
+                      Location Focused
+                    </Button>
+                  </div>
+                  
+                  <div className="mt-4">
+                    <h4 className="text-sm font-medium">Similar Properties Count</h4>
+                    <div className="flex items-center gap-2 mt-2">
+                      <Slider
+                        value={[similarCount]}
+                        min={3}
+                        max={10}
+                        step={1}
+                        onValueChange={(value) => setSimilarCount(value[0])}
+                      />
+                      <span className="w-8 text-sm text-muted-foreground">{similarCount}</span>
+                    </div>
+                  </div>
+                </TabsContent>
+              </Tabs>
+            </CardContent>
+          </Card>
+        </div>
+      ) : (
         <Card>
           <CardHeader>
-            <CardTitle>Similar Properties</CardTitle>
-            <CardDescription>
-              Top {similarProperties.length} properties most similar to your selection
-            </CardDescription>
+            <CardTitle>Property Comparison</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="space-y-4">
-              {similarProperties.map((property) => (
-                <div 
-                  key={property.id} 
-                  className="border rounded-md p-4 hover:bg-muted transition-colors cursor-pointer"
-                  onClick={() => handlePropertySelect(property)}
-                >
-                  <div className="flex items-center justify-between mb-2">
-                    <h4 className="font-medium">{property.address}</h4>
-                    <div className="bg-primary text-primary-foreground text-sm font-medium px-2 py-1 rounded-md">
-                      {Math.round(property.score * 100)}% Match
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-2 gap-2 text-sm">
-                    <div>
-                      <span className="text-muted-foreground">Value:</span> {formatCurrency(parseFloat(property.value?.replace(/[$,]/g, '') || '0'))}
-                    </div>
-                    <div>
-                      <span className="text-muted-foreground">Year Built:</span> {property.yearBuilt}
-                    </div>
-                    <div>
-                      <span className="text-muted-foreground">Sq. Ft:</span> {property.squareFeet?.toLocaleString()}
-                    </div>
-                    <div>
-                      <span className="text-muted-foreground">Beds/Baths:</span> {property.bedrooms} / {property.bathrooms}
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
+            <p className="text-muted-foreground">
+              Select a property to start comparing. You can select properties from the map or search for properties using the search button.
+            </p>
           </CardContent>
         </Card>
       )}
