@@ -4,14 +4,14 @@ import {
   TabsContent, 
   TabsList, 
   TabsTrigger 
-} from '@/components/ui/tabs';
+} from '../ui/tabs';
 import { 
   Card, 
   CardContent, 
   CardDescription, 
   CardHeader, 
   CardTitle 
-} from '@/components/ui/card';
+} from '../ui/card';
 import { 
   CircleDot, 
   Layers, 
@@ -22,7 +22,8 @@ import {
   Minimize2, 
   Filter 
 } from 'lucide-react';
-import { Property } from '@shared/schema';
+import { Property } from '../../shared/schema';
+import { ClusteringPanel } from '../analysis/ClusteringPanel';
 
 export interface SpatialAnalysisPanelProps {
   properties: Property[];
@@ -253,29 +254,7 @@ export const SpatialAnalysisPanel: React.FC<SpatialAnalysisPanelProps> = ({
             </TabsContent>
 
             <TabsContent value="clustering" className="h-full">
-              <div className="flex flex-col space-y-4 h-full">
-                <Card className="flex-grow overflow-hidden">
-                  <CardHeader className="pb-2">
-                    <CardTitle>Spatial Clustering</CardTitle>
-                    <CardDescription>
-                      Grouping properties based on location and attributes
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent className="h-[calc(100%-5rem)] overflow-hidden">
-                    <div className="bg-gray-100 rounded-md h-full flex items-center justify-center">
-                      <div className="text-center p-6">
-                        <Layers className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                        <h3 className="text-lg font-medium text-gray-700 mb-2">Spatial Clustering</h3>
-                        <p className="text-sm text-gray-500 max-w-md">
-                          This feature will display a map with spatial clustering results, showing
-                          how properties in Benton County can be grouped based on location, value,
-                          and other attributes.
-                        </p>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
+              <ClusteringPanel properties={properties} className="h-full" />
             </TabsContent>
 
             <TabsContent value="regression" className="h-full">
