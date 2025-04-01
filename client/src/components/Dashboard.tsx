@@ -17,7 +17,7 @@ import MapPanel from './panels/MapPanel';
 import ScriptPanel from './panels/ScriptPanel';
 import SpatialAnalysisPanel from './panels/SpatialAnalysisPanel';
 import { RegressionPanel } from './panels/RegressionPanel';
-import PropertyComparisonPanel from './panels/PropertyComparisonPanel';
+import { PropertyComparisonPanel } from './panels/PropertyComparisonPanel';
 import { ReportGenerator } from './export/ReportGenerator';
 import { Property } from '@shared/schema';
 import { useQuery } from '@tanstack/react-query';

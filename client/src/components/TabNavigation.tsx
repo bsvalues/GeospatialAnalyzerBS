@@ -1,5 +1,5 @@
 import React from 'react';
-import { Map, Database, Calculator, Settings, Activity, Workflow } from 'lucide-react';
+import { Map, Database, Calculator, Settings, Activity, Workflow, BarChartHorizontal } from 'lucide-react';
 
 interface TabNavigationProps {
   activeTab: string;
@@ -13,6 +13,7 @@ const TabNavigation: React.FC<TabNavigationProps> = ({ activeTab, onTabChange })
     { id: 'script', name: 'Script', icon: <Workflow size={14} className="mr-1" /> },
     { id: 'data', name: 'Data', icon: <Database size={14} className="mr-1" /> },
     { id: 'regression', name: 'Regression', icon: <Calculator size={14} className="mr-1" /> },
+    { id: 'comparison', name: 'Comparison', icon: <BarChartHorizontal size={14} className="mr-1" /> },
     { id: 'settings', name: 'Settings', icon: <Settings size={14} className="mr-1" /> }
   ];
   

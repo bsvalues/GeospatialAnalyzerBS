@@ -1,101 +1,134 @@
 import React, { useState } from 'react';
-import { Search } from 'lucide-react';
-import { Input } from '@/components/ui/input';
+import { usePropertyComparison } from './PropertyComparisonContext';
+import { Property } from '@/shared/schema';
+import { Search, X, MapPin } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from '@/components/ui/dialog';
-import { Property } from '../../shared/schema';
-import { PropertySearchResults } from './PropertySearchResults';
+import { Input } from '@/components/ui/input';
+import { Card, CardContent } from '@/components/ui/card';
+import { formatCurrency } from '@/lib/utils';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Badge } from '@/components/ui/badge';
 
 interface PropertySearchDialogProps {
-  properties: Property[];
-  buttonText?: string;
+  onClose: () => void;
   onSelectProperty: (property: Property) => void;
 }
 
-export const PropertySearchDialog: React.FC<PropertySearchDialogProps> = ({
-  properties,
-  buttonText = "Search Properties",
-  onSelectProperty,
-}) => {
-  const [isOpen, setIsOpen] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [searchResults, setSearchResults] = useState<Property[]>([]);
-
-  const handleSearch = () => {
-    if (!searchQuery.trim()) {
-      setSearchResults([]);
-      return;
-    }
-
-    const query = searchQuery.toLowerCase();
-    const results = properties.filter(property => {
-      // Search by address
-      if (property.address?.toLowerCase().includes(query)) return true;
-      
-      // Search by parcel ID
-      if (property.parcelId?.toLowerCase().includes(query)) return true;
-      
-      // Search by owner
-      if (property.owner?.toLowerCase().includes(query)) return true;
-      
-      // Search by neighborhood
-      if (property.neighborhood?.toLowerCase().includes(query)) return true;
-      
-      // Search by property type
-      if (property.propertyType?.toLowerCase().includes(query)) return true;
-      
-      return false;
-    }).slice(0, 20); // Limit to top 20 results
-
-    setSearchResults(results);
-  };
-
-  const handlePropertySelect = (property: Property) => {
-    onSelectProperty(property);
-    setIsOpen(false);
-    setSearchQuery('');
-    setSearchResults([]);
-  };
-
-  return (
-    <Dialog open={isOpen} onOpenChange={setIsOpen}>
-      <DialogTrigger asChild>
-        <Button variant="outline" size="sm">
-          <Search className="h-4 w-4 mr-2" />
-          {buttonText}
-        </Button>
-      </DialogTrigger>
-      
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>Search Properties</DialogTitle>
-          <DialogDescription>
-            Search by address, parcel ID, owner name, or neighborhood
-          </DialogDescription>
-        </DialogHeader>
-        
-        <div className="flex items-center space-x-2 my-4">
-          <Input 
-            placeholder="Enter search term..." 
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
-          />
-          <Button onClick={handleSearch}>Search</Button>
+/**
+ * Dialog for searching and selecting properties for comparison
+ */
+export function PropertySearchDialog({ onClose, onSelectProperty }: PropertySearchDialogProps) {
+  const { properties, isLoading } = usePropertyComparison();
+  const [searchTerm, setSearchTerm] = useState('');
+  
+  // Filter properties based on search term
+  const filteredProperties = properties.filter(property => {
+    if (!searchTerm) return true;
+    
+    const searchLower = searchTerm.toLowerCase();
+    return (
+      (property.address && property.address.toLowerCase().includes(searchLower)) ||
+      (property.parcelId && property.parcelId.toLowerCase().includes(searchLower)) ||
+      (property.owner && property.owner.toLowerCase().includes(searchLower)) ||
+      (property.neighborhood && property.neighborhood.toLowerCase().includes(searchLower))
+    );
+  });
+  
+  // Display search results
+  const renderSearchResults = () => {
+    if (isLoading) {
+      return (
+        <div className="text-center p-4">
+          <p>Loading properties...</p>
         </div>
-        
-        <PropertySearchResults 
-          results={searchResults} 
-          onSelectProperty={handlePropertySelect}
-        />
-      </DialogContent>
-    </Dialog>
+      );
+    }
+    
+    if (filteredProperties.length === 0) {
+      return (
+        <div className="text-center p-4">
+          <p className="text-gray-500">No properties found matching your search.</p>
+        </div>
+      );
+    }
+    
+    return (
+      <ScrollArea className="h-[300px] pr-4">
+        <div className="space-y-3">
+          {filteredProperties.map(property => (
+            <Card 
+              key={property.id} 
+              className="cursor-pointer hover:bg-gray-50 transition-colors"
+              onClick={() => onSelectProperty(property)}
+            >
+              <CardContent className="p-3">
+                <div className="flex justify-between">
+                  <div>
+                    <p className="font-medium text-sm">{property.address}</p>
+                    <div className="flex gap-2 mt-1">
+                      <Badge variant="outline" className="text-xs">
+                        {property.parcelId}
+                      </Badge>
+                      {property.propertyType && (
+                        <Badge variant="secondary" className="text-xs">
+                          {property.propertyType}
+                        </Badge>
+                      )}
+                    </div>
+                    <div className="flex gap-4 mt-2 text-xs text-gray-500">
+                      {property.squareFeet && (
+                        <span>{property.squareFeet.toLocaleString()} sq ft</span>
+                      )}
+                      {property.bedrooms && (
+                        <span>{property.bedrooms} bed{property.bedrooms !== 1 ? 's' : ''}</span>
+                      )}
+                      {property.bathrooms && (
+                        <span>{property.bathrooms} bath{property.bathrooms !== 1 ? 's' : ''}</span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <p className="font-bold">{property.value ? formatCurrency(property.value) : 'N/A'}</p>
+                    {property.neighborhood && (
+                      <p className="text-xs text-gray-500 mt-1 flex items-center justify-end">
+                        <MapPin className="h-3 w-3 mr-1" />
+                        {property.neighborhood}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      </ScrollArea>
+    );
+  };
+  
+  return (
+    <div>
+      <div className="flex items-center mb-4">
+        <div className="relative flex-1">
+          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-400" />
+          <Input
+            type="text"
+            placeholder="Search by address, parcel ID, owner, or neighborhood"
+            className="pl-9 pr-4"
+            value={searchTerm}
+            onChange={e => setSearchTerm(e.target.value)}
+          />
+        </div>
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={onClose}
+          className="ml-2"
+        >
+          <X className="h-4 w-4" />
+        </Button>
+      </div>
+      
+      {renderSearchResults()}
+    </div>
   );
-};
+}
