@@ -1,7 +1,7 @@
 import React, { ReactNode, useEffect, useState, useCallback } from 'react';
 import { useAutoHide } from '@/contexts/AutoHideContext';
 import { cn } from '@/lib/utils';
-import { Button } from '@/components/ui/button';
+import { Button } from './button';
 import { PinIcon, PinOffIcon, X, ArrowLeft, ArrowRight, MinimizeIcon, MaximizeIcon } from 'lucide-react';
 
 export interface AutoHidingPanelProps {

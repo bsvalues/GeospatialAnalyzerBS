@@ -326,6 +326,7 @@ export const MapComponent: React.FC<MapComponentProps> = ({
       <MapContainer
         center={center}
         zoom={zoom}
+        maxZoom={19}
         style={{ height: '100%', width: '100%' }}
         zoomControl={false} // We'll use our accessible controls instead
         ref={mapRef}

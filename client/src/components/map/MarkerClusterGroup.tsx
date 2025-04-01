@@ -76,7 +76,8 @@ const MarkerClusterGroup: React.FC<MarkerClusterGroupProps> = ({
     let validValueCount = 0;
     
     markers.forEach(marker => {
-      const property = marker.options.property as Property;
+      // Access property from the custom property we added to the marker
+      const property = (marker as any).property as Property;
       if (property && property.value) {
         // Extract numeric value from string like '$350,000'
         const numericValue = parseInt(property.value.replace(/[^0-9.-]+/g, ''));
@@ -138,7 +139,7 @@ const MarkerClusterGroup: React.FC<MarkerClusterGroupProps> = ({
       const isSelected = selectedProperty && selectedProperty.id === property.id;
       
       // Custom marker icon based on property type
-      const iconUrl = getMarkerIconForProperty(property, isSelected);
+      const iconUrl = getMarkerIconForProperty(property, isSelected || false);
       const markerIcon = L.icon({
         iconUrl,
         iconSize: [32, 32],
@@ -148,10 +149,12 @@ const MarkerClusterGroup: React.FC<MarkerClusterGroupProps> = ({
       });
       
       // Create and configure the marker
-      const marker = L.marker([property.latitude, property.longitude], {
+      const marker = L.marker([Number(property.latitude), Number(property.longitude)], {
         icon: markerIcon,
-        property: property // Store reference to property data
-      } as L.MarkerOptions);
+        // Add custom property data with extended MarkerOptions
+      }) as L.Marker;
+      // Store the property data on the marker instance directly
+      (marker as any).property = property;
       
       marker.on('click', () => {
         onPropertySelect(property);
