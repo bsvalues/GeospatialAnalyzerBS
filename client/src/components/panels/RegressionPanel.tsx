@@ -20,6 +20,7 @@ import { CoefficientImpactChart } from '@/components/regression/CoefficientImpac
 import { Property } from '@/shared/schema';
 import { apiRequest } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
+import { formatCurrency } from '@/lib/utils';
 
 /**
  * The Regression Panel provides tools for property valuation through regression modeling.
@@ -566,12 +567,3 @@ function VariableImportanceView({ model }: { model: RegressionModel }) {
   );
 }
 
-// Helper function to format currency values
-function formatCurrency(value: number): string {
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0
-  }).format(value);
-}
