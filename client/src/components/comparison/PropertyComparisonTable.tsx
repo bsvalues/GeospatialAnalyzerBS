@@ -9,7 +9,7 @@ import { ComparablePropertyResult } from '../../services/comparison/comparablesS
 interface PropertyComparisonTableProps {
   baseProperty: Property;
   selectedProperties: Property[];
-  similarityScores?: Map<number | string, number>;
+  similarityScores?: Record<number | string, number>;
   className?: string;
 }
 
@@ -31,7 +31,7 @@ export const PropertyComparisonTable: React.FC<PropertyComparisonTableProps> = (
   // Get similarity score for a property
   const getScore = (property: Property): number => {
     if (property.id === baseProperty.id) return 100; // Base property is 100% similar to itself
-    return similarityScores?.get(property.id) || 0;
+    return similarityScores?.[property.id] || 0;
   };
   
   // Format field values for comparison

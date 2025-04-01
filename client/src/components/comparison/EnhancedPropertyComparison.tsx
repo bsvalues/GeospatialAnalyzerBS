@@ -73,8 +73,8 @@ export const EnhancedPropertyComparison: React.FC<EnhancedPropertyComparisonProp
   // Current filter settings
   const [currentFilters, setCurrentFilters] = useState<ComparableFilters>({});
   
-  // Map of similarity scores
-  const [similarityScores, setSimilarityScores] = useState<Map<number | string, number>>(new Map());
+  // Map of similarity scores (using Record instead of Map)
+  const [similarityScores, setSimilarityScores] = useState<Record<string | number, number>>({});
   
   // Find comparable properties
   const handleFindComparables = () => {
@@ -84,12 +84,12 @@ export const EnhancedPropertyComparison: React.FC<EnhancedPropertyComparisonProp
     const results = findComparableProperties(baseProperty, allProperties);
     setComparableResults(results);
     
-    // Create a map of similarity scores
-    const scoresMap = new Map<number | string, number>();
+    // Create an object of similarity scores
+    const scoresObj: Record<string | number, number> = {};
     results.forEach(result => {
-      scoresMap.set(result.property.id, result.similarityScore);
+      scoresObj[result.property.id] = result.similarityScore;
     });
-    setSimilarityScores(scoresMap);
+    setSimilarityScores(scoresObj);
     
     setIsSearching(false);
   };
@@ -104,11 +104,11 @@ export const EnhancedPropertyComparison: React.FC<EnhancedPropertyComparisonProp
     setComparableResults(results);
     
     // Update similarity scores
-    const scoresMap = new Map<number | string, number>();
+    const scoresObj: Record<string | number, number> = {};
     results.forEach(result => {
-      scoresMap.set(result.property.id, result.similarityScore);
+      scoresObj[result.property.id] = result.similarityScore;
     });
-    setSimilarityScores(scoresMap);
+    setSimilarityScores(scoresObj);
     
     setIsSearching(false);
   };
