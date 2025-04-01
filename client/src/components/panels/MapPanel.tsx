@@ -321,59 +321,69 @@ export const MapPanel: React.FC<MapPanelProps> = ({ className }) => {
         )}
       </div>
       
-      {/* Auto-hiding property info sidebar */}
-      <div 
-        className={`h-full overflow-hidden border-l border-gray-200 transition-all duration-300 ease-in-out ${
-          showSidebar ? 'w-96 opacity-100' : 'w-0 opacity-0'
-        } ${isFullScreen ? 'bg-white' : ''}`}
+      {/* Property info sidebar using AutoHidingPanel */}
+      <AutoHidingPanel
+        id="property-info-panel"
+        defaultVisible={showSidebar}
+        title="Property Information"
+        position="right"
+        width="385px"
+        hideTimeout={10000}
+        className="h-full"
+        onVisibilityChange={setShowSidebar}
+        showPin={true}
+        showClose={false}
+        showMinimize={false}
       >
-        <PropertyInfoPanel
-          property={selectedProperty}
-          onClose={handleClosePropertyInfo}
-          onCompare={handleAddToCompare}
-        />
-        
-        {/* Compare properties list */}
-        {compareProperties.length > 0 && (
-          <div className="border-t border-gray-200 p-3">
-            <div className="flex justify-between items-center mb-2">
-              <h3 className="text-sm font-medium text-gray-700">Properties to Compare ({compareProperties.length}/3)</h3>
-              {compareProperties.length >= 2 && (
-                <button className="text-xs px-2 py-1 bg-primary text-white rounded hover:bg-primary/90">
-                  Compare Now
-                </button>
-              )}
-            </div>
-            <div className="space-y-2 max-h-40 overflow-y-auto">
-              {compareProperties.map(property => (
-                <div key={property.id} className="flex justify-between items-center bg-gray-50 p-2 rounded text-sm">
-                  <div className="truncate flex-grow">
-                    <div className="font-medium truncate">{property.address}</div>
-                    <div className="text-xs text-gray-500">{property.value || 'No value'}</div>
-                  </div>
-                  <button 
-                    onClick={() => handleRemoveFromCompare(property.id)}
-                    className="text-gray-400 hover:text-red-500 ml-2"
-                    title="Remove from comparison"
-                  >
-                    <X className="h-4 w-4" />
+        <div className="h-full flex flex-col">
+          <PropertyInfoPanel
+            property={selectedProperty}
+            onClose={handleClosePropertyInfo}
+            onCompare={handleAddToCompare}
+          />
+          
+          {/* Compare properties list */}
+          {compareProperties.length > 0 && (
+            <div className="border-t border-gray-200 p-3 mt-auto">
+              <div className="flex justify-between items-center mb-2">
+                <h3 className="text-sm font-medium text-gray-700">Properties to Compare ({compareProperties.length}/3)</h3>
+                {compareProperties.length >= 2 && (
+                  <button className="text-xs px-2 py-1 bg-primary text-white rounded hover:bg-primary/90">
+                    Compare Now
                   </button>
-                </div>
-              ))}
+                )}
+              </div>
+              <div className="space-y-2 max-h-40 overflow-y-auto">
+                {compareProperties.map(property => (
+                  <div key={property.id} className="flex justify-between items-center bg-gray-50 p-2 rounded text-sm">
+                    <div className="truncate flex-grow">
+                      <div className="font-medium truncate">{property.address}</div>
+                      <div className="text-xs text-gray-500">{property.value || 'No value'}</div>
+                    </div>
+                    <button 
+                      onClick={() => handleRemoveFromCompare(property.id)}
+                      className="text-gray-400 hover:text-red-500 ml-2"
+                      title="Remove from comparison"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  </div>
+                ))}
+              </div>
             </div>
-          </div>
-        )}
-      </div>
+          )}
+        </div>
+      </AutoHidingPanel>
       
       {/* Toggle sidebar button (always visible) */}
       <button
-        className={`absolute right-4 bottom-4 z-10 p-2.5 bg-white rounded-full shadow-md border border-gray-200 text-gray-600 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-primary/50 transition-transform duration-300 ${
-          showSidebar ? 'transform rotate-180' : ''
-        }`}
+        className={`absolute right-4 bottom-4 z-10 p-2.5 bg-white rounded-full shadow-md border border-gray-200 text-gray-600 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-primary/50 transition-transform duration-300`}
         onClick={() => setShowSidebar(!showSidebar)}
         title={showSidebar ? "Hide sidebar" : "Show sidebar"}
+        aria-label={showSidebar ? "Hide property information panel" : "Show property information panel"}
+        aria-pressed={showSidebar}
       >
-        <ChevronLeft className="h-5 w-5" />
+        <ChevronLeft className={`h-5 w-5 transition-transform ${showSidebar ? 'transform rotate-180' : ''}`} />
       </button>
     </div>
   );
