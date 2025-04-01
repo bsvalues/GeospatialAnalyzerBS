@@ -112,7 +112,7 @@ const Dashboard: React.FC<DashboardProps> = ({ className }) => {
           <div className="h-full p-6 overflow-auto">
             <h1 className="text-2xl font-bold mb-4 text-gray-800">Benton County Property Valuation Dashboard</h1>
             <p className="mb-6 text-gray-600">
-              Welcome to the Spatialest property valuation dashboard. This application provides advanced
+              Welcome to the GIS_BS property valuation dashboard. This application provides advanced
               spatial analysis and visualization tools for property assessment in Benton County, Washington.
             </p>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">

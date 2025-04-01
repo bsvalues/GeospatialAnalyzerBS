@@ -43,7 +43,7 @@ export interface ExportOptions {
  * Default options for export operations
  */
 const defaultExportOptions: ExportOptions = {
-  fileName: 'spatialest-export',
+  fileName: 'gis_bs-export',
   includeHeaders: true,
   dateGenerated: true,
   customFields: [],
@@ -331,8 +331,8 @@ export class ExportService {
         </table>
         
         <div class="footer">
-          <p>Spatialest Property Appraisal Platform</p>
-          <p>Copyright © ${new Date().getFullYear()} Spatialest</p>
+          <p>GIS_BS Property Appraisal Platform</p>
+          <p>Copyright © ${new Date().getFullYear()} GIS_BS</p>
         </div>
       </body>
       </html>
@@ -526,8 +526,8 @@ export class ExportService {
         </table>
         
         <div class="footer">
-          <p>Spatialest Property Appraisal Platform</p>
-          <p>Copyright © ${new Date().getFullYear()} Spatialest</p>
+          <p>GIS_BS Property Appraisal Platform</p>
+          <p>Copyright © ${new Date().getFullYear()} GIS_BS</p>
         </div>
       </body>
       </html>

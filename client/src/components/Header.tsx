@@ -79,9 +79,9 @@ export const Header: React.FC<HeaderProps> = ({ taxYear, onTaxYearChange }) => {
       <div className="flex items-center">
         <div className="flex items-center">
           <Map className="h-6 w-6 text-primary mr-2" />
-          <h1 className="text-xl font-bold text-primary">Spatialest</h1>
+          <h1 className="text-xl font-bold text-primary">GIS_BS</h1>
         </div>
-        <span className="ml-2 text-sm text-gray-500">GIS Property Valuation Tool</span>
+        <span className="ml-2 text-sm text-gray-500">Property Valuation & Analysis Platform</span>
       </div>
       
       <div className="flex items-center space-x-4">
