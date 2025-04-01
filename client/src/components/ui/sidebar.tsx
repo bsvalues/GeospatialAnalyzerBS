@@ -10,12 +10,7 @@ import { Input } from "@/components/ui/input"
 import { Separator } from "@/components/ui/separator"
 import { Sheet, SheetContent } from "@/components/ui/sheet"
 import { Skeleton } from "@/components/ui/skeleton"
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip"
+import { Tooltip } from "@/components/ui/tooltip"
 
 const SIDEBAR_COOKIE_NAME = "sidebar:state"
 const SIDEBAR_COOKIE_MAX_AGE = 60 * 60 * 24 * 7
@@ -130,8 +125,7 @@ const SidebarProvider = React.forwardRef<
 
     return (
       <SidebarContext.Provider value={contextValue}>
-        <TooltipProvider delayDuration={0}>
-          <div
+        <div
             style={
               {
                 "--sidebar-width": SIDEBAR_WIDTH,
@@ -148,7 +142,6 @@ const SidebarProvider = React.forwardRef<
           >
             {children}
           </div>
-        </TooltipProvider>
       </SidebarContext.Provider>
     )
   }
@@ -537,7 +530,7 @@ const SidebarMenuButton = React.forwardRef<
   React.ComponentProps<"button"> & {
     asChild?: boolean
     isActive?: boolean
-    tooltip?: string | React.ComponentProps<typeof TooltipContent>
+    tooltip?: string | { content?: React.ReactNode; placement?: 'top' | 'right' | 'bottom' | 'left'; delay?: number; className?: string }
   } & VariantProps<typeof sidebarMenuButtonVariants>
 >(
   (
@@ -570,21 +563,17 @@ const SidebarMenuButton = React.forwardRef<
       return button
     }
 
-    if (typeof tooltip === "string") {
-      tooltip = {
-        children: tooltip,
-      }
+        // Only show tooltip when sidebar is collapsed and not on mobile
+    if (state !== "collapsed" || isMobile) {
+      return button;
     }
-
+    
     return (
-      <Tooltip>
-        <TooltipTrigger asChild>{button}</TooltipTrigger>
-        <TooltipContent
-          side="right"
-          align="center"
-          hidden={state !== "collapsed" || isMobile}
-          {...tooltip}
-        />
+      <Tooltip
+        content={typeof tooltip === "string" ? tooltip : tooltip.content}
+        placement={typeof tooltip === "string" ? "right" : tooltip.placement || "right"}
+      >
+        {button}
       </Tooltip>
     )
   }

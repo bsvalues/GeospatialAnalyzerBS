@@ -139,26 +139,24 @@ export function PredictionScatterPlot({ model, className }: PredictionScatterPlo
                 strokeWidth={0.5}
                 strokeDasharray="3 3"
               />
-              <TooltipProvider>
-                <RechartsTooltip
-                  content={({ active, payload }) => {
-                    if (active && payload && payload.length) {
-                      const data = payload[0].payload;
-                      return (
-                        <div className="bg-white p-2 border border-gray-200 rounded shadow-sm text-xs">
-                          <p className="font-medium">Comparison</p>
-                          <p>Actual: {formatCurrency(data.actual)}</p>
-                          <p>Predicted: {formatCurrency(data.predicted)}</p>
-                          <p>Difference: {formatCurrency(data.residual)}</p>
-                          <p>Error: {data.percentError.toFixed(1)}%</p>
-                        </div>
-                      );
-                    }
-                    return null;
-                  }}
-                  cursor={{ strokeDasharray: '3 3' }}
-                />
-              </TooltipProvider>
+              <RechartsTooltip
+                content={({ active, payload }) => {
+                  if (active && payload && payload.length) {
+                    const data = payload[0].payload;
+                    return (
+                      <div className="bg-white p-2 border border-gray-200 rounded shadow-sm text-xs">
+                        <p className="font-medium">Comparison</p>
+                        <p>Actual: {formatCurrency(data.actual)}</p>
+                        <p>Predicted: {formatCurrency(data.predicted)}</p>
+                        <p>Difference: {formatCurrency(data.residual)}</p>
+                        <p>Error: {data.percentError.toFixed(1)}%</p>
+                      </div>
+                    );
+                  }
+                  return null;
+                }}
+                cursor={{ strokeDasharray: '3 3' }}
+              />
               <Legend />
               <Scatter 
                 name="Properties"
