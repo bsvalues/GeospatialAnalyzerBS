@@ -25,6 +25,7 @@ import ScriptPanel from './panels/ScriptPanel';
 import { SpatialAnalysisPanel } from './panels/SpatialAnalysisPanel';
 import { RegressionPanel } from './panels/RegressionPanel';
 import { PropertyComparisonPanel } from './panels/PropertyComparisonPanel';
+import { PredictiveModelingPanel } from './panels/PredictiveModelingPanel';
 import { SettingsPanel } from './panels/SettingsPanel';
 import { ReportGenerator } from './export/ReportGenerator';
 import { Property } from '@shared/schema';
@@ -381,6 +382,8 @@ const Dashboard: React.FC<DashboardProps> = ({ className }) => {
         )}
         
         {activeTab === 'regression' && <RegressionPanel />}
+        
+        {activeTab === 'predictive' && <PredictiveModelingPanel />}
         
         {activeTab === 'spatial' && (
           <SpatialAnalysisPanel properties={properties} />
