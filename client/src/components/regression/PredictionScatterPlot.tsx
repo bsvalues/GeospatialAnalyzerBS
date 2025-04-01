@@ -19,12 +19,7 @@ import {
   Tooltip as RechartsTooltip,
   Legend,
 } from 'recharts';
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger
-} from '@/components/ui/tooltip';
+import { Tooltip } from '@/components/ui/tooltip';
 import { Info } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
 
@@ -59,20 +54,18 @@ export function PredictionScatterPlot({ model, className }: PredictionScatterPlo
       <CardHeader className="pb-2">
         <div className="flex items-center justify-between">
           <CardTitle className="text-base font-semibold">Prediction Accuracy</CardTitle>
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Info className="h-4 w-4 text-muted-foreground" />
-              </TooltipTrigger>
-              <TooltipContent side="left">
-                <p className="max-w-[250px]">
-                  This scatter plot shows actual vs. predicted values. 
-                  Perfect predictions would fall on the diagonal line.
-                  Points are colored by error percentage.
-                </p>
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
+          <Tooltip
+            content={
+              <p className="max-w-[250px]">
+                This scatter plot shows actual vs. predicted values. 
+                Perfect predictions would fall on the diagonal line.
+                Points are colored by error percentage.
+              </p>
+            }
+            placement="left"
+          >
+            <Info className="h-4 w-4 text-muted-foreground" />
+          </Tooltip>
         </div>
         <CardDescription>
           Actual vs. predicted property values

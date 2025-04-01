@@ -18,12 +18,7 @@ import {
   Legend,
 } from 'recharts';
 import { Info } from 'lucide-react';
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger
-} from '@/components/ui/tooltip';
+import { Tooltip } from '@/components/ui/tooltip';
 
 export interface CoefficientImpactChartProps {
   model: RegressionModel;
@@ -59,20 +54,18 @@ export function CoefficientImpactChart({ model, className }: CoefficientImpactCh
       <CardHeader className="pb-2">
         <div className="flex items-center justify-between">
           <CardTitle className="text-base font-semibold">Variable Impact</CardTitle>
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Info className="h-4 w-4 text-muted-foreground" />
-              </TooltipTrigger>
-              <TooltipContent side="left">
-                <p className="max-w-[250px]">
-                  This chart shows the relative importance of each variable in the model.
-                  Larger bars indicate variables with greater impact on the predicted value.
-                  The color indicates the direction of the relationship.
-                </p>
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
+          <Tooltip
+            content={
+              <p className="max-w-[250px]">
+                This chart shows the relative importance of each variable in the model.
+                Larger bars indicate variables with greater impact on the predicted value.
+                The color indicates the direction of the relationship.
+              </p>
+            }
+            placement="left"
+          >
+            <Info className="h-4 w-4 text-muted-foreground" />
+          </Tooltip>
         </div>
         <CardDescription>
           Relative importance of predictors in the model
@@ -117,41 +110,39 @@ export function CoefficientImpactChart({ model, className }: CoefficientImpactCh
                 />
               ))}
             </Bar>
-            <TooltipProvider>
-              <Tooltip
-                wrapperStyle={{ zIndex: 1000 }}
-                content={({ active, payload }) => {
-                  if (active && payload && payload.length) {
-                    const data = payload[0].payload;
-                    return (
-                      <div className="bg-white p-3 border border-gray-200 rounded shadow-sm">
-                        <p className="font-semibold">{data.variable}</p>
-                        <div className="grid grid-cols-2 gap-x-4 gap-y-1 mt-1 text-sm">
-                          <span className="text-muted-foreground">Coefficient:</span>
-                          <span className={data.coefficient > 0 ? 'text-green-600' : 'text-red-600'}>
-                            {data.coefficient.toFixed(4)}
-                          </span>
-                          
-                          <span className="text-muted-foreground">p-value:</span>
-                          <span>
-                            {data.pValue < 0.001 ? '< 0.001' : data.pValue.toFixed(3)}
-                            {data.isSignificant && ' (significant)'}
-                          </span>
-                          
-                          <span className="text-muted-foreground">Importance:</span>
-                          <span>{(data.importance * 100).toFixed(1)}%</span>
-                          
-                          <span className="text-muted-foreground">Effect:</span>
-                          <span>{data.coefficient > 0 ? 'Positive' : 'Negative'}</span>
-                        </div>
+            <Tooltip
+              wrapperStyle={{ zIndex: 1000 }}
+              content={({ active, payload }) => {
+                if (active && payload && payload.length) {
+                  const data = payload[0].payload;
+                  return (
+                    <div className="bg-white p-3 border border-gray-200 rounded shadow-sm">
+                      <p className="font-semibold">{data.variable}</p>
+                      <div className="grid grid-cols-2 gap-x-4 gap-y-1 mt-1 text-sm">
+                        <span className="text-muted-foreground">Coefficient:</span>
+                        <span className={data.coefficient > 0 ? 'text-green-600' : 'text-red-600'}>
+                          {data.coefficient.toFixed(4)}
+                        </span>
+                        
+                        <span className="text-muted-foreground">p-value:</span>
+                        <span>
+                          {data.pValue < 0.001 ? '< 0.001' : data.pValue.toFixed(3)}
+                          {data.isSignificant && ' (significant)'}
+                        </span>
+                        
+                        <span className="text-muted-foreground">Importance:</span>
+                        <span>{(data.importance * 100).toFixed(1)}%</span>
+                        
+                        <span className="text-muted-foreground">Effect:</span>
+                        <span>{data.coefficient > 0 ? 'Positive' : 'Negative'}</span>
                       </div>
-                    );
-                  }
-                  return null;
-                }}
-                cursor={{ strokeDasharray: '3 3' }}
-              />
-            </TooltipProvider>
+                    </div>
+                  );
+                }
+                return null;
+              }}
+              cursor={{ strokeDasharray: '3 3' }}
+            />
           </BarChart>
         </ResponsiveContainer>
       </CardContent>

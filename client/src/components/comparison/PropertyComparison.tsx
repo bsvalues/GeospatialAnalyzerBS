@@ -9,7 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { Tooltip } from '@/components/ui/tooltip';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { PropertySearchDialog } from './PropertySearchDialog';
@@ -180,33 +180,23 @@ export function PropertyComparison() {
               </DialogContent>
             </Dialog>
             
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button variant="outline" size="sm" onClick={exportAsCSV}>
-                    <Download className="mr-2 h-4 w-4" />
-                    Export
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p>Export comparison as CSV</p>
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
+            <Tooltip
+              content="Export comparison as CSV"
+            >
+              <Button variant="outline" size="sm" onClick={exportAsCSV}>
+                <Download className="mr-2 h-4 w-4" />
+                Export
+              </Button>
+            </Tooltip>
             
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button variant="outline" size="sm" onClick={clearComparison}>
-                    <X className="mr-2 h-4 w-4" />
-                    Clear All
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p>Remove all properties from comparison</p>
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
+            <Tooltip
+              content="Remove all properties from comparison"
+            >
+              <Button variant="outline" size="sm" onClick={clearComparison}>
+                <X className="mr-2 h-4 w-4" />
+                Clear All
+              </Button>
+            </Tooltip>
           </div>
         </div>
         

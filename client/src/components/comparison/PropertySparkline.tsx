@@ -1,259 +1,174 @@
-import React, { useMemo } from 'react';
-import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, ReferenceLine, Dot } from 'recharts';
-import { ValuationDataPoint, formatCurrency, calculateGrowthRate } from './ValuationTrendUtils';
+import React from 'react';
+import { Property } from '@shared/schema';
 
-export interface PropertySparklineProps {
-  /**
-   * Historical valuation data points
-   */
-  data: ValuationDataPoint[];
-  
-  /**
-   * Height of the sparkline
-   */
-  height?: number | string;
-  
-  /**
-   * Width of the sparkline
-   */
-  width?: number | string;
-  
-  /**
-   * Whether to show tooltip on hover
-   */
-  showTooltip?: boolean;
-  
-  /**
-   * Fill color for the area
-   */
-  color?: string;
-  
-  /**
-   * Whether to highlight key points (min, max, last)
-   */
-  highlightPoints?: boolean;
-  
-  /**
-   * Whether to show the current value label
-   */
-  showCurrentValue?: boolean;
-  
-  /**
-   * Whether to show growth indicator
-   */
-  showGrowth?: boolean;
-  
-  /**
-   * CSS class name for additional styling
-   */
-  className?: string;
+interface ValueHistoryPoint {
+  year: number;
+  value: number;
 }
 
-/**
- * A minimal sparkline chart to show property value trends in a compact form
- */
+export interface PropertySparklineProps {
+  property: Property;
+  data: ValueHistoryPoint[];
+  width: number;
+  height: number;
+  showAxis?: boolean;
+}
+
 const PropertySparkline: React.FC<PropertySparklineProps> = ({
+  property,
   data,
-  height = 40,
-  width = '100%',
-  showTooltip = false,
-  color = '#3b82f6',
-  highlightPoints = false,
-  showCurrentValue = false,
-  showGrowth = false,
-  className = '',
+  width,
+  height,
+  showAxis = false
 }) => {
-  // Handle empty data
+  // If there's no data, return a placeholder
   if (!data || data.length === 0) {
     return (
       <div 
-        className={`bg-muted/50 rounded-sm ${className}`}
-        style={{ height, width }}
-        aria-label="No data available for sparkline"
-      />
+        style={{ width, height }} 
+        className="flex items-center justify-center bg-gray-50 text-gray-400 text-xs rounded"
+      >
+        No historical data
+      </div>
     );
   }
-  
-  // Calculate growth rate percentage
-  const growthRate = useMemo(() => calculateGrowthRate(data), [data]);
-  
-  // Find min, max, and current points
-  const minMaxPoints = useMemo(() => {
-    if (!highlightPoints || data.length <= 1) return { min: null, max: null };
-    
-    let minPoint = data[0];
-    let maxPoint = data[0];
-    
-    for (let i = 1; i < data.length; i++) {
-      if (data[i].value < minPoint.value) minPoint = data[i];
-      if (data[i].value > maxPoint.value) maxPoint = data[i];
-    }
-    
-    return { min: minPoint, max: maxPoint };
-  }, [data, highlightPoints]);
-  
-  // Get the current (last) value
-  const currentValue = data[data.length - 1].value;
-  const currentYear = data[data.length - 1].year;
-  
-  // Determine sparkline color based on growth
-  const determineColors = () => {
-    // Default positive
-    if (growthRate >= 0) {
-      return {
-        line: color,
-        area: color,
-        opacity: 0.15
-      };
-    }
-    
-    // Negative growth
-    return {
-      line: '#ef4444', // red-500
-      area: '#ef4444',
-      opacity: 0.1
-    };
-  };
-  
-  const colors = determineColors();
 
+  // Find min and max values for scaling
+  const values = data.map(d => d.value);
+  const minValue = Math.min(...values);
+  const maxValue = Math.max(...values);
+  const valueRange = maxValue - minValue || 1; // Avoid division by zero
+  
+  // Find min and max years
+  const years = data.map(d => d.year);
+  const minYear = Math.min(...years);
+  const maxYear = Math.max(...years);
+  const yearRange = maxYear - minYear || 1;
+  
+  // Calculate padding
+  const paddingX = 25;
+  const paddingY = showAxis ? 20 : 2;
+  const graphWidth = width - (paddingX * 2);
+  const graphHeight = height - (paddingY * 2);
+  
+  // Generate SVG path for the line
+  const points = data.map((d, i) => {
+    const x = paddingX + ((d.year - minYear) / yearRange) * graphWidth;
+    const y = height - paddingY - ((d.value - minValue) / valueRange) * graphHeight;
+    return `${x},${y}`;
+  }).join(' ');
+  
   return (
-    <div className={`relative ${className}`} style={{ height, width }} data-testid="property-sparkline">
-      {/* Growth indicator */}
-      {showGrowth && (
-        <div 
-          className={`absolute top-0 right-0 text-xs font-medium z-10 ${
-            growthRate >= 0 ? 'text-emerald-600' : 'text-rose-600'
-          }`}
-          style={{ fontSize: '10px' }}
-        >
-          {growthRate >= 0 ? '↑' : '↓'} {Math.abs(growthRate).toFixed(1)}%
-        </div>
+    <svg width={width} height={height} className="property-sparkline">
+      {/* Line connecting data points */}
+      <polyline
+        points={points}
+        fill="none"
+        stroke="#3b82f6"
+        strokeWidth="2"
+        strokeLinejoin="round"
+        strokeLinecap="round"
+      />
+      
+      {/* Data points */}
+      {data.map((d, i) => {
+        const x = paddingX + ((d.year - minYear) / yearRange) * graphWidth;
+        const y = height - paddingY - ((d.value - minValue) / valueRange) * graphHeight;
+        
+        return (
+          <circle
+            key={i}
+            cx={x}
+            cy={y}
+            r="3"
+            fill="#3b82f6"
+          />
+        );
+      })}
+      
+      {/* Most recent data point with highlight */}
+      {data.length > 0 && (
+        <circle
+          cx={paddingX + ((data[data.length - 1].year - minYear) / yearRange) * graphWidth}
+          cy={height - paddingY - ((data[data.length - 1].value - minValue) / valueRange) * graphHeight}
+          r="4"
+          fill="#2563eb"
+          stroke="#ffffff"
+          strokeWidth="1"
+        />
       )}
       
-      <ResponsiveContainer width="100%" height="100%">
-        <AreaChart
-          data={data}
-          margin={{ top: 2, right: showCurrentValue ? 40 : 0, left: 0, bottom: 2 }}
-        >
-          {/* Hide the axes by default for a cleaner sparkline look */}
-          <XAxis 
-            dataKey="year" 
-            hide={true} 
+      {/* X-axis (years) if showAxis is true */}
+      {showAxis && (
+        <>
+          <line 
+            x1={paddingX} 
+            y1={height - paddingY} 
+            x2={width - paddingX} 
+            y2={height - paddingY} 
+            stroke="#e5e7eb" 
+            strokeWidth="1"
           />
-          
-          <YAxis 
-            hide={true} 
-            domain={['dataMin - 1000', 'dataMax + 1000']} 
-          />
-          
-          {/* Optional tooltip with enhanced styling */}
-          {showTooltip && (
-            <Tooltip
-              formatter={(value: number) => [formatCurrency(value), 'Value']}
-              labelFormatter={(label) => `Year: ${label}`}
-              contentStyle={{ 
-                fontSize: '12px',
-                backgroundColor: 'rgba(255, 255, 255, 0.95)',
-                borderRadius: '4px',
-                boxShadow: '0 2px 8px rgba(0, 0, 0, 0.15)',
-                border: 'none',
-                padding: '6px 10px'
-              }}
-            />
-          )}
-          
-          {/* Enhanced area chart for the sparkline */}
-          <defs>
-            <linearGradient id={`sparkGradient-${color.replace('#', '')}`} x1="0" y1="0" x2="0" y2="1">
-              <stop offset="5%" stopColor={colors.area} stopOpacity={colors.opacity * 2} />
-              <stop offset="95%" stopColor={colors.area} stopOpacity={0} />
-            </linearGradient>
-          </defs>
-          
-          {/* Area chart for the sparkline */}
-          <Area
-            type="monotone"
-            dataKey="value"
-            stroke={colors.line}
-            strokeWidth={1.5}
-            fill={`url(#sparkGradient-${color.replace('#', '')})`}
-            fillOpacity={colors.opacity}
-            isAnimationActive={false}
-            connectNulls={true}
-            dot={false}
-            activeDot={{ r: 4, strokeWidth: 1, fill: '#fff', stroke: colors.line }}
-          />
-          
-          {/* Custom dots for key points (min, max, last) if enabled */}
-          {highlightPoints && minMaxPoints.min && minMaxPoints.min !== data[data.length-1] && (
-            <ReferenceLine 
-              x={minMaxPoints.min.year} 
-              stroke="none"
-              ifOverflow="hidden"
-            >
-              <g>
-                <circle
-                  cx={0} 
-                  cy={0} 
-                  r={3}
-                  fill="#fff"
-                  stroke="#64748b"
-                  strokeWidth={1}
+          {data.map((d, i) => {
+            const x = paddingX + ((d.year - minYear) / yearRange) * graphWidth;
+            
+            return (
+              <g key={`x-${i}`}>
+                <line 
+                  x1={x} 
+                  y1={height - paddingY} 
+                  x2={x} 
+                  y2={height - paddingY + 5} 
+                  stroke="#9ca3af" 
+                  strokeWidth="1"
                 />
+                <text 
+                  x={x} 
+                  y={height - 2} 
+                  fontSize="10" 
+                  textAnchor="middle" 
+                  fill="#6b7280"
+                >
+                  {d.year}
+                </text>
               </g>
-            </ReferenceLine>
-          )}
-          
-          {highlightPoints && minMaxPoints.max && minMaxPoints.max !== data[data.length-1] && (
-            <ReferenceLine 
-              x={minMaxPoints.max.year} 
-              stroke="none"
-              ifOverflow="hidden"
-            >
-              <g>
-                <circle
-                  cx={0} 
-                  cy={0} 
-                  r={3}
-                  fill="#fff"
-                  stroke={colors.line}
-                  strokeWidth={1.5}
-                />
-              </g>
-            </ReferenceLine>
-          )}
-          
-          {/* Always highlight the last point for emphasis */}
-          <ReferenceLine 
-            x={currentYear} 
-            stroke="none"
-            ifOverflow="hidden"
+            );
+          })}
+        </>
+      )}
+      
+      {/* Y-axis (values) if showAxis is true */}
+      {showAxis && (
+        <>
+          <line 
+            x1={paddingX} 
+            y1={paddingY} 
+            x2={paddingX} 
+            y2={height - paddingY} 
+            stroke="#e5e7eb" 
+            strokeWidth="1"
+          />
+          <text 
+            x={5} 
+            y={paddingY + 10} 
+            fontSize="10" 
+            textAnchor="start" 
+            fill="#6b7280"
           >
-            <g>
-              <circle
-                cx={0} 
-                cy={0} 
-                r={3.5}
-                fill="#fff"
-                stroke={colors.line}
-                strokeWidth={2}
-              />
-            </g>
-          </ReferenceLine>
-        </AreaChart>
-      </ResponsiveContainer>
-      
-      {/* Current value label outside the chart */}
-      {showCurrentValue && (
-        <div 
-          className="absolute right-0 top-1/2 transform -translate-y-1/2 font-medium"
-          style={{ fontSize: '12px' }}
-        >
-          {formatCurrency(currentValue)}
-        </div>
+            ${maxValue.toLocaleString()}
+          </text>
+          <text 
+            x={5} 
+            y={height - paddingY - 5} 
+            fontSize="10" 
+            textAnchor="start" 
+            fill="#6b7280"
+          >
+            ${minValue.toLocaleString()}
+          </text>
+        </>
       )}
-    </div>
+    </svg>
   );
 };
 

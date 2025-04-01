@@ -7,12 +7,7 @@ import {
   CardTitle,
   CardDescription,
 } from '@/components/ui/card';
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger
-} from '@/components/ui/tooltip';
+import { Tooltip } from '@/components/ui/tooltip';
 import {
   ResponsiveContainer,
   BarChart,
@@ -113,20 +108,18 @@ export function ResidualHistogram({ model, className }: ResidualHistogramProps) 
       <CardHeader className="pb-2">
         <div className="flex items-center justify-between">
           <CardTitle className="text-base font-semibold">Residual Distribution</CardTitle>
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Info className="h-4 w-4 text-muted-foreground" />
-              </TooltipTrigger>
-              <TooltipContent side="left">
-                <p className="max-w-[250px]">
-                  This histogram shows the distribution of model errors (residuals).
-                  For a good model, residuals should be normally distributed around zero,
-                  with minimal outliers.
-                </p>
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
+          <Tooltip
+            content={
+              <p className="max-w-[250px]">
+                This histogram shows the distribution of model errors (residuals).
+                For a good model, residuals should be normally distributed around zero,
+                with minimal outliers.
+              </p>
+            }
+            placement="left"
+          >
+            <Info className="h-4 w-4 text-muted-foreground" />
+          </Tooltip>
         </div>
         <CardDescription>
           Mean: {formatCurrency(mean)} • StdDev: {formatCurrency(stdDev)}
@@ -160,27 +153,25 @@ export function ResidualHistogram({ model, className }: ResidualHistogramProps) 
                 }}
               />
               
-              <TooltipProvider>
-                <Tooltip 
-                  content={({ active, payload, label }) => {
-                    if (active && payload && payload.length) {
-                      const bin = payload[0].payload;
-                      return (
-                        <div className="bg-white p-2 border border-gray-200 rounded shadow-sm text-xs">
-                          <p className="font-medium">Range: {formatCurrency(bin.start)} to {formatCurrency(bin.end)}</p>
-                          <p>Count: {bin.count} properties</p>
-                          <p>Percentage: {((bin.count / totalResiduals) * 100).toFixed(1)}%</p>
-                          <p className="text-muted-foreground mt-1">
-                            {bin.start <= 0 && bin.end >= 0 ? 'Contains zero point' : ''}
-                          </p>
-                        </div>
-                      );
-                    }
-                    return null;
-                  }}
-                  cursor={{ fill: 'rgba(0, 0, 0, 0.1)' }}
-                />
-              </TooltipProvider>
+              <Tooltip 
+                content={({ active, payload, label }) => {
+                  if (active && payload && payload.length) {
+                    const bin = payload[0].payload;
+                    return (
+                      <div className="bg-white p-2 border border-gray-200 rounded shadow-sm text-xs">
+                        <p className="font-medium">Range: {formatCurrency(bin.start)} to {formatCurrency(bin.end)}</p>
+                        <p>Count: {bin.count} properties</p>
+                        <p>Percentage: {((bin.count / totalResiduals) * 100).toFixed(1)}%</p>
+                        <p className="text-muted-foreground mt-1">
+                          {bin.start <= 0 && bin.end >= 0 ? 'Contains zero point' : ''}
+                        </p>
+                      </div>
+                    );
+                  }
+                  return null;
+                }}
+                cursor={{ fill: 'rgba(0, 0, 0, 0.1)' }}
+              />
               
               <ReferenceLine x={0} stroke="#888" strokeWidth={2} />
               <Bar dataKey="count">

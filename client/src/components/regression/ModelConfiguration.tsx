@@ -30,12 +30,7 @@ import {
   FormMessage 
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
-import { 
-  Tooltip, 
-  TooltipContent, 
-  TooltipProvider, 
-  TooltipTrigger 
-} from '@/components/ui/tooltip';
+import { Tooltip } from '@/components/ui/tooltip';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
@@ -562,23 +557,20 @@ export function ModelConfiguration({
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
                   <h3 className="text-sm font-medium">Independent Variable Transformations</h3>
-                  <TooltipProvider>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Button variant="ghost" size="icon" className="h-7 w-7">
-                          <Info className="h-4 w-4" />
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        <p className="max-w-[250px]">
-                          Transformations can help linearize relationships.
-                          Log transforms are useful for skewed data,
-                          square root for count data, and square/inverse
-                          for non-linear relationships.
-                        </p>
-                      </TooltipContent>
-                    </Tooltip>
-                  </TooltipProvider>
+                  <Tooltip
+                    content={
+                      <p className="max-w-[250px]">
+                        Transformations can help linearize relationships.
+                        Log transforms are useful for skewed data,
+                        square root for count data, and square/inverse
+                        for non-linear relationships.
+                      </p>
+                    }
+                  >
+                    <Button variant="ghost" size="icon" className="h-7 w-7">
+                      <Info className="h-4 w-4" />
+                    </Button>
+                  </Tooltip>
                 </div>
                 
                 <div className="space-y-2 border rounded-md p-3">

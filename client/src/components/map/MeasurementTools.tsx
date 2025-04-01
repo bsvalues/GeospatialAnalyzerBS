@@ -17,12 +17,7 @@ import {
   MinusCircle,
   Text
 } from 'lucide-react';
-import { 
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from '@/components/ui/tooltip';
+import { Tooltip } from '@/components/ui/tooltip';
 
 // Units for measurement
 const UNITS = {
@@ -414,25 +409,20 @@ export const MeasurementTools: React.FC<MeasurementToolsProps> = ({
   
   return (
     <>
-      <TooltipProvider>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button
-              variant="outline"
-              size="sm"
-              className="absolute top-4 left-[136px] z-10 bg-white p-2"
-              onClick={() => setIsVisible(prev => !prev)}
-              aria-label="Toggle Measurement Tools"
-              data-testid="toggle-measurement-tools"
-            >
-              <Ruler className="h-4 w-4" />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>
-            <p>Measurement Tools</p>
-          </TooltipContent>
-        </Tooltip>
-      </TooltipProvider>
+      <Tooltip
+        content="Measurement Tools"
+      >
+        <Button
+          variant="outline"
+          size="sm"
+          className="absolute top-4 left-[136px] z-10 bg-white p-2"
+          onClick={() => setIsVisible(prev => !prev)}
+          aria-label="Toggle Measurement Tools"
+          data-testid="toggle-measurement-tools"
+        >
+          <Ruler className="h-4 w-4" />
+        </Button>
+      </Tooltip>
       
       <Card
         className={cn(

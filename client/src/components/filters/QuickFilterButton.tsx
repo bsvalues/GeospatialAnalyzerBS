@@ -1,7 +1,7 @@
 import React from 'react';
 import { Button } from '@/components/ui/button';
 import { PropertyFilterState } from '@/contexts/PropertyFilterContext';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { Tooltip } from '@/components/ui/tooltip';
 
 export interface QuickFilter {
   id: string;
@@ -30,25 +30,21 @@ export const QuickFilterButton: React.FC<QuickFilterButtonProps> = ({
   };
   
   return (
-    <TooltipProvider>
-      <Tooltip delayDuration={300}>
-        <TooltipTrigger asChild>
-          <Button
-            variant={active ? 'default' : variant}
-            size="sm"
-            onClick={handleClick}
-            disabled={disabled}
-            className={active ? 'font-semibold' : 'font-normal'}
-            aria-pressed={active}
-          >
-            {filter.name}
-          </Button>
-        </TooltipTrigger>
-        <TooltipContent>
-          <p>{filter.description}</p>
-        </TooltipContent>
-      </Tooltip>
-    </TooltipProvider>
+    <Tooltip
+      content={filter.description}
+      delay={300}
+    >
+      <Button
+        variant={active ? 'default' : variant}
+        size="sm"
+        onClick={handleClick}
+        disabled={disabled}
+        className={active ? 'font-semibold' : 'font-normal'}
+        aria-pressed={active}
+      >
+        {filter.name}
+      </Button>
+    </Tooltip>
   );
 };
 

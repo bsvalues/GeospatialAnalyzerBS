@@ -1,11 +1,6 @@
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { 
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from '@/components/ui/tooltip';
+import { Tooltip } from '@/components/ui/tooltip';
 import { BarChart3 } from 'lucide-react';
 import NeighborhoodDemographicOverlay from './NeighborhoodDemographicOverlay';
 
@@ -37,24 +32,19 @@ export const DemographicOverlayControl: React.FC<DemographicOverlayControlProps>
 
   return (
     <>
-      <TooltipProvider>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button
-              variant={showOverlay ? "default" : "outline"}
-              size="sm"
-              className={className}
-              onClick={toggleOverlay}
-              aria-label="Toggle Demographic Overlay"
-            >
-              <BarChart3 className="h-4 w-4" />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>
-            <p>Demographic Overlay</p>
-          </TooltipContent>
-        </Tooltip>
-      </TooltipProvider>
+      <Tooltip
+        content="Demographic Overlay"
+      >
+        <Button
+          variant={showOverlay ? "default" : "outline"}
+          size="sm"
+          className={className}
+          onClick={toggleOverlay}
+          aria-label="Toggle Demographic Overlay"
+        >
+          <BarChart3 className="h-4 w-4" />
+        </Button>
+      </Tooltip>
 
       <NeighborhoodDemographicOverlay 
         visible={showOverlay} 
