@@ -15,7 +15,8 @@ import {
   Download, 
   Printer, 
   Maximize2, 
-  X 
+  X,
+  ChevronLeft
 } from 'lucide-react';
 
 export interface MapPanelProps {
@@ -32,8 +33,45 @@ export const MapPanel: React.FC<MapPanelProps> = ({ className }) => {
   // State for the panel UI
   const [showLayerPanel, setShowLayerPanel] = useState(false);
   const [showFilterPanel, setShowFilterPanel] = useState(false);
+  const [showSidebar, setShowSidebar] = useState(false); // For auto-hide sidebar
   const [searchQuery, setSearchQuery] = useState('');
   const [isFullScreen, setIsFullScreen] = useState(false);
+  const [autoHideTimeoutId, setAutoHideTimeoutId] = useState<number | null>(null);
+  
+  // Auto-hide sidebar when a property is not selected
+  useEffect(() => {
+    if (selectedProperty) {
+      setShowSidebar(true);
+    } else if (compareProperties.length === 0) {
+      // Only hide the sidebar if no property is selected and nothing is in comparison
+      setShowSidebar(false);
+    }
+  }, [selectedProperty, compareProperties]);
+  
+  // Auto-hide panels after user interaction
+  useEffect(() => {
+    // Clear any existing timeout
+    if (autoHideTimeoutId) {
+      window.clearTimeout(autoHideTimeoutId);
+    }
+    
+    // If any panel is showing, set a timeout to hide it after 5 seconds of inactivity
+    if (showLayerPanel || showFilterPanel) {
+      const timeoutId = window.setTimeout(() => {
+        setShowLayerPanel(false);
+        setShowFilterPanel(false);
+      }, 5000); // Hide after 5 seconds
+      
+      setAutoHideTimeoutId(timeoutId);
+    }
+    
+    // Cleanup on unmount
+    return () => {
+      if (autoHideTimeoutId) {
+        window.clearTimeout(autoHideTimeoutId);
+      }
+    };
+  }, [showLayerPanel, showFilterPanel, autoHideTimeoutId]);
   
   // Fetch properties from the API
   const { data: properties = [], isLoading, error } = useQuery({
@@ -203,50 +241,88 @@ export const MapPanel: React.FC<MapPanelProps> = ({ className }) => {
           </div>
         </div>
         
-        {/* Layer panel */}
-        {showLayerPanel && (
-          <div className="absolute top-14 left-4 z-10 bg-white rounded-md shadow-md border border-gray-200 w-64 max-h-[60vh] overflow-y-auto">
-            <div className="p-3 border-b border-gray-200">
-              <h3 className="font-medium text-gray-800">Map Layers</h3>
-            </div>
-            <div className="p-3">
-              <h4 className="text-sm font-medium text-gray-500 mb-2">Base Maps</h4>
-              {mapLayers.filter(layer => layer.type === 'base').map(layer => (
-                <div key={layer.id} className="flex items-center mb-2">
-                  <input
-                    type="radio"
-                    id={`base-${layer.id}`}
-                    checked={layer.checked}
-                    onChange={() => handleBaseLayerChange(layer.id)}
-                    className="mr-2 accent-primary"
-                  />
-                  <label htmlFor={`base-${layer.id}`} className="text-sm">{layer.name}</label>
-                </div>
-              ))}
-              
-              <h4 className="text-sm font-medium text-gray-500 mt-4 mb-2">Overlay Layers</h4>
-              {mapLayers.filter(layer => layer.type === 'viewable' || layer.type === 'analysis').map(layer => (
-                <div key={layer.id} className="flex items-center mb-2">
-                  <input
-                    type="checkbox"
-                    id={`layer-${layer.id}`}
-                    checked={layer.checked}
-                    onChange={() => handleLayerToggle(layer.id)}
-                    className="mr-2 accent-primary"
-                  />
-                  <label htmlFor={`layer-${layer.id}`} className="text-sm">{layer.name}</label>
-                </div>
-              ))}
-            </div>
+        {/* Layer panel with transition */}
+        <div 
+          className={`absolute top-14 left-4 z-10 bg-white rounded-md shadow-md border border-gray-200 w-64 max-h-[60vh] overflow-y-auto transition-all duration-300 ease-in-out ${
+            showLayerPanel ? 'opacity-100 scale-100' : 'opacity-0 scale-95 pointer-events-none'
+          }`}
+          onMouseEnter={() => {
+            // Reset timeout when user interacts with panel
+            if (autoHideTimeoutId) {
+              window.clearTimeout(autoHideTimeoutId);
+              setAutoHideTimeoutId(null);
+            }
+          }}
+        >
+          <div className="p-3 border-b border-gray-200">
+            <h3 className="font-medium text-gray-800">Map Layers</h3>
           </div>
-        )}
+          <div className="p-3">
+            <h4 className="text-sm font-medium text-gray-500 mb-2">Base Maps</h4>
+            {mapLayers.filter(layer => layer.type === 'base').map(layer => (
+              <div key={layer.id} className="flex items-center mb-2">
+                <input
+                  type="radio"
+                  id={`base-${layer.id}`}
+                  checked={layer.checked}
+                  onChange={() => {
+                    handleBaseLayerChange(layer.id);
+                    // Reset the auto-hide timeout
+                    if (autoHideTimeoutId) {
+                      window.clearTimeout(autoHideTimeoutId);
+                    }
+                    const timeoutId = window.setTimeout(() => {
+                      setShowLayerPanel(false);
+                    }, 5000);
+                    setAutoHideTimeoutId(timeoutId);
+                  }}
+                  className="mr-2 accent-primary"
+                />
+                <label htmlFor={`base-${layer.id}`} className="text-sm">{layer.name}</label>
+              </div>
+            ))}
+            
+            <h4 className="text-sm font-medium text-gray-500 mt-4 mb-2">Overlay Layers</h4>
+            {mapLayers.filter(layer => layer.type === 'viewable' || layer.type === 'analysis').map(layer => (
+              <div key={layer.id} className="flex items-center mb-2">
+                <input
+                  type="checkbox"
+                  id={`layer-${layer.id}`}
+                  checked={layer.checked}
+                  onChange={() => {
+                    handleLayerToggle(layer.id);
+                    // Reset the auto-hide timeout
+                    if (autoHideTimeoutId) {
+                      window.clearTimeout(autoHideTimeoutId);
+                    }
+                    const timeoutId = window.setTimeout(() => {
+                      setShowLayerPanel(false);
+                    }, 5000);
+                    setAutoHideTimeoutId(timeoutId);
+                  }}
+                  className="mr-2 accent-primary"
+                />
+                <label htmlFor={`layer-${layer.id}`} className="text-sm">{layer.name}</label>
+              </div>
+            ))}
+          </div>
+        </div>
         
-        {/* Property Filter Panel */}
-        {showFilterPanel && (
-          <div className="absolute top-14 left-4 z-10 w-[350px]">
-            <PropertyFilterPanel className="w-full" />
-          </div>
-        )}
+        {/* Property Filter Panel with transition */}
+        <div 
+          className={`absolute top-14 left-4 z-10 w-[350px] transition-all duration-300 ease-in-out ${
+            showFilterPanel ? 'opacity-100 scale-100' : 'opacity-0 scale-95 pointer-events-none'
+          }`}
+          onMouseEnter={() => {
+            // Reset timeout when user interacts with panel
+            if (autoHideTimeoutId) {
+              window.clearTimeout(autoHideTimeoutId);
+              setAutoHideTimeoutId(null);
+            }
+          }}
+        >
+          <PropertyFilterPanel className="w-full" />
+        </div>
         
         {isLoading ? (
           <div className="h-full w-full flex items-center justify-center bg-gray-100">
@@ -297,8 +373,12 @@ export const MapPanel: React.FC<MapPanelProps> = ({ className }) => {
         )}
       </div>
       
-      {/* Property info sidebar */}
-      <div className={`w-96 h-full overflow-hidden border-l border-gray-200 ${isFullScreen ? 'bg-white' : ''}`}>
+      {/* Auto-hiding property info sidebar */}
+      <div 
+        className={`h-full overflow-hidden border-l border-gray-200 transition-all duration-300 ease-in-out ${
+          showSidebar ? 'w-96 opacity-100' : 'w-0 opacity-0'
+        } ${isFullScreen ? 'bg-white' : ''}`}
+      >
         <PropertyInfoPanel
           property={selectedProperty}
           onClose={handleClosePropertyInfo}
@@ -336,6 +416,17 @@ export const MapPanel: React.FC<MapPanelProps> = ({ className }) => {
           </div>
         )}
       </div>
+      
+      {/* Toggle sidebar button (always visible) */}
+      <button
+        className={`absolute right-4 bottom-4 z-10 p-2.5 bg-white rounded-full shadow-md border border-gray-200 text-gray-600 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-primary/50 transition-transform duration-300 ${
+          showSidebar ? 'transform rotate-180' : ''
+        }`}
+        onClick={() => setShowSidebar(!showSidebar)}
+        title={showSidebar ? "Hide sidebar" : "Show sidebar"}
+      >
+        <ChevronLeft className="h-5 w-5" />
+      </button>
     </div>
   );
 };

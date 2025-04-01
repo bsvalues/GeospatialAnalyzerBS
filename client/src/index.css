@@ -28,17 +28,21 @@
   }
 }
 
-.custom-pulsing-icon .pulse-effect {
+/* Apply pulsing animation to map marker pulse effects */
+.pulse-effect {
   animation: pulse 1.5s infinite;
 }
 
-/* Enhanced property markers */
+/* Auto-hide panel transitions */
 .property-marker-enhanced {
-  transition: all 0.2s ease-in-out;
+  transform-origin: center center;
+  transition: all 0.3s ease-in-out;
 }
 
-.property-marker-enhanced:hover {
-  transform: scale(1.1);
+.property-marker-enhanced:hover,
+.map-3d-marker:hover {
+  transform: scale(1.2) translateY(-5px);
+  filter: drop-shadow(0 6px 8px rgba(0,0,0,0.3));
   z-index: 1000 !important;
 }
 
@@ -66,11 +70,12 @@
 /* 3D effect helpers */
 .map-3d-marker {
   filter: drop-shadow(0 2px 3px rgba(0,0,0,0.2));
-  transition: all 0.2s ease-in-out;
+  transition: all 0.3s ease-in-out;
   cursor: pointer;
+  transform-origin: center bottom;
 }
 
 .map-3d-marker:hover {
-  filter: drop-shadow(0 3px 5px rgba(0,0,0,0.3));
-  transform: translateY(-2px);
+  filter: drop-shadow(0 5px 8px rgba(0,0,0,0.3));
+  transform: translateY(-3px) scale(1.12);
 }
