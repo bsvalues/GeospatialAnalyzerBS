@@ -220,3 +220,114 @@
   filter: drop-shadow(0 5px 8px rgba(0,0,0,0.3));
   transform: translateY(-3px) scale(1.12);
 }
+
+/* Accessibility related styles */
+:root {
+  --reduced-motion: no-preference;
+  --font-size-scale: 1;
+}
+
+/* Apply font scaling to text elements */
+.font-scalable {
+  font-size: calc(1em * var(--font-size-scale));
+}
+
+h1.font-scalable {
+  font-size: calc(2rem * var(--font-size-scale));
+}
+
+h2.font-scalable {
+  font-size: calc(1.5rem * var(--font-size-scale));
+}
+
+h3.font-scalable {
+  font-size: calc(1.25rem * var(--font-size-scale));
+}
+
+p.font-scalable, li.font-scalable, div.font-scalable {
+  font-size: calc(1rem * var(--font-size-scale));
+}
+
+small.font-scalable {
+  font-size: calc(0.875rem * var(--font-size-scale));
+}
+
+/* Reduced motion settings */
+@media (prefers-reduced-motion: reduce), (--reduced-motion: reduce) {
+  *, ::after, ::before {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  
+  .map-3d-marker:hover, 
+  .property-marker-enhanced:hover {
+    transform: none !important;
+    filter: none !important;
+  }
+  
+  .pulse-effect {
+    animation: none !important;
+  }
+}
+
+/* High contrast mode */
+.high-contrast-mode {
+  color-scheme: light dark;
+}
+
+body.high-contrast-mode {
+  --background: #ffffff;
+  --foreground: #000000;
+  --primary: #0000cc;
+  --muted: #f2f2f2;
+  --muted-foreground: #000000;
+  --contrast-border: 2px solid #000000;
+}
+
+.high-contrast-mode .bg-white,
+.high-contrast-mode .bg-background {
+  background-color: var(--background) !important;
+  color: var(--foreground) !important;
+}
+
+.high-contrast-mode .text-gray-500,
+.high-contrast-mode .text-gray-600,
+.high-contrast-mode .text-gray-700 {
+  color: var(--foreground) !important;
+}
+
+.high-contrast-mode button:not([disabled]),
+.high-contrast-mode a {
+  color: var(--primary) !important;
+  text-decoration: underline;
+}
+
+.high-contrast-mode button:focus,
+.high-contrast-mode a:focus,
+.high-contrast-mode input:focus,
+.high-contrast-mode select:focus {
+  outline: 2px solid var(--primary) !important;
+  outline-offset: 2px;
+}
+
+.high-contrast-mode input,
+.high-contrast-mode select,
+.high-contrast-mode textarea {
+  border: var(--contrast-border) !important;
+  background-color: var(--background) !important;
+  color: var(--foreground) !important;
+}
+
+.high-contrast-mode .border,
+.high-contrast-mode .border-gray-100,
+.high-contrast-mode .border-gray-200 {
+  border: var(--contrast-border) !important;
+}
+
+/* Focus indicators for keyboard navigation */
+.keyboard-navigation-active :focus {
+  outline: 3px solid #007FD4 !important;
+  outline-offset: 3px !important;
+}

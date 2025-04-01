@@ -1,6 +1,10 @@
-import React, { createContext, useContext, useState, ReactNode } from 'react';
+import React, { createContext, ReactNode, useContext, useState, useEffect } from 'react';
+import { screenReaderAnnouncer } from '../services/accessibility/screenReaderService';
 
-interface MapAccessibilityContextProps {
+/**
+ * Map accessibility context props
+ */
+export interface MapAccessibilityContextProps {
   /** Enable or disable high contrast mode */
   highContrastMode: boolean;
   /** Toggle high contrast mode */
@@ -34,68 +38,132 @@ interface MapAccessibilityContextProps {
   announceToScreenReader: (message: string) => void;
 }
 
-const MapAccessibilityContext = createContext<MapAccessibilityContextProps | undefined>(undefined);
+// Create context with default values
+const MapAccessibilityContext = createContext<MapAccessibilityContextProps>({
+  highContrastMode: false,
+  toggleHighContrastMode: () => {},
+  
+  keyboardNavigation: false,
+  toggleKeyboardNavigation: () => {},
+  
+  screenReaderAnnouncements: true,
+  toggleScreenReaderAnnouncements: () => {},
+  
+  fontSizeScale: 1,
+  increaseFontSize: () => {},
+  decreaseFontSize: () => {},
+  resetFontSize: () => {},
+  
+  reducedMotion: false,
+  toggleReducedMotion: () => {},
+  
+  announceToScreenReader: () => {}
+});
+
+// Local storage key for saving preferences
+const STORAGE_KEY = 'map_accessibility_preferences';
 
 /**
  * Provider component for map accessibility settings
  */
 export const MapAccessibilityProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  // Accessibility states
+  // State for accessibility preferences
   const [highContrastMode, setHighContrastMode] = useState(false);
-  const [keyboardNavigation, setKeyboardNavigation] = useState(true);
+  const [keyboardNavigation, setKeyboardNavigation] = useState(false);
   const [screenReaderAnnouncements, setScreenReaderAnnouncements] = useState(true);
   const [fontSizeScale, setFontSizeScale] = useState(1);
   const [reducedMotion, setReducedMotion] = useState(false);
-  
+
+  // Load preferences from local storage on mount
+  useEffect(() => {
+    const savedPreferences = localStorage.getItem(STORAGE_KEY);
+    
+    if (savedPreferences) {
+      try {
+        const preferences = JSON.parse(savedPreferences);
+        
+        setHighContrastMode(preferences.highContrastMode || false);
+        setKeyboardNavigation(preferences.keyboardNavigation || false);
+        setScreenReaderAnnouncements(preferences.screenReaderAnnouncements !== false); // Default to true
+        setFontSizeScale(preferences.fontSizeScale || 1);
+        setReducedMotion(preferences.reducedMotion || false);
+      } catch (e) {
+        console.error('Failed to parse accessibility preferences', e);
+      }
+    }
+  }, []);
+
+  // Save preferences when they change
+  useEffect(() => {
+    const preferences = {
+      highContrastMode,
+      keyboardNavigation,
+      screenReaderAnnouncements,
+      fontSizeScale,
+      reducedMotion
+    };
+    
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(preferences));
+    
+    // Apply reduced motion preference to CSS
+    if (reducedMotion) {
+      document.documentElement.style.setProperty('--reduced-motion', 'reduce');
+    } else {
+      document.documentElement.style.setProperty('--reduced-motion', 'no-preference');
+    }
+    
+    // Apply high contrast mode to body class
+    if (highContrastMode) {
+      document.body.classList.add('high-contrast-mode');
+    } else {
+      document.body.classList.remove('high-contrast-mode');
+    }
+    
+    // Apply font size scale to CSS variable
+    document.documentElement.style.setProperty('--font-size-scale', fontSizeScale.toString());
+  }, [highContrastMode, keyboardNavigation, screenReaderAnnouncements, fontSizeScale, reducedMotion]);
+
   // Toggle functions
   const toggleHighContrastMode = () => setHighContrastMode(prev => !prev);
   const toggleKeyboardNavigation = () => setKeyboardNavigation(prev => !prev);
   const toggleScreenReaderAnnouncements = () => setScreenReaderAnnouncements(prev => !prev);
   const toggleReducedMotion = () => setReducedMotion(prev => !prev);
-  
+
   // Font size functions
   const increaseFontSize = () => setFontSizeScale(prev => Math.min(prev + 0.1, 1.5));
   const decreaseFontSize = () => setFontSizeScale(prev => Math.max(prev - 0.1, 0.8));
   const resetFontSize = () => setFontSizeScale(1);
-  
+
   // Screen reader announcement function
   const announceToScreenReader = (message: string) => {
-    if (!screenReaderAnnouncements) return;
-    
-    let announceElement = document.getElementById('map-announcements');
-    
-    // Create the announcement element if it doesn't exist
-    if (!announceElement) {
-      announceElement = document.createElement('div');
-      announceElement.id = 'map-announcements';
-      announceElement.className = 'sr-only';
-      announceElement.setAttribute('aria-live', 'polite');
-      announceElement.setAttribute('aria-atomic', 'true');
-      document.body.appendChild(announceElement);
+    if (screenReaderAnnouncements) {
+      screenReaderAnnouncer.announce(message);
     }
-    
-    // Set the message
-    announceElement.textContent = message;
   };
-  
-  const value = {
+
+  const contextValue: MapAccessibilityContextProps = {
     highContrastMode,
     toggleHighContrastMode,
+    
     keyboardNavigation,
     toggleKeyboardNavigation,
+    
     screenReaderAnnouncements,
     toggleScreenReaderAnnouncements,
+    
     fontSizeScale,
     increaseFontSize,
     decreaseFontSize,
     resetFontSize,
+    
     reducedMotion,
     toggleReducedMotion,
+    
     announceToScreenReader
   };
-  
+
   return (
-    <MapAccessibilityContext.Provider value={value}>
+    <MapAccessibilityContext.Provider value={contextValue}>
       {children}
     </MapAccessibilityContext.Provider>
   );
@@ -105,12 +173,5 @@ export const MapAccessibilityProvider: React.FC<{ children: ReactNode }> = ({ ch
  * Hook to use map accessibility settings
  */
 export const useMapAccessibility = (): MapAccessibilityContextProps => {
-  const context = useContext(MapAccessibilityContext);
-  if (context === undefined) {
-    throw new Error('useMapAccessibility must be used within a MapAccessibilityProvider');
-  }
-  return context;
+  return useContext(MapAccessibilityContext);
 };
-
-// Export the context for testing
-export { MapAccessibilityContext };

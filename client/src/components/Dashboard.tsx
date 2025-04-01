@@ -25,6 +25,7 @@ import ScriptPanel from './panels/ScriptPanel';
 import { SpatialAnalysisPanel } from './panels/SpatialAnalysisPanel';
 import { RegressionPanel } from './panels/RegressionPanel';
 import { PropertyComparisonPanel } from './panels/PropertyComparisonPanel';
+import { SettingsPanel } from './panels/SettingsPanel';
 import { ReportGenerator } from './export/ReportGenerator';
 import { Property } from '@shared/schema';
 import { useQuery } from '@tanstack/react-query';
@@ -402,19 +403,8 @@ const Dashboard: React.FC<DashboardProps> = ({ className }) => {
         )}
         
         {activeTab === 'settings' && (
-          <div className="h-full p-6 flex items-center justify-center">
-            <div className="text-center max-w-md">
-              <div className="bg-gray-50 p-5 rounded-full inline-block mb-4">
-                <Settings className="w-12 h-12 text-gray-300" />
-              </div>
-              <h3 className="text-xl font-semibold text-gray-800 mb-3">Settings Panel</h3>
-              <p className="text-gray-600 mb-6">
-                The Settings panel will allow you to configure application preferences, user settings, and data sources.
-              </p>
-              <button className="bg-primary/10 text-primary px-4 py-2 rounded-lg text-sm font-medium hover:bg-primary/20 transition-colors duration-200">
-                Coming Soon
-              </button>
-            </div>
+          <div className="h-full">
+            <SettingsPanel />
           </div>
         )}
       </div>

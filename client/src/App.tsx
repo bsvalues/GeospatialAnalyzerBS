@@ -23,7 +23,7 @@ function Router() {
   );
 }
 
-function App() {
+export function App() {
   const [taxYear, setTaxYear] = useState('2025');
   
   return (
