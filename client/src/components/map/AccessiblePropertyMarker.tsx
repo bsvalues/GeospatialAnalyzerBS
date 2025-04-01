@@ -17,7 +17,171 @@ export interface AccessiblePropertyMarkerProps {
   markerRef?: React.RefObject<L.Marker>;
 }
 
-// Helper function to create an accessible icon with proper contrast
+// Helper function to adjust color brightness
+function adjustColor(hex: string, percent: number): string {
+  // Remove # if present
+  hex = hex.replace(/^#/, '');
+  
+  // Parse the hex color
+  let r = parseInt(hex.substring(0, 2), 16);
+  let g = parseInt(hex.substring(2, 4), 16);
+  let b = parseInt(hex.substring(4, 6), 16);
+  
+  // Adjust brightness
+  r = Math.min(255, Math.max(0, r + percent));
+  g = Math.min(255, Math.max(0, g + percent));
+  b = Math.min(255, Math.max(0, b + percent));
+  
+  // Convert back to hex
+  return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
+}
+
+// Create a 3D marker icon
+const create3DIcon = (propertyType: string, isSelected: boolean): L.DivIcon => {
+  // Use high contrast colors with proper WCAG compliance
+  const getColorByPropertyType = (type: string): string => {
+    switch (type.toLowerCase()) {
+      case 'residential':
+        return '#2E8540'; // Green with good contrast
+      case 'commercial':
+        return '#0071BC'; // Blue with good contrast
+      case 'industrial': 
+        return '#D83933'; // Red with good contrast
+      case 'agricultural':
+        return '#FDB81E'; // Amber with good contrast
+      default:
+        return '#4773AA'; // Default blue with good contrast
+    }
+  };
+  
+  const baseColor = getColorByPropertyType(propertyType);
+  const darkColor = adjustColor(baseColor, -30); // Darker shade for 3D effect
+  const size = isSelected ? 30 : 26; // Larger when selected for better visibility
+  
+  return L.divIcon({
+    className: 'accessible-property-marker-3d property-marker-enhanced map-3d-marker',
+    html: `
+      <div style="
+        position: relative;
+        width: ${size}px;
+        height: ${size}px;
+        filter: drop-shadow(0 2px 3px rgba(0,0,0,0.3));
+      ">
+        <!-- Main marker -->
+        <div style="
+          position: absolute;
+          top: 0;
+          left: 0;
+          width: 100%;
+          height: 100%;
+          background: linear-gradient(135deg, ${baseColor}, ${darkColor});
+          border-radius: 50%;
+          border: 2px solid white;
+          box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+          z-index: 10;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        "
+        role="img" 
+        aria-label="${propertyType} property${isSelected ? ' (selected)' : ''}">
+          ${isSelected ? '<span style="color: white; font-weight: bold; font-size: 16px; position: relative; z-index: 20;">✓</span>' : ''}
+        </div>
+        
+        <!-- Shadow effect -->
+        <div style="
+          position: absolute;
+          bottom: -4px;
+          left: 2px;
+          width: 90%;
+          height: 10%;
+          background: rgba(0,0,0,0.3);
+          border-radius: 50%;
+          filter: blur(2px);
+          z-index: 5;
+        "></div>
+        
+        <!-- Top highlight for 3D effect -->
+        <div style="
+          position: absolute;
+          top: 4px;
+          left: 4px;
+          width: 35%;
+          height: 35%;
+          background: rgba(255,255,255,0.7);
+          border-radius: 50%;
+          z-index: 15;
+        "></div>
+      </div>
+    `,
+    iconSize: [size, size],
+    iconAnchor: [size/2, size/2],
+    popupAnchor: [0, -(size/2)]
+  });
+};
+
+// Create a pulsing marker for selected property
+const createPulsingIcon = (propertyType: string): L.DivIcon => {
+  // Use high contrast colors with proper WCAG compliance
+  const getColorByPropertyType = (type: string): string => {
+    switch (type.toLowerCase()) {
+      case 'residential':
+        return '#2E8540'; // Green with good contrast
+      case 'commercial':
+        return '#0071BC'; // Blue with good contrast
+      case 'industrial': 
+        return '#D83933'; // Red with good contrast
+      case 'agricultural':
+        return '#FDB81E'; // Amber with good contrast
+      default:
+        return '#ec4899'; // Pink for selected (default)
+    }
+  };
+  
+  const color = getColorByPropertyType(propertyType);
+  const size = 32; // Larger for selected properties
+  
+  return L.divIcon({
+    className: 'accessible-property-marker-pulsing property-marker-enhanced',
+    html: `
+      <div class="pulsing-marker-container" style="position: relative;">
+        <div style="
+          background-color: ${color}; 
+          width: ${size}px; 
+          height: ${size}px; 
+          border-radius: 50%; 
+          border: 3px solid white; 
+          box-shadow: 0 0 15px rgba(0,0,0,0.4);
+          position: relative;
+          z-index: 2;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        "
+        role="img" 
+        aria-label="${propertyType} property (selected)">
+          <span style="color: white; font-weight: bold; font-size: 18px; position: relative; z-index: 20;">✓</span>
+        </div>
+        <div class="pulse-effect" style="
+          position: absolute;
+          top: -10px;
+          left: -10px;
+          right: -10px;
+          bottom: -10px;
+          border-radius: 50%;
+          background: ${color};
+          opacity: 0.4;
+          z-index: 1;
+        "></div>
+      </div>
+    `,
+    iconSize: [size, size],
+    iconAnchor: [size/2, size/2],
+    popupAnchor: [0, -(size/2)]
+  });
+};
+
+// Helper function to create an accessible icon with proper contrast (original basic version)
 const createAccessibleIcon = (propertyType: string, isSelected: boolean): L.DivIcon => {
   // Use high contrast colors with proper WCAG compliance
   const getColorByPropertyType = (type: string): string => {
@@ -169,13 +333,19 @@ export const AccessiblePropertyMarker: React.FC<AccessiblePropertyMarkerProps> =
   
   // Different marker styling based on marker type
   const getIcon = () => {
+    // If selected, use the pulsing icon regardless of marker type
+    if (isSelected) {
+      return createPulsingIcon(propertyType);
+    }
+    
     switch (markerType) {
       case 'cluster':
         return createClusterIcon(propertyType, isSelected);
       case 'heatmap':
         return createHeatmapIcon(propertyType, isSelected);
       default:
-        return createAccessibleIcon(propertyType, isSelected);
+        // Use enhanced 3D icons for default markers
+        return create3DIcon(propertyType, isSelected);
     }
   };
   

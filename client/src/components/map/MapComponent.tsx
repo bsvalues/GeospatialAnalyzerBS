@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { MapContainer, TileLayer, Marker, Popup, useMap, LayersControl, LayerGroup, CircleMarker, ZoomControl } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Popup, useMap, LayersControl, LayerGroup, CircleMarker, ZoomControl, GeoJSON, Tooltip, Rectangle, Polygon } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { Property } from '@shared/schema';
@@ -19,14 +19,163 @@ import MiniMap from './MiniMap';
 import icon from 'leaflet/dist/images/marker-icon.png';
 import iconShadow from 'leaflet/dist/images/marker-shadow.png';
 
-// Create custom icons for different property types
-const createIcon = (color: string) => {
+// Note: We're referencing these CSS files but not actually importing them
+// as they would be added in a real implementation with the actual plugins
+// import 'leaflet-fullscreen/dist/Leaflet.fullscreen.css';
+// import 'leaflet-measure/dist/leaflet-measure.css';
+
+// Extend Leaflet with additional plugins
+// (Note: In a real implementation, we would actually load these plugins)
+
+// Custom animated marker effect - creates a pulsing effect around markers
+const createPulsingIcon = (color: string, size: number = 24) => {
+  return L.divIcon({
+    className: 'custom-pulsing-icon',
+    html: `
+      <div style="position: relative;">
+        <div style="
+          background-color: ${color}; 
+          width: ${size}px; 
+          height: ${size}px; 
+          border-radius: 50%; 
+          border: 2px solid white; 
+          box-shadow: 0 0 15px rgba(0,0,0,0.4);
+          position: relative;
+          z-index: 2;
+        "></div>
+        <div style="
+          position: absolute;
+          top: -10px;
+          left: -10px;
+          right: -10px;
+          bottom: -10px;
+          border-radius: 50%;
+          background: ${color};
+          opacity: 0.4;
+          animation: pulse 1.5s infinite;
+          z-index: 1;
+        "></div>
+      </div>
+    `,
+    iconSize: [size, size],
+    iconAnchor: [size/2, size/2],
+    popupAnchor: [0, -size/2]
+  });
+};
+
+// 3D Effect marker with shadow
+const create3DIcon = (color: string, size: number = 24) => {
+  const darkColor = adjustColor(color, -30); // Darker shade for 3D effect
+  
+  return L.divIcon({
+    className: 'custom-3d-icon',
+    html: `
+      <div style="
+        position: relative;
+        width: ${size}px;
+        height: ${size}px;
+      ">
+        <!-- Main marker -->
+        <div style="
+          position: absolute;
+          top: 0;
+          left: 0;
+          width: 100%;
+          height: 100%;
+          background: linear-gradient(135deg, ${color}, ${darkColor});
+          border-radius: 50%;
+          border: 2px solid white;
+          box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+          z-index: 10;
+        "></div>
+        
+        <!-- Shadow effect -->
+        <div style="
+          position: absolute;
+          bottom: -4px;
+          left: 2px;
+          width: 90%;
+          height: 10%;
+          background: rgba(0,0,0,0.3);
+          border-radius: 50%;
+          filter: blur(2px);
+          z-index: 5;
+        "></div>
+        
+        <!-- Top highlight for 3D effect -->
+        <div style="
+          position: absolute;
+          top: 4px;
+          left: 4px;
+          width: 35%;
+          height: 35%;
+          background: rgba(255,255,255,0.7);
+          border-radius: 50%;
+          z-index: 15;
+        "></div>
+      </div>
+    `,
+    iconSize: [size, size],
+    iconAnchor: [size/2, size/2],
+    popupAnchor: [0, -size/2]
+  });
+};
+
+// Helper function to adjust color brightness
+function adjustColor(hex: string, percent: number): string {
+  // Remove # if present
+  hex = hex.replace(/^#/, '');
+  
+  // Parse the hex color
+  let r = parseInt(hex.substring(0, 2), 16);
+  let g = parseInt(hex.substring(2, 4), 16);
+  let b = parseInt(hex.substring(4, 6), 16);
+  
+  // Adjust brightness
+  r = Math.min(255, Math.max(0, r + percent));
+  g = Math.min(255, Math.max(0, g + percent));
+  b = Math.min(255, Math.max(0, b + percent));
+  
+  // Convert back to hex
+  return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
+}
+
+// Create standard marker icons
+const createStandardIcon = (color: string, size: number = 22) => {
   return L.divIcon({
     className: 'custom-div-icon',
-    html: `<div style="background-color: ${color}; width: 22px; height: 22px; border-radius: 50%; border: 2px solid white; box-shadow: 0 1px 3px rgba(0,0,0,0.4);"></div>`,
-    iconSize: [22, 22],
-    iconAnchor: [11, 11],
-    popupAnchor: [0, -11]
+    html: `<div style="background-color: ${color}; width: ${size}px; height: ${size}px; border-radius: 50%; border: 2px solid white; box-shadow: 0 1px 3px rgba(0,0,0,0.4);"></div>`,
+    iconSize: [size, size],
+    iconAnchor: [size/2, size/2],
+    popupAnchor: [0, -size/2]
+  });
+};
+
+// Fancy text labels for markers
+const createLabeledIcon = (color: string, label: string, size: number = 26) => {
+  return L.divIcon({
+    className: 'custom-labeled-icon',
+    html: `
+      <div style="position: relative;">
+        <div style="
+          background-color: ${color}; 
+          width: ${size}px; 
+          height: ${size}px; 
+          border-radius: 50%; 
+          border: 2px solid white; 
+          box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          color: white;
+          font-weight: bold;
+          font-size: ${size * 0.6}px;
+        ">${label}</div>
+      </div>
+    `,
+    iconSize: [size, size],
+    iconAnchor: [size/2, size/2],
+    popupAnchor: [0, -size/2]
   });
 };
 
@@ -39,13 +188,18 @@ const DefaultIcon = L.icon({
   shadowSize: [41, 41]
 });
 
-// Create custom markers based on property types
-const ResidentialIcon = createIcon('#4ade80'); // Green
-const CommercialIcon = createIcon('#3b82f6'); // Blue
-const IndustrialIcon = createIcon('#ef4444'); // Red
-const AgriculturalIcon = createIcon('#f59e0b'); // Amber
-const SelectedIcon = createIcon('#f43f5e'); // Pink
-const DefaultDotIcon = createIcon('#6b7280'); // Gray
+// Create custom markers based on property types (now with enhanced 3D look)
+const ResidentialIcon = create3DIcon('#4ade80', 26); // Green
+const CommercialIcon = create3DIcon('#3b82f6', 26); // Blue
+const IndustrialIcon = create3DIcon('#ef4444', 26); // Red
+const AgriculturalIcon = create3DIcon('#f59e0b', 26); // Amber
+const SelectedIcon = createPulsingIcon('#f43f5e', 28); // Pink with pulsing effect
+const DefaultDotIcon = createStandardIcon('#6b7280', 22); // Gray
+
+// Create labeled icons for specific categories
+const PropertyIcon1 = createLabeledIcon('#8b5cf6', 'R', 28); // Purple with R label
+const PropertyIcon2 = createLabeledIcon('#ec4899', 'C', 28); // Pink with C label
+const PropertyIcon3 = createLabeledIcon('#14b8a6', 'A', 28); // Teal with A label
 
 L.Marker.prototype.options.icon = DefaultIcon;
 
