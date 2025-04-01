@@ -128,7 +128,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   ];
 
   // API routes for property data
-  
+
   // Get all properties
   app.get('/api/properties', async (req, res) => {
     try {
@@ -145,7 +145,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const sortOrder = req.query.sortOrder as 'asc' | 'desc' | undefined;
       const limit = req.query.limit ? parseInt(req.query.limit as string) : undefined;
       const offset = req.query.offset ? parseInt(req.query.offset as string) : undefined;
-      
+
       // Get filtered properties from storage
       const properties = await storage.getPropertiesByFilter({
         minYearBuilt,
@@ -161,25 +161,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
         limit,
         offset
       });
-      
+
       res.json(properties);
     } catch (error) {
       console.error('Error fetching properties:', error);
       res.status(500).json({ error: 'Failed to fetch properties' });
     }
   });
-  
+
   // Get a single property by ID
   app.get('/api/properties/:id', async (req, res) => {
     try {
       const propertyId = parseInt(req.params.id);
-      
+
       if (isNaN(propertyId)) {
         return res.status(400).json({ error: 'Invalid property ID' });
       }
-      
+
       const property = await storage.getPropertyById(propertyId);
-      
+
       if (property) {
         res.json(property);
       } else {
@@ -190,16 +190,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ error: 'Failed to fetch property' });
     }
   });
-  
+
   // Search properties by text
   app.get('/api/properties/search', async (req, res) => {
     try {
       const searchText = req.query.q as string || '';
-      
+
       if (!searchText) {
         return res.status(400).json({ error: 'Search query is required' });
       }
-      
+
       const properties = await storage.searchProperties(searchText);
       res.json(properties);
     } catch (error) {
@@ -207,58 +207,58 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ error: 'Failed to search properties' });
     }
   });
-  
+
   // Find similar properties
   app.get('/api/properties/similar/:id', async (req, res) => {
     try {
       const propertyId = parseInt(req.params.id);
       const limit = req.query.limit ? parseInt(req.query.limit as string) : 5;
-      
+
       if (isNaN(propertyId)) {
         return res.status(400).json({ error: 'Invalid property ID' });
       }
-      
+
       // Get the reference property
       const referenceProperty = await storage.getPropertyById(propertyId);
-      
+
       if (!referenceProperty) {
         return res.status(404).json({ error: 'Reference property not found' });
       }
-      
+
       // Get all properties
       const allProperties = await storage.getProperties();
-      
+
       // Calculate similarity scores
       const similarProperties = allProperties
         .filter(p => p.id !== propertyId) // Exclude the reference property
         .map(property => {
           // Calculate similarity based on weighted factors
           let similarityScore = 0;
-          
+
           // Factor: Square footage (30% weight)
           const sqftDiff = Math.abs(property.squareFeet - referenceProperty.squareFeet);
           const sqftSimilarity = Math.max(0, 1 - (sqftDiff / 2000)); // Normalize to 0-1
           similarityScore += sqftSimilarity * 0.3;
-          
+
           // Factor: Year built (20% weight)
           if (property.yearBuilt && referenceProperty.yearBuilt) {
             const yearDiff = Math.abs(property.yearBuilt - referenceProperty.yearBuilt);
             const yearSimilarity = Math.max(0, 1 - (yearDiff / 50)); // Normalize to 0-1
             similarityScore += yearSimilarity * 0.2;
           }
-          
+
           // Factor: Neighborhood (30% weight)
           if (property.neighborhood && referenceProperty.neighborhood) {
             const neighborhoodSimilarity = property.neighborhood === referenceProperty.neighborhood ? 1 : 0;
             similarityScore += neighborhoodSimilarity * 0.3;
           }
-          
+
           // Factor: Property type (10% weight)
           if (property.propertyType && referenceProperty.propertyType) {
             const propertyTypeSimilarity = property.propertyType === referenceProperty.propertyType ? 1 : 0;
             similarityScore += propertyTypeSimilarity * 0.1;
           }
-          
+
           // Factor: Value (10% weight)
           if (property.value && referenceProperty.value) {
             const propertyValue = parseFloat(property.value.replace(/[^0-9.-]+/g, ''));
@@ -267,19 +267,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
             const valueSimilarity = Math.max(0, 1 - (valueDiff / 500000)); // Normalize to 0-1
             similarityScore += valueSimilarity * 0.1;
           }
-          
+
           return { ...property, similarityScore };
         })
         .sort((a, b) => b.similarityScore - a.similarityScore) // Sort by similarity (descending)
         .slice(0, limit); // Limit the number of results
-      
+
       res.json(similarProperties.map(({ similarityScore, ...property }) => property));
     } catch (error) {
       console.error('Error finding similar properties:', error);
       res.status(500).json({ error: 'Failed to find similar properties' });
     }
   });
-  
+
   // Find properties within a geographic region
   app.get('/api/properties/region', async (req, res) => {
     try {
@@ -287,11 +287,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const west = parseFloat(req.query.west as string);
       const north = parseFloat(req.query.north as string);
       const east = parseFloat(req.query.east as string);
-      
+
       if (isNaN(south) || isNaN(west) || isNaN(north) || isNaN(east)) {
         return res.status(400).json({ error: 'Invalid bounds parameters' });
       }
-      
+
       const properties = await storage.getPropertiesInRegion([south, west, north, east]);
       res.json(properties);
     } catch (error) {
@@ -380,11 +380,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       { id: 5, name: 'Neighborhood Factor Analysis', r2: 0.825, variables: 7, cov: 11.3, samples: 278, lastRun: '2024-03-22', type: 'geospatial' }
     ]);
   });
-  
+
   // Get model variables by model ID
   app.get('/api/regression/models/:id/variables', (req, res) => {
     const modelId = parseInt(req.params.id);
-    
+
     const variablesByModel = {
       1: [
         { name: 'squareFeet', coefficient: 105.82, tValue: 9.7, pValue: 0.00001, correlation: 0.84, included: true },
@@ -436,15 +436,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         { name: 'noiseLevel', coefficient: -3500.00, tValue: -1.8, pValue: 0.07342, correlation: -0.29, included: false }
       ]
     };
-    
+
     // Return the variables for the requested model, or an empty array if model not found
     res.json(variablesByModel[modelId as keyof typeof variablesByModel] || []);
   });
-  
+
   // Get model predictions
   app.get('/api/regression/models/:id/predictions', (req, res) => {
     const modelId = parseInt(req.params.id);
-    
+
     // Generate realistic prediction data with actual vs predicted values
     const predictions = Array.from({ length: 40 }, (_, i) => {
       const actualValue = 200000 + Math.random() * 400000;
@@ -460,14 +460,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         address: `${1000 + i} Sample St, Benton County, WA`
       };
     });
-    
+
     res.json(predictions);
   });
-  
+
   // Get model diagnostics
   app.get('/api/regression/models/:id/diagnostics', (req, res) => {
     const modelId = parseInt(req.params.id);
-    
+
     // Generate histogram data for residuals
     const residualBins = [
       { bin: '-30% to -25%', count: Math.floor(Math.random() * 5) },
@@ -483,7 +483,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       { bin: '20% to 25%', count: Math.floor(Math.random() * 8) },
       { bin: '25% to 30%', count: Math.floor(Math.random() * 5) }
     ];
-    
+
     // Generate scatter plot data (predicted vs actual)
     const scatterData = Array.from({ length: 50 }, () => {
       const actual = 200000 + Math.random() * 400000;
@@ -493,7 +493,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         predicted: Math.round(actual + error)
       };
     });
-    
+
     // Model metrics
     const metrics = {
       r2: 0.75 + Math.random() * 0.15,
@@ -506,20 +506,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
       cov: 8 + Math.random() * 7,
       prd: 0.95 + Math.random() * 0.1
     };
-    
+
     res.json({
       residualHistogram: residualBins,
       scatterPlot: scatterData,
       metrics: metrics
     });
   });
-  
+
   // API routes for property valuations with historical data for visualization
   app.get('/api/valuations', (req, res) => {
     // Filter parameters
     const neighborhood = req.query.neighborhood as string;
     const yearBuilt = req.query.yearBuilt as string;
-    
+
     const valuationData = [
       {
         id: '1',
@@ -653,15 +653,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ]
       }
     ];
-    
+
     // Filter by neighborhood if specified
     let filteredData = valuationData;
     if (neighborhood) {
-      filteredData = filteredData.filter(item => 
+      filteredData = filteredData.filter(item =>
         item.neighborhood.toLowerCase().includes(neighborhood.toLowerCase())
       );
     }
-    
+
     // Filter by year built if specified
     if (yearBuilt) {
       const yearBuiltNum = parseInt(yearBuilt);
@@ -669,11 +669,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         filteredData = filteredData.filter(item => item.yearBuilt >= yearBuiltNum);
       }
     }
-    
+
     res.json(filteredData);
   });
 
+  const port = process.env.PORT || 5000; // Use environment variable or default to 5000
   const httpServer = createServer(app);
+  httpServer.listen(port, () => console.log(`Server listening on port ${port}`));
 
   return httpServer;
 }
