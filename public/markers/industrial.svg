@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="32px" height="32px" viewBox="0 0 32 32" version="1.1" xmlns="http://www.w3.org/2000/svg">
+    <title>Industrial Property Marker</title>
+    <defs>
+        <linearGradient x1="0%" y1="0%" x2="100%" y2="100%" id="industrialGradient">
+            <stop stop-color="#F44336" offset="0%"></stop>
+            <stop stop-color="#C62828" offset="100%"></stop>
+        </linearGradient>
+        <filter x="-20%" y="-20%" width="140%" height="140%" filterUnits="objectBoundingBox" id="shadow">
+            <feOffset dx="0" dy="1" in="SourceAlpha" result="shadowOffsetOuter1"></feOffset>
+            <feGaussianBlur stdDeviation="1" in="shadowOffsetOuter1" result="shadowBlurOuter1"></feGaussianBlur>
+            <feColorMatrix values="0 0 0 0 0   0 0 0 0 0   0 0 0 0 0  0 0 0 0.4 0" type="matrix" in="shadowBlurOuter1" result="shadowMatrixOuter1"></feColorMatrix>
+            <feMerge>
+                <feMergeNode in="shadowMatrixOuter1"></feMergeNode>
+                <feMergeNode in="SourceGraphic"></feMergeNode>
+            </feMerge>
+        </filter>
+    </defs>
+    <g stroke="none" stroke-width="1" fill="none" fill-rule="evenodd">
+        <g filter="url(#shadow)">
+            <path d="M16,2 C22.0751,2 27,6.92487 27,13 C27,17.0796 24.5,20.4796 19.5,23.1992 L16,30 L12.5,23.1992 C7.5,20.4796 5,17.0796 5,13 C5,6.92487 9.92487,2 16,2 Z" fill="url(#industrialGradient)"></path>
+            <path d="M11,10 L21,10 L21,21 L11,21 L11,10 Z" fill="#FFFFFF" opacity="0.6"></path>
+            <path d="M12,10 L18,14 L18,20 L12,20 L12,10 Z" fill="#FFFFFF"></path>
+            <rect x="19" y="14" width="1" height="6" fill="#FFFFFF"></rect>
+            <path d="M12,10 L14,10 L14,13 L12,13 L12,10 Z" fill="#B71C1C" opacity="0.7"></path>
+        </g>
+    </g>
+</svg>

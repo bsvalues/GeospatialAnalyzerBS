@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="32px" height="32px" viewBox="0 0 32 32" version="1.1" xmlns="http://www.w3.org/2000/svg">
+    <title>Vacant Land Marker</title>
+    <defs>
+        <linearGradient x1="0%" y1="0%" x2="100%" y2="100%" id="vacantGradient">
+            <stop stop-color="#CDDC39" offset="0%"></stop>
+            <stop stop-color="#AFB42B" offset="100%"></stop>
+        </linearGradient>
+        <filter x="-20%" y="-20%" width="140%" height="140%" filterUnits="objectBoundingBox" id="shadow">
+            <feOffset dx="0" dy="1" in="SourceAlpha" result="shadowOffsetOuter1"></feOffset>
+            <feGaussianBlur stdDeviation="1" in="shadowOffsetOuter1" result="shadowBlurOuter1"></feGaussianBlur>
+            <feColorMatrix values="0 0 0 0 0   0 0 0 0 0   0 0 0 0 0  0 0 0 0.4 0" type="matrix" in="shadowBlurOuter1" result="shadowMatrixOuter1"></feColorMatrix>
+            <feMerge>
+                <feMergeNode in="shadowMatrixOuter1"></feMergeNode>
+                <feMergeNode in="SourceGraphic"></feMergeNode>
+            </feMerge>
+        </filter>
+    </defs>
+    <g stroke="none" stroke-width="1" fill="none" fill-rule="evenodd">
+        <g filter="url(#shadow)">
+            <path d="M16,2 C22.0751,2 27,6.92487 27,13 C27,17.0796 24.5,20.4796 19.5,23.1992 L16,30 L12.5,23.1992 C7.5,20.4796 5,17.0796 5,13 C5,6.92487 9.92487,2 16,2 Z" fill="url(#vacantGradient)"></path>
+            <path d="M11,11 L21,11 L21,20 L11,20 L11,11 Z" fill="#FFFFFF" opacity="0.5"></path>
+            <path d="M14,14 L16,9 L18,14 L14,14 Z" fill="#FFFFFF"></path>
+            <path d="M13,16 L15,18 L13,18 L13,16 Z" fill="#FFFFFF"></path>
+            <path d="M17,17 L19,15 L19,17 L17,17 Z" fill="#FFFFFF"></path>
+        </g>
+    </g>
+</svg>

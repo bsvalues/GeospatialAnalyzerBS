@@ -14,6 +14,7 @@ import MapLegend from './MapLegend';
 // Import new map tools
 import MeasurementTools from './MeasurementTools';
 import MiniMap from './MiniMap';
+import MarkerClusterGroup from './MarkerClusterGroup';
 
 // Fix Leaflet default icon issue
 import icon from 'leaflet/dist/images/marker-icon.png';
@@ -375,26 +376,18 @@ export const MapComponent: React.FC<MapComponentProps> = ({
             />
           </LayersControl.BaseLayer>
           
-          {/* Property parcels layer */}
+          {/* Property parcels layer with clustering */}
           <LayersControl.Overlay 
             checked={viewableLayers.find(l => l.id === 'parcels')?.checked || false} 
             name="Property Parcels"
           >
             <LayerGroup>
-              {properties.map(property => (
-                <AccessiblePropertyMarker
-                  key={property.id}
-                  property={property}
-                  coordinates={property.coordinates as [number, number]}
-                  isSelected={selectedProperty?.id === property.id}
-                  isHovered={hoveredPropertyId === property.id}
-                  onClick={handleMarkerClick}
-                  onMouseOver={() => setHoveredPropertyId(property.id)}
-                  onMouseOut={() => setHoveredPropertyId(null)}
-                  markerType="default"
-                  focusable={true}
-                />
-              ))}
+              {/* Use MarkerClusterGroup for better performance with many markers */}
+              <MarkerClusterGroup
+                properties={properties}
+                onPropertySelect={handleMarkerClick}
+                selectedProperty={selectedProperty}
+              />
             </LayerGroup>
           </LayersControl.Overlay>
           

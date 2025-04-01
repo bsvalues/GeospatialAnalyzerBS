@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="32px" height="32px" viewBox="0 0 32 32" version="1.1" xmlns="http://www.w3.org/2000/svg">
+    <title>Generic Property Marker</title>
+    <defs>
+        <linearGradient x1="0%" y1="0%" x2="100%" y2="100%" id="propertyGradient">
+            <stop stop-color="#9E9E9E" offset="0%"></stop>
+            <stop stop-color="#616161" offset="100%"></stop>
+        </linearGradient>
+        <filter x="-20%" y="-20%" width="140%" height="140%" filterUnits="objectBoundingBox" id="shadow">
+            <feOffset dx="0" dy="1" in="SourceAlpha" result="shadowOffsetOuter1"></feOffset>
+            <feGaussianBlur stdDeviation="1" in="shadowOffsetOuter1" result="shadowBlurOuter1"></feGaussianBlur>
+            <feColorMatrix values="0 0 0 0 0   0 0 0 0 0   0 0 0 0 0  0 0 0 0.4 0" type="matrix" in="shadowBlurOuter1" result="shadowMatrixOuter1"></feColorMatrix>
+            <feMerge>
+                <feMergeNode in="shadowMatrixOuter1"></feMergeNode>
+                <feMergeNode in="SourceGraphic"></feMergeNode>
+            </feMerge>
+        </filter>
+    </defs>
+    <g stroke="none" stroke-width="1" fill="none" fill-rule="evenodd">
+        <g filter="url(#shadow)">
+            <path d="M16,2 C22.0751,2 27,6.92487 27,13 C27,17.0796 24.5,20.4796 19.5,23.1992 L16,30 L12.5,23.1992 C7.5,20.4796 5,17.0796 5,13 C5,6.92487 9.92487,2 16,2 Z" fill="url(#propertyGradient)"></path>
+            <path d="M12,10 L20,10 L20,18 L12,18 L12,10 Z" fill="#FFFFFF" opacity="0.7"></path>
+            <path d="M13,11 L19,11 L19,17 L13,17 L13,11 Z" fill="#FFFFFF" opacity="0.7"></path>
+            <path d="M14,12 L18,12 L18,16 L14,16 L14,12 Z" fill="#FFFFFF"></path>
+            <path d="M15,13 L17,13 L17,15 L15,15 L15,13 Z" fill="#616161"></path>
+            <path d="M14,18 L18,18 L18,20 L14,20 L14,18 Z" fill="#FFFFFF"></path>
+        </g>
+    </g>
+</svg>
