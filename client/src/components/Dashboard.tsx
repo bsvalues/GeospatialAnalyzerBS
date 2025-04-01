@@ -20,9 +20,9 @@ import {
   DollarSign,
   Layers
 } from 'lucide-react';
-import MapPanel from './panels/MapPanel';
+import { MapPanel } from './panels/MapPanel';
 import ScriptPanel from './panels/ScriptPanel';
-import SpatialAnalysisPanel from './panels/SpatialAnalysisPanel';
+import { SpatialAnalysisPanel } from './panels/SpatialAnalysisPanel';
 import { RegressionPanel } from './panels/RegressionPanel';
 import { PropertyComparisonPanel } from './panels/PropertyComparisonPanel';
 import { ReportGenerator } from './export/ReportGenerator';
@@ -358,7 +358,7 @@ const Dashboard: React.FC<DashboardProps> = ({ className }) => {
           </div>
         )}
         
-        {activeTab === 'map' && <MapPanel />}
+        {activeTab === 'map' && <MapPanel properties={properties} />}
         
         {activeTab === 'scripts' && <ScriptPanel />}
         

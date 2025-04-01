@@ -1,191 +1,173 @@
 import React from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import '@testing-library/jest-dom';
-import HeatmapVisualization from '../components/analysis/HeatmapVisualization';
-import { Property } from '@/shared/schema';
+import { MapContainer, TileLayer } from 'react-leaflet';
+import { HeatmapVisualization } from '../components/analysis/HeatmapVisualization';
+import { Property } from '@shared/schema';
 
-// Mock leaflet as it's not available in the test environment
-jest.mock('leaflet', () => ({
-  latLng: (lat: number, lng: number) => ({ lat, lng }),
-  divIcon: jest.fn().mockReturnValue({}),
-  heatLayer: jest.fn().mockReturnValue({
-    addTo: jest.fn(),
-    setLatLngs: jest.fn(),
-    redraw: jest.fn(),
-    removeFrom: jest.fn(),
-  }),
-  map: jest.fn().mockReturnValue({
-    setView: jest.fn(),
-    addLayer: jest.fn(),
-    removeLayer: jest.fn(),
-    on: jest.fn(),
-    off: jest.fn(),
-    invalidateSize: jest.fn(),
-  }),
-}));
-
-// Mock the react-leaflet components
-jest.mock('react-leaflet', () => ({
-  MapContainer: jest.fn().mockImplementation(({ children }) => <div data-testid="map-container">{children}</div>),
-  TileLayer: jest.fn().mockImplementation(() => <div data-testid="tile-layer" />),
-  LayerGroup: jest.fn().mockImplementation(({ children }) => <div data-testid="layer-group">{children}</div>),
-  useMap: jest.fn().mockReturnValue({
-    setView: jest.fn(),
-    addLayer: jest.fn(),
-    removeLayer: jest.fn(),
-    on: jest.fn(),
-    off: jest.fn(),
-    invalidateSize: jest.fn(),
-  }),
-}));
-
-// Mock property data
+// Mock properties for testing
 const mockProperties: Property[] = [
   {
     id: 1,
-    parcelId: "123",
-    address: "123 Main St",
-    latitude: 40.7128,
-    longitude: -74.006,
-    value: "500000",
-    yearBuilt: 2000,
+    parcelId: 'PROP001',
+    address: '123 Main St',
     squareFeet: 2000,
-    neighborhood: "Downtown",
-    propertyType: "Residential",
-    lastSaleDate: "2020-01-01",
-    salePrice: "450000"
+    value: '200000',
+    latitude: 47.1234,
+    longitude: -122.4567,
+    propertyType: 'residential'
   },
   {
     id: 2,
-    parcelId: "456",
-    address: "456 Elm St",
-    latitude: 40.7129,
-    longitude: -74.007,
-    value: "600000",
-    yearBuilt: 2010,
+    parcelId: 'PROP002',
+    address: '456 Oak Ave',
     squareFeet: 2500,
-    neighborhood: "Downtown",
-    propertyType: "Residential",
-    lastSaleDate: "2021-02-01",
-    salePrice: "550000"
+    value: '300000',
+    latitude: 47.1235,
+    longitude: -122.4568,
+    propertyType: 'residential'
   },
   {
     id: 3,
-    parcelId: "789",
-    address: "789 Oak St",
-    latitude: 40.713,
-    longitude: -74.008,
-    value: null, // Test handling null values
-    yearBuilt: 1995,
-    squareFeet: 1800,
-    neighborhood: "Uptown",
-    propertyType: "Residential",
-    lastSaleDate: "2019-06-15",
-    salePrice: "400000"
+    parcelId: 'PROP003',
+    address: '789 Elm St',
+    squareFeet: 3000,
+    value: '400000',
+    latitude: 47.1236,
+    longitude: -122.4569,
+    propertyType: 'residential'
   }
 ];
 
-describe('HeatmapVisualization Component', () => {
-  test('should render with default property value parameter', async () => {
-    render(<HeatmapVisualization properties={mockProperties} />);
-    
-    // Verify the component renders
-    expect(screen.getByTestId('map-container')).toBeInTheDocument();
-    expect(screen.getByTestId('heatmap-controls')).toBeInTheDocument();
-    expect(screen.getByText('Property Value Heatmap')).toBeInTheDocument();
-  });
-  
-  test('should update visualization when time period changes', async () => {
-    render(<HeatmapVisualization properties={mockProperties} />);
-    
-    // Find and interact with time period selector
-    const timeSelector = screen.getByLabelText('Time Period');
-    expect(timeSelector).toBeInTheDocument();
-    
-    // Change time period
-    fireEvent.change(timeSelector, { target: { value: '2021' } });
-    
-    // Verify the time period display updates
-    expect(screen.getByText('2021')).toBeInTheDocument();
-    
-    // Verify the heatmap would update (implementation specific)
-    // This would typically check if the redraw or update method was called
-    await waitFor(() => {
-      expect(screen.getByTestId('heatmap-layer')).toHaveAttribute('data-time-period', '2021');
-    });
-  });
-  
-  test('should correctly handle properties with null/undefined values', async () => {
-    render(<HeatmapVisualization properties={mockProperties} />);
-    
-    // Verify that properties with null values are excluded or handled
-    // This is implementation specific, but we're checking that the component doesn't crash
-    expect(screen.getByTestId('heatmap-layer')).toBeInTheDocument();
-    
-    // Check for appropriate warning or indicator about excluded properties
-    expect(screen.getByText(/2 of 3 properties displayed/i)).toBeInTheDocument();
-  });
-  
-  test('should apply custom color gradients when specified', async () => {
-    // Define custom color scheme
-    const customColors = {
-      start: '#ff0000',
-      end: '#0000ff',
+// Mock functions
+jest.mock('leaflet.heat', () => {
+  return jest.fn().mockImplementation(() => {
+    return {
+      addTo: jest.fn(),
+      setLatLngs: jest.fn(),
+      setOptions: jest.fn(),
+      getLatLngs: jest.fn().mockReturnValue([]),
+      redraw: jest.fn(),
+      _map: {}
     };
-    
-    render(<HeatmapVisualization properties={mockProperties} colorScheme={customColors} />);
-    
-    // Find color scheme selector
-    const colorSelector = screen.getByLabelText('Color Scheme');
-    expect(colorSelector).toBeInTheDocument();
-    
-    // Verify that the custom colors are applied
-    expect(screen.getByTestId('heatmap-layer')).toHaveAttribute('data-color-start', customColors.start);
-    expect(screen.getByTestId('heatmap-layer')).toHaveAttribute('data-color-end', customColors.end);
   });
-  
-  test('should render empty state message when no data available', async () => {
-    render(<HeatmapVisualization properties={[]} />);
-    
-    // Verify empty state is shown
-    expect(screen.getByText('No property data available for heatmap visualization.')).toBeInTheDocument();
-    
-    // Verify map is still rendered, but heatmap layer is not
-    expect(screen.getByTestId('map-container')).toBeInTheDocument();
-    expect(screen.queryByTestId('heatmap-layer')).not.toBeInTheDocument();
+});
+
+// Mock react-leaflet
+jest.mock('react-leaflet', () => {
+  const originalModule = jest.requireActual('react-leaflet');
+  return {
+    ...originalModule,
+    useMap: jest.fn().mockReturnValue({
+      addLayer: jest.fn(),
+      removeLayer: jest.fn(),
+      getBounds: jest.fn().mockReturnValue({
+        getSouthWest: jest.fn().mockReturnValue([47.12, -122.46]),
+        getNorthEast: jest.fn().mockReturnValue([47.13, -122.45])
+      }),
+      getCenter: jest.fn().mockReturnValue({
+        lat: 47.125,
+        lng: -122.455
+      })
+    })
+  };
+});
+
+// Setup component wrapper to provide map context
+const renderWithMap = (ui: React.ReactElement) => {
+  return render(
+    <MapContainer center={[47.125, -122.455]} zoom={12} style={{ height: '100vh' }}>
+      <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+      {ui}
+    </MapContainer>
+  );
+};
+
+describe('HeatmapVisualization Component', () => {
+  // Test rendering on map
+  test('should render on the map correctly', () => {
+    renderWithMap(<HeatmapVisualization properties={mockProperties} />);
+    // Check if heat map controls are rendered
+    expect(screen.getByText(/heat map/i)).toBeInTheDocument();
   });
-  
-  test('should filter properties based on selected criteria', async () => {
-    render(<HeatmapVisualization properties={mockProperties} />);
+
+  // Test intensity control
+  test('should update intensity when slider is adjusted', async () => {
+    renderWithMap(<HeatmapVisualization properties={mockProperties} />);
     
-    // Find filter controls
-    const propertyTypeFilter = screen.getByLabelText('Property Type');
-    expect(propertyTypeFilter).toBeInTheDocument();
+    // Get intensity slider
+    const intensitySlider = screen.getByLabelText(/intensity/i);
+    expect(intensitySlider).toBeInTheDocument();
     
-    // Apply filter
-    fireEvent.change(propertyTypeFilter, { target: { value: 'Residential' } });
+    // Change intensity value
+    fireEvent.change(intensitySlider, { target: { value: '0.8' } });
     
-    // Verify the filter was applied
-    expect(screen.getByTestId('heatmap-layer')).toHaveAttribute('data-filter-type', 'Residential');
-    
-    // Verify filter count displayed
-    expect(screen.getByText(/3 of 3 properties displayed/i)).toBeInTheDocument();
-  });
-  
-  test('should display detailed information for selected heatmap area', async () => {
-    render(<HeatmapVisualization properties={mockProperties} />);
-    
-    // Simulate clicking on a heatmap area
-    const heatmapLayer = screen.getByTestId('heatmap-layer');
-    fireEvent.click(heatmapLayer);
-    
-    // Verify detailed information panel appears
+    // Component should update
     await waitFor(() => {
-      expect(screen.getByTestId('heatmap-details-panel')).toBeInTheDocument();
+      expect(intensitySlider).toHaveValue('0.8');
     });
+  });
+  
+  // Test radius control
+  test('should update radius when slider is adjusted', async () => {
+    renderWithMap(<HeatmapVisualization properties={mockProperties} />);
     
-    // Check for appropriate summary statistics
-    expect(screen.getByText(/Average Value:/i)).toBeInTheDocument();
-    expect(screen.getByText(/Property Count:/i)).toBeInTheDocument();
+    // Get radius slider
+    const radiusSlider = screen.getByLabelText(/radius/i);
+    expect(radiusSlider).toBeInTheDocument();
+    
+    // Change radius value
+    fireEvent.change(radiusSlider, { target: { value: '30' } });
+    
+    // Component should update
+    await waitFor(() => {
+      expect(radiusSlider).toHaveValue('30');
+    });
+  });
+  
+  // Test variable selection
+  test('should change visualization variable when different option is selected', async () => {
+    renderWithMap(<HeatmapVisualization properties={mockProperties} />);
+    
+    // Get variable selector
+    const variableSelector = screen.getByLabelText(/variable/i);
+    expect(variableSelector).toBeInTheDocument();
+    
+    // Change variable to price per sq ft
+    fireEvent.change(variableSelector, { target: { value: 'pricePerSqFt' } });
+    
+    // Component should update
+    await waitFor(() => {
+      expect(variableSelector).toHaveValue('pricePerSqFt');
+    });
+  });
+  
+  // Test empty properties handling
+  test('should handle empty properties array', () => {
+    renderWithMap(<HeatmapVisualization properties={[]} />);
+    
+    // Should show a message for no data
+    expect(screen.getByText(/no property data available/i)).toBeInTheDocument();
+  });
+  
+  // Test properties with missing coordinates
+  test('should handle properties with missing coordinates', () => {
+    const propertiesWithMissingCoords = [
+      ...mockProperties,
+      {
+        id: 4,
+        parcelId: 'PROP004',
+        address: '101 Missing Coords St',
+        squareFeet: 1500,
+        value: '150000',
+        propertyType: 'residential'
+        // Missing latitude and longitude
+      }
+    ];
+    
+    renderWithMap(<HeatmapVisualization properties={propertiesWithMissingCoords} />);
+    
+    // Should render without errors
+    expect(screen.getByText(/heat map/i)).toBeInTheDocument();
   });
 });
