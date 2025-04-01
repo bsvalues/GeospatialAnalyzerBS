@@ -3,7 +3,10 @@ import { usePropertyComparison, MAX_COMPARISON_PROPERTIES } from './PropertyComp
 import { Property } from '@/shared/schema';
 import { formatCurrency } from '@/lib/utils';
 import { saveAs } from 'file-saver';
-import { X, Download, Plus, ArrowDownUp, Home, Calendar, Ruler, Square, DollarSign, Map } from 'lucide-react';
+import { 
+  X, Download, Plus, ArrowDownUp, Home, Calendar, Ruler, Square, 
+  DollarSign, Map, BarChart3, BarChart2, LineChart, Share2, Calculator 
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -13,6 +16,7 @@ import { Tooltip } from '@/components/ui/tooltip';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { PropertySearchDialog } from './PropertySearchDialog';
+import { EnhancedPropertyComparison } from './EnhancedPropertyComparison';
 
 /**
  * Component to display a comparison of multiple properties
@@ -30,6 +34,8 @@ export function PropertyComparison() {
   const [sortField, setSortField] = useState<string>('value');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
   const [showSearchDialog, setShowSearchDialog] = useState(false);
+  const [showEnhancedComparison, setShowEnhancedComparison] = useState(false);
+  const [selectedPropertyForAnalysis, setSelectedPropertyForAnalysis] = useState<Property | null>(null);
   
   // If no properties are loaded or selected, display a message to add properties
   if (comparisonProperties.length === 0) {
@@ -332,10 +338,10 @@ export function PropertyComparison() {
                         )}
                       </div>
                     </TableCell>
-                    <TableCell>{property.value ? formatCurrency(property.value) : 'N/A'}</TableCell>
+                    <TableCell>{property.value ? formatCurrency(parseFloat(property.value)) : 'N/A'}</TableCell>
                     <TableCell>{property.squareFeet?.toLocaleString()}</TableCell>
                     <TableCell>
-                      {pricePerSqFt > 0 ? formatCurrency(pricePerSqFt, 'en-US', 'USD', 2) : 'N/A'}
+                      {pricePerSqFt > 0 ? formatCurrency(pricePerSqFt) : 'N/A'}
                     </TableCell>
                     <TableCell>{property.yearBuilt || 'N/A'}</TableCell>
                     <TableCell>{property.bedrooms || 'N/A'}</TableCell>
@@ -345,13 +351,30 @@ export function PropertyComparison() {
                     </TableCell>
                     <TableCell>{property.neighborhood || 'N/A'}</TableCell>
                     <TableCell>
-                      <Button 
-                        variant="ghost" 
-                        size="icon"
-                        onClick={() => removeFromComparison(property.id)}
-                      >
-                        <X className="h-4 w-4" />
-                      </Button>
+                      <div className="flex items-center gap-1">
+                        <Tooltip content="Analyze this property">
+                          <Button 
+                            variant="ghost" 
+                            size="icon"
+                            onClick={() => {
+                              setSelectedPropertyForAnalysis(property);
+                              setShowEnhancedComparison(true);
+                            }}
+                          >
+                            <BarChart2 className="h-4 w-4" />
+                          </Button>
+                        </Tooltip>
+                        
+                        <Tooltip content="Remove from comparison">
+                          <Button 
+                            variant="ghost" 
+                            size="icon"
+                            onClick={() => removeFromComparison(property.id)}
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </Tooltip>
+                      </div>
                     </TableCell>
                   </TableRow>
                 );
@@ -361,7 +384,7 @@ export function PropertyComparison() {
         </div>
         
         {comparisonProperties.length < MAX_COMPARISON_PROPERTIES && (
-          <div className="mt-4 flex justify-center">
+          <div className="mt-4 flex justify-center gap-4">
             <Button 
               variant="outline" 
               onClick={() => setShowSearchDialog(true)}
@@ -369,6 +392,20 @@ export function PropertyComparison() {
               <Plus className="mr-2 h-4 w-4" />
               Add Another Property ({comparisonProperties.length}/{MAX_COMPARISON_PROPERTIES})
             </Button>
+            
+            {comparisonProperties.length > 0 && (
+              <Button
+                variant="default"
+                onClick={() => {
+                  // Use the first property as the base for comparison
+                  setSelectedPropertyForAnalysis(comparisonProperties[0]);
+                  setShowEnhancedComparison(true);
+                }}
+              >
+                <BarChart3 className="mr-2 h-4 w-4" />
+                Enhanced Analysis
+              </Button>
+            )}
             
             {showSearchDialog && (
               <PropertySearchDialog
@@ -380,6 +417,16 @@ export function PropertyComparison() {
               />
             )}
           </div>
+        )}
+        
+        {/* Enhanced Property Comparison Dialog */}
+        {showEnhancedComparison && selectedPropertyForAnalysis && (
+          <EnhancedPropertyComparison
+            baseProperty={selectedPropertyForAnalysis}
+            allProperties={properties || []}
+            isOpen={showEnhancedComparison}
+            onClose={() => setShowEnhancedComparison(false)}
+          />
         )}
       </CardContent>
     </Card>

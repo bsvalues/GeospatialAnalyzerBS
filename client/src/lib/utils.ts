@@ -124,3 +124,36 @@ export function titleCase(str: string): string {
     .map(word => word.charAt(0).toUpperCase() + word.slice(1))
     .join(' ');
 }
+
+/**
+ * Calculate haversine distance between two points on Earth
+ * @param point1 [latitude, longitude] of first point
+ * @param point2 [latitude, longitude] of second point
+ * @returns Distance in kilometers
+ */
+export function haversineDistance(
+  point1: [number, number],
+  point2: [number, number]
+): number {
+  // Earth's radius in kilometers
+  const R = 6371;
+  
+  // Convert latitude and longitude from degrees to radians
+  const lat1 = (point1[0] * Math.PI) / 180;
+  const lon1 = (point1[1] * Math.PI) / 180;
+  const lat2 = (point2[0] * Math.PI) / 180;
+  const lon2 = (point2[1] * Math.PI) / 180;
+  
+  // Differences
+  const dLat = lat2 - lat1;
+  const dLon = lon2 - lon1;
+  
+  // Haversine formula
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  const distance = R * c;
+  
+  return distance;
+}
