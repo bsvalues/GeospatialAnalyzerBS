@@ -6,7 +6,7 @@ import PropertyFilterPanel from '@/components/filters/PropertyFilterPanel';
 import { Property } from '@shared/schema';
 import { MapLayer, MapOptions } from '@/shared/types';
 import { usePropertyFilter } from '@/contexts/PropertyFilterContext';
-import AutoHidingPanel from '@/components/ui/AutoHidingPanel';
+import { AutoHidingPanel } from '@/components/ui/AutoHidingPanel';
 import { 
   Layers, 
   Search, 
