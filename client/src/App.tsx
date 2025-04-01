@@ -8,6 +8,7 @@ import Header from './components/Header';
 import NotFound from '@/pages/not-found';
 import { MapAccessibilityProvider } from './contexts/MapAccessibilityContext';
 import { PropertyFilterProvider } from './contexts/PropertyFilterContext';
+import { AutoHideProvider } from './contexts/AutoHideContext';
 import PropertyTrendsDemo from './components/comparison/PropertyTrendsDemo';
 import NeighborhoodTimelineDemo from './components/neighborhood/NeighborhoodTimelineDemo';
 
@@ -29,13 +30,15 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <MapAccessibilityProvider>
         <PropertyFilterProvider>
-          <div className="flex flex-col h-screen bg-gray-50">
-            <Header taxYear={taxYear} onTaxYearChange={setTaxYear} />
-            <div className="flex-grow overflow-hidden">
-              <Router />
+          <AutoHideProvider>
+            <div className="flex flex-col h-screen bg-gray-50">
+              <Header taxYear={taxYear} onTaxYearChange={setTaxYear} />
+              <div className="flex-grow overflow-hidden">
+                <Router />
+              </div>
             </div>
-          </div>
-          <Toaster />
+            <Toaster />
+          </AutoHideProvider>
         </PropertyFilterProvider>
       </MapAccessibilityProvider>
     </QueryClientProvider>

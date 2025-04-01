@@ -2,6 +2,147 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Auto-hiding panel animations */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes fadeOut {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes slideInLeft {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+@keyframes slideOutLeft {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-100%);
+  }
+}
+
+@keyframes slideInRight {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+@keyframes slideOutRight {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(100%);
+  }
+}
+
+@keyframes slideInTop {
+  from {
+    transform: translateY(-100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
+@keyframes slideOutTop {
+  from {
+    transform: translateY(0);
+  }
+  to {
+    transform: translateY(-100%);
+  }
+}
+
+@keyframes slideInBottom {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
+@keyframes slideOutBottom {
+  from {
+    transform: translateY(0);
+  }
+  to {
+    transform: translateY(100%);
+  }
+}
+
+.auto-hiding-panel {
+  @apply bg-white border rounded-md shadow-md overflow-hidden;
+}
+
+.auto-hiding-panel.position-left {
+  @apply left-4 top-20;
+}
+
+.auto-hiding-panel.position-right {
+  @apply right-4 top-20;
+}
+
+.auto-hiding-panel.position-top {
+  @apply top-4 left-1/2 transform -translate-x-1/2;
+}
+
+.auto-hiding-panel.position-bottom {
+  @apply bottom-4 left-1/2 transform -translate-x-1/2;
+}
+
+.auto-hiding-panel[aria-hidden="true"] {
+  @apply pointer-events-none;
+}
+
+.auto-hiding-panel.pinned {
+  @apply border-blue-500 shadow-blue-100;
+}
+
+.auto-hiding-panel.minimized .panel-content {
+  @apply hidden;
+}
+
+/* Pulsing animation for markers */
+@keyframes pulse {
+  0% {
+    transform: scale(0.95);
+    box-shadow: 0 0 0 0 rgba(255, 82, 82, 0.7);
+  }
+  
+  70% {
+    transform: scale(1);
+    box-shadow: 0 0 0 10px rgba(255, 82, 82, 0);
+  }
+  
+  100% {
+    transform: scale(0.95);
+    box-shadow: 0 0 0 0 rgba(255, 82, 82, 0);
+  }
+}
+
 @layer base {
   * {
     @apply border-border;

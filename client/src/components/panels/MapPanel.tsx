@@ -6,6 +6,7 @@ import PropertyFilterPanel from '@/components/filters/PropertyFilterPanel';
 import { Property } from '@shared/schema';
 import { MapLayer, MapOptions } from '@/shared/types';
 import { usePropertyFilter } from '@/contexts/PropertyFilterContext';
+import AutoHidingPanel from '@/components/ui/AutoHidingPanel';
 import { 
   Layers, 
   Search, 
@@ -36,9 +37,8 @@ export const MapPanel: React.FC<MapPanelProps> = ({ className }) => {
   const [showSidebar, setShowSidebar] = useState(false); // For auto-hide sidebar
   const [searchQuery, setSearchQuery] = useState('');
   const [isFullScreen, setIsFullScreen] = useState(false);
-  const [autoHideTimeoutId, setAutoHideTimeoutId] = useState<number | null>(null);
   
-  // Auto-hide sidebar when a property is not selected
+  // Auto-hide sidebar when a property is selected
   useEffect(() => {
     if (selectedProperty) {
       setShowSidebar(true);
@@ -47,31 +47,6 @@ export const MapPanel: React.FC<MapPanelProps> = ({ className }) => {
       setShowSidebar(false);
     }
   }, [selectedProperty, compareProperties]);
-  
-  // Auto-hide panels after user interaction
-  useEffect(() => {
-    // Clear any existing timeout
-    if (autoHideTimeoutId) {
-      window.clearTimeout(autoHideTimeoutId);
-    }
-    
-    // If any panel is showing, set a timeout to hide it after 5 seconds of inactivity
-    if (showLayerPanel || showFilterPanel) {
-      const timeoutId = window.setTimeout(() => {
-        setShowLayerPanel(false);
-        setShowFilterPanel(false);
-      }, 5000); // Hide after 5 seconds
-      
-      setAutoHideTimeoutId(timeoutId);
-    }
-    
-    // Cleanup on unmount
-    return () => {
-      if (autoHideTimeoutId) {
-        window.clearTimeout(autoHideTimeoutId);
-      }
-    };
-  }, [showLayerPanel, showFilterPanel, autoHideTimeoutId]);
   
   // Fetch properties from the API
   const { data: properties = [], isLoading, error } = useQuery({
@@ -160,13 +135,13 @@ export const MapPanel: React.FC<MapPanelProps> = ({ className }) => {
   const { filters, applyFilters } = usePropertyFilter();
   
   // Filter properties based on search query and property filters
-  const searchFilteredProperties = searchQuery 
-    ? properties.filter(property => 
+  const searchFilteredProperties = searchQuery && Array.isArray(properties)
+    ? properties.filter((property: Property) => 
         property.address.toLowerCase().includes(searchQuery.toLowerCase()) ||
         property.parcelId.toLowerCase().includes(searchQuery.toLowerCase()) ||
         (property.owner && property.owner.toLowerCase().includes(searchQuery.toLowerCase()))
       )
-    : properties;
+    : (properties as Property[]);
     
   // Apply property filters if they are active
   const filteredProperties = filters.isActive 
@@ -241,22 +216,17 @@ export const MapPanel: React.FC<MapPanelProps> = ({ className }) => {
           </div>
         </div>
         
-        {/* Layer panel with transition */}
-        <div 
-          className={`absolute top-14 left-4 z-10 bg-white rounded-md shadow-md border border-gray-200 w-64 max-h-[60vh] overflow-y-auto transition-all duration-300 ease-in-out ${
-            showLayerPanel ? 'opacity-100 scale-100' : 'opacity-0 scale-95 pointer-events-none'
-          }`}
-          onMouseEnter={() => {
-            // Reset timeout when user interacts with panel
-            if (autoHideTimeoutId) {
-              window.clearTimeout(autoHideTimeoutId);
-              setAutoHideTimeoutId(null);
-            }
-          }}
+        {/* Layer panel using AutoHidingPanel component */}
+        <AutoHidingPanel
+          id="map-layers-panel"
+          defaultVisible={showLayerPanel}
+          title="Map Layers"
+          position="left"
+          width="320px"
+          hideTimeout={5000}
+          className="absolute top-14 left-4 z-10 max-h-[60vh] overflow-y-auto"
+          onVisibilityChange={setShowLayerPanel}
         >
-          <div className="p-3 border-b border-gray-200">
-            <h3 className="font-medium text-gray-800">Map Layers</h3>
-          </div>
           <div className="p-3">
             <h4 className="text-sm font-medium text-gray-500 mb-2">Base Maps</h4>
             {mapLayers.filter(layer => layer.type === 'base').map(layer => (
@@ -265,17 +235,7 @@ export const MapPanel: React.FC<MapPanelProps> = ({ className }) => {
                   type="radio"
                   id={`base-${layer.id}`}
                   checked={layer.checked}
-                  onChange={() => {
-                    handleBaseLayerChange(layer.id);
-                    // Reset the auto-hide timeout
-                    if (autoHideTimeoutId) {
-                      window.clearTimeout(autoHideTimeoutId);
-                    }
-                    const timeoutId = window.setTimeout(() => {
-                      setShowLayerPanel(false);
-                    }, 5000);
-                    setAutoHideTimeoutId(timeoutId);
-                  }}
+                  onChange={() => handleBaseLayerChange(layer.id)}
                   className="mr-2 accent-primary"
                 />
                 <label htmlFor={`base-${layer.id}`} className="text-sm">{layer.name}</label>
@@ -289,40 +249,28 @@ export const MapPanel: React.FC<MapPanelProps> = ({ className }) => {
                   type="checkbox"
                   id={`layer-${layer.id}`}
                   checked={layer.checked}
-                  onChange={() => {
-                    handleLayerToggle(layer.id);
-                    // Reset the auto-hide timeout
-                    if (autoHideTimeoutId) {
-                      window.clearTimeout(autoHideTimeoutId);
-                    }
-                    const timeoutId = window.setTimeout(() => {
-                      setShowLayerPanel(false);
-                    }, 5000);
-                    setAutoHideTimeoutId(timeoutId);
-                  }}
+                  onChange={() => handleLayerToggle(layer.id)}
                   className="mr-2 accent-primary"
                 />
                 <label htmlFor={`layer-${layer.id}`} className="text-sm">{layer.name}</label>
               </div>
             ))}
           </div>
-        </div>
+        </AutoHidingPanel>
         
-        {/* Property Filter Panel with transition */}
-        <div 
-          className={`absolute top-14 left-4 z-10 w-[350px] transition-all duration-300 ease-in-out ${
-            showFilterPanel ? 'opacity-100 scale-100' : 'opacity-0 scale-95 pointer-events-none'
-          }`}
-          onMouseEnter={() => {
-            // Reset timeout when user interacts with panel
-            if (autoHideTimeoutId) {
-              window.clearTimeout(autoHideTimeoutId);
-              setAutoHideTimeoutId(null);
-            }
-          }}
+        {/* Property Filter Panel using AutoHidingPanel */}
+        <AutoHidingPanel
+          id="property-filter-panel"
+          defaultVisible={showFilterPanel}
+          title="Property Filters"
+          position="left"
+          width="350px"
+          hideTimeout={5000}
+          className="absolute top-14 left-4 z-10"
+          onVisibilityChange={setShowFilterPanel}
         >
           <PropertyFilterPanel className="w-full" />
-        </div>
+        </AutoHidingPanel>
         
         {isLoading ? (
           <div className="h-full w-full flex items-center justify-center bg-gray-100">
