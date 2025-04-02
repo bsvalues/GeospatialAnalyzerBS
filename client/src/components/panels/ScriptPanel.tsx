@@ -5,6 +5,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { ScriptGroup, ScriptStep } from '@/shared/types';
 import ScriptWorkflow from '../script/ScriptWorkflow';
 import ScriptEditor from '../script/ScriptEditor';
+import { Property } from '@shared/schema';
 
 interface ScriptData {
   scriptGroups: ScriptGroup[];
@@ -12,7 +13,11 @@ interface ScriptData {
   sqlQueries: { name: string; description: string; }[];
 }
 
-const ScriptPanel: React.FC = () => {
+interface ScriptPanelProps {
+  properties?: Property[];
+}
+
+const ScriptPanel: React.FC<ScriptPanelProps> = ({ properties = [] }) => {
   // Sample script data
   const [scriptData, setScriptData] = useState<ScriptData>({
     scriptGroups: [

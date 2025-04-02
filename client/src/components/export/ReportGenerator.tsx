@@ -13,12 +13,14 @@ import {
   Report,
   ReportSectionType
 } from '../../services/reporting/reportBuilderService';
+import { Property } from '@shared/schema';
 
 /**
  * Report Generator Component Props
  */
 interface ReportGeneratorProps {
   propertyId?: number;
+  properties?: Property[];
   className?: string;
 }
 
@@ -26,7 +28,7 @@ interface ReportGeneratorProps {
  * Report Generator Component
  * Provides UI for creating, customizing, and exporting property reports
  */
-export const ReportGenerator = ({ propertyId, className }: ReportGeneratorProps) => {
+export const ReportGenerator = ({ propertyId, properties = [], className }: ReportGeneratorProps) => {
   const [reportTitle, setReportTitle] = useState('Property Report');
   const [selectedSections, setSelectedSections] = useState<Record<string, boolean>>({
     'property-summary': true,
@@ -194,7 +196,10 @@ export const ReportGenerator = ({ propertyId, className }: ReportGeneratorProps)
             title: sectionInfo.name,
             type: sectionType as ReportSectionType,
             order: index,
-            content: { propertyId }
+            content: { 
+              propertyId,
+              properties: properties || []
+            }
           };
           reportBuilder.addSection(report, section);
         }

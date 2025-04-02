@@ -1,11 +1,16 @@
 import React from 'react';
 import { PropertyComparisonProvider } from '../comparison/PropertyComparisonContext';
 import { PropertyComparison } from '../comparison/PropertyComparison';
+import { Property } from '@shared/schema';
+
+interface PropertyComparisonPanelProps {
+  properties: Property[];
+}
 
 /**
  * Panel that wraps the property comparison functionality
  */
-export function PropertyComparisonPanel() {
+export function PropertyComparisonPanel({ properties }: PropertyComparisonPanelProps) {
   return (
     <div className="h-full p-6 overflow-auto">
       <div className="mb-6">
@@ -17,7 +22,7 @@ export function PropertyComparisonPanel() {
       </div>
       
       <PropertyComparisonProvider>
-        <PropertyComparison />
+        <PropertyComparison properties={properties} />
       </PropertyComparisonProvider>
     </div>
   );

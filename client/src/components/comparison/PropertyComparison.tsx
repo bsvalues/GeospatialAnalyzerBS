@@ -23,15 +23,22 @@ import { OneClickPropertyReport } from '../export/OneClickPropertyReport';
 /**
  * Component to display a comparison of multiple properties
  */
-export function PropertyComparison() {
+interface PropertyComparisonProps {
+  properties?: Property[];
+}
+
+export function PropertyComparison({ properties: propProperties }: PropertyComparisonProps) {
   const { 
     comparisonProperties, 
     removeFromComparison, 
     clearComparison,
     addToComparison,
-    properties,
+    properties: contextProperties,
     isLoading
   } = usePropertyComparison();
+  
+  // Use properties from props if provided, otherwise from context
+  const properties = propProperties || contextProperties;
   
   const [sortField, setSortField] = useState<string>('value');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');

@@ -19,21 +19,25 @@ import { PredictionResult } from '../../services/predictive/propertyValueModel';
 
 interface PredictiveModelingPanelProps {
   className?: string;
+  properties?: Property[];
 }
 
-export function PredictiveModelingPanel({ className }: PredictiveModelingPanelProps) {
+export function PredictiveModelingPanel({ className, properties: propProperties }: PredictiveModelingPanelProps) {
   const [activeTab, setActiveTab] = useState('value-prediction');
   const [selectedPropertyId, setSelectedPropertyId] = useState<number | null>(null);
   const [predictionResult, setPredictionResult] = useState<PredictionResult | null>(null);
   
-  // Fetch all properties for selection
-  const { data: properties = [] } = useQuery<Property[]>({
+  // Fetch all properties for selection if not provided via props
+  const { data: fetchedProperties = [] } = useQuery<Property[]>({
     queryKey: ['/api/properties'],
     staleTime: 1000 * 60 * 5, // 5 minutes
   });
   
+  // Use properties from props or fallback to fetched ones
+  const allProperties: Property[] = propProperties || fetchedProperties || [];
+
   // Get selected property
-  const selectedProperty = properties.find(p => p.id === selectedPropertyId);
+  const selectedProperty = allProperties.find((p: Property) => p.id === selectedPropertyId);
   
   // Handle property selection
   const handlePropertyChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
@@ -69,7 +73,7 @@ export function PredictiveModelingPanel({ className }: PredictiveModelingPanelPr
           onChange={handlePropertyChange}
         >
           <option value="">Select a property...</option>
-          {properties.map(property => (
+          {allProperties.map((property: Property) => (
             <option key={property.id} value={property.id.toString()}>
               {property.address} - {property.parcelId}
             </option>

@@ -23,37 +23,27 @@ import { useToast } from '@/hooks/use-toast';
 import { formatCurrency } from '@/lib/utils';
 
 /**
+ * Interface for RegressionPanel properties
+ */
+interface RegressionPanelProps {
+  properties: Property[];
+}
+
+/**
  * The Regression Panel provides tools for property valuation through regression modeling.
  * It offers ordinary least squares, weighted, and geographically weighted regression methods.
  */
-export function RegressionPanel() {
-  const [properties, setProperties] = useState<Property[]>([]);
+export function RegressionPanel({ properties }: RegressionPanelProps) {
   const [activeModel, setActiveModel] = useState<RegressionModel | null>(null);
   const [savedModels, setSavedModels] = useState<RegressionModel[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
   
-  // Fetch properties on component mount
+  // We're now getting properties from props, so we don't need to fetch them separately
   useEffect(() => {
-    const fetchProperties = async () => {
-      try {
-        const response = await fetch('/api/properties');
-        const properties = await response.json();
-        if (properties) {
-          setProperties(properties);
-        }
-      } catch (error) {
-        console.error('Error fetching properties:', error);
-        toast({
-          title: 'Failed to load properties',
-          description: 'Could not retrieve property data. Please try again later.',
-          variant: 'destructive',
-        });
-      }
-    };
-    
-    fetchProperties();
-  }, [toast]);
+    // Log properties count
+    console.log(`Regression panel received ${properties.length} properties`);
+  }, [properties]);
   
   // Generate a sample regression model for demonstration purposes
   const generateDemoModel = () => {

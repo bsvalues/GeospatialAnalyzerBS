@@ -63,8 +63,8 @@ import { PropertyComparisonTable } from './PropertyComparisonTable';
 import { PropertyAttributesTable } from './PropertyAttributesTable';
 import { MarketPositionScatter } from './MarketPositionScatter';
 
-// Ensure proper reference to JavaScript's built-in Map class
-const JavaScriptMap = globalThis.Map;
+// Fix for Map constructor: Remove incorrect reference that's causing errors
+// Use {} for plain objects as key/value maps instead of Map constructor
 
 // Helper functions
 const calculateDifference = (value1: number, value2: number): { percentage: number, direction: 'up' | 'down' | 'same' } => {

@@ -527,7 +527,7 @@ const Dashboard: React.FC<DashboardProps> = ({ className }) => {
         {activeTab === 'scripts' && <ScriptPanel properties={properties} />}
         {activeTab === 'reporting' && <ReportGenerator properties={properties} />}
         {activeTab === 'kpi' && <KPIDashboardPanel taxYear="2025" />}
-        {activeTab === 'analytics' && <AdvancedAnalyticsPanel properties={properties} />}
+        {activeTab === 'analytics' && <AdvancedAnalyticsPanel allProperties={properties} />}
         {activeTab === 'settings' && <SettingsPanel />}
       </div>
     </div>
