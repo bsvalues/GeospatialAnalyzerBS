@@ -17,6 +17,7 @@ import HomePage from '@/pages/home';
 import DashboardPage from '@/pages/dashboard';
 import AboutPage from '@/pages/about';
 import GetSmarterPage from '@/pages/get-smarter';
+import ScriptingPage from '@/pages/scripting';
 
 function Router() {
   const [location] = useLocation();
@@ -32,6 +33,7 @@ function Router() {
         <Route path="/get-smarter" component={GetSmarterPage} />
         <Route path="/trends" component={PropertyTrendsDemo} />
         <Route path="/neighborhoods" component={NeighborhoodTimelineDemo} />
+        <Route path="/scripting" component={ScriptingPage} />
         <Route component={NotFound} />
       </Switch>
     </>
