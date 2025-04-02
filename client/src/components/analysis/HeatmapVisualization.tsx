@@ -80,32 +80,58 @@ export const HeatmapVisualization: React.FC<HeatmapVisualizationProps> = ({ prop
     });
   };
 
+  // Make sure map is properly sized
+  useEffect(() => {
+    if (!map) return;
+    
+    // Force a map size recalculation - fixes issues with map container having zero height
+    setTimeout(() => {
+      map.invalidateSize();
+    }, 300);
+  }, [map]);
+
   // Initialize or update heat map
   useEffect(() => {
     if (!map) return;
 
     // Generate heat points
     const heatPoints = generateHeatMapPoints();
-
-    if (heatLayerRef.current) {
-      // Update existing layer
-      heatLayerRef.current.setLatLngs(heatPoints);
-      heatLayerRef.current.setOptions({
-        radius: radius,
-        maxZoom: 15,
-        blur: 15,
-        gradient: { 0.4: 'blue', 0.6: 'lime', 0.8: 'yellow', 1.0: 'red' }
-      });
-    } else {
-      // Create new heat map layer
-      const heatLayer = L.heatLayer(heatPoints, {
-        radius: radius,
-        maxZoom: 15,
-        blur: 15,
-        gradient: { 0.4: 'blue', 0.6: 'lime', 0.8: 'yellow', 1.0: 'red' }
-      }).addTo(map);
-
-      heatLayerRef.current = heatLayer;
+    
+    // Ensure map is properly sized
+    map.invalidateSize();
+    
+    // Only create/update heatmap if we have valid points and map is initialized
+    if (heatPoints.length > 0 && map.getSize().y > 0) {
+      if (heatLayerRef.current) {
+        // Update existing layer
+        heatLayerRef.current.setLatLngs(heatPoints);
+        heatLayerRef.current.setOptions({
+          radius: radius,
+          maxZoom: 15,
+          blur: 15,
+          gradient: { 0.4: 'blue', 0.6: 'lime', 0.8: 'yellow', 1.0: 'red' }
+        });
+      } else {
+        // Create new heat map layer with a try-catch to handle potential errors
+        try {
+          const heatLayer = L.heatLayer(heatPoints, {
+            radius: radius,
+            maxZoom: 15,
+            blur: 15,
+            gradient: { 0.4: 'blue', 0.6: 'lime', 0.8: 'yellow', 1.0: 'red' }
+          });
+          
+          // Only add to map if successfully created
+          heatLayer.addTo(map);
+          heatLayerRef.current = heatLayer;
+        } catch (error) {
+          console.error("Error creating heat layer:", error);
+        }
+      }
+    } else if (heatLayerRef.current && map) {
+      // Remove layer if no points or invalid map size
+      map.removeLayer(heatLayerRef.current);
+      heatLayerRef.current = null;
     }
 
     // Cleanup on unmount
