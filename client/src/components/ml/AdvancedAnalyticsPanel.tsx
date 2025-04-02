@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Zap, LineChart, BarChart2, Globe } from 'lucide-react';
+import { Zap, LineChart, BarChart2, Globe, AlertTriangle } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Property } from '@shared/schema';
 import { ValuationModelPanel } from './ValuationModelPanel';
 import { ForecastPanel } from './ForecastPanel';
 import { SpatialAnalyticsPanel } from './SpatialAnalyticsPanel';
+import { OutlierDetectionPanel } from '../analysis/OutlierDetectionPanel';
 
 interface AdvancedAnalyticsPanelProps {
   selectedProperty?: Property;
@@ -22,7 +23,7 @@ export function AdvancedAnalyticsPanel({
 
   return (
     <div className={`space-y-6 ${className}`}>
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
         <Card className="bg-gradient-to-br from-blue-50 to-indigo-50 border-blue-200 hover:shadow-md transition-shadow duration-200">
           <CardHeader className="pb-2">
             <CardTitle className="text-lg text-blue-700 flex items-center">
@@ -94,10 +95,28 @@ export function AdvancedAnalyticsPanel({
             <div className="text-sm text-amber-700 mt-1">Market comparables processed</div>
           </CardContent>
         </Card>
+        
+        <Card className="bg-gradient-to-br from-red-50 to-rose-50 border-red-200 hover:shadow-md transition-shadow duration-200">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-lg text-red-700 flex items-center">
+              <AlertTriangle className="h-5 w-5 mr-2 text-red-500" />
+              Outlier Detection
+            </CardTitle>
+            <CardDescription className="text-red-600/80">
+              Anomaly identification
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-red-900">
+              4.7%
+            </div>
+            <div className="text-sm text-red-700 mt-1">Market anomaly rate</div>
+          </CardContent>
+        </Card>
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-3">
+        <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="valuation" className="flex items-center">
             <Zap className="h-4 w-4 mr-2" />
             Valuation Model
@@ -109,6 +128,10 @@ export function AdvancedAnalyticsPanel({
           <TabsTrigger value="spatial" className="flex items-center">
             <Globe className="h-4 w-4 mr-2" />
             Spatial Analytics
+          </TabsTrigger>
+          <TabsTrigger value="outliers" className="flex items-center">
+            <AlertTriangle className="h-4 w-4 mr-2" />
+            Outlier Detection
           </TabsTrigger>
         </TabsList>
         
@@ -122,6 +145,10 @@ export function AdvancedAnalyticsPanel({
         
         <TabsContent value="spatial" className="mt-4">
           <SpatialAnalyticsPanel selectedProperty={selectedProperty} allProperties={allProperties} />
+        </TabsContent>
+        
+        <TabsContent value="outliers" className="mt-4">
+          <OutlierDetectionPanel properties={allProperties} />
         </TabsContent>
       </Tabs>
     </div>
