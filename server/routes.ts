@@ -15,6 +15,47 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json(clientConfig);
   });
   
+  // API route to proxy Google Maps Extractor API requests
+  app.post('/api/maps/query-locate', async (req, res) => {
+    try {
+      const { query, country, language } = req.body;
+      
+      if (!query) {
+        return res.status(400).json({ error: 'Missing required parameter: query' });
+      }
+      
+      if (!process.env.RAPIDAPI_KEY) {
+        return res.status(500).json({ error: 'API key not configured' });
+      }
+      
+      // Build query string
+      const params = new URLSearchParams();
+      params.append('query', query);
+      params.append('country', country || 'us');
+      params.append('language', language || 'en');
+      
+      const url = `https://google-maps-extractor2.p.rapidapi.com/query_locate?${params.toString()}`;
+      
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'x-rapidapi-host': 'google-maps-extractor2.p.rapidapi.com',
+          'x-rapidapi-key': process.env.RAPIDAPI_KEY
+        }
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Google Maps API error: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      res.json(data);
+    } catch (error) {
+      console.error('Error fetching from Google Maps API:', error);
+      res.status(500).json({ error: 'Failed to fetch location data from Google Maps' });
+    }
+  });
+  
   // API route to proxy Zillow API property details
   app.post('/api/zillow/property-data', async (req, res) => {
     try {

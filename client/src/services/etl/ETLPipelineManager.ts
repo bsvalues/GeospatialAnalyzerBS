@@ -287,6 +287,36 @@ class ETLPipelineManager {
         isActive: true,
         createdAt: new Date(),
         updatedAt: new Date()
+      },
+      {
+        id: 'rule-4',
+        name: 'Extract Lat/Long',
+        description: 'Extract latitude and longitude from location data',
+        dataType: 'location',
+        transformationCode: 'SPLIT_LOCATION(coordinates)',
+        isActive: true,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      },
+      {
+        id: 'rule-5',
+        name: 'Parse Address Components',
+        description: 'Parse address into components (street, city, state, zip)',
+        dataType: 'address',
+        transformationCode: 'PARSE_ADDRESS(address)',
+        isActive: true,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      },
+      {
+        id: 'rule-6',
+        name: 'Generate POI Score',
+        description: 'Generate point-of-interest score based on nearby amenities',
+        dataType: 'number',
+        transformationCode: 'CALCULATE_POI_SCORE(latitude, longitude)',
+        isActive: true,
+        createdAt: new Date(),
+        updatedAt: new Date()
       }
     ];
     
@@ -337,10 +367,25 @@ class ETLPipelineManager {
       updatedAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000)  // 1 day ago
     };
     
+    // Create sample job 4 - Google Maps Location Import
+    const job4: ETLJob = {
+      id: 'job-4',
+      name: 'Google Maps POI Import',
+      description: 'Import Points of Interest data from Google Maps API for Benton County properties',
+      status: 'created',
+      sourceId: 'google-maps-source', // Will be replaced by actual source ID when registered
+      targetId: 'target-1',
+      transformationIds: [transformationRules[3].id, transformationRules[4].id, transformationRules[5].id],
+      transformationRules: [transformationRules[3], transformationRules[4], transformationRules[5]], // For backward compatibility
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
+    
     // Add jobs to map
     this.jobs.set(job1.id, job1);
     this.jobs.set(job2.id, job2);
     this.jobs.set(job3.id, job3);
+    this.jobs.set(job4.id, job4);
     
     // Create sample execution logs
     const log1: ETLExecutionLog = {
@@ -446,6 +491,48 @@ class ETLPipelineManager {
           
           if (rule.name.includes('Format Date') && transformed.timestamp) {
             transformed.formattedDate = transformed.timestamp.toISOString().split('T')[0];
+          }
+          
+          // Handle geospatial transformations
+          if (rule.name.includes('Extract Lat/Long') && transformed.coordinates) {
+            if (Array.isArray(transformed.coordinates) && transformed.coordinates.length >= 2) {
+              transformed.latitude = transformed.coordinates[0];
+              transformed.longitude = transformed.coordinates[1];
+            }
+          }
+          
+          // Handle address parsing
+          if (rule.name.includes('Parse Address') && transformed.address) {
+            const addressParts = transformed.address.split(',').map((part: string) => part.trim());
+            
+            if (addressParts.length >= 3) {
+              transformed.street = addressParts[0];
+              transformed.city = addressParts[1];
+              
+              // Handle state and zip in the last part
+              const stateZip = addressParts[2].split(' ');
+              if (stateZip.length >= 2) {
+                transformed.state = stateZip[0];
+                transformed.zip = stateZip[stateZip.length - 1];
+              }
+            }
+          }
+          
+          // Handle POI score generation
+          if (rule.name.includes('Generate POI Score') && transformed.latitude && transformed.longitude) {
+            // Generate a POI score based on some algorithm
+            // Higher scores for properties in locations with more amenities
+            const baseScore = Math.random() * 80 + 20; // 20-100 base score
+            
+            // Modify score based on property attributes 
+            // This would be based on real data like schools, shopping centers, etc.
+            transformed.poiScore = Math.min(100, Math.round(baseScore));
+            transformed.poiBreakdown = {
+              schools: Math.round(Math.random() * 25),
+              transportation: Math.round(Math.random() * 25),
+              shopping: Math.round(Math.random() * 25),
+              recreation: Math.round(Math.random() * 25)
+            };
           }
         }
       });

@@ -23,7 +23,7 @@ export interface TransformationRule {
   id: string;
   name: string;
   description?: string;
-  dataType: 'text' | 'number' | 'date' | 'boolean' | 'object';
+  dataType: 'text' | 'number' | 'date' | 'boolean' | 'object' | 'location' | 'address' | 'geospatial';
   transformationCode: string;
   isActive: boolean;
   createdAt: Date;

@@ -20,6 +20,7 @@ import GetSmarterPage from '@/pages/get-smarter';
 import ScriptingPage from '@/pages/scripting';
 import ETLPage from '@/pages/etl';
 import IncomeTestPage from '@/pages/income-test';
+import DataConnectorsPage from '@/pages/DataConnectors';
 
 function Router() {
   const [location] = useLocation();
@@ -38,6 +39,7 @@ function Router() {
         <Route path="/scripting" component={ScriptingPage} />
         <Route path="/etl" component={ETLPage} />
         <Route path="/income-test" component={IncomeTestPage} />
+        <Route path="/data-connectors" component={DataConnectorsPage} />
         <Route component={NotFound} />
       </Switch>
     </>
