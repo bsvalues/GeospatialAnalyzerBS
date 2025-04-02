@@ -41,18 +41,18 @@ export interface DashboardProps {
 
 const Dashboard: React.FC<DashboardProps> = ({ className }) => {
   const [activeTab, setActiveTab] = useState('overview');
-  
+
   // Fetch properties data
   const { data: properties = [] } = useQuery<Property[]>({
     queryKey: ['/api/properties'],
     staleTime: 1000 * 60 * 5, // 5 minutes
   });
-  
+
   return (
-    <div className={`h-full flex flex-col ${className}`}>
+    <div className={`h-full flex flex-col ${className}`} data-testid="dashboard-container">
       {/* Tab navigation */}
       <TabNavigation activeTab={activeTab} onTabChange={setActiveTab} />
-      
+
       {/* Panel content */}
       <div className="flex-grow overflow-hidden bg-gray-50">
         {activeTab === 'overview' && (
@@ -72,7 +72,7 @@ const Dashboard: React.FC<DashboardProps> = ({ className }) => {
                   </button>
                 </div>
               </div>
-              
+
               {/* Quick Stats - Count Cards */}
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
                 <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-100 transition-all duration-200 hover:shadow-md">
@@ -90,7 +90,7 @@ const Dashboard: React.FC<DashboardProps> = ({ className }) => {
                     </div>
                   </div>
                 </div>
-                
+
                 <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-100 transition-all duration-200 hover:shadow-md">
                   <div className="flex items-start justify-between">
                     <div>
@@ -106,7 +106,7 @@ const Dashboard: React.FC<DashboardProps> = ({ className }) => {
                     </div>
                   </div>
                 </div>
-                
+
                 <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-100 transition-all duration-200 hover:shadow-md">
                   <div className="flex items-start justify-between">
                     <div>
@@ -122,7 +122,7 @@ const Dashboard: React.FC<DashboardProps> = ({ className }) => {
                     </div>
                   </div>
                 </div>
-                
+
                 <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-100 transition-all duration-200 hover:shadow-md">
                   <div className="flex items-start justify-between">
                     <div>
@@ -139,7 +139,7 @@ const Dashboard: React.FC<DashboardProps> = ({ className }) => {
                   </div>
                 </div>
               </div>
-              
+
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
                 {/* Property Statistics Card - redesigned */}
                 <div className="bg-white p-6 rounded-xl border border-gray-100 shadow-sm">
@@ -185,7 +185,7 @@ const Dashboard: React.FC<DashboardProps> = ({ className }) => {
                     </button>
                   </div>
                 </div>
-                
+
                 {/* Value Distribution Card - redesigned */}
                 <div className="bg-white p-6 rounded-xl border border-gray-100 shadow-sm">
                   <div className="flex justify-between items-center mb-6">
@@ -224,7 +224,7 @@ const Dashboard: React.FC<DashboardProps> = ({ className }) => {
                     </div>
                   </div>
                 </div>
-                
+
                 {/* Recent Activity Card - redesigned */}
                 <div className="bg-white p-6 rounded-xl border border-gray-100 shadow-sm">
                   <div className="flex justify-between items-center mb-6">
@@ -282,7 +282,7 @@ const Dashboard: React.FC<DashboardProps> = ({ className }) => {
                   </div>
                 </div>
               </div>
-              
+
               {/* Alert Card - redesigned */}
               <div className="bg-gradient-to-r from-amber-50 to-amber-100 p-6 rounded-xl border border-amber-200 shadow-sm mb-8">
                 <div className="flex flex-col sm:flex-row sm:items-center">
@@ -306,7 +306,7 @@ const Dashboard: React.FC<DashboardProps> = ({ className }) => {
                   </div>
                 </div>
               </div>
-              
+
               {/* Quick Access Cards */}
               <h2 className="text-xl font-bold mb-4 text-gray-900">Quick Access</h2>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -362,11 +362,11 @@ const Dashboard: React.FC<DashboardProps> = ({ className }) => {
             </div>
           </div>
         )}
-        
+
         {activeTab === 'map' && <MapPanel properties={properties} />}
-        
+
         {activeTab === 'scripts' && <ScriptPanel />}
-        
+
         {activeTab === 'data' && (
           <div className="h-full p-6 flex items-center justify-center">
             <div className="text-center max-w-md">
@@ -383,21 +383,21 @@ const Dashboard: React.FC<DashboardProps> = ({ className }) => {
             </div>
           </div>
         )}
-        
+
         {activeTab === 'regression' && <RegressionPanel />}
-        
+
         {activeTab === 'predictive' && <PredictiveModelingPanel />}
-        
+
         {activeTab === 'timeseries' && <TimeSeriesAnalysisPanel properties={properties} />}
-        
+
         {activeTab === 'spatial' && (
           <SpatialAnalysisPanel properties={properties} />
         )}
-        
+
         {activeTab === 'comparison' && <PropertyComparisonPanel />}
-        
+
         {activeTab === 'kpi' && <KPIDashboardPanel />}
-        
+
         {activeTab === 'advanced' && (
           <div className="h-full p-6 overflow-auto">
             <div className="max-w-7xl mx-auto">
@@ -411,7 +411,7 @@ const Dashboard: React.FC<DashboardProps> = ({ className }) => {
             </div>
           </div>
         )}
-        
+
         {activeTab === 'reports' && (
           <div className="h-full p-6 overflow-auto">
             <div className="max-w-7xl mx-auto">
@@ -425,7 +425,7 @@ const Dashboard: React.FC<DashboardProps> = ({ className }) => {
             </div>
           </div>
         )}
-        
+
         {activeTab === 'settings' && (
           <div className="h-full">
             <SettingsPanel />
