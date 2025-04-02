@@ -8,6 +8,7 @@ import NotFound from '@/pages/not-found';
 import { MapAccessibilityProvider } from './contexts/MapAccessibilityContext';
 import { PropertyFilterProvider } from './contexts/PropertyFilterContext';
 import { AutoHideProvider } from './contexts/AutoHideContext';
+import { TourProvider } from './contexts/TourContext';
 import PropertyTrendsDemo from './components/comparison/PropertyTrendsDemo';
 import NeighborhoodTimelineDemo from './components/neighborhood/NeighborhoodTimelineDemo';
 
@@ -48,12 +49,14 @@ export function App() {
       <MapAccessibilityProvider>
         <PropertyFilterProvider>
           <AutoHideProvider>
-            <div className="flex flex-col h-screen bg-gray-50">
-              <div className="flex-grow overflow-hidden">
-                <Router />
+            <TourProvider>
+              <div className="flex flex-col h-screen bg-gray-50">
+                <div className="flex-grow overflow-hidden">
+                  <Router />
+                </div>
               </div>
-            </div>
-            <Toaster />
+              <Toaster />
+            </TourProvider>
           </AutoHideProvider>
         </PropertyFilterProvider>
       </MapAccessibilityProvider>

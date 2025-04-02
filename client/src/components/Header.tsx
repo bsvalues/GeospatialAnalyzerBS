@@ -14,9 +14,8 @@ import {
 import { Link } from 'wouter';
 import { useMapAccessibility } from '@/contexts/MapAccessibilityContext';
 import { useToast } from '@/hooks/use-toast';
-import { TourGuideButton } from '@/components/ui/TourGuideButton';
-import { useGuidedTour } from '@/hooks/use-guided-tour';
-import { TourStepsService } from '@/services/tourStepsService';
+import { TourButton } from './TourButton';
+import { useTour } from '@/contexts/TourContext';
 
 interface HeaderProps {
   taxYear: string;
@@ -45,15 +44,7 @@ export const Header: React.FC<HeaderProps> = ({ taxYear, onTaxYearChange }) => {
   const [isAccessibilityDialogOpen, setIsAccessibilityDialogOpen] = React.useState(false);
   
   // Set up the guided tour
-  const { startTour, hasCompletedTour } = useGuidedTour(
-    'overview-tour',
-    TourStepsService.getOverviewTourSteps(),
-    {
-      showProgress: true,
-      exitOnOverlayClick: false,
-      showStepNumbers: true
-    }
-  );
+  const { startTour, hasSeenTour } = useTour();
   
   const handleAccessibilityToggle = (setting: string) => {
     switch (setting) {
@@ -170,9 +161,12 @@ export const Header: React.FC<HeaderProps> = ({ taxYear, onTaxYearChange }) => {
           </button>
           
           {/* Tour Guide Button */}
-          <TourGuideButton 
-            onClick={startTour} 
-            pulsing={!hasCompletedTour}
+          <TourButton 
+            variant="ghost"
+            size="icon"
+            className="text-white hover:text-white hover:bg-white/10 transition-colors"
+            showTooltip={true}
+            tooltipContent={hasSeenTour ? 'Restart guided tour' : 'Start guided tour'}
           />
           
           <button
