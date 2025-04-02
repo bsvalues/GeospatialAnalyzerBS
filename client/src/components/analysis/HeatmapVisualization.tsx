@@ -74,9 +74,9 @@ export const HeatmapVisualization: React.FC<HeatmapVisualizationProps> = ({ prop
       const lng = Number(property.longitude);
       const value = getPropertyValue(property, variable);
       // Normalize value between 0 and 1, then scale by intensity
-      const intensity = maxValue ? (value / maxValue) * intensity : 0;
+      const intensityValue = maxValue ? (value / maxValue) * intensity : 0;
 
-      return [lat, lng, intensity];
+      return [lat, lng, intensityValue];
     });
   };
 

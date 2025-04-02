@@ -1,0 +1,55 @@
+msgport.js:70 {"notify":"init_tab"}
+react-dom.development.js:29895 Download the React DevTools for a better development experience: https://reactjs.org/link/react-devtools
+react-dom.development.js:22878  Uncaught ReferenceError: Cannot access 'intensity2' before initialization
+    at HeatmapVisualization.tsx:77:57
+    at Array.map (<anonymous>)
+    at generateHeatMapPoints (HeatmapVisualization.tsx:72:28)
+    at HeatmapVisualization.tsx:88:24
+    at commitHookEffectListMount (react-dom.development.js:23189:26)
+    at commitPassiveMountOnFiber (react-dom.development.js:24965:13)
+    at commitPassiveMountEffects_complete (react-dom.development.js:24930:9)
+    at commitPassiveMountEffects_begin (react-dom.development.js:24917:7)
+    at commitPassiveMountEffects (react-dom.development.js:24905:3)
+    at flushPassiveEffectsImpl (react-dom.development.js:27078:3)
+react-dom.development.js:18704  The above error occurred in the <HeatmapVisualization> component:
+
+    at HeatmapVisualization (https://36f825ae-60ff-40fd-bbda-a0152b16a9cc-00-2rv542emo1oso.picard.replit.dev/src/components/analysis/HeatmapVisualization.tsx:26:40)
+    at ControlledLayer (https://36f825ae-60ff-40fd-bbda-a0152b16a9cc-00-2rv542emo1oso.picard.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/react-leaflet.js?v=869efa2e:472:27)
+    at ContainerComponent (https://36f825ae-60ff-40fd-bbda-a0152b16a9cc-00-2rv542emo1oso.picard.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/react-leaflet.js?v=869efa2e:76:35)
+    at div
+    at MapContainerComponent (https://36f825ae-60ff-40fd-bbda-a0152b16a9cc-00-2rv542emo1oso.picard.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/react-leaflet.js?v=869efa2e:545:34)
+    at MapComponent (https://36f825ae-60ff-40fd-bbda-a0152b16a9cc-00-2rv542emo1oso.picard.replit.dev/src/components/map/MapComponent.tsx:25:3)
+    at div
+    at _c9 (https://36f825ae-60ff-40fd-bbda-a0152b16a9cc-00-2rv542emo1oso.picard.replit.dev/src/components/ui/card.tsx:114:12)
+    at div
+    at _c (https://36f825ae-60ff-40fd-bbda-a0152b16a9cc-00-2rv542emo1oso.picard.replit.dev/src/components/ui/card.tsx:20:11)
+    at MapPanel (https://36f825ae-60ff-40fd-bbda-a0152b16a9cc-00-2rv542emo1oso.picard.replit.dev/src/components/panels/MapPanel.tsx:20:3)
+    at div
+    at div
+    at Dashboard (https://36f825ae-60ff-40fd-bbda-a0152b16a9cc-00-2rv542emo1oso.picard.replit.dev/src/components/Dashboard.tsx:57:22)
+    at DashboardPage
+    at Route (https://36f825ae-60ff-40fd-bbda-a0152b16a9cc-00-2rv542emo1oso.picard.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/wouter.js?v=869efa2e:323:16)
+    at Switch (https://36f825ae-60ff-40fd-bbda-a0152b16a9cc-00-2rv542emo1oso.picard.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/wouter.js?v=869efa2e:379:17)
+    at Router (https://36f825ae-60ff-40fd-bbda-a0152b16a9cc-00-2rv542emo1oso.picard.replit.dev/src/App.tsx?v=kNqk9znwqH3ZdHmWJl3sD:36:22)
+    at div
+    at div
+    at AutoHideProvider (https://36f825ae-60ff-40fd-bbda-a0152b16a9cc-00-2rv542emo1oso.picard.replit.dev/src/contexts/AutoHideContext.tsx:30:36)
+    at PropertyFilterProvider (https://36f825ae-60ff-40fd-bbda-a0152b16a9cc-00-2rv542emo1oso.picard.replit.dev/src/contexts/PropertyFilterContext.tsx:117:42)
+    at MapAccessibilityProvider (https://36f825ae-60ff-40fd-bbda-a0152b16a9cc-00-2rv542emo1oso.picard.replit.dev/src/contexts/MapAccessibilityContext.tsx:44:44)
+    at QueryClientProvider (https://36f825ae-60ff-40fd-bbda-a0152b16a9cc-00-2rv542emo1oso.picard.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/@tanstack_react-query.js?v=869efa2e:2805:3)
+    at App
+
+Consider adding an error boundary to your tree to customize error handling behavior.
+Visit https://reactjs.org/link/error-boundaries to learn more about error boundaries.
+logCapturedError @ react-dom.development.js:18704
+react-dom.development.js:12056  Uncaught ReferenceError: Cannot access 'intensity2' before initialization
+    at HeatmapVisualization.tsx:77:57
+    at Array.map (<anonymous>)
+    at generateHeatMapPoints (HeatmapVisualization.tsx:72:28)
+    at HeatmapVisualization.tsx:88:24
+    at commitHookEffectListMount (react-dom.development.js:23189:26)
+    at commitPassiveMountOnFiber (react-dom.development.js:24965:13)
+    at commitPassiveMountEffects_complete (react-dom.development.js:24930:9)
+    at commitPassiveMountEffects_begin (react-dom.development.js:24917:7)
+    at commitPassiveMountEffects (react-dom.development.js:24905:3)
+    at flushPassiveEffectsImpl (react-dom.development.js:27078:3)
