@@ -12,7 +12,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
-import { ArrowRightIcon, ClockIcon, DatabaseIcon, FilterIcon, PlayIcon, PlusIcon, SettingsIcon, TableIcon } from 'lucide-react';
+import { ArrowRightIcon, ClockIcon, DatabaseIcon, FilterIcon, PlayIcon, PlusIcon, SettingsIcon, TableIcon, ZapIcon } from 'lucide-react';
+import ETLOptimizationPanel from './ETLOptimizationPanel';
 import ETLPipeline, { DataSource, DataTransformation, ETLJob, JobRun } from '../../services/etl/ETLPipeline';
 import Scheduler from '../../services/etl/Scheduler';
 
@@ -376,6 +377,10 @@ const ETLManager: React.FC = () => {
               <FilterIcon className="h-4 w-4 mr-2" />
               Transformations
             </TabsTrigger>
+            <TabsTrigger value="optimization" className="flex-1">
+              <ZapIcon className="h-4 w-4 mr-2" />
+              Optimization
+            </TabsTrigger>
             <TabsTrigger value="settings" className="flex-1">
               <SettingsIcon className="h-4 w-4 mr-2" />
               Settings
@@ -580,6 +585,29 @@ const ETLManager: React.FC = () => {
                   </Card>
                 ))}
               </div>
+            )}
+          </TabsContent>
+          
+          <TabsContent value="optimization" className="m-0 p-6">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-medium">AI-Powered ETL Optimization</h3>
+            </div>
+            
+            {loading ? (
+              <div className="flex justify-center py-8">
+                <div className="animate-pulse">Loading suggestions...</div>
+              </div>
+            ) : (
+              <ETLOptimizationPanel 
+                onApplySuggestion={(job) => {
+                  // Update jobs state after a suggestion is applied
+                  setJobs(prev => prev.map(j => j.id === job.id ? job : j));
+                  toast({
+                    title: 'Job Updated',
+                    description: 'The job has been updated based on the optimization suggestion.'
+                  });
+                }}
+              />
             )}
           </TabsContent>
           

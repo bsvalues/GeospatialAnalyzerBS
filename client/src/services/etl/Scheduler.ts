@@ -1,123 +1,112 @@
 /**
- * ETL Scheduler Service
+ * ETL Job Scheduler Service
  * 
- * Handles the scheduling of ETL jobs based on cron expressions.
- * Uses a simple interval-based approach to check for jobs that need to be run.
+ * This service manages scheduling of ETL jobs using cron expressions.
+ * It periodically checks for jobs that need to be run based on their schedules.
  */
 
-import ETLPipeline, { ETLJob } from './ETLPipeline';
+import ETLPipeline from './ETLPipeline';
 
 /**
- * A simple parser for cron expressions to determine when a job should run next.
- * 
- * Supports:
- * - Minutes: 0-59
- * - Hours: 0-23
- * - Day of month: 1-31
- * - Month: 1-12
- * - Day of week: 0-6 (Sunday is 0)
- * 
- * Common cron patterns are included in the implementation
+ * Helper to parse cron expressions
  */
 class CronParser {
   /**
-   * Parse a cron expression and determine the next run time
-   * 
-   * @param cronExpression The cron expression to parse
-   * @returns The next date to run, or null if the expression is invalid
+   * Parse a cron expression and calculate the next run time
    */
-  static getNextRunTime(cronExpression: string): Date | null {
+  public static getNextRunTime(cronExpression: string): Date | null {
     try {
-      const now = new Date();
+      // Simple cron parser for basic patterns
+      // Format: minute hour day month weekday
+      // e.g. "*/30 * * * *" for every 30 minutes
       
-      // Parse the cron expression
+      const now = new Date();
       const parts = cronExpression.trim().split(/\s+/);
       
-      // We need exactly 5 parts for a valid cron expression
       if (parts.length !== 5) {
+        console.error('Invalid cron expression format:', cronExpression);
         return null;
       }
       
-      // For simplicity, we'll just handle some common patterns
+      const [minuteExp, hourExp, dayExp, monthExp, weekdayExp] = parts;
       
-      // Check for "every n minutes" pattern: */n * * * *
-      const minuteMatch = parts[0].match(/^\*\/(\d+)$/);
-      if (minuteMatch && parts[1] === '*' && parts[2] === '*' && parts[3] === '*' && parts[4] === '*') {
-        const minutes = parseInt(minuteMatch[1], 10);
-        if (isNaN(minutes) || minutes <= 0 || minutes > 59) {
+      // Clone current date for calculating next run
+      const nextRun = new Date(now);
+      nextRun.setSeconds(0);
+      nextRun.setMilliseconds(0);
+      
+      // Handle common patterns
+      if (minuteExp.startsWith('*/')) {
+        // Every X minutes
+        const interval = parseInt(minuteExp.slice(2), 10);
+        if (isNaN(interval) || interval <= 0) {
+          console.error('Invalid minute interval:', minuteExp);
           return null;
         }
         
-        const next = new Date(now);
-        next.setSeconds(0);
-        next.setMilliseconds(0);
-        next.setMinutes(Math.ceil(next.getMinutes() / minutes) * minutes);
+        const currentMinute = now.getMinutes();
+        const nextMinute = Math.ceil(currentMinute / interval) * interval;
         
-        if (next <= now) {
-          next.setMinutes(next.getMinutes() + minutes);
+        nextRun.setMinutes(nextMinute);
+        
+        if (nextRun <= now) {
+          nextRun.setTime(nextRun.getTime() + interval * 60 * 1000);
         }
         
-        return next;
+        return nextRun;
       }
       
-      // Check for "every n hours" pattern: 0 */n * * *
-      const hourMatch = parts[1].match(/^\*\/(\d+)$/);
-      if (parts[0] === '0' && hourMatch && parts[2] === '*' && parts[3] === '*' && parts[4] === '*') {
-        const hours = parseInt(hourMatch[1], 10);
-        if (isNaN(hours) || hours <= 0 || hours > 23) {
+      if (minuteExp === '0' && hourExp.startsWith('*/')) {
+        // Every X hours at minute 0
+        const interval = parseInt(hourExp.slice(2), 10);
+        if (isNaN(interval) || interval <= 0) {
+          console.error('Invalid hour interval:', hourExp);
           return null;
         }
         
-        const next = new Date(now);
-        next.setSeconds(0);
-        next.setMilliseconds(0);
-        next.setMinutes(0);
-        next.setHours(Math.ceil(next.getHours() / hours) * hours);
+        const currentHour = now.getHours();
+        const nextHour = Math.ceil(currentHour / interval) * interval;
         
-        if (next <= now) {
-          next.setHours(next.getHours() + hours);
+        nextRun.setMinutes(0);
+        nextRun.setHours(nextHour);
+        
+        if (nextRun <= now) {
+          nextRun.setTime(nextRun.getTime() + interval * 60 * 60 * 1000);
         }
         
-        return next;
+        return nextRun;
       }
       
-      // Check for "at specific time every day" pattern: m h * * *
-      if (!parts[0].includes('*') && !parts[1].includes('*') && parts[2] === '*' && parts[3] === '*' && parts[4] === '*') {
-        const minutes = parseInt(parts[0], 10);
-        const hours = parseInt(parts[1], 10);
+      if (minuteExp === '0' && hourExp === '0') {
+        // Daily at midnight, weekly, or monthly
+        nextRun.setHours(0);
+        nextRun.setMinutes(0);
         
-        if (isNaN(minutes) || isNaN(hours) || minutes < 0 || minutes > 59 || hours < 0 || hours > 23) {
-          return null;
+        // Add one day by default
+        nextRun.setDate(nextRun.getDate() + 1);
+        
+        // Check if it's a specific day of week
+        if (weekdayExp !== '*') {
+          const targetDay = parseInt(weekdayExp, 10); // 0 = Sunday, 1 = Monday, etc.
+          if (!isNaN(targetDay) && targetDay >= 0 && targetDay <= 6) {
+            const currentDay = nextRun.getDay();
+            const daysToAdd = (targetDay + 7 - currentDay) % 7;
+            
+            if (daysToAdd > 0) {
+              nextRun.setDate(nextRun.getDate() + daysToAdd - 1); // -1 because we already added 1
+            }
+          }
         }
         
-        const next = new Date(now);
-        next.setSeconds(0);
-        next.setMilliseconds(0);
-        next.setMinutes(minutes);
-        next.setHours(hours);
-        
-        if (next <= now) {
-          next.setDate(next.getDate() + 1);
-        }
-        
-        return next;
+        return nextRun;
       }
       
-      // For more complex expressions, we would use a more robust library in a production environment
-      // This is a simplified implementation for demonstration purposes
+      // For more complex cron expressions, we'd need a full cron parser library
+      console.warn('Complex cron expression detected, using approximation:', cronExpression);
       
-      // Default fallback: run once a day at midnight
-      const next = new Date(now);
-      next.setSeconds(0);
-      next.setMilliseconds(0);
-      next.setMinutes(0);
-      next.setHours(0);
-      
-      if (next <= now) {
-        next.setDate(next.getDate() + 1);
-      }
-      
-      return next;
+      // Default: just add one hour as a fallback
+      nextRun.setTime(nextRun.getTime() + 60 * 60 * 1000);
+      return nextRun;
     } catch (error) {
       console.error('Error parsing cron expression:', error);
       return null;
@@ -126,20 +115,24 @@ class CronParser {
 }
 
 /**
- * ETL Scheduler class for managing scheduled jobs
+ * ETL Job Scheduler
  */
-export class Scheduler {
-  private checkInterval: number = 60000; // Check every minute
+class Scheduler {
   private intervalId: number | null = null;
-  private lastCheck: Date = new Date();
+  private checkInterval: number = 60000; // Check every minute by default
   
-  // Singleton instance
   private static instance: Scheduler;
   
+  /**
+   * Private constructor for singleton pattern
+   */
   private constructor() {
     // Private constructor for singleton pattern
   }
   
+  /**
+   * Get the singleton instance
+   */
   public static getInstance(): Scheduler {
     if (!Scheduler.instance) {
       Scheduler.instance = new Scheduler();
@@ -150,21 +143,21 @@ export class Scheduler {
   /**
    * Start the scheduler
    */
-  public start(): void {
-    if (this.intervalId) {
-      console.log('Scheduler is already running');
-      return;
+  public start(interval: number = this.checkInterval): void {
+    if (this.intervalId !== null) {
+      this.stop(); // Stop existing scheduler if running
     }
     
     console.log('Starting ETL job scheduler');
-    this.lastCheck = new Date();
     
-    // Immediately check for jobs that should be run
-    this.checkScheduledJobs();
+    this.checkInterval = interval;
     
-    // Set up interval to check for jobs periodically
+    // Schedule initial check
+    this.checkSchedules();
+    
+    // Set interval for periodic checks
     this.intervalId = window.setInterval(() => {
-      this.checkScheduledJobs();
+      this.checkSchedules();
     }, this.checkInterval);
   }
   
@@ -172,131 +165,110 @@ export class Scheduler {
    * Stop the scheduler
    */
   public stop(): void {
-    if (this.intervalId) {
-      console.log('Stopping ETL job scheduler');
+    console.log('Stopping ETL job scheduler');
+    
+    if (this.intervalId !== null) {
       window.clearInterval(this.intervalId);
       this.intervalId = null;
     }
   }
   
   /**
-   * Check for jobs that need to be run based on their schedule
+   * Check job schedules and run jobs if needed
    */
-  private checkScheduledJobs(): void {
+  private checkSchedules(): void {
+    const jobs = ETLPipeline.getJobs();
     const now = new Date();
-    const etlPipeline = ETLPipeline;
     
-    // Get all jobs
-    const jobs = etlPipeline.getJobs();
-    
-    // Filter for jobs that have a schedule and are enabled
-    const scheduledJobs = jobs.filter(job => job.schedule && job.enabled);
-    
-    for (const job of scheduledJobs) {
-      if (this.shouldRunJob(job, now)) {
-        console.log(`Scheduled execution of ETL job: ${job.name}`);
+    jobs.forEach(job => {
+      // Skip jobs that are not enabled or already running
+      if (!job.enabled || job.status === 'running' || !job.schedule) {
+        return;
+      }
+      
+      // Calculate next run time if not set
+      if (!job.nextRun) {
+        const nextRun = CronParser.getNextRunTime(job.schedule);
+        if (nextRun) {
+          ETLPipeline.updateJob(job.id, { nextRun });
+        }
+        return;
+      }
+      
+      // Check if it's time to run the job
+      if (job.nextRun <= now) {
+        console.log(`Running scheduled job: ${job.name} (${job.id})`);
         
-        // Run the job and handle any errors
-        try {
-          etlPipeline.runJob(job.id).catch(error => {
-            console.error(`Error running scheduled ETL job ${job.name}:`, error);
-          });
-          
-          // Update next run time based on schedule
-          if (job.schedule) {
-            const nextRun = CronParser.getNextRunTime(job.schedule);
-            if (nextRun) {
-              etlPipeline.updateJob(job.id, { nextRun });
-            }
-          }
-        } catch (error) {
-          console.error(`Error scheduling ETL job ${job.name}:`, error);
+        // Run the job
+        ETLPipeline.runJob(job.id).catch(error => {
+          console.error(`Error running scheduled job ${job.id}:`, error);
+        });
+        
+        // Calculate the next run time
+        const nextRun = CronParser.getNextRunTime(job.schedule);
+        if (nextRun) {
+          ETLPipeline.updateJob(job.id, { nextRun });
         }
       }
-    }
-    
-    this.lastCheck = now;
+    });
   }
   
   /**
-   * Determine if a job should be run based on its schedule
-   */
-  private shouldRunJob(job: ETLJob, now: Date): boolean {
-    // If job is running, don't run it again
-    if (job.status === 'running') {
-      return false;
-    }
-    
-    // If no schedule, don't run
-    if (!job.schedule) {
-      return false;
-    }
-    
-    // If job has a nextRun time, check if it's due
-    if (job.nextRun) {
-      return job.nextRun <= now;
-    }
-    
-    // If no nextRun time, calculate it based on the schedule
-    const nextRun = CronParser.getNextRunTime(job.schedule);
-    
-    if (!nextRun) {
-      console.warn(`Invalid schedule for job ${job.name}: ${job.schedule}`);
-      return false;
-    }
-    
-    // Calculate the next run time and check if it would have happened between the last check and now
-    const wouldHaveRun = nextRun > this.lastCheck && nextRun <= now;
-    
-    // Update the job's nextRun time if we're not going to run it now
-    if (!wouldHaveRun) {
-      ETLPipeline.updateJob(job.id, { nextRun });
-    }
-    
-    return wouldHaveRun;
-  }
-  
-  /**
-   * Update the check interval
-   */
-  public setCheckInterval(intervalMs: number): void {
-    if (intervalMs < 1000) {
-      throw new Error('Check interval must be at least 1000ms');
-    }
-    
-    this.checkInterval = intervalMs;
-    
-    // Restart the scheduler if it's running
-    if (this.intervalId) {
-      this.stop();
-      this.start();
-    }
-  }
-  
-  /**
-   * Schedule a job with a given cron expression
+   * Schedule a job with a cron expression
+   * 
+   * @param jobId The ID of the job to schedule
+   * @param cronExpression The cron expression for scheduling
    */
   public scheduleJob(jobId: string, cronExpression: string): void {
     const job = ETLPipeline.getJob(jobId);
     
     if (!job) {
-      throw new Error(`ETL job with ID ${jobId} not found`);
+      throw new Error(`Job with ID ${jobId} not found`);
     }
     
-    // Make sure the cron expression is valid
     const nextRun = CronParser.getNextRunTime(cronExpression);
     
     if (!nextRun) {
       throw new Error(`Invalid cron expression: ${cronExpression}`);
     }
     
-    // Update the job with the new schedule and next run time
     ETLPipeline.updateJob(jobId, {
       schedule: cronExpression,
       nextRun
     });
+  }
+  
+  /**
+   * Unschedule a job
+   */
+  public unscheduleJob(jobId: string): void {
+    const job = ETLPipeline.getJob(jobId);
     
-    console.log(`Scheduled ETL job ${job.name} with expression "${cronExpression}". Next run at: ${nextRun.toLocaleString()}`);
+    if (!job) {
+      throw new Error(`Job with ID ${jobId} not found`);
+    }
+    
+    ETLPipeline.updateJob(jobId, {
+      schedule: undefined,
+      nextRun: undefined
+    });
+  }
+  
+  /**
+   * Set the check interval
+   */
+  public setCheckInterval(interval: number): void {
+    if (interval < 1000) {
+      throw new Error('Check interval must be at least 1000ms');
+    }
+    
+    this.checkInterval = interval;
+    
+    if (this.intervalId !== null) {
+      // Restart scheduler with new interval
+      this.stop();
+      this.start();
+    }
   }
 }
 
