@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Zap, LineChart, BarChart2, BarChart4, Globe, AlertTriangle } from 'lucide-react';
+import { Zap, LineChart, BarChart2, BarChart4, Globe, AlertTriangle, MapPin } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Property } from '@shared/schema';
 import { ValuationModelPanel } from './ValuationModelPanel';
@@ -8,6 +8,7 @@ import { ForecastPanel } from './ForecastPanel';
 import { SpatialAnalyticsPanel } from './SpatialAnalyticsPanel';
 import { AdvancedRegressionPanel } from './AdvancedRegressionPanel';
 import { OutlierDetectionPanel } from '../analysis/OutlierDetectionPanel';
+import { ProximityAnalysisPanel } from '../spatial/ProximityAnalysisPanel';
 
 interface AdvancedAnalyticsPanelProps {
   selectedProperty?: Property;
@@ -117,7 +118,7 @@ export function AdvancedAnalyticsPanel({
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-5">
+        <TabsList className="grid w-full grid-cols-6">
           <TabsTrigger value="valuation" className="flex items-center">
             <Zap className="h-4 w-4 mr-2" />
             Valuation Model
@@ -133,6 +134,10 @@ export function AdvancedAnalyticsPanel({
           <TabsTrigger value="spatial" className="flex items-center">
             <Globe className="h-4 w-4 mr-2" />
             Spatial Analytics
+          </TabsTrigger>
+          <TabsTrigger value="proximity" className="flex items-center">
+            <MapPin className="h-4 w-4 mr-2" />
+            Proximity Analysis
           </TabsTrigger>
           <TabsTrigger value="outliers" className="flex items-center">
             <AlertTriangle className="h-4 w-4 mr-2" />
@@ -154,6 +159,10 @@ export function AdvancedAnalyticsPanel({
         
         <TabsContent value="spatial" className="mt-4">
           <SpatialAnalyticsPanel selectedProperty={selectedProperty} allProperties={allProperties} />
+        </TabsContent>
+        
+        <TabsContent value="proximity" className="mt-4">
+          <ProximityAnalysisPanel selectedProperty={selectedProperty} allProperties={allProperties} />
         </TabsContent>
         
         <TabsContent value="outliers" className="mt-4">
