@@ -8,7 +8,7 @@ import { useState } from 'react';
 import { Link, useLocation } from 'wouter';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
-import { Menu, X, Layers, Map, FileText, Home, Database } from 'lucide-react';
+import { Menu, X, Layers, Map, FileText, Home, Database, DollarSign } from 'lucide-react';
 
 const Header = () => {
   const [location] = useLocation();
@@ -19,6 +19,7 @@ const Header = () => {
     { href: '/', label: 'Home', icon: <Home className="w-4 h-4 mr-2" /> },
     { href: '/analysis', label: 'Analysis', icon: <Map className="w-4 h-4 mr-2" /> },
     { href: '/properties', label: 'Properties', icon: <Database className="w-4 h-4 mr-2" /> },
+    { href: '/income', label: 'Income', icon: <DollarSign className="w-4 h-4 mr-2" /> },
     { href: '/layers', label: 'Layers', icon: <Layers className="w-4 h-4 mr-2" /> },
     { href: '/reports', label: 'Reports', icon: <FileText className="w-4 h-4 mr-2" /> }
   ];
