@@ -1,85 +1,34 @@
-import React, { useState } from 'react';
-import { Switch, Route, useLocation } from 'wouter';
-import { queryClient } from './lib/queryClient';
-import { QueryClientProvider } from '@tanstack/react-query';
+/**
+ * App Component
+ * 
+ * This is the main application component that handles routing
+ * and provides the application layout.
+ */
+import { Switch, Route } from 'wouter';
+import AnalysisPage from './pages/Analysis';
 import { Toaster } from '@/components/ui/toaster';
 import Header from './components/Header';
-import NotFound from '@/pages/not-found';
-import { MapAccessibilityProvider } from './contexts/MapAccessibilityContext';
-import { PropertyFilterProvider } from './contexts/PropertyFilterContext';
-import { AutoHideProvider } from './contexts/AutoHideContext';
-import { TourProvider } from './contexts/TourContext';
-import PropertyTrendsDemo from './components/comparison/PropertyTrendsDemo';
-import NeighborhoodTimelineDemo from './components/neighborhood/NeighborhoodTimelineDemo';
 
-// Page imports
-import HomePage from '@/pages/home';
-import DashboardPage from '@/pages/dashboard';
-import AboutPage from '@/pages/about';
-import GetSmarterPage from '@/pages/get-smarter';
-import ScriptingPage from '@/pages/scripting';
-import ETLPage from '@/pages/etl';
-import IncomeTestPage from '@/pages/income-test';
-import DataConnectorsPage from '@/pages/DataConnectors';
-import LayersPage from '@/pages/Layers';
-import DataPage from '@/pages/Data';
-import AnalysisPage from '@/pages/Analysis';
-import PropertiesPage from '@/pages/Properties';
-import ReportsPage from '@/pages/Reports';
-
-function Router() {
-  const [location] = useLocation();
-  const showHeader = !['/'].includes(location);
-
+export const App = () => {
   return (
-    <>
-      {showHeader && <HeaderWithYear />}
-      <Switch>
-        <Route path="/" component={HomePage} />
-        <Route path="/dashboard" component={DashboardPage} />
-        <Route path="/about" component={AboutPage} />
-        <Route path="/get-smarter" component={GetSmarterPage} />
-        <Route path="/trends" component={PropertyTrendsDemo} />
-        <Route path="/neighborhoods" component={NeighborhoodTimelineDemo} />
-        <Route path="/scripting" component={ScriptingPage} />
-        <Route path="/etl" component={ETLPage} />
-        <Route path="/income-test" component={IncomeTestPage} />
-        <Route path="/data-connectors" component={DataConnectorsPage} />
-        <Route path="/layers" component={LayersPage} />
-        <Route path="/data" component={DataPage} />
-        <Route path="/analysis" component={AnalysisPage} />
-        <Route path="/properties" component={PropertiesPage} />
-        <Route path="/reports" component={ReportsPage} />
-        <Route component={NotFound} />
-      </Switch>
-    </>
+    <div className="min-h-screen flex flex-col">
+      <Header />
+      <main className="flex-grow">
+        <Switch>
+          <Route path="/" component={AnalysisPage} />
+          <Route path="/analysis" component={AnalysisPage} />
+          {/* Additional routes will be added as needed */}
+          <Route>
+            <div className="container mx-auto py-8">
+              <h1 className="text-2xl font-bold">Page Not Found</h1>
+              <p>The page you're looking for doesn't exist.</p>
+            </div>
+          </Route>
+        </Switch>
+      </main>
+      <Toaster />
+    </div>
   );
-}
-
-function HeaderWithYear() {
-  const [taxYear, setTaxYear] = useState('2025');
-  return <Header taxYear={taxYear} onTaxYearChange={setTaxYear} />;
-}
-
-export function App() {
-  return (
-    <QueryClientProvider client={queryClient}>
-      <MapAccessibilityProvider>
-        <PropertyFilterProvider>
-          <AutoHideProvider>
-            <TourProvider>
-              <div className="flex flex-col h-screen bg-gray-50">
-                <div className="flex-grow overflow-hidden">
-                  <Router />
-                </div>
-              </div>
-              <Toaster />
-            </TourProvider>
-          </AutoHideProvider>
-        </PropertyFilterProvider>
-      </MapAccessibilityProvider>
-    </QueryClientProvider>
-  );
-}
+};
 
 export default App;

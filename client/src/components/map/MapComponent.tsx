@@ -1,73 +1,83 @@
-import React, { useState } from 'react';
-import { MapContainer, TileLayer, ZoomControl, LayersControl } from 'react-leaflet';
-import { HeatmapVisualization } from '../analysis/HeatmapVisualization';
-import { HotspotVisualization } from '../analysis/HotspotVisualization';
-import { Property } from '@shared/schema';
+/**
+ * MapComponent
+ * 
+ * This component renders a Leaflet map with various layers and controls.
+ * It serves as the central visualization component for the application.
+ */
+import { useRef, useEffect, useState } from 'react';
+import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 
-const { BaseLayer, Overlay } = LayersControl;
+// Import images for markers (if used)
+// Leaflet needs these for the default markers to display correctly
+import markerIconPng from 'leaflet/dist/images/marker-icon.png';
+import markerShadowPng from 'leaflet/dist/images/marker-shadow.png';
 
-// Interface for component props
+// Set up the default icon for Leaflet
+L.Icon.Default.mergeOptions({
+  iconUrl: markerIconPng,
+  shadowUrl: markerShadowPng
+});
+
+// Define prop types for the MapComponent
 interface MapComponentProps {
-  properties: Property[];
   center?: [number, number];
   zoom?: number;
-  children?: React.ReactNode;
+  height?: string;
+  width?: string;
+  className?: string;
 }
 
-/**
- * Main map component that handles various visualization layers
- */
-export const MapComponent: React.FC<MapComponentProps> = ({ 
-  properties, 
-  center = [47.123, -122.456], // Default center (Benton County, WA)
+export const MapComponent = ({
+  center = [46.2087, -119.1372], // Default to Kennewick, WA (Benton County)
   zoom = 12,
-  children 
-}) => {
-  // State for active visualization layers
-  const [showHeatmap, setShowHeatmap] = useState<boolean>(false);
-  const [showHotspots, setShowHotspots] = useState<boolean>(false);
+  height = '600px',
+  width = '100%',
+  className = ''
+}: MapComponentProps) => {
+  // Create a ref to hold the map div element
+  const mapRef = useRef<HTMLDivElement>(null);
+  
+  // Track the Leaflet map instance
+  const [map, setMap] = useState<L.Map | null>(null);
+  
+  // Initialize the map when the component mounts
+  useEffect(() => {
+    if (mapRef.current && !map) {
+      // Create a new Leaflet map instance
+      const mapInstance = L.map(mapRef.current).setView(center, zoom);
+      
+      // Add OpenStreetMap tile layer
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+        maxZoom: 19
+      }).addTo(mapInstance);
+      
+      // Store the map instance in state
+      setMap(mapInstance);
+      
+      // Clean up the map when the component unmounts
+      return () => {
+        mapInstance.remove();
+      };
+    }
+  }, [mapRef, map, center, zoom]);
+  
+  // Update the map view when center or zoom props change
+  useEffect(() => {
+    if (map) {
+      map.setView(center, zoom);
+    }
+  }, [map, center, zoom]);
   
   return (
-    <MapContainer 
-      center={center} 
-      zoom={zoom} 
-      style={{ height: '100%', width: '100%' }}
-      zoomControl={false}
-    >
-      <ZoomControl position="bottomright" />
-      
-      <LayersControl position="topright">
-        <BaseLayer checked name="Street Map">
-          <TileLayer
-            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-          />
-        </BaseLayer>
-        <BaseLayer name="Satellite">
-          <TileLayer
-            url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
-            attribution='&copy; <a href="https://www.esri.com/">Esri</a>'
-          />
-        </BaseLayer>
-        <BaseLayer name="Topographic">
-          <TileLayer
-            url="https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png"
-            attribution='&copy; <a href="https://opentopomap.org">OpenTopoMap</a> contributors'
-          />
-        </BaseLayer>
-        
-        <Overlay name="Heat Map">
-          <HeatmapVisualization properties={properties} />
-        </Overlay>
-        
-        <Overlay name="Hotspot Analysis">
-          <HotspotVisualization properties={properties} />
-        </Overlay>
-      </LayersControl>
-      
-      {/* Additional map elements passed as children */}
-      {children}
-    </MapContainer>
+    <div 
+      ref={mapRef} 
+      style={{ height, width }} 
+      className={`map-container ${className}`} 
+      data-testid="map-container"
+    />
   );
 };
+
+export default MapComponent;

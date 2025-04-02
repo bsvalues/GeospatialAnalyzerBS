@@ -1,14 +1,16 @@
 #!/bin/bash
 
-# Usage: ./run-single-test.sh <test-file-path>
-# Example: ./run-single-test.sh client/src/__tests__/MapPanel.test.tsx
+# This script runs a single test file
+# Usage: ./run-single-test.sh path/to/test.test.tsx
 
 if [ -z "$1" ]; then
-  echo "Error: Please provide a test file path"
-  echo "Usage: ./run-single-test.sh <test-file-path>"
-  echo "Example: ./run-single-test.sh client/src/__tests__/MapPanel.test.tsx"
+  echo "Usage: ./run-single-test.sh path/to/test.test.tsx"
   exit 1
 fi
 
-# Run the specified test file with Jest
-NODE_OPTIONS=--experimental-vm-modules npx jest "$1" --verbose
+TEST_FILE=$1
+
+echo "Running test: $TEST_FILE"
+NODE_OPTIONS=--experimental-vm-modules npx jest $TEST_FILE --no-cache --detectOpenHandles
+
+echo "Test completed."
