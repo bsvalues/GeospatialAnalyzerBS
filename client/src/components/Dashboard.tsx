@@ -26,7 +26,7 @@ import {
   GitCompare,
   ArrowRight
 } from 'lucide-react';
-import { OneClickExport } from '@/components/export/OneClickExport';
+import { PropertyInsightsReport } from '@/components/export/PropertyInsightsReport';
 import { MapPanel } from './panels/MapPanel';
 import ScriptPanel from './panels/ScriptPanel';
 import { SpatialAnalysisPanel } from './panels/SpatialAnalysisPanel';
@@ -96,12 +96,12 @@ const Dashboard: React.FC<DashboardProps> = ({ className }) => {
                   initial={{ opacity: 0, scale: 0.95 }}
                   animate={{ opacity: 1, scale: 1 }}
                   transition={{ duration: 0.5, delay: 0.2 }}
-                  className="mt-4 md:mt-0 relative group"
+                  className="mt-4 md:mt-0"
                 >
-                  <div className="absolute -inset-1 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-xl opacity-70 blur-sm group-hover:opacity-100 transition duration-300 z-0" />
-                  <OneClickExport 
-                    text="Generate Property Insights"
-                    className="relative px-4 py-2 shadow-sm z-10 bg-gradient-to-r from-blue-600 to-indigo-600 text-white hover:shadow-blue-500/50"
+                  <PropertyInsightsReport 
+                    buttonText="Generate Property Insights"
+                    className="px-4 py-2 shadow-sm"
+                    showDialog={true}
                   />
                 </motion.div>
               </div>
