@@ -1,0 +1,68 @@
+**Goals for This Phase**
+- Achieve stable, testable core app startup.
+- Create a breathtaking yet minimal visual experience.
+- Design a test suite that becomes the backbone of future development.
+- Validate core workflows and critical paths before expanding.
+---
+## 🔧 Minimal Setup (Stable Foundation)
+**Core Features to Implement:**
+- 🚀 App Startup & Welcome Screen
+- Apple-tier minimalist loading animation (tailwind + subtle motion)
+- Welcome message with philosophical prompt or knowledge teaser
+- 📐 Design System Base
+- Tailwind + ShadCN UI setup
+- Typography + spacing scale that screams quality
+- Responsive grid & layout scaffold
+- 🌐 Routing (if web-based)
+- Minimal navigation: `Home`, `About`, `Get Smarter`
+---
+## ✅ Core Tests to Run Now
+We’ll run these before anything else to ensure the base is reliable:
+### 1. **App Startup**
+- [ ] App initializes without errors
+- [ ] Welcome screen renders correctly
+- [ ] Responsive layout loads on all screen sizes
+### 2. **Design System Verification**
+- [ ] Tailwind classes render as expected
+- [ ] ShadCN component example loads (e.g., button, card)
+- [ ] Color palette and fonts match intended design
+### 3. **Visual Sanity Checks**
+- [ ] No overflowing elements or layout shifts
+- [ ] Mobile nav/menu displays as intended
+- [ ] Light/dark mode toggles correctly (if included)
+---
+## 🧪 Phase 1: Pre-Coding Test Suite
+Here’s the **test spec** before we write a single line of new code:
+### 🧪 `tests/ui.test.tsx`
+```ts
+describe("Initial UI Load", () => {
+it("should render the welcome screen", () => {
+render();
+expect(screen.getByText(/welcome/i)).toBeInTheDocument();
+});
+it("should have a responsive layout", () => {
+// Simulate window resize
+global.innerWidth = 320;
+fireEvent(window, new Event("resize"));
+// Check for mobile nav or specific UI change
+expect(screen.getByTestId("mobile-nav")).toBeVisible();
+});
+});
+```
+---
+## 📈 Phase 2 Planning (Coming Next)
+Once Phase 1 is stable and beautiful:
+- 🧠 Knowledge modules (visual walkthroughs, interactive learning)
+- 🗂 AI-powered semantic search through in-app content
+- 📚 Smart bookmarks + knowledge journaling
+- 🧭 Guided “deep dives” with unlockable content
+---
+## 🔁 Plan Review – Self-Audit
+**Potential Issues to Watch For:**
+- Over-investing in animation before the core UX is stable
+- Ignoring accessibility in favor of visual aesthetics
+- Building components without test coverage from the start
+**Opportunities to Improve:**
+- Make visual polish testable with visual regression tools (e.g., Percy)
+- Embed an Easter egg or subtle delight moment on first load
+- Treat the welcome screen like a trailer to a movie: deliver awe
