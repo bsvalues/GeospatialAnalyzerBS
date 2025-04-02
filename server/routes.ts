@@ -4,6 +4,101 @@ import { storage } from "./storage";
 import { z } from "zod";
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  // API route for accessing whitelisted environment variables
+  app.get('/api/config', (req, res) => {
+    // Only expose whitelisted environment variables
+    const clientConfig = {
+      // API keys
+      hasRapidApiKey: !!process.env.RAPIDAPI_KEY
+    };
+    
+    res.json(clientConfig);
+  });
+  
+  // API route to proxy Zillow API requests to protect the API key
+  app.post('/api/zillow/property-data', async (req, res) => {
+    try {
+      const { zpid, data: dataType } = req.body;
+      
+      if (!zpid) {
+        return res.status(400).json({ error: 'Missing required parameter: zpid' });
+      }
+      
+      if (!process.env.RAPIDAPI_KEY) {
+        return res.status(500).json({ error: 'API key not configured' });
+      }
+      
+      // Build URL with optional data parameter
+      let url = `https://zillow-com-property-data.p.rapidapi.com/property_data.php?zpid=${zpid}`;
+      if (dataType) {
+        url += `&data=${dataType}`;
+      }
+      
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'x-rapidapi-host': 'zillow-com-property-data.p.rapidapi.com',
+          'x-rapidapi-key': process.env.RAPIDAPI_KEY
+        }
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Zillow API error: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      res.json(data);
+    } catch (error) {
+      console.error('Error fetching from Zillow API:', error);
+      res.status(500).json({ error: 'Failed to fetch property data from Zillow' });
+    }
+  });
+  
+  // API route to proxy Zillow property search
+  app.post('/api/zillow/search', async (req, res) => {
+    try {
+      const { location, price_min, price_max, beds_min, baths_min, home_types, searchType, page } = req.body;
+      
+      if (!location) {
+        return res.status(400).json({ error: 'Missing required parameter: location' });
+      }
+      
+      if (!process.env.RAPIDAPI_KEY) {
+        return res.status(500).json({ error: 'API key not configured' });
+      }
+      
+      // Build query string
+      const params = new URLSearchParams();
+      params.append('location', location);
+      if (searchType) params.append('searchType', searchType);
+      if (page) params.append('page', page.toString());
+      if (price_min) params.append('price_min', price_min.toString());
+      if (price_max) params.append('price_max', price_max.toString());
+      if (beds_min) params.append('beds_min', beds_min.toString());
+      if (baths_min) params.append('baths_min', baths_min.toString());
+      if (home_types) params.append('home_types', home_types);
+      
+      const url = `https://zillow-com-property-data.p.rapidapi.com/extended_search.php?${params.toString()}`;
+      
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'x-rapidapi-host': 'zillow-com-property-data.p.rapidapi.com',
+          'x-rapidapi-key': process.env.RAPIDAPI_KEY
+        }
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Zillow API error: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      res.json(data);
+    } catch (error) {
+      console.error('Error searching properties from Zillow API:', error);
+      res.status(500).json({ error: 'Failed to search properties from Zillow' });
+    }
+  });
   // Sample property data (simulating database)
   const properties = [
     {
