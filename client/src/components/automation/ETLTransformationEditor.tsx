@@ -1,539 +1,609 @@
-import { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
-import { Badge } from '@/components/ui/badge';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Textarea } from '@/components/ui/textarea';
+import { Badge } from '@/components/ui/badge';
+import { 
+  Code, 
+  Play, 
+  Plus, 
+  Trash2, 
+  Edit, 
+  CheckCircle, 
+  ExternalLink
+} from 'lucide-react';
 import { TransformationRule } from '../../services/etl/ETLTypes';
-import { CheckCircle, Code, Database, Edit, PlusCircle, Save, Trash2, Play, FileText } from 'lucide-react';
-import Editor from '@monaco-editor/react';
 
-// Function to generate unique IDs for transformation rules
-const generateId = (): string => {
-  return Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
-};
-
-/**
- * Mock function to validate transformation code
- */
-const validateTransformationCode = (
-  code: string,
-  dataType: 'number' | 'text' | 'date' | 'boolean' | 'object'
-): { isValid: boolean; message: string } => {
-  if (!code.trim()) {
-    return { isValid: false, message: 'Code cannot be empty' };
-  }
-  
-  // Simple validation based on data type (this would be more sophisticated in a real app)
-  switch (dataType) {
-    case 'number':
-      if (code.includes('UPPER(') || code.includes('LOWER(') || code.includes('CONCAT(')) {
-        return { isValid: false, message: 'String functions cannot be used with number data type' };
-      }
-      break;
-    case 'text':
-      if (code.includes('SUM(') || code.includes('AVG(') || code.includes('COUNT(')) {
-        return { isValid: false, message: 'Aggregate functions cannot be used with text data type' };
-      }
-      break;
-    case 'date':
-      if (!code.includes('DATE') && !code.includes('TIMESTAMP') && !code.includes('INTERVAL')) {
-        return { isValid: false, message: 'Date transformation should use date functions' };
-      }
-      break;
-    case 'boolean':
-      if (!code.includes('=') && !code.includes('>') && !code.includes('<') && 
-          !code.includes('AND') && !code.includes('OR') && !code.includes('NOT')) {
-        return { isValid: false, message: 'Boolean transformation should include logical operators' };
-      }
-      break;
-  }
-  
-  return { isValid: true, message: 'Validation successful' };
-};
-
-/**
- * Sample transformation rule templates
- */
-const ruleTemplates: Record<string, { name: string; description: string; code: string; dataType: 'number' | 'text' | 'date' | 'boolean' | 'object' }> = {
-  uppercase: {
-    name: 'Uppercase Text',
-    description: 'Convert text to uppercase',
-    code: 'UPPER(column_name)',
-    dataType: 'text'
+// Mock data for sample transformations
+const sampleTransformations: TransformationRule[] = [
+  {
+    id: 'rule-1',
+    name: 'Convert to Uppercase',
+    description: 'Converts text values to uppercase',
+    dataType: 'text',
+    transformationCode: 'UPPER(${field})',
+    isActive: true,
+    createdAt: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000), // 30 days ago
+    updatedAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000)   // 2 days ago
   },
-  lowercase: {
-    name: 'Lowercase Text',
-    description: 'Convert text to lowercase',
-    code: 'LOWER(column_name)',
-    dataType: 'text'
-  },
-  formatDate: {
-    name: 'Format Date',
-    description: 'Format date as YYYY-MM-DD',
-    code: "TO_CHAR(column_name, 'YYYY-MM-DD')",
-    dataType: 'date'
-  },
-  calculateArea: {
+  {
+    id: 'rule-2',
     name: 'Calculate Area',
-    description: 'Calculate area based on length and width',
-    code: 'length_column * width_column',
-    dataType: 'number'
+    description: 'Calculate property area from length and width',
+    dataType: 'number',
+    transformationCode: '${length} * ${width}',
+    isActive: true,
+    createdAt: new Date(Date.now() - 25 * 24 * 60 * 60 * 1000), // 25 days ago
+    updatedAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000)   // 1 day ago
   },
-  concatenate: {
-    name: 'Concatenate Fields',
-    description: 'Combine multiple fields into one',
-    code: "CONCAT(first_name, ' ', last_name)",
-    dataType: 'text'
+  {
+    id: 'rule-3',
+    name: 'Data Quality Check',
+    description: 'Validates data quality',
+    dataType: 'boolean',
+    transformationCode: '${value} != NULL AND LENGTH(${value}) > 0',
+    isActive: false,
+    createdAt: new Date(Date.now() - 20 * 24 * 60 * 60 * 1000), // 20 days ago
+    updatedAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000)   // 1 day ago
+  },
+  {
+    id: 'rule-4',
+    name: 'Format Date',
+    description: 'Formats dates to ISO standard',
+    dataType: 'date',
+    transformationCode: 'TO_CHAR(${date}, \'YYYY-MM-DD\')',
+    isActive: true,
+    createdAt: new Date(Date.now() - 15 * 24 * 60 * 60 * 1000), // 15 days ago
+    updatedAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000)   // 1 day ago
+  }
+];
+
+// Mock function to test a transformation
+const testTransformation = async (code: string): Promise<{ success: boolean; result?: string; error?: string }> => {
+  // Simulate processing delay
+  await new Promise(resolve => setTimeout(resolve, 1000));
+  
+  try {
+    // Simple validation for demonstration purposes
+    if (!code.trim()) {
+      throw new Error('Transformation code cannot be empty');
+    }
+    
+    if (code.includes('ERROR')) {
+      throw new Error('Transformation contains errors');
+    }
+    
+    return {
+      success: true,
+      result: 'Transformation is valid and executable'
+    };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error'
+    };
   }
 };
 
-/**
- * ETL Transformation Editor Component
- */
 export function ETLTransformationEditor() {
-  const [transformationRules, setTransformationRules] = useState<TransformationRule[]>([]);
-  const [selectedRule, setSelectedRule] = useState<TransformationRule | null>(null);
-  const [newRule, setNewRule] = useState<Omit<TransformationRule, 'id' | 'createdAt' | 'updatedAt'>>({
+  const [transformations, setTransformations] = useState<TransformationRule[]>(sampleTransformations);
+  const [selectedTransformation, setSelectedTransformation] = useState<TransformationRule | null>(null);
+  const [formOpen, setFormOpen] = useState(false);
+  const [isEdit, setIsEdit] = useState(false);
+  const [isTestingCode, setIsTestingCode] = useState(false);
+  const [testResult, setTestResult] = useState<{ success: boolean; result?: string; error?: string } | null>(null);
+  const [showCodePanel, setShowCodePanel] = useState(false);
+  
+  const [formData, setFormData] = useState<Partial<TransformationRule>>({
     name: '',
     description: '',
     dataType: 'text',
     transformationCode: '',
     isActive: true
   });
-  const [isEditing, setIsEditing] = useState(false);
-  const [validationResult, setValidationResult] = useState<{ isValid: boolean; message: string } | null>(null);
-  const [saveSuccess, setSaveSuccess] = useState(false);
-  const [openDialog, setOpenDialog] = useState(false);
-  const [activeTemplate, setActiveTemplate] = useState<string | null>(null);
   
-  // Initialize with sample rules
-  useEffect(() => {
-    const sampleRules: TransformationRule[] = [
-      {
-        id: generateId(),
-        name: 'Convert Address to Uppercase',
-        description: 'Converts property address to uppercase for standardization',
-        dataType: 'text',
-        transformationCode: 'UPPER(property.address)',
-        isActive: true,
-        createdAt: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000), // 7 days ago
-        updatedAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000)  // 3 days ago
-      },
-      {
-        id: generateId(),
-        name: 'Calculate Price per Square Foot',
-        description: 'Calculates the price per square foot of a property',
-        dataType: 'number',
-        transformationCode: 'property.value / property.squareFeet',
-        isActive: true,
-        createdAt: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000), // 5 days ago
-        updatedAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000)  // 2 days ago
-      },
-      {
-        id: generateId(),
-        name: 'Format Assessment Date',
-        description: 'Formats the assessment date in YYYY-MM-DD format',
-        dataType: 'date',
-        transformationCode: "TO_CHAR(property.assessmentDate, 'YYYY-MM-DD')",
-        isActive: false,
-        createdAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000), // 3 days ago
-        updatedAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000)  // 1 day ago
-      }
-    ];
-    
-    setTransformationRules(sampleRules);
-  }, []);
-  
-  // Handle selecting a rule for editing
-  const handleSelectRule = (rule: TransformationRule) => {
-    setSelectedRule(rule);
-    setNewRule({
-      name: rule.name,
-      description: rule.description || '',
-      dataType: rule.dataType,
-      transformationCode: rule.transformationCode,
-      isActive: rule.isActive
-    });
-    setIsEditing(true);
-    setValidationResult(null);
-    setOpenDialog(true);
+  // Handle selecting a transformation
+  const handleSelectTransformation = (transformation: TransformationRule) => {
+    setSelectedTransformation(transformation);
+    setTestResult(null);
+    setShowCodePanel(true);
   };
   
-  // Handle creating a new rule
-  const handleNewRule = () => {
-    setSelectedRule(null);
-    setNewRule({
+  // Handle opening the create form
+  const handleOpenCreateForm = () => {
+    setFormData({
       name: '',
       description: '',
       dataType: 'text',
       transformationCode: '',
       isActive: true
     });
-    setIsEditing(false);
-    setValidationResult(null);
-    setOpenDialog(true);
+    setIsEdit(false);
+    setFormOpen(true);
   };
   
-  // Handle input changes for the rule form
-  const handleInputChange = (field: keyof typeof newRule, value: string | boolean) => {
-    setNewRule(prev => ({ ...prev, [field]: value }));
-    
-    // If changing data type, reset the code
-    if (field === 'dataType') {
-      setNewRule(prev => ({ ...prev, transformationCode: '' }));
-      setValidationResult(null);
-    }
+  // Handle opening the edit form
+  const handleOpenEditForm = (transformation: TransformationRule) => {
+    setFormData({
+      name: transformation.name,
+      description: transformation.description,
+      dataType: transformation.dataType,
+      transformationCode: transformation.transformationCode,
+      isActive: transformation.isActive
+    });
+    setIsEdit(true);
+    setFormOpen(true);
   };
   
-  // Handle code changes in the editor
-  const handleCodeChange = (value: string | undefined) => {
-    if (value !== undefined) {
-      setNewRule(prev => ({ ...prev, transformationCode: value }));
-      setValidationResult(null);
-    }
-  };
-  
-  // Apply template to current rule
-  const applyTemplate = (templateKey: string) => {
-    const template = ruleTemplates[templateKey];
-    setNewRule(prev => ({
-      ...prev,
-      name: template.name,
-      description: template.description,
-      dataType: template.dataType,
-      transformationCode: template.code
-    }));
-    setActiveTemplate(templateKey);
-  };
-  
-  // Validate the transformation code
-  const handleValidateCode = () => {
-    const result = validateTransformationCode(
-      newRule.transformationCode,
-      newRule.dataType
-    );
-    setValidationResult(result);
-  };
-  
-  // Save or update a rule
-  const handleSaveRule = () => {
-    // Validate first
-    const result = validateTransformationCode(
-      newRule.transformationCode,
-      newRule.dataType
-    );
-    
-    if (!result.isValid) {
-      setValidationResult(result);
-      return;
-    }
-    
+  // Handle form submission
+  const handleFormSubmit = () => {
     const now = new Date();
     
-    if (isEditing && selectedRule) {
-      // Update existing rule
-      const updatedRules = transformationRules.map(rule => 
-        rule.id === selectedRule.id 
+    if (isEdit && selectedTransformation) {
+      // Update existing transformation
+      const updatedTransformations = transformations.map(t => 
+        t.id === selectedTransformation.id 
           ? { 
-              ...rule, 
-              ...newRule, 
+              ...t, 
+              ...formData, 
               updatedAt: now 
             }
-          : rule
+          : t
       );
-      setTransformationRules(updatedRules);
+      
+      setTransformations(updatedTransformations);
+      setSelectedTransformation({
+        ...selectedTransformation,
+        ...formData,
+        updatedAt: now
+      });
     } else {
-      // Create new rule
-      const newRuleWithId: TransformationRule = {
-        id: generateId(),
-        ...newRule,
+      // Create new transformation
+      const newTransformation: TransformationRule = {
+        id: `rule-${transformations.length + 1}`,
+        name: formData.name || 'Unnamed Transformation',
+        description: formData.description || '',
+        dataType: formData.dataType as 'text' | 'number' | 'date' | 'boolean' | 'object',
+        transformationCode: formData.transformationCode || '',
+        isActive: formData.isActive || false,
         createdAt: now,
         updatedAt: now
       };
-      setTransformationRules([...transformationRules, newRuleWithId]);
+      
+      setTransformations([...transformations, newTransformation]);
+      setSelectedTransformation(newTransformation);
+      setShowCodePanel(true);
     }
     
-    setSaveSuccess(true);
-    setTimeout(() => {
-      setSaveSuccess(false);
-      setOpenDialog(false);
-    }, 1500);
+    // Close the form
+    setFormOpen(false);
   };
   
-  // Delete a rule
-  const handleDeleteRule = (id: string) => {
-    setTransformationRules(transformationRules.filter(rule => rule.id !== id));
-  };
-  
-  // Toggle rule active state
-  const handleToggleActive = (id: string) => {
-    setTransformationRules(transformationRules.map(rule =>
-      rule.id === id ? { ...rule, isActive: !rule.isActive } : rule
-    ));
-  };
-  
-  // Format date to relative time
-  const formatRelativeDate = (date: Date): string => {
-    const now = new Date();
-    const diffMs = now.getTime() - date.getTime();
-    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+  // Handle form input change
+  const handleFormInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const { name, value } = e.target;
     
-    if (diffDays === 0) {
-      return 'Today';
-    } else if (diffDays === 1) {
-      return 'Yesterday';
-    } else if (diffDays < 7) {
-      return `${diffDays} days ago`;
-    } else if (diffDays < 30) {
-      return `${Math.floor(diffDays / 7)} weeks ago`;
-    } else {
-      return `${Math.floor(diffDays / 30)} months ago`;
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+  
+  // Handle form select change
+  const handleFormSelectChange = (name: string, value: string) => {
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+  
+  // Handle form switch change
+  const handleFormSwitchChange = (name: string, value: boolean) => {
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+  
+  // Handle toggling transformation active state
+  const handleToggleActive = (id: string) => {
+    const updatedTransformations = transformations.map(t => 
+      t.id === id 
+        ? { ...t, isActive: !t.isActive, updatedAt: new Date() }
+        : t
+    );
+    
+    setTransformations(updatedTransformations);
+    
+    // Update selected transformation if it's the one being toggled
+    if (selectedTransformation && selectedTransformation.id === id) {
+      setSelectedTransformation({
+        ...selectedTransformation,
+        isActive: !selectedTransformation.isActive,
+        updatedAt: new Date()
+      });
+    }
+  };
+  
+  // Handle deleting a transformation
+  const handleDeleteTransformation = (id: string) => {
+    const updatedTransformations = transformations.filter(t => t.id !== id);
+    setTransformations(updatedTransformations);
+    
+    // Clear selection if the deleted transformation was selected
+    if (selectedTransformation && selectedTransformation.id === id) {
+      setSelectedTransformation(null);
+      setShowCodePanel(false);
+    }
+  };
+  
+  // Handle testing transformation code
+  const handleTestCode = async () => {
+    if (!selectedTransformation) return;
+    
+    setIsTestingCode(true);
+    setTestResult(null);
+    
+    try {
+      const result = await testTransformation(selectedTransformation.transformationCode);
+      setTestResult(result);
+    } catch (error) {
+      setTestResult({
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error occurred'
+      });
+    } finally {
+      setIsTestingCode(false);
     }
   };
   
   return (
-    <div className="p-6">
+    <div className="container mx-auto p-6">
       <div className="flex justify-between items-center mb-6">
-        <h2 className="text-2xl font-bold">Transformation Rules Editor</h2>
-        <Button onClick={handleNewRule} className="flex items-center">
-          <PlusCircle className="h-4 w-4 mr-2" />
-          New Rule
+        <h1 className="text-2xl font-bold">ETL Transformation Rules</h1>
+        <Button onClick={handleOpenCreateForm}>
+          <Plus className="h-4 w-4 mr-2" />
+          Create Transformation
         </Button>
       </div>
       
-      {transformationRules.length === 0 ? (
-        <Card className="p-8 text-center">
-          <div className="flex flex-col items-center space-y-4">
-            <Code className="h-12 w-12 text-gray-400" />
-            <h3 className="text-lg font-semibold">No Transformation Rules</h3>
-            <p className="text-gray-500 max-w-md mx-auto">
-              Transformation rules define how data is processed during ETL jobs.
-              Click "New Rule" to create your first transformation rule.
-            </p>
-            <Button onClick={handleNewRule} variant="outline">
-              <PlusCircle className="h-4 w-4 mr-2" />
-              Create First Rule
-            </Button>
-          </div>
-        </Card>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {transformationRules.map(rule => (
-            <Card key={rule.id} className={`transition-colors ${!rule.isActive ? 'bg-gray-50' : ''}`}>
-              <CardHeader className="pb-2">
-                <div className="flex justify-between items-start">
-                  <div>
-                    <CardTitle>{rule.name}</CardTitle>
-                    <CardDescription>
-                      {rule.description || 'No description'}
-                    </CardDescription>
-                  </div>
-                  <div className="flex items-center space-x-1">
-                    <Badge variant={rule.isActive ? 'default' : 'outline'}>
-                      {rule.isActive ? 'Active' : 'Inactive'}
-                    </Badge>
-                    <Badge variant="outline" className="capitalize">
-                      {rule.dataType}
-                    </Badge>
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent className="pb-2">
-                <div className="bg-gray-100 rounded-md p-3 text-sm font-mono overflow-x-auto">
-                  {rule.transformationCode}
-                </div>
-                <div className="flex justify-between items-center mt-2 text-xs text-gray-500">
-                  <span>Created: {formatRelativeDate(rule.createdAt)}</span>
-                  <span>Updated: {formatRelativeDate(rule.updatedAt)}</span>
-                </div>
-              </CardContent>
-              <CardFooter className="flex justify-between pt-2">
-                <div className="flex items-center space-x-2">
-                  <Label htmlFor={`active-${rule.id}`} className="text-sm">Active</Label>
-                  <Switch
-                    id={`active-${rule.id}`}
-                    checked={rule.isActive}
-                    onCheckedChange={() => handleToggleActive(rule.id)}
-                  />
-                </div>
-                <div className="flex space-x-2">
-                  <Button 
-                    variant="outline" 
-                    size="sm"
-                    onClick={() => handleSelectRule(rule)}
-                    className="flex items-center"
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="lg:col-span-1">
+          <Card>
+            <CardHeader>
+              <CardTitle>Transformation Rules</CardTitle>
+              <CardDescription>
+                Define how data should be transformed during ETL processes
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {transformations.map(transformation => (
+                  <Card 
+                    key={transformation.id} 
+                    className={`cursor-pointer transition-colors ${
+                      selectedTransformation?.id === transformation.id 
+                        ? 'bg-gray-50 border-blue-300' 
+                        : 'hover:bg-gray-50'
+                    }`}
+                    onClick={() => handleSelectTransformation(transformation)}
                   >
-                    <Edit className="h-4 w-4 mr-1" />
-                    Edit
-                  </Button>
-                  <Button 
-                    variant="outline" 
-                    size="sm"
-                    onClick={() => handleDeleteRule(rule.id)}
-                    className="flex items-center text-red-500 hover:text-red-700"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </div>
-              </CardFooter>
-            </Card>
-          ))}
-        </div>
-      )}
-      
-      <Dialog open={openDialog} onOpenChange={setOpenDialog}>
-        <DialogContent className="max-w-3xl">
-          <DialogHeader>
-            <DialogTitle>{isEditing ? 'Edit Transformation Rule' : 'Create New Transformation Rule'}</DialogTitle>
-            <DialogDescription>
-              Define how your data should be transformed during ETL processing.
-            </DialogDescription>
-          </DialogHeader>
-          
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div className="space-y-4 md:col-span-2">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="rule-name">Rule Name</Label>
-                  <Input 
-                    id="rule-name" 
-                    value={newRule.name}
-                    onChange={(e) => handleInputChange('name', e.target.value)}
-                    placeholder="My Transformation Rule"
-                  />
-                </div>
+                    <CardContent className="p-4">
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <div className="flex items-center space-x-2">
+                            <h3 className="font-medium">{transformation.name}</h3>
+                            {!transformation.isActive && (
+                              <Badge variant="outline" className="text-gray-500 border-gray-300">
+                                Inactive
+                              </Badge>
+                            )}
+                          </div>
+                          <p className="text-sm text-gray-500 mt-1">
+                            {transformation.description || 'No description'}
+                          </p>
+                          <div className="flex items-center mt-2">
+                            <Badge variant="secondary" className="text-xs">
+                              {transformation.dataType.toUpperCase()}
+                            </Badge>
+                          </div>
+                        </div>
+                        
+                        <div className="flex items-center space-x-1">
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-8 w-8 p-0"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleToggleActive(transformation.id);
+                            }}
+                          >
+                            {transformation.isActive ? (
+                              <CheckCircle className="h-4 w-4 text-green-500" />
+                            ) : (
+                              <CheckCircle className="h-4 w-4 text-gray-300" />
+                            )}
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-8 w-8 p-0"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleOpenEditForm(transformation);
+                            }}
+                          >
+                            <Edit className="h-4 w-4 text-gray-500" />
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-8 w-8 p-0"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDeleteTransformation(transformation.id);
+                            }}
+                          >
+                            <Trash2 className="h-4 w-4 text-gray-500" />
+                          </Button>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
                 
-                <div className="space-y-2">
-                  <Label htmlFor="rule-type">Data Type</Label>
-                  <Select 
-                    value={newRule.dataType}
-                    onValueChange={(value) => handleInputChange('dataType', value)}
-                  >
-                    <SelectTrigger id="rule-type">
-                      <SelectValue placeholder="Select type" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="text">Text</SelectItem>
-                      <SelectItem value="number">Number</SelectItem>
-                      <SelectItem value="date">Date</SelectItem>
-                      <SelectItem value="boolean">Boolean</SelectItem>
-                      <SelectItem value="object">Object/JSON</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-              
-              <div className="space-y-2">
-                <Label htmlFor="rule-description">Description</Label>
-                <Textarea 
-                  id="rule-description" 
-                  value={newRule.description}
-                  onChange={(e) => handleInputChange('description', e.target.value)}
-                  placeholder="Describe what this transformation does"
-                  rows={2}
-                />
-              </div>
-              
-              <div className="space-y-2">
-                <div className="flex justify-between items-center">
-                  <Label>Transformation Code</Label>
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
-                    onClick={handleValidateCode}
-                    className="flex items-center"
-                  >
-                    <Play className="h-4 w-4 mr-1" />
-                    Validate
-                  </Button>
-                </div>
-                <div className="border rounded-md overflow-hidden" style={{ height: '200px' }}>
-                  <Editor
-                    height="200px"
-                    language="sql"
-                    value={newRule.transformationCode}
-                    onChange={handleCodeChange}
-                    options={{
-                      minimap: { enabled: false },
-                      scrollBeyondLastLine: false,
-                      fontSize: 14,
-                      lineNumbers: 'on'
-                    }}
-                  />
-                </div>
-                
-                {validationResult && (
-                  <div className={`text-sm p-2 rounded ${
-                    validationResult.isValid ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
-                  }`}>
-                    {validationResult.message}
+                {transformations.length === 0 && (
+                  <div className="text-center p-6 text-gray-500 bg-gray-50 rounded-md">
+                    No transformation rules defined
                   </div>
                 )}
               </div>
-              
-              <div className="flex items-center space-x-2">
-                <Switch
-                  id="rule-active"
-                  checked={newRule.isActive}
-                  onCheckedChange={(checked) => handleInputChange('isActive', checked)}
-                />
-                <Label htmlFor="rule-active">Rule is active</Label>
-              </div>
+            </CardContent>
+          </Card>
+        </div>
+        
+        <div className="lg:col-span-2">
+          {showCodePanel && selectedTransformation ? (
+            <Card>
+              <CardHeader>
+                <div className="flex justify-between items-start">
+                  <div>
+                    <CardTitle>{selectedTransformation.name}</CardTitle>
+                    <CardDescription>
+                      {selectedTransformation.description || 'No description'}
+                    </CardDescription>
+                  </div>
+                  <Badge variant={selectedTransformation.isActive ? 'default' : 'secondary'}>
+                    {selectedTransformation.isActive ? 'Active' : 'Inactive'}
+                  </Badge>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  <div>
+                    <Label htmlFor="transformationCode" className="text-sm font-medium flex items-center">
+                      <Code className="h-4 w-4 mr-1" />
+                      Transformation Code
+                      <Badge className="ml-2" variant="outline">
+                        {selectedTransformation.dataType.toUpperCase()}
+                      </Badge>
+                    </Label>
+                    <div className="mt-2 relative">
+                      <div className="rounded-md overflow-hidden border border-gray-300">
+                        <pre className="bg-gray-50 p-4 font-mono text-sm overflow-auto max-h-[300px]">
+                          <code>{selectedTransformation.transformationCode}</code>
+                        </pre>
+                      </div>
+                      <Button
+                        size="sm"
+                        className="absolute top-2 right-2"
+                        onClick={handleTestCode}
+                        disabled={isTestingCode}
+                      >
+                        <Play className="h-4 w-4 mr-1" />
+                        Test
+                      </Button>
+                    </div>
+                    
+                    {testResult && (
+                      <div className={`mt-4 p-4 rounded-md ${
+                        testResult.success 
+                          ? 'bg-green-50 border border-green-200' 
+                          : 'bg-red-50 border border-red-200'
+                      }`}>
+                        <div className="flex items-start">
+                          {testResult.success ? (
+                            <CheckCircle className="h-5 w-5 text-green-500 mr-2 flex-shrink-0 mt-0.5" />
+                          ) : (
+                            <Trash2 className="h-5 w-5 text-red-500 mr-2 flex-shrink-0 mt-0.5" />
+                          )}
+                          <div>
+                            <p className={`font-medium ${
+                              testResult.success 
+                                ? 'text-green-800' 
+                                : 'text-red-800'
+                            }`}>
+                              {testResult.success ? 'Transformation is valid' : 'Transformation error'}
+                            </p>
+                            <p className={`text-sm mt-1 ${
+                              testResult.success 
+                                ? 'text-green-700' 
+                                : 'text-red-700'
+                            }`}>
+                              {testResult.success ? testResult.result : testResult.error}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                  
+                  <div className="mt-6">
+                    <h3 className="text-sm font-medium mb-2">Usage Examples</h3>
+                    <Card className="bg-gray-50">
+                      <CardContent className="p-4">
+                        <div className="space-y-4">
+                          <div>
+                            <h4 className="text-xs font-semibold text-gray-600 uppercase">SQL Example</h4>
+                            <pre className="bg-white mt-1 p-3 rounded-md text-xs border border-gray-200 overflow-auto">
+                              <code>
+                                SELECT {selectedTransformation.transformationCode.replace(/\${([^}]+)}/g, '$1')}, 
+                                original_value
+                                FROM my_table
+                              </code>
+                            </pre>
+                          </div>
+                          
+                          <div>
+                            <h4 className="text-xs font-semibold text-gray-600 uppercase">Python Example</h4>
+                            <pre className="bg-white mt-1 p-3 rounded-md text-xs border border-gray-200 overflow-auto">
+                              <code>
+                                {`def transform_data(df):
+    df['transformed_column'] = ${selectedTransformation.transformationCode.replace(/\${([^}]+)}/g, "df['$1']")}
+    return df`}
+                              </code>
+                            </pre>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </div>
+                </div>
+              </CardContent>
+              <CardFooter className="flex justify-between">
+                <Button 
+                  variant="outline"
+                  onClick={() => handleOpenEditForm(selectedTransformation)}
+                >
+                  <Edit className="h-4 w-4 mr-2" />
+                  Edit Transformation
+                </Button>
+                <Button>
+                  <ExternalLink className="h-4 w-4 mr-2" />
+                  Apply to ETL Job
+                </Button>
+              </CardFooter>
+            </Card>
+          ) : (
+            <Card>
+              <CardContent className="p-12">
+                <div className="text-center">
+                  <Code className="h-12 w-12 mx-auto text-gray-300" />
+                  <h3 className="mt-4 text-lg font-medium">Select a Transformation Rule</h3>
+                  <p className="mt-2 text-sm text-gray-500">
+                    Click on a transformation rule from the list to view and test its code,
+                    or create a new transformation rule.
+                  </p>
+                  <Button
+                    className="mt-6"
+                    onClick={handleOpenCreateForm}
+                  >
+                    <Plus className="h-4 w-4 mr-2" />
+                    Create Transformation
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+        </div>
+      </div>
+      
+      {/* Create/Edit Transformation Form Dialog */}
+      <Dialog open={formOpen} onOpenChange={setFormOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              {isEdit ? 'Edit Transformation Rule' : 'Create Transformation Rule'}
+            </DialogTitle>
+            <DialogDescription>
+              {isEdit 
+                ? 'Update the details of this transformation rule' 
+                : 'Define a new transformation rule for ETL processes'}
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="name">Name</Label>
+              <Input
+                id="name"
+                name="name"
+                value={formData.name || ''}
+                onChange={handleFormInputChange}
+                placeholder="e.g., Convert to Uppercase"
+              />
             </div>
             
-            <div className="space-y-4">
-              <Label>Template Gallery</Label>
-              <ScrollArea className="h-[300px] border rounded-md p-2">
-                <div className="space-y-2">
-                  {Object.entries(ruleTemplates).map(([key, template]) => (
-                    <Card 
-                      key={key} 
-                      className={`p-3 cursor-pointer hover:bg-gray-50 ${activeTemplate === key ? 'border-blue-500 bg-blue-50' : ''}`}
-                      onClick={() => applyTemplate(key)}
-                    >
-                      <h4 className="font-semibold">{template.name}</h4>
-                      <p className="text-xs text-gray-500">{template.description}</p>
-                      <div className="text-xs mt-1 font-mono bg-gray-100 p-1 rounded">
-                        {template.code}
-                      </div>
-                    </Card>
-                  ))}
-                </div>
-              </ScrollArea>
+            <div className="space-y-2">
+              <Label htmlFor="description">Description</Label>
+              <Textarea
+                id="description"
+                name="description"
+                value={formData.description || ''}
+                onChange={handleFormInputChange}
+                placeholder="Briefly describe what this transformation does"
+                rows={2}
+              />
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="dataType">Data Type</Label>
+              <Select
+                defaultValue={formData.dataType || 'text'}
+                onValueChange={(value) => handleFormSelectChange('dataType', value)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select data type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="text">Text</SelectItem>
+                  <SelectItem value="number">Number</SelectItem>
+                  <SelectItem value="date">Date</SelectItem>
+                  <SelectItem value="boolean">Boolean</SelectItem>
+                  <SelectItem value="object">Object</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="transformationCode">Transformation Code</Label>
+              <Textarea
+                id="transformationCode"
+                name="transformationCode"
+                value={formData.transformationCode || ''}
+                onChange={handleFormInputChange}
+                placeholder="Enter transformation code, using ${field} for field references"
+                rows={4}
+                className="font-mono"
+              />
+              <p className="text-xs text-gray-500">
+                Use ${field} to reference input fields, e.g., UPPER(${name})
+              </p>
+            </div>
+            
+            <div className="flex items-center space-x-2">
+              <Switch
+                id="isActive"
+                checked={formData.isActive || false}
+                onCheckedChange={(checked) => handleFormSwitchChange('isActive', checked)}
+              />
+              <Label htmlFor="isActive">Active</Label>
             </div>
           </div>
           
           <DialogFooter>
-            <div className="flex justify-between w-full">
-              <Button 
-                variant="outline" 
-                onClick={() => setOpenDialog(false)}
-              >
-                Cancel
-              </Button>
-              {saveSuccess ? (
-                <Button className="bg-green-600 flex items-center">
-                  <CheckCircle className="h-4 w-4 mr-1" />
-                  Saved Successfully
-                </Button>
-              ) : (
-                <Button 
-                  onClick={handleSaveRule}
-                  disabled={!newRule.name || !newRule.transformationCode}
-                  className="flex items-center"
-                >
-                  <Save className="h-4 w-4 mr-1" />
-                  {isEditing ? 'Update Rule' : 'Save Rule'}
-                </Button>
-              )}
-            </div>
+            <Button variant="outline" onClick={() => setFormOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleFormSubmit}>
+              {isEdit ? 'Update' : 'Create'} Transformation
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

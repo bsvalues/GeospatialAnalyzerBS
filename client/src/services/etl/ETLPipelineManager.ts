@@ -1,67 +1,89 @@
 /**
  * ETL Pipeline Manager
  * 
- * Manages the execution of ETL pipelines and coordinates data flow between
- * extraction, transformation, and loading steps.
+ * This service manages ETL jobs, transformations, and executions.
  */
 
 import { v4 as uuidv4 } from 'uuid';
+import { metricsCollector } from './MetricsCollector';
+import { dataConnector } from './DataConnector';
 import { 
-  DataSource, 
   ETLJob, 
-  ETLJobStatus, 
-  ETLPipelineContext,
+  ETLJobStatus,
   TransformationRule,
   ETLExecutionLog,
-  ETLExecutionError,
+  ETLExecutionError
 } from './ETLTypes';
-import { metricsCollector } from './MetricsCollector';
 
-export class ETLPipelineManager {
-  private jobs: Map<string, ETLJob> = new Map();
-  private activePipelines: Map<string, ETLPipelineContext> = new Map();
-  private executionLogs: ETLExecutionLog[] = [];
-  
-  /**
-   * Create a new ETL job
-   */
-  createJob(job: Omit<ETLJob, 'id' | 'status' | 'createdAt' | 'updatedAt'>): ETLJob {
-    const id = uuidv4();
-    const now = new Date();
+/**
+ * ETL Pipeline Manager Service
+ */
+class ETLPipelineManager {
+  private jobs: Map<string, ETLJob>;
+  private activePipelines: Map<string, any>; // In a real app, this would hold running pipeline instances
+  private executionLogs: ETLExecutionLog[];
+
+  constructor() {
+    this.jobs = new Map();
+    this.activePipelines = new Map();
+    this.executionLogs = [];
     
-    const newJob: ETLJob = {
-      id,
-      ...job,
-      status: 'created',
-      createdAt: now,
-      updatedAt: now
-    };
-    
-    this.jobs.set(id, newJob);
-    return newJob;
+    // Initialize with some sample jobs
+    this.initializeSampleJobs();
   }
-  
+
   /**
    * Get a job by ID
    */
   getJob(jobId: string): ETLJob | undefined {
     return this.jobs.get(jobId);
   }
-  
+
   /**
    * Get all jobs
    */
   getAllJobs(): ETLJob[] {
     return Array.from(this.jobs.values());
   }
-  
+
   /**
-   * Update a job
+   * Create a new ETL job
    */
-  updateJob(jobId: string, updates: Partial<Omit<ETLJob, 'id' | 'createdAt'>>): ETLJob | undefined {
+  createJob(params: {
+    name: string;
+    description?: string;
+    sourceId: string;
+    targetId: string;
+    transformationRules: TransformationRule[];
+    schedule?: any;
+  }): ETLJob {
+    const jobId = uuidv4();
+    
+    const job: ETLJob = {
+      id: jobId,
+      name: params.name,
+      description: params.description || '',
+      status: 'created' as ETLJobStatus,
+      sourceId: params.sourceId,
+      targetId: params.targetId,
+      transformationRules: params.transformationRules,
+      schedule: params.schedule,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
+    
+    this.jobs.set(jobId, job);
+    return job;
+  }
+
+  /**
+   * Update an existing ETL job
+   */
+  updateJob(jobId: string, updates: Partial<ETLJob>): ETLJob | undefined {
     const job = this.jobs.get(jobId);
     if (!job) return undefined;
     
+    // Update fields
     const updatedJob: ETLJob = {
       ...job,
       ...updates,
@@ -71,164 +93,354 @@ export class ETLPipelineManager {
     this.jobs.set(jobId, updatedJob);
     return updatedJob;
   }
-  
+
   /**
-   * Delete a job
+   * Delete an ETL job
    */
   deleteJob(jobId: string): boolean {
-    // Cannot delete active jobs
-    const job = this.jobs.get(jobId);
-    if (!job || job.status === 'running') return false;
+    // Ensure the job isn't currently running
+    if (this.activePipelines.has(jobId)) {
+      return false;
+    }
     
     return this.jobs.delete(jobId);
   }
-  
+
   /**
    * Execute an ETL job
    */
   async executeJob(jobId: string): Promise<ETLExecutionLog | undefined> {
-    // Get the job
     const job = this.jobs.get(jobId);
     if (!job) return undefined;
     
     // Update job status
-    this.updateJob(jobId, { status: 'running', lastRunAt: new Date() });
+    this.updateJob(jobId, { status: 'running' });
     
     // Start metrics collection
     metricsCollector.startJobMetrics(jobId, job.name);
     
-    const startTime = new Date();
-    const executionId = uuidv4();
-    
     // Create execution log
     const executionLog: ETLExecutionLog = {
-      id: executionId,
+      id: uuidv4(),
       jobId,
-      startTime,
+      startTime: new Date(),
       status: 'success',
       recordsProcessed: 0,
       errors: []
     };
     
     try {
-      // Start the extraction phase
-      const extractTaskId = uuidv4();
+      // 1. Extract phase
+      const extractTaskId = 'extract-' + uuidv4();
       metricsCollector.startTaskMetrics(jobId, extractTaskId, 'Extract Data');
       
-      // Extract data
-      // In a real implementation, this would connect to the source
-      // and extract actual data
-      const extractedData = await this.mockExtract(job);
+      const source = dataConnector.getDataSource(job.sourceId);
+      if (!source) {
+        throw new Error(`Source data source (${job.sourceId}) not found`);
+      }
       
-      // Update metrics
+      // Simulate data extraction (would connect to actual data source in real app)
+      await this.simulateDelay(1500);
+      const extractedData = this.simulateDataExtraction(source.type, 1000);
+      
       metricsCollector.updateRecordCount(jobId, extractedData.length, extractTaskId);
       metricsCollector.completeTaskMetrics(jobId, extractTaskId);
       
-      // Start transformation phase
-      const transformTaskId = uuidv4();
+      // 2. Transform phase
+      const transformTaskId = 'transform-' + uuidv4();
       metricsCollector.startTaskMetrics(jobId, transformTaskId, 'Transform Data');
       
-      // Apply transformations
-      const transformedData = await this.mockTransform(extractedData, job.transformationRules);
+      // Apply transformations (would apply actual transformations in real app)
+      await this.simulateDelay(800);
+      const transformedData = this.simulateDataTransformation(extractedData, job.transformationRules);
       
-      // Update metrics
       metricsCollector.updateRecordCount(jobId, transformedData.length, transformTaskId);
       metricsCollector.completeTaskMetrics(jobId, transformTaskId);
       
-      // Start loading phase
-      const loadTaskId = uuidv4();
+      // 3. Load phase
+      const loadTaskId = 'load-' + uuidv4();
       metricsCollector.startTaskMetrics(jobId, loadTaskId, 'Load Data');
       
-      // Load data
-      const recordsLoaded = await this.mockLoad(transformedData, job);
+      const target = dataConnector.getDataSource(job.targetId);
+      if (!target) {
+        throw new Error(`Target data source (${job.targetId}) not found`);
+      }
       
-      // Update metrics
-      metricsCollector.updateRecordCount(jobId, recordsLoaded, loadTaskId);
+      // Simulate data loading (would load to actual target in real app)
+      await this.simulateDelay(1200);
+      const loadedRecords = this.simulateDataLoading(transformedData, target.type);
+      
+      metricsCollector.updateRecordCount(jobId, loadedRecords, loadTaskId);
       metricsCollector.completeTaskMetrics(jobId, loadTaskId);
       
-      // Update execution log
-      executionLog.recordsProcessed = recordsLoaded;
+      // 4. Complete execution
       executionLog.endTime = new Date();
+      executionLog.recordsProcessed = loadedRecords;
+      this.executionLogs.push(executionLog);
       
       // Update job status
-      this.updateJob(jobId, { status: 'completed' });
-      
-      // Complete metrics collection
-      metricsCollector.completeJobMetrics(jobId);
+      this.updateJob(jobId, { 
+        status: 'completed',
+        lastRunAt: new Date()
+      });
       
     } catch (error) {
-      // Handle errors
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      const executionError: ETLExecutionError = {
-        code: 'ETL_EXECUTION_ERROR',
+      // Handle error
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      
+      executionLog.status = 'error';
+      executionLog.endTime = new Date();
+      executionLog.message = errorMessage;
+      executionLog.errors.push({
+        code: 'ETL-ERR-001',
         message: errorMessage,
         timestamp: new Date()
-      };
+      });
       
-      executionLog.errors.push(executionError);
-      executionLog.status = 'error';
-      executionLog.message = `Job failed: ${errorMessage}`;
-      executionLog.endTime = new Date();
+      this.executionLogs.push(executionLog);
+      
+      // Record error in metrics
+      metricsCollector.recordError(jobId);
       
       // Update job status
       this.updateJob(jobId, { status: 'failed' });
-      
-      // Update metrics
-      metricsCollector.incrementErrorCount(jobId);
-      metricsCollector.completeJobMetrics(jobId);
     }
     
-    // Save the execution log
-    this.executionLogs.push(executionLog);
+    // Complete metrics collection
+    metricsCollector.completeJobMetrics(jobId);
     
     return executionLog;
   }
-  
+
   /**
    * Get execution logs for a job
    */
   getJobExecutionLogs(jobId: string): ETLExecutionLog[] {
     return this.executionLogs.filter(log => log.jobId === jobId);
   }
-  
+
   /**
-   * Mock extraction process
-   * In a real implementation, this would extract data from the source
+   * Get all execution logs
    */
-  private async mockExtract(job: ETLJob): Promise<any[]> {
-    // Simulate extraction time
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    
-    // Create some mock data
-    const recordCount = Math.floor(Math.random() * 1000) + 500;
-    return Array.from({ length: recordCount }, (_, i) => ({
-      id: i + 1,
-      name: `Record ${i + 1}`,
-      value: Math.floor(Math.random() * 1000),
-      timestamp: new Date()
-    }));
+  getAllExecutionLogs(): ETLExecutionLog[] {
+    return [...this.executionLogs];
   }
-  
+
   /**
-   * Mock transformation process
-   * In a real implementation, this would apply the transformation rules
+   * Pause a running job
    */
-  private async mockTransform(data: any[], rules: TransformationRule[]): Promise<any[]> {
-    // Simulate transformation time
-    await new Promise(resolve => setTimeout(resolve, 1500));
+  pauseJob(jobId: string): boolean {
+    const job = this.jobs.get(jobId);
+    if (!job || job.status !== 'running') return false;
     
-    // Apply simple transformations
-    // In a real implementation, this would interpret and apply the rules
+    // Update job status
+    this.updateJob(jobId, { status: 'paused' });
+    return true;
+  }
+
+  /**
+   * Resume a paused job
+   */
+  resumeJob(jobId: string): boolean {
+    const job = this.jobs.get(jobId);
+    if (!job || job.status !== 'paused') return false;
+    
+    // Update job status
+    this.updateJob(jobId, { status: 'running' });
+    return true;
+  }
+
+  /**
+   * Initialize with sample jobs
+   */
+  private initializeSampleJobs() {
+    // Create sample transformation rules
+    const transformationRules: TransformationRule[] = [
+      {
+        id: 'rule-1',
+        name: 'Uppercase Names',
+        description: 'Convert property names to uppercase',
+        dataType: 'text',
+        transformationCode: 'UPPER(name)',
+        isActive: true,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      },
+      {
+        id: 'rule-2',
+        name: 'Calculate Area',
+        description: 'Calculate property area from length and width',
+        dataType: 'number',
+        transformationCode: 'LENGTH * WIDTH',
+        isActive: true,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      },
+      {
+        id: 'rule-3',
+        name: 'Format Date',
+        description: 'Format date to ISO format',
+        dataType: 'date',
+        transformationCode: 'FORMAT_DATE(date, "YYYY-MM-DD")',
+        isActive: true,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      }
+    ];
+    
+    // Create sample job 1
+    const job1: ETLJob = {
+      id: 'job-1',
+      name: 'Property Data Import',
+      description: 'Import property data from county database to local storage',
+      status: 'completed',
+      sourceId: 'source-1',
+      targetId: 'target-1',
+      transformationRules: [transformationRules[0], transformationRules[1]],
+      createdAt: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000), // 7 days ago
+      updatedAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000), // 2 days ago
+      lastRunAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000)  // 2 days ago
+    };
+    
+    // Create sample job 2
+    const job2: ETLJob = {
+      id: 'job-2',
+      name: 'Demographic Data Sync',
+      description: 'Sync demographic data from census API',
+      status: 'scheduled',
+      sourceId: 'source-2',
+      targetId: 'target-1',
+      transformationRules: [transformationRules[2]],
+      schedule: {
+        frequency: 'daily',
+        startDate: new Date(Date.now() + 24 * 60 * 60 * 1000) // Tomorrow
+      },
+      createdAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000), // 3 days ago
+      updatedAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000)  // 1 day ago
+    };
+    
+    // Create sample job 3
+    const job3: ETLJob = {
+      id: 'job-3',
+      name: 'Market Analysis Data',
+      description: 'Process market analysis data from multiple sources',
+      status: 'created',
+      sourceId: 'source-3',
+      targetId: 'target-2',
+      transformationRules: transformationRules,
+      createdAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000), // 1 day ago
+      updatedAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000)  // 1 day ago
+    };
+    
+    // Add jobs to map
+    this.jobs.set(job1.id, job1);
+    this.jobs.set(job2.id, job2);
+    this.jobs.set(job3.id, job3);
+    
+    // Create sample execution logs
+    const log1: ETLExecutionLog = {
+      id: 'log-1',
+      jobId: job1.id,
+      startTime: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000), // 2 days ago
+      endTime: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000 + 30 * 60 * 1000), // +30 minutes
+      status: 'success',
+      recordsProcessed: 5000,
+      errors: []
+    };
+    
+    const log2: ETLExecutionLog = {
+      id: 'log-2',
+      jobId: job1.id,
+      startTime: new Date(Date.now() - 9 * 24 * 60 * 60 * 1000), // 9 days ago
+      endTime: new Date(Date.now() - 9 * 24 * 60 * 60 * 1000 + 45 * 60 * 1000), // +45 minutes
+      status: 'warning',
+      recordsProcessed: 4800,
+      message: 'Some records could not be processed',
+      errors: [
+        {
+          code: 'ETL-WARN-001',
+          message: '200 records had invalid format',
+          timestamp: new Date(Date.now() - 9 * 24 * 60 * 60 * 1000 + 40 * 60 * 1000)
+        }
+      ]
+    };
+    
+    // Add logs to array
+    this.executionLogs.push(log1);
+    this.executionLogs.push(log2);
+  }
+
+  /**
+   * Simulate a delay (for async operations)
+   */
+  private simulateDelay(ms: number): Promise<void> {
+    return new Promise(resolve => setTimeout(resolve, ms));
+  }
+
+  /**
+   * Simulate data extraction
+   */
+  private simulateDataExtraction(sourceType: string, count: number): any[] {
+    const data = [];
+    
+    for (let i = 0; i < count; i++) {
+      if (sourceType === 'database') {
+        data.push({
+          id: i,
+          name: `Property ${i}`,
+          value: Math.floor(Math.random() * 1000000) + 100000,
+          address: `${i} Main St`,
+          city: 'Benton',
+          state: 'WA',
+          zip: '99320',
+          latitude: 46.2 + (Math.random() * 0.5),
+          longitude: -119.1 + (Math.random() * 0.5),
+          createdAt: new Date()
+        });
+      } else if (sourceType === 'api') {
+        data.push({
+          id: i,
+          population: Math.floor(Math.random() * 10000) + 1000,
+          medianIncome: Math.floor(Math.random() * 50000) + 30000,
+          housingUnits: Math.floor(Math.random() * 5000) + 500,
+          region: `Region-${Math.floor(i / 100)}`,
+          timestamp: new Date()
+        });
+      } else {
+        data.push({
+          id: i,
+          value: Math.random() * 1000,
+          timestamp: new Date()
+        });
+      }
+    }
+    
+    return data;
+  }
+
+  /**
+   * Simulate data transformation
+   */
+  private simulateDataTransformation(data: any[], rules: TransformationRule[]): any[] {
+    // In a real app, this would apply the actual transformation rules
+    // Here we just simulate some basic transformations
+    
     return data.map(item => {
       const transformed = { ...item };
       
-      // Apply mock transformations based on rule types
+      // Apply some mock transformations based on rule names
       rules.forEach(rule => {
         if (rule.isActive) {
-          if (rule.dataType === 'number' && typeof item.value === 'number') {
-            transformed.value = item.value * 2; // Sample transformation
-          } else if (rule.dataType === 'text' && typeof item.name === 'string') {
-            transformed.name = item.name.toUpperCase(); // Sample transformation
+          if (rule.name.includes('Uppercase') && transformed.name) {
+            transformed.name = transformed.name.toUpperCase();
+          }
+          
+          if (rule.name.includes('Calculate Area') && transformed.length && transformed.width) {
+            transformed.area = transformed.length * transformed.width;
+          }
+          
+          if (rule.name.includes('Format Date') && transformed.timestamp) {
+            transformed.formattedDate = transformed.timestamp.toISOString().split('T')[0];
           }
         }
       });
@@ -236,21 +448,24 @@ export class ETLPipelineManager {
       return transformed;
     });
   }
-  
+
   /**
-   * Mock loading process
-   * In a real implementation, this would load data to the target
+   * Simulate data loading
    */
-  private async mockLoad(data: any[], job: ETLJob): Promise<number> {
-    // Simulate loading time
-    await new Promise(resolve => setTimeout(resolve, 800));
+  private simulateDataLoading(data: any[], targetType: string): number {
+    // Simulate some data loss or failure during loading
+    const successRate = 0.98; // 98% success rate
+    let loadedCount = 0;
     
-    // Simulate some records being filtered out
-    const loadedCount = data.length - Math.floor(Math.random() * 20);
+    data.forEach(item => {
+      if (Math.random() < successRate) {
+        loadedCount++;
+      }
+    });
     
     return loadedCount;
   }
 }
 
-// Export singleton instance
+// Singleton instance
 export const etlPipelineManager = new ETLPipelineManager();

@@ -1,281 +1,289 @@
 /**
- * ETL Metrics Collector Service
+ * ETL Metrics Collector
  * 
- * This service collects and analyzes performance metrics for ETL jobs.
+ * This service collects and manages metrics for ETL jobs, including execution time,
+ * memory usage, CPU utilization, and error counts.
  */
+
+export interface MemoryUsage {
+  initialHeapSize: number;
+  finalHeapSize: number;
+  peakHeapSize: number;
+}
+
+export interface TaskMetrics {
+  taskId: string;
+  taskName: string;
+  startTime: Date;
+  endTime: Date | null;
+  executionTime: number;
+  recordsProcessed: number;
+}
 
 export interface ETLJobMetrics {
   jobId: string;
-  executionTime: number; // in milliseconds
+  jobName: string;
   startTime: Date;
   endTime: Date | null;
-  memoryUsage: {
-    initialHeapSize: number;
-    peakHeapSize: number;
-    finalHeapSize: number;
-  };
-  cpuUtilization: number; // percentage
+  executionTime: number;
+  taskMetrics: TaskMetrics[];
   recordsProcessed: number;
   errorCount: number;
-  taskMetrics: {
-    taskId: string;
-    taskName: string;
-    startTime: Date;
-    endTime: Date | null;
-    executionTime: number;
-    recordsProcessed: number;
-  }[];
+  memoryUsage: MemoryUsage;
+  cpuUtilization: number; // percentage of available CPU
 }
 
-export type MetricsSnapshot = Omit<ETLJobMetrics, 'endTime' | 'taskMetrics'> & {
-  endTime: Date | null;
-  taskMetrics: {
-    taskId: string;
-    taskName: string;
-    startTime: Date;
-    endTime: Date | null;
-    executionTime: number;
-    recordsProcessed: number;
-  }[];
-}
+type MetricsUpdateCallback = (metrics: ETLJobMetrics) => void;
 
-export class MetricsCollector {
-  private activeJobMetrics: Map<string, ETLJobMetrics> = new Map();
-  private historicalMetrics: ETLJobMetrics[] = [];
-  private listeners: ((metrics: MetricsSnapshot) => void)[] = [];
+/**
+ * Metrics Collector Service
+ */
+class MetricsCollector {
+  private activeJobMetrics: Map<string, ETLJobMetrics>;
+  private historicalMetrics: ETLJobMetrics[];
+  private updateCallbacks: MetricsUpdateCallback[];
+
+  constructor() {
+    this.activeJobMetrics = new Map();
+    this.historicalMetrics = [];
+    this.updateCallbacks = [];
+  }
 
   /**
    * Start collecting metrics for a job
    */
-  startJobMetrics(jobId: string, jobName: string): void {
-    const startTime = new Date();
-    
-    // Get initial memory usage from browser
-    const initialMemory = window.performance && (performance as any).memory 
-      ? (performance as any).memory.usedJSHeapSize 
-      : 0;
-    
+  startJobMetrics(jobId: string, jobName: string): ETLJobMetrics {
     const metrics: ETLJobMetrics = {
       jobId,
-      executionTime: 0,
-      startTime,
-      endTime: null,
-      memoryUsage: {
-        initialHeapSize: initialMemory,
-        peakHeapSize: initialMemory,
-        finalHeapSize: initialMemory
-      },
-      cpuUtilization: 0,
-      recordsProcessed: 0,
-      errorCount: 0,
-      taskMetrics: []
-    };
-    
-    this.activeJobMetrics.set(jobId, metrics);
-    this.notifyListeners(jobId);
-    
-    // Start periodic collection
-    this.scheduleMetricsUpdate(jobId);
-  }
-  
-  /**
-   * Schedule periodic updates of metrics while job is running
-   */
-  private scheduleMetricsUpdate(jobId: string): void {
-    // Only schedule if job is still active
-    if (!this.activeJobMetrics.has(jobId)) return;
-    
-    // Update metrics
-    this.updateJobMetrics(jobId);
-    
-    // Schedule next update
-    setTimeout(() => this.scheduleMetricsUpdate(jobId), 1000);
-  }
-  
-  /**
-   * Update metrics for an active job
-   */
-  private updateJobMetrics(jobId: string): void {
-    const metrics = this.activeJobMetrics.get(jobId);
-    if (!metrics) return;
-    
-    // Update execution time
-    const currentTime = new Date();
-    metrics.executionTime = currentTime.getTime() - metrics.startTime.getTime();
-    
-    // Update memory usage if available in browser
-    if (window.performance && (performance as any).memory) {
-      const currentHeapSize = (performance as any).memory.usedJSHeapSize;
-      metrics.memoryUsage.peakHeapSize = Math.max(
-        metrics.memoryUsage.peakHeapSize,
-        currentHeapSize
-      );
-    }
-    
-    // Estimate CPU utilization (not accurate in browser environment)
-    // In a real implementation, this would use server-side metrics
-    metrics.cpuUtilization = Math.min(
-      100,
-      Math.random() * 30 + metrics.taskMetrics.length * 10
-    );
-    
-    this.notifyListeners(jobId);
-  }
-  
-  /**
-   * Start collecting metrics for a task within a job
-   */
-  startTaskMetrics(jobId: string, taskId: string, taskName: string): void {
-    const metrics = this.activeJobMetrics.get(jobId);
-    if (!metrics) return;
-    
-    metrics.taskMetrics.push({
-      taskId,
-      taskName,
+      jobName,
       startTime: new Date(),
       endTime: null,
       executionTime: 0,
-      recordsProcessed: 0
-    });
-    
-    this.notifyListeners(jobId);
-  }
-  
-  /**
-   * Update record count for a job or task
-   */
-  updateRecordCount(jobId: string, count: number, taskId?: string): void {
-    const metrics = this.activeJobMetrics.get(jobId);
-    if (!metrics) return;
-    
-    if (taskId) {
-      const taskMetric = metrics.taskMetrics.find(t => t.taskId === taskId);
-      if (taskMetric) {
-        taskMetric.recordsProcessed = count;
-      }
-    } else {
-      metrics.recordsProcessed = count;
-    }
-    
-    this.notifyListeners(jobId);
-  }
-  
-  /**
-   * Increment error count for a job
-   */
-  incrementErrorCount(jobId: string): void {
-    const metrics = this.activeJobMetrics.get(jobId);
-    if (!metrics) return;
-    
-    metrics.errorCount++;
-    this.notifyListeners(jobId);
-  }
-  
-  /**
-   * Complete metrics collection for a task
-   */
-  completeTaskMetrics(jobId: string, taskId: string): void {
-    const metrics = this.activeJobMetrics.get(jobId);
-    if (!metrics) return;
-    
-    const taskMetric = metrics.taskMetrics.find(t => t.taskId === taskId);
-    if (taskMetric) {
-      const endTime = new Date();
-      taskMetric.endTime = endTime;
-      taskMetric.executionTime = endTime.getTime() - taskMetric.startTime.getTime();
-    }
-    
-    this.notifyListeners(jobId);
-  }
-  
-  /**
-   * Complete metrics collection for a job
-   */
-  completeJobMetrics(jobId: string): ETLJobMetrics | null {
-    const metrics = this.activeJobMetrics.get(jobId);
-    if (!metrics) return null;
-    
-    // Set final timestamps and metrics
-    const endTime = new Date();
-    metrics.endTime = endTime;
-    metrics.executionTime = endTime.getTime() - metrics.startTime.getTime();
-    
-    // Update final memory usage if available
-    if (window.performance && (performance as any).memory) {
-      metrics.memoryUsage.finalHeapSize = (performance as any).memory.usedJSHeapSize;
-    }
-    
-    // Move to historical metrics
-    this.activeJobMetrics.delete(jobId);
-    this.historicalMetrics.push({ ...metrics });
-    
-    this.notifyListeners(jobId);
+      taskMetrics: [],
+      recordsProcessed: 0,
+      errorCount: 0,
+      memoryUsage: {
+        initialHeapSize: this.getCurrentHeapSize(),
+        finalHeapSize: 0,
+        peakHeapSize: this.getCurrentHeapSize()
+      },
+      cpuUtilization: 0
+    };
+
+    this.activeJobMetrics.set(jobId, metrics);
     return metrics;
   }
-  
+
   /**
-   * Get current metrics for a job
+   * Get current metrics for a job (both active and historical)
    */
   getJobMetrics(jobId: string): ETLJobMetrics | null {
     // Check active jobs first
     const activeMetrics = this.activeJobMetrics.get(jobId);
-    if (activeMetrics) return { ...activeMetrics };
-    
-    // Check historical metrics
+    if (activeMetrics) {
+      // Update execution time for active jobs
+      if (!activeMetrics.endTime) {
+        activeMetrics.executionTime = this.calculateExecutionTime(activeMetrics.startTime);
+      }
+      return activeMetrics;
+    }
+
+    // Then check historical metrics
     const historicalMetrics = this.historicalMetrics.find(m => m.jobId === jobId);
-    return historicalMetrics ? { ...historicalMetrics } : null;
+    return historicalMetrics || null;
   }
-  
-  /**
-   * Get all active job metrics
-   */
-  getAllActiveJobMetrics(): ETLJobMetrics[] {
-    return Array.from(this.activeJobMetrics.values()).map(metrics => ({ ...metrics }));
-  }
-  
+
   /**
    * Get all historical job metrics
    */
   getHistoricalJobMetrics(): ETLJobMetrics[] {
     return [...this.historicalMetrics];
   }
-  
+
+  /**
+   * Complete metrics collection for a job
+   */
+  completeJobMetrics(jobId: string): ETLJobMetrics | null {
+    const metrics = this.activeJobMetrics.get(jobId);
+    if (!metrics) return null;
+
+    // Capture final metrics
+    metrics.endTime = new Date();
+    metrics.executionTime = this.calculateExecutionTime(metrics.startTime, metrics.endTime);
+    metrics.memoryUsage.finalHeapSize = this.getCurrentHeapSize();
+    metrics.cpuUtilization = this.calculateCpuUtilization();
+
+    // Calculate total records processed from all tasks
+    metrics.recordsProcessed = metrics.taskMetrics.reduce(
+      (total, task) => total + task.recordsProcessed, 
+      0
+    );
+
+    // Move to historical metrics
+    this.historicalMetrics.push({ ...metrics });
+    
+    // Notify subscribers
+    this.notifyMetricsUpdated(metrics);
+
+    return metrics;
+  }
+
+  /**
+   * Start collecting metrics for a task
+   */
+  startTaskMetrics(jobId: string, taskId: string, taskName: string): TaskMetrics | null {
+    const jobMetrics = this.activeJobMetrics.get(jobId);
+    if (!jobMetrics) return null;
+
+    const taskMetrics: TaskMetrics = {
+      taskId,
+      taskName,
+      startTime: new Date(),
+      endTime: null,
+      executionTime: 0,
+      recordsProcessed: 0
+    };
+
+    jobMetrics.taskMetrics.push(taskMetrics);
+    
+    // Update job metrics with current memory usage
+    const currentHeapSize = this.getCurrentHeapSize();
+    if (currentHeapSize > jobMetrics.memoryUsage.peakHeapSize) {
+      jobMetrics.memoryUsage.peakHeapSize = currentHeapSize;
+    }
+
+    // Notify subscribers
+    this.notifyMetricsUpdated(jobMetrics);
+
+    return taskMetrics;
+  }
+
+  /**
+   * Complete metrics collection for a task
+   */
+  completeTaskMetrics(jobId: string, taskId: string): TaskMetrics | null {
+    const jobMetrics = this.activeJobMetrics.get(jobId);
+    if (!jobMetrics) return null;
+
+    const taskMetrics = jobMetrics.taskMetrics.find(t => t.taskId === taskId);
+    if (!taskMetrics) return null;
+
+    // Capture final metrics
+    taskMetrics.endTime = new Date();
+    taskMetrics.executionTime = this.calculateExecutionTime(
+      taskMetrics.startTime, 
+      taskMetrics.endTime
+    );
+
+    // Update job metrics with current memory usage
+    const currentHeapSize = this.getCurrentHeapSize();
+    if (currentHeapSize > jobMetrics.memoryUsage.peakHeapSize) {
+      jobMetrics.memoryUsage.peakHeapSize = currentHeapSize;
+    }
+
+    // Notify subscribers
+    this.notifyMetricsUpdated(jobMetrics);
+
+    return taskMetrics;
+  }
+
+  /**
+   * Update record count for a task
+   */
+  updateRecordCount(
+    jobId: string, 
+    recordCount: number, 
+    taskId?: string
+  ): boolean {
+    const jobMetrics = this.activeJobMetrics.get(jobId);
+    if (!jobMetrics) return false;
+
+    if (taskId) {
+      // Update record count for specific task
+      const taskMetrics = jobMetrics.taskMetrics.find(t => t.taskId === taskId);
+      if (!taskMetrics) return false;
+      taskMetrics.recordsProcessed = recordCount;
+    } else {
+      // Update job-level record count
+      jobMetrics.recordsProcessed = recordCount;
+    }
+
+    // Notify subscribers
+    this.notifyMetricsUpdated(jobMetrics);
+
+    return true;
+  }
+
+  /**
+   * Record an error occurrence
+   */
+  recordError(jobId: string): boolean {
+    const jobMetrics = this.activeJobMetrics.get(jobId);
+    if (!jobMetrics) return false;
+
+    jobMetrics.errorCount++;
+
+    // Notify subscribers
+    this.notifyMetricsUpdated(jobMetrics);
+
+    return true;
+  }
+
   /**
    * Subscribe to metrics updates
    */
-  subscribeToMetricsUpdates(listener: (metrics: MetricsSnapshot) => void): () => void {
-    this.listeners.push(listener);
+  subscribeToMetricsUpdates(callback: MetricsUpdateCallback): () => void {
+    this.updateCallbacks.push(callback);
     
     // Return unsubscribe function
     return () => {
-      this.listeners = this.listeners.filter(l => l !== listener);
+      this.updateCallbacks = this.updateCallbacks.filter(cb => cb !== callback);
     };
   }
-  
+
   /**
-   * Notify listeners of metrics updates
+   * Notify subscribers of metrics updates
    */
-  private notifyListeners(jobId: string): void {
-    const metrics = this.activeJobMetrics.get(jobId);
-    if (!metrics) return;
-    
-    const snapshot: MetricsSnapshot = {
-      jobId: metrics.jobId,
-      executionTime: metrics.executionTime,
-      startTime: metrics.startTime,
-      endTime: metrics.endTime,
-      memoryUsage: { ...metrics.memoryUsage },
-      cpuUtilization: metrics.cpuUtilization,
-      recordsProcessed: metrics.recordsProcessed,
-      errorCount: metrics.errorCount,
-      taskMetrics: metrics.taskMetrics.map(task => ({ ...task }))
-    };
-    
-    for (const listener of this.listeners) {
-      listener(snapshot);
+  private notifyMetricsUpdated(metrics: ETLJobMetrics): void {
+    this.updateCallbacks.forEach(callback => {
+      callback({ ...metrics });
+    });
+  }
+
+  /**
+   * Calculate execution time between two timestamps
+   */
+  private calculateExecutionTime(startTime: Date, endTime: Date | null = null): number {
+    const end = endTime || new Date();
+    return end.getTime() - startTime.getTime();
+  }
+
+  /**
+   * Get current heap size (using performance API when available)
+   */
+  private getCurrentHeapSize(): number {
+    // Note: performance.memory is a non-standard Chrome-only feature
+    // TypeScript doesn't have types for it by default, so we use this workaround
+    const perf = performance as any;
+    if (typeof perf !== 'undefined' && 
+        perf.memory && 
+        perf.memory.usedJSHeapSize) {
+      return perf.memory.usedJSHeapSize;
     }
+    // Fallback when actual memory metrics aren't available
+    return Math.floor(Math.random() * 1000000) + 500000;
+  }
+
+  /**
+   * Calculate CPU utilization (mockup implementation)
+   */
+  private calculateCpuUtilization(): number {
+    // This is a mockup implementation since browsers don't provide direct CPU metrics
+    // In a production app, this could be approximated using task execution times
+    // or could be provided by server-side metrics
+    return Math.min(95, Math.floor(Math.random() * 60) + 20);
   }
 }
 
-// Export singleton instance
+// Singleton instance
 export const metricsCollector = new MetricsCollector();
