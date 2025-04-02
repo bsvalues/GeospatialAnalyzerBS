@@ -14,6 +14,9 @@ import {
 import { Link } from 'wouter';
 import { useMapAccessibility } from '@/contexts/MapAccessibilityContext';
 import { useToast } from '@/hooks/use-toast';
+import { TourGuideButton } from '@/components/ui/TourGuideButton';
+import { useGuidedTour } from '@/hooks/use-guided-tour';
+import { TourStepsService } from '@/services/tourStepsService';
 
 interface HeaderProps {
   taxYear: string;
@@ -40,6 +43,17 @@ export const Header: React.FC<HeaderProps> = ({ taxYear, onTaxYearChange }) => {
   
   // State for accessibility dialog
   const [isAccessibilityDialogOpen, setIsAccessibilityDialogOpen] = React.useState(false);
+  
+  // Set up the guided tour
+  const { startTour, hasCompletedTour } = useGuidedTour(
+    'overview-tour',
+    TourStepsService.getOverviewTourSteps(),
+    {
+      showProgress: true,
+      exitOnOverlayClick: false,
+      showStepNumbers: true
+    }
+  );
   
   const handleAccessibilityToggle = (setting: string) => {
     switch (setting) {
@@ -155,12 +169,11 @@ export const Header: React.FC<HeaderProps> = ({ taxYear, onTaxYearChange }) => {
             <Accessibility className="h-5 w-5" />
           </button>
           
-          <button
-            className="text-white hover:text-white p-1.5 rounded-full hover:bg-white/10 transition-all duration-200"
-            aria-label="Help"
-          >
-            <HelpCircle className="h-5 w-5" />
-          </button>
+          {/* Tour Guide Button */}
+          <TourGuideButton 
+            onClick={startTour} 
+            pulsing={!hasCompletedTour}
+          />
           
           <button
             className="text-white hover:text-white p-1.5 rounded-full hover:bg-white/10 transition-all duration-200 relative"

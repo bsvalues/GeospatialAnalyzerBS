@@ -59,7 +59,7 @@ const Dashboard: React.FC<DashboardProps> = ({ className }) => {
   return (
     <div className={`h-full flex flex-col ${className} bg-gradient-to-b from-[#f8faff] to-[#e6f2ff]`} data-testid="dashboard-container">
       {/* Tab navigation */}
-      <TabNavigation activeTab={activeTab} onTabChange={setActiveTab} />
+      <TabNavigation activeTab={activeTab} onTabChange={setActiveTab} data-tour="app-navigation" />
 
       {/* Subtle background elements */}
       <div className="absolute top-1/4 right-1/3 w-[300px] h-[300px] bg-blue-300 rounded-full blur-[130px] opacity-10 z-0 pointer-events-none" />
@@ -71,10 +71,10 @@ const Dashboard: React.FC<DashboardProps> = ({ className }) => {
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(255,255,255,0)_0%,rgba(255,255,255,0.7)_70%,rgba(255,255,255,0.9)_100%)] z-[1] pointer-events-none" />
 
         {activeTab === 'overview' && (
-          <div className="h-full p-6 overflow-auto relative z-10">
+          <div className="h-full p-6 overflow-auto relative z-10" data-tour="overview-panel">
             <div className="max-w-7xl mx-auto">
               <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-8">
-                <div>
+                <div data-tour="welcome-message">
                   <motion.h1 
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
@@ -112,6 +112,7 @@ const Dashboard: React.FC<DashboardProps> = ({ className }) => {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.6, delay: 0.1 }}
                 className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8"
+                data-tour="quick-stats"
               >
                 <motion.div 
                   whileHover={{ y: -5, transition: { duration: 0.2 } }}
@@ -195,6 +196,7 @@ const Dashboard: React.FC<DashboardProps> = ({ className }) => {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.6, delay: 0.2 }}
                 className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8"
+                data-tour="detailed-stats"
               >
                 {/* Property Statistics Card - redesigned with glassmorphism */}
                 <motion.div 
@@ -353,6 +355,7 @@ const Dashboard: React.FC<DashboardProps> = ({ className }) => {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.6, delay: 0.3 }}
                 className="bg-gradient-to-r from-amber-50/90 to-amber-100/90 backdrop-blur-md p-6 rounded-xl border border-amber-200 shadow-sm mb-8"
+                data-tour="alerts-panel"
               >
                 <div className="flex flex-col sm:flex-row sm:items-center">
                   <div className="flex-shrink-0 bg-gradient-to-br from-amber-300 to-amber-500 p-3 rounded-full mb-4 sm:mb-0 sm:mr-5 shadow-sm">
@@ -395,12 +398,14 @@ const Dashboard: React.FC<DashboardProps> = ({ className }) => {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.6, delay: 0.5 }}
                 className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6"
+                data-tour="feature-cards"
               >
                 <motion.button 
                   onClick={() => setActiveTab('map')}
                   className="p-6 bg-white/80 backdrop-blur-md rounded-xl border border-blue-50 shadow-[0_8px_16px_rgba(112,144,176,0.08)] hover:shadow-lg hover:-translate-y-1 transition-all duration-200 text-left"
                   whileHover={{ scale: 1.03 }}
                   whileTap={{ scale: 0.98 }}
+                  data-tour="map-feature"
                 >
                   <div className="mb-4 bg-gradient-to-br from-blue-400 to-blue-600 w-12 h-12 flex items-center justify-center rounded-lg shadow-sm">
                     <Map className="h-6 w-6 text-white" />
@@ -455,6 +460,7 @@ const Dashboard: React.FC<DashboardProps> = ({ className }) => {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.6, delay: 0.6 }}
                 className="mt-8 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6"
+                data-tour="advanced-features"
               >
                 <motion.button 
                   onClick={() => setActiveTab('regression')}
