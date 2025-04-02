@@ -18,12 +18,34 @@ interface HeatMapControlsProps {
   onToggle: (enabled: boolean) => void;
 }
 
-// Predefined color gradients
+// Predefined color gradients with enhanced visibility
 const colorGradients = {
-  default: { 0.4: 'blue', 0.6: 'lime', 0.8: 'yellow', 1.0: 'red' },
-  valueChange: { 0: 'blue', 0.4: 'cyan', 0.5: 'lime', 0.7: 'yellow', 1.0: 'red' },
-  heatOnly: { 0.4: 'yellow', 0.6: 'orange', 0.8: 'orangered', 1.0: 'red' },
-  cool: { 0.4: 'cyan', 0.6: 'blue', 0.8: 'darkblue', 1.0: 'purple' }
+  default: { 
+    0.2: '#0a337f', // Deep blue
+    0.4: '#1a73e8', // Bright blue
+    0.6: '#00c853', // Vivid green
+    0.8: '#ffd600', // Bright yellow
+    1.0: '#d50000'  // Deep red
+  },
+  valueChange: { 
+    0.0: '#01579b', // Deep blue
+    0.3: '#039be5', // Bright blue
+    0.5: '#00c853', // Vivid green
+    0.7: '#ffd600', // Bright yellow
+    1.0: '#d50000'  // Deep red
+  },
+  heatOnly: { 
+    0.3: '#ff9800', // Orange
+    0.5: '#ff6d00', // Dark orange
+    0.7: '#f44336', // Light red
+    1.0: '#b71c1c'  // Deep red
+  },
+  cool: { 
+    0.2: '#00b8d4', // Cyan
+    0.4: '#2962ff', // Bright blue
+    0.7: '#304ffe', // Indigo
+    1.0: '#6200ea'  // Deep purple
+  }
 };
 
 export const HeatMapControls: React.FC<HeatMapControlsProps> = ({
@@ -137,7 +159,9 @@ export const HeatMapControls: React.FC<HeatMapControlsProps> = ({
                 onClick={() => onSettingsChange({ gradient: colorGradients.default })}
                 disabled={!isEnabled}
               >
-                <div className="w-8 h-4 rounded-sm mr-2 bg-gradient-to-r from-blue via-lime via-yellow to-red"></div>
+                <div className="w-8 h-4 rounded-sm mr-2" style={{
+                  background: 'linear-gradient(to right, #0a337f, #1a73e8, #00c853, #ffd600, #d50000)'
+                }}></div>
                 Default
               </Button>
               
@@ -148,7 +172,9 @@ export const HeatMapControls: React.FC<HeatMapControlsProps> = ({
                 onClick={() => onSettingsChange({ gradient: colorGradients.valueChange })}
                 disabled={!isEnabled}
               >
-                <div className="w-8 h-4 rounded-sm mr-2 bg-gradient-to-r from-blue via-cyan via-lime via-yellow to-red"></div>
+                <div className="w-8 h-4 rounded-sm mr-2" style={{
+                  background: 'linear-gradient(to right, #01579b, #039be5, #00c853, #ffd600, #d50000)'
+                }}></div>
                 Value Change
               </Button>
               
@@ -159,7 +185,9 @@ export const HeatMapControls: React.FC<HeatMapControlsProps> = ({
                 onClick={() => onSettingsChange({ gradient: colorGradients.heatOnly })}
                 disabled={!isEnabled}
               >
-                <div className="w-8 h-4 rounded-sm mr-2 bg-gradient-to-r from-yellow via-orange via-orange-600 to-red"></div>
+                <div className="w-8 h-4 rounded-sm mr-2" style={{
+                  background: 'linear-gradient(to right, #ff9800, #ff6d00, #f44336, #b71c1c)'
+                }}></div>
                 Heat Only
               </Button>
               
@@ -170,7 +198,9 @@ export const HeatMapControls: React.FC<HeatMapControlsProps> = ({
                 onClick={() => onSettingsChange({ gradient: colorGradients.cool })}
                 disabled={!isEnabled}
               >
-                <div className="w-8 h-4 rounded-sm mr-2 bg-gradient-to-r from-cyan via-blue via-indigo to-purple-800"></div>
+                <div className="w-8 h-4 rounded-sm mr-2" style={{
+                  background: 'linear-gradient(to right, #00b8d4, #2962ff, #304ffe, #6200ea)'
+                }}></div>
                 Cool
               </Button>
             </div>

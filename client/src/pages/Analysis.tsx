@@ -189,32 +189,28 @@ const AnalysisPage = () => {
         </TabsContent>
         
         <TabsContent value="market" className="space-y-4">
+          {/* Full-width immersive map section */}
+          <div className="relative w-full">
+            {/* Map container - now taller and more prominent */}
+            <div 
+              ref={mapContainerRef} 
+              className="h-[600px] w-full rounded-md shadow-lg border-0 overflow-hidden"
+            ></div>
+            
+            {/* Floating controls panel */}
+            <div className="absolute top-4 right-4 w-[350px] bg-card/95 backdrop-blur-sm rounded-lg shadow-lg border p-3 z-[1000]">
+              <h3 className="text-lg font-semibold flex items-center mb-2">
+                <Map className="h-5 w-5 mr-2" />
+                Market Heat Map
+              </h3>
+              <p className="text-sm text-muted-foreground mb-3">
+                Visualize property market trends across Benton County
+              </p>
+              <MarketTrendsHeatMap map={map} className="bg-transparent shadow-none border-0" />
+            </div>
+          </div>
+          
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <Card className="md:col-span-2">
-              <CardHeader className="pb-2">
-                <div className="flex justify-between items-center">
-                  <div>
-                    <CardTitle className="flex items-center">
-                      <Map className="h-5 w-5 mr-2" />
-                      Interactive Heat Map
-                    </CardTitle>
-                    <CardDescription>
-                      Visualize property market trends geospatially
-                    </CardDescription>
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent>
-                {/* Map container */}
-                <div 
-                  ref={mapContainerRef} 
-                  className="h-[400px] w-full rounded-md border mb-4"
-                ></div>
-                
-                {/* Heat Map Controls */}
-                <MarketTrendsHeatMap map={map} className="mt-4" />
-              </CardContent>
-            </Card>
             
             <Card>
               <CardHeader className="pb-2">

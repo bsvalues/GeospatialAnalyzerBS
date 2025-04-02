@@ -26,16 +26,23 @@ export const MarketTrendsHeatMap: React.FC<MarketTrendsHeatMapProps> = ({
     staleTime: 1000 * 60 * 5, // 5 minutes
   });
 
-  // Heat map state
-  const [heatMapEnabled, setHeatMapEnabled] = useState(false);
+  // Heat map state - enabled by default for better user experience
+  const [heatMapEnabled, setHeatMapEnabled] = useState(true);
   const [showLegend, setShowLegend] = useState(true);
   
-  // Default heat map settings
+  // Default heat map settings with enhanced visibility
   const [heatMapSettings, setHeatMapSettings] = useState<HeatMapSettings>({
     metric: 'value',
-    radius: 25,
-    blur: 15,
-    gradient: { 0.4: 'blue', 0.6: 'lime', 0.8: 'yellow', 1.0: 'red' },
+    radius: 30,
+    blur: 10, // Reduced blur for sharper visualization
+    // High-contrast gradient with deeper colors
+    gradient: { 
+      0.2: '#0a337f', // Deep blue
+      0.4: '#1a73e8', // Bright blue
+      0.6: '#00c853', // Vivid green
+      0.8: '#ffd600', // Bright yellow
+      1.0: '#d50000'  // Deep red
+    },
     maxIntensity: null,
     intensityProperty: 'value',
     showLegend: true
