@@ -1,4 +1,4 @@
-import { pgTable, text, serial, integer, boolean, jsonb, numeric, varchar, primaryKey } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, boolean, jsonb, numeric, varchar, primaryKey, timestamp } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -189,6 +189,90 @@ export const incomeLeaseUp = pgTable("income_lease_up", {
   rentTotal: numeric("rent_total", { precision: 14, scale: 0 }),
   leasePct: numeric("lease_pct", { precision: 5, scale: 2 }),
   leaseTotal: numeric("lease_total", { precision: 14, scale: 0 })
+});
+
+// ETL Data Sources table
+export const etlDataSources = pgTable("etl_data_sources", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  description: text("description"),
+  type: text("type").notNull(), // database, api, file, memory
+  connectionDetails: jsonb("connection_details").notNull(),
+  isConnected: boolean("is_connected").default(false),
+  lastConnected: timestamp("last_connected"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow()
+});
+
+// ETL Transformation Rules table
+export const etlTransformationRules = pgTable("etl_transformation_rules", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  description: text("description"),
+  dataType: text("data_type").notNull(), // text, number, date, boolean, object
+  transformationCode: text("transformation_code").notNull(),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow()
+});
+
+// ETL Jobs table
+export const etlJobs = pgTable("etl_jobs", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  description: text("description"),
+  sourceId: integer("source_id").notNull(), // References etlDataSources.id
+  targetId: integer("target_id").notNull(), // References etlDataSources.id
+  transformationIds: jsonb("transformation_ids").notNull().default([]), // Array of transformation rule IDs
+  status: text("status").notNull().default("idle"), // idle, running, success, failed, warning
+  schedule: jsonb("schedule"), // frequency, start_date, days_of_week, time_of_day, etc.
+  metrics: jsonb("metrics"), // execution time, CPU/memory utilization, rows processed, etc.
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+  lastRunAt: timestamp("last_run_at")
+});
+
+// ETL Optimization Suggestions table
+export const etlOptimizationSuggestions = pgTable("etl_optimization_suggestions", {
+  id: serial("id").primaryKey(),
+  jobId: integer("job_id").notNull(), // References etlJobs.id
+  type: text("type").notNull(), // performance, resource, code, scheduling
+  severity: text("severity").notNull(), // low, medium, high
+  title: text("title").notNull(),
+  description: text("description").notNull(),
+  suggestedAction: text("suggested_action").notNull(),
+  estimatedImprovement: jsonb("estimated_improvement").notNull(), // metric, percentage
+  status: text("status").notNull().default("new"), // new, in_progress, implemented, ignored
+  category: text("category"),
+  implementationComplexity: text("implementation_complexity"),
+  suggestedCode: text("suggested_code"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow()
+});
+
+// ETL Batch Jobs table
+export const etlBatchJobs = pgTable("etl_batch_jobs", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  description: text("description"),
+  jobIds: jsonb("job_ids").notNull(), // Array of job IDs
+  status: text("status").notNull().default("idle"), // idle, running, success, failed, warning
+  progress: integer("progress").notNull().default(0), // 0-100
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+  startedAt: timestamp("started_at"),
+  completedAt: timestamp("completed_at")
+});
+
+// ETL Alerts table
+export const etlAlerts = pgTable("etl_alerts", {
+  id: serial("id").primaryKey(),
+  jobId: integer("job_id").notNull(), // References etlJobs.id
+  type: text("type").notNull(), // error, warning, info
+  message: text("message").notNull(),
+  details: text("details"),
+  timestamp: timestamp("timestamp").defaultNow(),
+  isRead: boolean("is_read").default(false)
 });
 
 // Create schemas for inserting data
@@ -384,3 +468,84 @@ export type IncomeHotelMotelDetail = typeof incomeHotelMotelDetail.$inferSelect;
 
 export type InsertIncomeLeaseUp = z.infer<typeof insertIncomeLeaseUpSchema>;
 export type IncomeLeaseUp = typeof incomeLeaseUp.$inferSelect;
+
+// ETL insert schemas
+export const insertEtlDataSourceSchema = createInsertSchema(etlDataSources).pick({
+  name: true,
+  description: true,
+  type: true,
+  connectionDetails: true,
+  isConnected: true,
+  lastConnected: true
+});
+
+export const insertEtlTransformationRuleSchema = createInsertSchema(etlTransformationRules).pick({
+  name: true,
+  description: true,
+  dataType: true,
+  transformationCode: true,
+  isActive: true
+});
+
+export const insertEtlJobSchema = createInsertSchema(etlJobs).pick({
+  name: true,
+  description: true,
+  sourceId: true,
+  targetId: true,
+  transformationIds: true,
+  status: true,
+  schedule: true,
+  metrics: true,
+  lastRunAt: true
+});
+
+export const insertEtlOptimizationSuggestionSchema = createInsertSchema(etlOptimizationSuggestions).pick({
+  jobId: true,
+  type: true,
+  severity: true,
+  title: true,
+  description: true,
+  suggestedAction: true,
+  estimatedImprovement: true,
+  status: true,
+  category: true,
+  implementationComplexity: true,
+  suggestedCode: true
+});
+
+export const insertEtlBatchJobSchema = createInsertSchema(etlBatchJobs).pick({
+  name: true,
+  description: true,
+  jobIds: true,
+  status: true,
+  progress: true,
+  startedAt: true,
+  completedAt: true
+});
+
+export const insertEtlAlertSchema = createInsertSchema(etlAlerts).pick({
+  jobId: true,
+  type: true,
+  message: true,
+  details: true,
+  isRead: true
+});
+
+// ETL type exports
+export type InsertEtlDataSource = z.infer<typeof insertEtlDataSourceSchema>;
+export type EtlDataSource = typeof etlDataSources.$inferSelect;
+
+export type InsertEtlTransformationRule = z.infer<typeof insertEtlTransformationRuleSchema>;
+export type EtlTransformationRule = typeof etlTransformationRules.$inferSelect;
+
+export type InsertEtlJob = z.infer<typeof insertEtlJobSchema>;
+export type EtlJob = typeof etlJobs.$inferSelect;
+
+export type InsertEtlOptimizationSuggestion = z.infer<typeof insertEtlOptimizationSuggestionSchema>;
+export type EtlOptimizationSuggestion = typeof etlOptimizationSuggestions.$inferSelect;
+
+export type InsertEtlBatchJob = z.infer<typeof insertEtlBatchJobSchema>;
+export type EtlBatchJob = typeof etlBatchJobs.$inferSelect;
+
+export type InsertEtlAlert = z.infer<typeof insertEtlAlertSchema>;
+export type EtlAlert = typeof etlAlerts.$inferSelect;

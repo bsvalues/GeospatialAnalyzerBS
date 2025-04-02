@@ -30,6 +30,8 @@ export interface TransformationRule {
   updatedAt: Date;
 }
 
+export type ETLJobStatus = 'idle' | 'running' | 'success' | 'failed' | 'warning' | 'paused' | 'completed' | 'scheduled' | 'created';
+
 export interface ETLJob {
   id: string;
   name: string;
@@ -37,7 +39,8 @@ export interface ETLJob {
   sourceId: string;
   targetId: string;
   transformationIds: string[];
-  status: 'idle' | 'running' | 'success' | 'failed' | 'warning';
+  transformationRules?: TransformationRule[]; // For backward compatibility 
+  status: ETLJobStatus;
   schedule?: {
     frequency: 'once' | 'hourly' | 'daily' | 'weekly' | 'monthly';
     startDate?: Date;
@@ -170,4 +173,21 @@ export interface ETLPipelineConfig {
     onError: boolean;
     recipients: string[];
   };
+}
+
+export interface ETLExecutionError {
+  code: string;
+  message: string;
+  timestamp: Date;
+}
+
+export interface ETLExecutionLog {
+  id: string;
+  jobId: string;
+  startTime: Date;
+  endTime?: Date;
+  status: 'success' | 'error' | 'warning';
+  recordsProcessed: number;
+  message?: string;
+  errors: ETLExecutionError[];
 }

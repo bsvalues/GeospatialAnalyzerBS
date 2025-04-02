@@ -578,12 +578,12 @@ export function ETLTransformationEditor() {
                 name="transformationCode"
                 value={formData.transformationCode || ''}
                 onChange={handleFormInputChange}
-                placeholder="Enter transformation code, using ${field} for field references"
+                placeholder="Enter transformation code, using dollar sign and curly braces for field references"
                 rows={4}
                 className="font-mono"
               />
               <p className="text-xs text-gray-500">
-                Use ${field} to reference input fields, e.g., UPPER(${name})
+                Use dollar sign and curly braces to reference input fields, e.g., UPPER(fieldName)
               </p>
             </div>
             

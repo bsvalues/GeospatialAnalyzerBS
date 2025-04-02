@@ -66,7 +66,8 @@ class ETLPipelineManager {
       status: 'created' as ETLJobStatus,
       sourceId: params.sourceId,
       targetId: params.targetId,
-      transformationRules: params.transformationRules,
+      transformationIds: params.transformationRules.map(rule => rule.id),
+      transformationRules: params.transformationRules, // Keep for backward compatibility
       schedule: params.schedule,
       createdAt: new Date(),
       updatedAt: new Date()
@@ -152,7 +153,8 @@ class ETLPipelineManager {
       
       // Apply transformations (would apply actual transformations in real app)
       await this.simulateDelay(800);
-      const transformedData = this.simulateDataTransformation(extractedData, job.transformationRules);
+      const transformRules = job.transformationRules || [];
+      const transformedData = this.simulateDataTransformation(extractedData, transformRules);
       
       metricsCollector.updateRecordCount(jobId, transformedData.length, transformTaskId);
       metricsCollector.completeTaskMetrics(jobId, transformTaskId);
@@ -296,7 +298,8 @@ class ETLPipelineManager {
       status: 'completed',
       sourceId: 'source-1',
       targetId: 'target-1',
-      transformationRules: [transformationRules[0], transformationRules[1]],
+      transformationIds: [transformationRules[0].id, transformationRules[1].id],
+      transformationRules: [transformationRules[0], transformationRules[1]], // For backward compatibility
       createdAt: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000), // 7 days ago
       updatedAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000), // 2 days ago
       lastRunAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000)  // 2 days ago
@@ -310,7 +313,8 @@ class ETLPipelineManager {
       status: 'scheduled',
       sourceId: 'source-2',
       targetId: 'target-1',
-      transformationRules: [transformationRules[2]],
+      transformationIds: [transformationRules[2].id],
+      transformationRules: [transformationRules[2]], // For backward compatibility
       schedule: {
         frequency: 'daily',
         startDate: new Date(Date.now() + 24 * 60 * 60 * 1000) // Tomorrow
@@ -327,7 +331,8 @@ class ETLPipelineManager {
       status: 'created',
       sourceId: 'source-3',
       targetId: 'target-2',
-      transformationRules: transformationRules,
+      transformationIds: transformationRules.map(rule => rule.id),
+      transformationRules: transformationRules, // For backward compatibility
       createdAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000), // 1 day ago
       updatedAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000)  // 1 day ago
     };

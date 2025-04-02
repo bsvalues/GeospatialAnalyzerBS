@@ -4,6 +4,12 @@ import {
   incomeHotelMotel,
   incomeHotelMotelDetail,
   incomeLeaseUp,
+  etlDataSources,
+  etlTransformationRules,
+  etlJobs,
+  etlOptimizationSuggestions,
+  etlBatchJobs,
+  etlAlerts,
   type User, 
   type InsertUser, 
   type Property, 
@@ -13,7 +19,19 @@ import {
   type IncomeHotelMotelDetail,
   type InsertIncomeHotelMotelDetail,
   type IncomeLeaseUp,
-  type InsertIncomeLeaseUp
+  type InsertIncomeLeaseUp,
+  type EtlDataSource,
+  type InsertEtlDataSource,
+  type EtlTransformationRule,
+  type InsertEtlTransformationRule,
+  type EtlJob,
+  type InsertEtlJob,
+  type EtlOptimizationSuggestion,
+  type InsertEtlOptimizationSuggestion,
+  type EtlBatchJob,
+  type InsertEtlBatchJob,
+  type EtlAlert,
+  type InsertEtlAlert
 } from "@shared/schema";
 
 // modify the interface with any CRUD methods
@@ -63,17 +81,74 @@ export interface IStorage {
   createIncomeLeaseUp(incomeLeaseUp: InsertIncomeLeaseUp): Promise<IncomeLeaseUp>;
   updateIncomeLeaseUp(incomeLeaseUpId: number, incomeLeaseUp: Partial<InsertIncomeLeaseUp>): Promise<IncomeLeaseUp | undefined>;
   deleteIncomeLeaseUp(incomeLeaseUpId: number): Promise<boolean>;
+
+  // ETL Data Source operations
+  getEtlDataSources(): Promise<EtlDataSource[]>;
+  getEtlDataSourceById(id: number): Promise<EtlDataSource | undefined>;
+  createEtlDataSource(dataSource: InsertEtlDataSource): Promise<EtlDataSource>;
+  updateEtlDataSource(id: number, dataSource: Partial<InsertEtlDataSource>): Promise<EtlDataSource | undefined>;
+  deleteEtlDataSource(id: number): Promise<boolean>;
+  
+  // ETL Transformation Rule operations
+  getEtlTransformationRules(): Promise<EtlTransformationRule[]>;
+  getEtlTransformationRuleById(id: number): Promise<EtlTransformationRule | undefined>;
+  createEtlTransformationRule(rule: InsertEtlTransformationRule): Promise<EtlTransformationRule>;
+  updateEtlTransformationRule(id: number, rule: Partial<InsertEtlTransformationRule>): Promise<EtlTransformationRule | undefined>;
+  deleteEtlTransformationRule(id: number): Promise<boolean>;
+  
+  // ETL Job operations
+  getEtlJobs(): Promise<EtlJob[]>;
+  getEtlJobById(id: number): Promise<EtlJob | undefined>;
+  createEtlJob(job: InsertEtlJob): Promise<EtlJob>;
+  updateEtlJob(id: number, job: Partial<InsertEtlJob>): Promise<EtlJob | undefined>;
+  deleteEtlJob(id: number): Promise<boolean>;
+  
+  // ETL Optimization Suggestion operations
+  getEtlOptimizationSuggestions(): Promise<EtlOptimizationSuggestion[]>;
+  getEtlOptimizationSuggestionsByJobId(jobId: number): Promise<EtlOptimizationSuggestion[]>;
+  getEtlOptimizationSuggestionById(id: number): Promise<EtlOptimizationSuggestion | undefined>;
+  createEtlOptimizationSuggestion(suggestion: InsertEtlOptimizationSuggestion): Promise<EtlOptimizationSuggestion>;
+  updateEtlOptimizationSuggestion(id: number, suggestion: Partial<InsertEtlOptimizationSuggestion>): Promise<EtlOptimizationSuggestion | undefined>;
+  deleteEtlOptimizationSuggestion(id: number): Promise<boolean>;
+  
+  // ETL Batch Job operations
+  getEtlBatchJobs(): Promise<EtlBatchJob[]>;
+  getEtlBatchJobById(id: number): Promise<EtlBatchJob | undefined>;
+  createEtlBatchJob(batchJob: InsertEtlBatchJob): Promise<EtlBatchJob>;
+  updateEtlBatchJob(id: number, batchJob: Partial<InsertEtlBatchJob>): Promise<EtlBatchJob | undefined>;
+  deleteEtlBatchJob(id: number): Promise<boolean>;
+  
+  // ETL Alert operations
+  getEtlAlerts(): Promise<EtlAlert[]>;
+  getEtlAlertsByJobId(jobId: number): Promise<EtlAlert[]>;
+  getEtlAlertById(id: number): Promise<EtlAlert | undefined>;
+  createEtlAlert(alert: InsertEtlAlert): Promise<EtlAlert>;
+  updateEtlAlert(id: number, alert: Partial<InsertEtlAlert>): Promise<EtlAlert | undefined>;
+  deleteEtlAlert(id: number): Promise<boolean>;
 }
 
+// MemStorage class implementation
 export class MemStorage implements IStorage {
   private users: Map<number, User>;
   private properties: Map<number, Property>;
   private incomeHotelMotelMap: Map<string, IncomeHotelMotel>;
   private incomeHotelMotelDetailMap: Map<string, IncomeHotelMotelDetail>;
   private incomeLeaseUpMap: Map<number, IncomeLeaseUp>;
+  private etlDataSourcesMap: Map<number, EtlDataSource>;
+  private etlTransformationRulesMap: Map<number, EtlTransformationRule>;
+  private etlJobsMap: Map<number, EtlJob>;
+  private etlOptimizationSuggestionsMap: Map<number, EtlOptimizationSuggestion>;
+  private etlBatchJobsMap: Map<number, EtlBatchJob>;
+  private etlAlertsMap: Map<number, EtlAlert>;
   private userCurrentId: number;
   private propertyCurrentId: number;
   private incomeLeaseUpCurrentId: number;
+  private etlDataSourceCurrentId: number;
+  private etlTransformationRuleCurrentId: number;
+  private etlJobCurrentId: number;
+  private etlOptimizationSuggestionCurrentId: number;
+  private etlBatchJobCurrentId: number;
+  private etlAlertCurrentId: number;
 
   constructor() {
     this.users = new Map();
@@ -81,10 +156,23 @@ export class MemStorage implements IStorage {
     this.incomeHotelMotelMap = new Map();
     this.incomeHotelMotelDetailMap = new Map();
     this.incomeLeaseUpMap = new Map();
+    this.etlDataSourcesMap = new Map();
+    this.etlTransformationRulesMap = new Map();
+    this.etlJobsMap = new Map();
+    this.etlOptimizationSuggestionsMap = new Map();
+    this.etlBatchJobsMap = new Map();
+    this.etlAlertsMap = new Map();
     this.userCurrentId = 1;
     this.propertyCurrentId = 1;
     this.incomeLeaseUpCurrentId = 1;
+    this.etlDataSourceCurrentId = 1;
+    this.etlTransformationRuleCurrentId = 1;
+    this.etlJobCurrentId = 1;
+    this.etlOptimizationSuggestionCurrentId = 1;
+    this.etlBatchJobCurrentId = 1;
+    this.etlAlertCurrentId = 1;
     this.initializeSampleProperties();
+    this.initializeSampleEtlData();
   }
 
   // User operations
@@ -221,8 +309,8 @@ export class MemStorage implements IStorage {
         const [lat, lng] = property.coordinates;
         return lat >= south && lat <= north && lng >= west && lng <= east;
       } else if (property.latitude && property.longitude) {
-        return property.latitude >= south && property.latitude <= north && 
-               property.longitude >= west && property.longitude <= east;
+        return Number(property.latitude) >= south && Number(property.latitude) <= north && 
+               Number(property.longitude) >= west && Number(property.longitude) <= east;
       }
       return false;
     });
@@ -480,6 +568,301 @@ export class MemStorage implements IStorage {
   async deleteIncomeLeaseUp(incomeLeaseUpId: number): Promise<boolean> {
     return this.incomeLeaseUpMap.delete(incomeLeaseUpId);
   }
+  
+  // ETL Data Source operations
+  async getEtlDataSources(): Promise<EtlDataSource[]> {
+    return Array.from(this.etlDataSourcesMap.values());
+  }
+  
+  async getEtlDataSourceById(id: number): Promise<EtlDataSource | undefined> {
+    return this.etlDataSourcesMap.get(id);
+  }
+  
+  async createEtlDataSource(dataSource: InsertEtlDataSource): Promise<EtlDataSource> {
+    const id = this.etlDataSourceCurrentId++;
+    const newDataSource: EtlDataSource = {
+      id,
+      name: dataSource.name,
+      description: dataSource.description || null,
+      type: dataSource.type,
+      connectionDetails: dataSource.connectionDetails,
+      isConnected: dataSource.isConnected || false,
+      lastConnected: dataSource.lastConnected ? new Date(dataSource.lastConnected) : null,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
+    this.etlDataSourcesMap.set(id, newDataSource);
+    return newDataSource;
+  }
+  
+  async updateEtlDataSource(id: number, dataSource: Partial<InsertEtlDataSource>): Promise<EtlDataSource | undefined> {
+    const existingDataSource = this.etlDataSourcesMap.get(id);
+    if (!existingDataSource) {
+      return undefined;
+    }
+    
+    const updatedDataSource: EtlDataSource = {
+      ...existingDataSource,
+      ...dataSource,
+      lastConnected: dataSource.lastConnected ? new Date(dataSource.lastConnected) : existingDataSource.lastConnected,
+      updatedAt: new Date()
+    };
+    
+    this.etlDataSourcesMap.set(id, updatedDataSource);
+    return updatedDataSource;
+  }
+  
+  async deleteEtlDataSource(id: number): Promise<boolean> {
+    return this.etlDataSourcesMap.delete(id);
+  }
+  
+  // ETL Transformation Rule operations
+  async getEtlTransformationRules(): Promise<EtlTransformationRule[]> {
+    return Array.from(this.etlTransformationRulesMap.values());
+  }
+  
+  async getEtlTransformationRuleById(id: number): Promise<EtlTransformationRule | undefined> {
+    return this.etlTransformationRulesMap.get(id);
+  }
+  
+  async createEtlTransformationRule(rule: InsertEtlTransformationRule): Promise<EtlTransformationRule> {
+    const id = this.etlTransformationRuleCurrentId++;
+    const newRule: EtlTransformationRule = {
+      id,
+      name: rule.name,
+      description: rule.description || null,
+      dataType: rule.dataType,
+      transformationCode: rule.transformationCode,
+      isActive: rule.isActive !== undefined ? rule.isActive : true,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
+    this.etlTransformationRulesMap.set(id, newRule);
+    return newRule;
+  }
+  
+  async updateEtlTransformationRule(id: number, rule: Partial<InsertEtlTransformationRule>): Promise<EtlTransformationRule | undefined> {
+    const existingRule = this.etlTransformationRulesMap.get(id);
+    if (!existingRule) {
+      return undefined;
+    }
+    
+    const updatedRule: EtlTransformationRule = {
+      ...existingRule,
+      ...rule,
+      updatedAt: new Date()
+    };
+    
+    this.etlTransformationRulesMap.set(id, updatedRule);
+    return updatedRule;
+  }
+  
+  async deleteEtlTransformationRule(id: number): Promise<boolean> {
+    return this.etlTransformationRulesMap.delete(id);
+  }
+  
+  // ETL Job operations
+  async getEtlJobs(): Promise<EtlJob[]> {
+    return Array.from(this.etlJobsMap.values());
+  }
+  
+  async getEtlJobById(id: number): Promise<EtlJob | undefined> {
+    return this.etlJobsMap.get(id);
+  }
+  
+  async createEtlJob(job: InsertEtlJob): Promise<EtlJob> {
+    const id = this.etlJobCurrentId++;
+    const newJob: EtlJob = {
+      id,
+      name: job.name,
+      description: job.description || null,
+      sourceId: job.sourceId,
+      targetId: job.targetId,
+      transformationIds: job.transformationIds || [],
+      status: job.status || "idle",
+      schedule: job.schedule,
+      metrics: job.metrics || {},
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      lastRunAt: job.lastRunAt ? new Date(job.lastRunAt) : null
+    };
+    this.etlJobsMap.set(id, newJob);
+    return newJob;
+  }
+  
+  async updateEtlJob(id: number, job: Partial<InsertEtlJob>): Promise<EtlJob | undefined> {
+    const existingJob = this.etlJobsMap.get(id);
+    if (!existingJob) {
+      return undefined;
+    }
+    
+    const updatedJob: EtlJob = {
+      ...existingJob,
+      ...job,
+      lastRunAt: job.lastRunAt ? new Date(job.lastRunAt) : existingJob.lastRunAt,
+      updatedAt: new Date()
+    };
+    
+    this.etlJobsMap.set(id, updatedJob);
+    return updatedJob;
+  }
+  
+  async deleteEtlJob(id: number): Promise<boolean> {
+    return this.etlJobsMap.delete(id);
+  }
+  
+  // ETL Optimization Suggestion operations
+  async getEtlOptimizationSuggestions(): Promise<EtlOptimizationSuggestion[]> {
+    return Array.from(this.etlOptimizationSuggestionsMap.values());
+  }
+  
+  async getEtlOptimizationSuggestionsByJobId(jobId: number): Promise<EtlOptimizationSuggestion[]> {
+    return Array.from(this.etlOptimizationSuggestionsMap.values())
+      .filter(suggestion => suggestion.jobId === jobId);
+  }
+  
+  async getEtlOptimizationSuggestionById(id: number): Promise<EtlOptimizationSuggestion | undefined> {
+    return this.etlOptimizationSuggestionsMap.get(id);
+  }
+  
+  async createEtlOptimizationSuggestion(suggestion: InsertEtlOptimizationSuggestion): Promise<EtlOptimizationSuggestion> {
+    const id = this.etlOptimizationSuggestionCurrentId++;
+    const newSuggestion: EtlOptimizationSuggestion = {
+      id,
+      jobId: suggestion.jobId,
+      type: suggestion.type,
+      severity: suggestion.severity,
+      title: suggestion.title,
+      description: suggestion.description,
+      suggestedAction: suggestion.suggestedAction,
+      estimatedImprovement: suggestion.estimatedImprovement,
+      status: suggestion.status || "new",
+      category: suggestion.category || null,
+      implementationComplexity: suggestion.implementationComplexity || null,
+      suggestedCode: suggestion.suggestedCode || null,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
+    this.etlOptimizationSuggestionsMap.set(id, newSuggestion);
+    return newSuggestion;
+  }
+  
+  async updateEtlOptimizationSuggestion(id: number, suggestion: Partial<InsertEtlOptimizationSuggestion>): Promise<EtlOptimizationSuggestion | undefined> {
+    const existingSuggestion = this.etlOptimizationSuggestionsMap.get(id);
+    if (!existingSuggestion) {
+      return undefined;
+    }
+    
+    const updatedSuggestion: EtlOptimizationSuggestion = {
+      ...existingSuggestion,
+      ...suggestion,
+      updatedAt: new Date()
+    };
+    
+    this.etlOptimizationSuggestionsMap.set(id, updatedSuggestion);
+    return updatedSuggestion;
+  }
+  
+  async deleteEtlOptimizationSuggestion(id: number): Promise<boolean> {
+    return this.etlOptimizationSuggestionsMap.delete(id);
+  }
+  
+  // ETL Batch Job operations
+  async getEtlBatchJobs(): Promise<EtlBatchJob[]> {
+    return Array.from(this.etlBatchJobsMap.values());
+  }
+  
+  async getEtlBatchJobById(id: number): Promise<EtlBatchJob | undefined> {
+    return this.etlBatchJobsMap.get(id);
+  }
+  
+  async createEtlBatchJob(batchJob: InsertEtlBatchJob): Promise<EtlBatchJob> {
+    const id = this.etlBatchJobCurrentId++;
+    const newBatchJob: EtlBatchJob = {
+      id,
+      name: batchJob.name,
+      description: batchJob.description || null,
+      jobIds: batchJob.jobIds,
+      status: batchJob.status || "idle",
+      progress: batchJob.progress || 0,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      startedAt: batchJob.startedAt ? new Date(batchJob.startedAt) : null,
+      completedAt: batchJob.completedAt ? new Date(batchJob.completedAt) : null
+    };
+    this.etlBatchJobsMap.set(id, newBatchJob);
+    return newBatchJob;
+  }
+  
+  async updateEtlBatchJob(id: number, batchJob: Partial<InsertEtlBatchJob>): Promise<EtlBatchJob | undefined> {
+    const existingBatchJob = this.etlBatchJobsMap.get(id);
+    if (!existingBatchJob) {
+      return undefined;
+    }
+    
+    const updatedBatchJob: EtlBatchJob = {
+      ...existingBatchJob,
+      ...batchJob,
+      startedAt: batchJob.startedAt ? new Date(batchJob.startedAt) : existingBatchJob.startedAt,
+      completedAt: batchJob.completedAt ? new Date(batchJob.completedAt) : existingBatchJob.completedAt,
+      updatedAt: new Date()
+    };
+    
+    this.etlBatchJobsMap.set(id, updatedBatchJob);
+    return updatedBatchJob;
+  }
+  
+  async deleteEtlBatchJob(id: number): Promise<boolean> {
+    return this.etlBatchJobsMap.delete(id);
+  }
+  
+  // ETL Alert operations
+  async getEtlAlerts(): Promise<EtlAlert[]> {
+    return Array.from(this.etlAlertsMap.values());
+  }
+  
+  async getEtlAlertsByJobId(jobId: number): Promise<EtlAlert[]> {
+    return Array.from(this.etlAlertsMap.values())
+      .filter(alert => alert.jobId === jobId);
+  }
+  
+  async getEtlAlertById(id: number): Promise<EtlAlert | undefined> {
+    return this.etlAlertsMap.get(id);
+  }
+  
+  async createEtlAlert(alert: InsertEtlAlert): Promise<EtlAlert> {
+    const id = this.etlAlertCurrentId++;
+    const newAlert: EtlAlert = {
+      id,
+      jobId: alert.jobId,
+      type: alert.type,
+      message: alert.message,
+      details: alert.details || null,
+      timestamp: new Date(),
+      isRead: alert.isRead || false
+    };
+    this.etlAlertsMap.set(id, newAlert);
+    return newAlert;
+  }
+  
+  async updateEtlAlert(id: number, alert: Partial<InsertEtlAlert>): Promise<EtlAlert | undefined> {
+    const existingAlert = this.etlAlertsMap.get(id);
+    if (!existingAlert) {
+      return undefined;
+    }
+    
+    const updatedAlert: EtlAlert = {
+      ...existingAlert,
+      ...alert
+    };
+    
+    this.etlAlertsMap.set(id, updatedAlert);
+    return updatedAlert;
+  }
+  
+  async deleteEtlAlert(id: number): Promise<boolean> {
+    return this.etlAlertsMap.delete(id);
+  }
 
   private initializeSampleProperties() {
     // Benton County, WA neighborhoods
@@ -560,6 +943,553 @@ export class MemStorage implements IStorage {
     // Store properties in the map
     sampleProperties.forEach(property => {
       this.properties.set(property.id, property);
+    });
+  }
+  
+  private initializeSampleEtlData() {
+    // Initialize ETL Data Sources
+    const dataSources: InsertEtlDataSource[] = [
+      {
+        name: "Benton County Property Database",
+        description: "Main county property data source containing assessment records",
+        type: "database",
+        connectionDetails: {
+          databaseType: "postgresql",
+          host: "county-db.bentoncounty.gov",
+          port: 5432,
+          database: "property_records",
+          schema: "public"
+        },
+        isConnected: true,
+        lastConnected: new Date()
+      },
+      {
+        name: "Washington State GIS Portal",
+        description: "State-level GIS data for geospatial analysis",
+        type: "api",
+        connectionDetails: {
+          endpoint: "https://gis-api.wa.gov/property",
+          authType: "apiKey",
+          rateLimitPerMinute: 100
+        },
+        isConnected: true,
+        lastConnected: new Date()
+      },
+      {
+        name: "Census Bureau API",
+        description: "Demographic data from US Census Bureau",
+        type: "api",
+        connectionDetails: {
+          endpoint: "https://api.census.gov/data/latest",
+          authType: "apiKey",
+          rateLimitPerMinute: 500
+        },
+        isConnected: true,
+        lastConnected: new Date()
+      },
+      {
+        name: "Historical Property Sales CSV",
+        description: "Historical property sales data in CSV format",
+        type: "file",
+        connectionDetails: {
+          fileType: "csv",
+          path: "/data/historical_sales.csv",
+          hasHeader: true
+        },
+        isConnected: true,
+        lastConnected: new Date()
+      },
+      {
+        name: "Local PostGIS Database",
+        description: "Local geospatial database for analysis",
+        type: "database",
+        connectionDetails: {
+          databaseType: "postgresql",
+          host: "localhost",
+          port: 5432,
+          database: "postgis_data",
+          schema: "public",
+          extensions: ["postgis"]
+        },
+        isConnected: true,
+        lastConnected: new Date()
+      }
+    ];
+    
+    // Add data sources to the map
+    dataSources.forEach(source => {
+      const id = this.etlDataSourceCurrentId++;
+      const dataSource: EtlDataSource = {
+        id,
+        name: source.name,
+        description: source.description || null,
+        type: source.type,
+        connectionDetails: source.connectionDetails,
+        isConnected: source.isConnected || false,
+        lastConnected: source.lastConnected ? new Date(source.lastConnected) : null,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      };
+      this.etlDataSourcesMap.set(id, dataSource);
+    });
+    
+    // Initialize ETL Transformation Rules
+    const transformationRules: InsertEtlTransformationRule[] = [
+      {
+        name: "Normalize Address Format",
+        description: "Standardizes address formats to USPS standards",
+        dataType: "text",
+        transformationCode: `
+          function normalizeAddress(address) {
+            // Convert to uppercase
+            let result = address.toUpperCase();
+            // Replace abbreviated directions
+            result = result.replace(/\\bN\\b/g, 'NORTH')
+                          .replace(/\\bS\\b/g, 'SOUTH')
+                          .replace(/\\bE\\b/g, 'EAST')
+                          .replace(/\\bW\\b/g, 'WEST');
+            // Standardize common abbreviations
+            result = result.replace(/\\bST\\b/g, 'STREET')
+                          .replace(/\\bAVE\\b/g, 'AVENUE')
+                          .replace(/\\bRD\\b/g, 'ROAD');
+            return result;
+          }
+        `,
+        isActive: true
+      },
+      {
+        name: "Calculate Price Per Square Foot",
+        description: "Computes the price per square foot from sale price and area",
+        dataType: "number",
+        transformationCode: `
+          function calculatePricePerSqFt(salePrice, squareFeet) {
+            // Remove currency symbols and commas
+            const price = parseFloat(salePrice.replace(/[$,]/g, ''));
+            // Guard against division by zero
+            if (!squareFeet || squareFeet <= 0) return null;
+            // Calculate and format to 2 decimal places
+            return (price / squareFeet).toFixed(2);
+          }
+        `,
+        isActive: true
+      },
+      {
+        name: "Parse GeoJSON to Coordinates",
+        description: "Extracts lat/long coordinates from GeoJSON format",
+        dataType: "object",
+        transformationCode: `
+          function parseGeoJSON(geojson) {
+            try {
+              const data = JSON.parse(geojson);
+              if (data.type === 'Point' && Array.isArray(data.coordinates)) {
+                return {
+                  longitude: data.coordinates[0],
+                  latitude: data.coordinates[1]
+                };
+              }
+              return null;
+            } catch (e) {
+              return null;
+            }
+          }
+        `,
+        isActive: true
+      },
+      {
+        name: "Date Format Standardization",
+        description: "Converts various date formats to ISO standard",
+        dataType: "date",
+        transformationCode: `
+          function standardizeDate(dateString) {
+            // Try to parse the date using various formats
+            const date = new Date(dateString);
+            // Check if date is valid
+            if (isNaN(date.getTime())) return null;
+            // Return ISO format
+            return date.toISOString().split('T')[0];
+          }
+        `,
+        isActive: true
+      },
+      {
+        name: "Clean Property Type Classification",
+        description: "Maps various property type descriptions to standard categories",
+        dataType: "text",
+        transformationCode: `
+          function standardizePropertyType(typeString) {
+            const typeMap = {
+              'SFR': 'Single Family',
+              'SINGLE FAMILY': 'Single Family',
+              'SINGLE-FAMILY': 'Single Family',
+              'APT': 'Apartment',
+              'APARTMENT': 'Apartment',
+              'CONDO': 'Condominium',
+              'CONDOMINIUM': 'Condominium',
+              'COMMERCIAL': 'Commercial',
+              'COM': 'Commercial',
+              'IND': 'Industrial',
+              'INDUSTRIAL': 'Industrial',
+              'VACANT': 'Vacant Land',
+              'VAC': 'Vacant Land'
+            };
+            
+            const type = typeString.toUpperCase().trim();
+            return typeMap[type] || 'Other';
+          }
+        `,
+        isActive: true
+      }
+    ];
+    
+    // Add transformation rules to the map
+    transformationRules.forEach(rule => {
+      const id = this.etlTransformationRuleCurrentId++;
+      const transformationRule: EtlTransformationRule = {
+        id,
+        name: rule.name,
+        description: rule.description || null,
+        dataType: rule.dataType,
+        transformationCode: rule.transformationCode,
+        isActive: rule.isActive !== undefined ? rule.isActive : true,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      };
+      this.etlTransformationRulesMap.set(id, transformationRule);
+    });
+    
+    // Initialize ETL Jobs
+    const jobs: InsertEtlJob[] = [
+      {
+        name: "Daily Property Update",
+        description: "Imports new and updated properties from county database",
+        sourceId: 1, // Reference to Benton County Property Database
+        targetId: 5, // Reference to Local PostGIS Database
+        transformationIds: [1, 2, 3, 4, 5], // Reference to transformation rules
+        status: "success",
+        schedule: {
+          frequency: "daily",
+          time: "02:00",
+          timezone: "America/Los_Angeles"
+        },
+        metrics: {
+          lastExecutionTime: 187.4, // seconds
+          recordsProcessed: 1250,
+          memoryUsage: 512, // MB
+          cpuUtilization: 45.2, // percentage
+          successRate: 99.8 // percentage
+        },
+        lastRunAt: new Date(Date.now() - 3600000) // 1 hour ago
+      },
+      {
+        name: "Weekly Census Data Integration",
+        description: "Imports demographic data for property analysis",
+        sourceId: 3, // Reference to Census Bureau API
+        targetId: 5, // Reference to Local PostGIS Database
+        transformationIds: [3, 4], // Reference to transformation rules
+        status: "idle",
+        schedule: {
+          frequency: "weekly",
+          dayOfWeek: "Sunday",
+          time: "03:00",
+          timezone: "America/Los_Angeles"
+        },
+        metrics: {
+          lastExecutionTime: 432.1, // seconds
+          recordsProcessed: 5200,
+          memoryUsage: 1024, // MB
+          cpuUtilization: 75.3, // percentage
+          successRate: 100 // percentage
+        },
+        lastRunAt: new Date(Date.now() - 86400000 * 5) // 5 days ago
+      },
+      {
+        name: "Historical Sales Data Import",
+        description: "One-time import of historical sales data",
+        sourceId: 4, // Reference to Historical Property Sales CSV
+        targetId: 5, // Reference to Local PostGIS Database
+        transformationIds: [2, 4], // Reference to transformation rules
+        status: "success",
+        schedule: null, // One-time job, no schedule
+        metrics: {
+          lastExecutionTime: 1456.7, // seconds
+          recordsProcessed: 25000,
+          memoryUsage: 2048, // MB
+          cpuUtilization: 92.1, // percentage
+          successRate: 99.5 // percentage
+        },
+        lastRunAt: new Date(Date.now() - 86400000 * 30) // 30 days ago
+      },
+      {
+        name: "GIS Boundary Update",
+        description: "Updates property boundaries from state GIS data",
+        sourceId: 2, // Reference to Washington State GIS Portal
+        targetId: 5, // Reference to Local PostGIS Database
+        transformationIds: [3], // Reference to transformation rules
+        status: "failed",
+        schedule: {
+          frequency: "monthly",
+          dayOfMonth: 1,
+          time: "01:00",
+          timezone: "America/Los_Angeles"
+        },
+        metrics: {
+          lastExecutionTime: 856.3, // seconds
+          recordsProcessed: 7500,
+          memoryUsage: 1536, // MB
+          cpuUtilization: 85.4, // percentage
+          successRate: 68.2 // percentage
+        },
+        lastRunAt: new Date(Date.now() - 86400000 * 2) // 2 days ago
+      },
+      {
+        name: "Real-time Property Sales Feed",
+        description: "Streams real-time property sales data",
+        sourceId: 1, // Reference to Benton County Property Database
+        targetId: 5, // Reference to Local PostGIS Database
+        transformationIds: [1, 2, 4], // Reference to transformation rules
+        status: "running",
+        schedule: {
+          frequency: "continuous",
+          pollingInterval: 300 // seconds
+        },
+        metrics: {
+          lastExecutionTime: "ongoing",
+          recordsProcessed: 150,
+          memoryUsage: 384, // MB
+          cpuUtilization: 25.6, // percentage
+          successRate: 100 // percentage
+        },
+        lastRunAt: new Date() // Now
+      }
+    ];
+    
+    // Add jobs to the map
+    jobs.forEach(job => {
+      const id = this.etlJobCurrentId++;
+      const etlJob: EtlJob = {
+        id,
+        name: job.name,
+        description: job.description || null,
+        sourceId: job.sourceId,
+        targetId: job.targetId,
+        transformationIds: job.transformationIds,
+        status: job.status || 'idle',
+        schedule: job.schedule,
+        metrics: job.metrics,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        lastRunAt: job.lastRunAt ? new Date(job.lastRunAt) : null
+      };
+      this.etlJobsMap.set(id, etlJob);
+    });
+    
+    // Initialize ETL Optimization Suggestions
+    const optimizationSuggestions: InsertEtlOptimizationSuggestion[] = [
+      {
+        jobId: 1, // Daily Property Update
+        type: "performance",
+        severity: "medium",
+        title: "Implement database indexing for faster queries",
+        description: "Current queries on the property_records table are not using indexes effectively",
+        suggestedAction: "Add an index on the last_updated_date column to improve query performance",
+        estimatedImprovement: {
+          metric: "execution_time",
+          percentage: 40
+        },
+        status: "new",
+        category: "database",
+        implementationComplexity: "low",
+        suggestedCode: "CREATE INDEX idx_property_last_updated ON property_records(last_updated_date);"
+      },
+      {
+        jobId: 5, // Real-time Property Sales Feed
+        type: "resource",
+        severity: "high",
+        title: "Reduce memory usage by optimizing JSON parsing",
+        description: "The job is consuming excessive memory when processing large JSON responses",
+        suggestedAction: "Use streaming JSON parser instead of loading entire response into memory",
+        estimatedImprovement: {
+          metric: "memory_usage",
+          percentage: 65
+        },
+        status: "in_progress",
+        category: "code",
+        implementationComplexity: "medium",
+        suggestedCode: "const JSONStream = require('JSONStream');\nconst parser = JSONStream.parse('*.properties');\nrequest.pipe(parser);"
+      },
+      {
+        jobId: 3, // Historical Sales Data Import
+        type: "scheduling",
+        severity: "low",
+        title: "Run job during off-peak hours",
+        description: "This resource-intensive job is running during peak system usage times",
+        suggestedAction: "Reschedule the job to run during off-peak hours (2AM-5AM)",
+        estimatedImprovement: {
+          metric: "system_impact",
+          percentage: 30
+        },
+        status: "implemented",
+        category: "scheduling",
+        implementationComplexity: "low",
+        suggestedCode: null
+      },
+      {
+        jobId: 4, // GIS Boundary Update
+        type: "code",
+        severity: "high",
+        title: "Implement retry logic for API failures",
+        description: "Job is failing due to intermittent API timeouts with no retry mechanism",
+        suggestedAction: "Add exponential backoff retry logic for API requests",
+        estimatedImprovement: {
+          metric: "success_rate",
+          percentage: 95
+        },
+        status: "new",
+        category: "resiliency",
+        implementationComplexity: "medium",
+        suggestedCode: "async function fetchWithRetry(url, options, maxRetries = 3) {\n  let retries = 0;\n  while (retries < maxRetries) {\n    try {\n      return await fetch(url, options);\n    } catch (err) {\n      retries++;\n      if (retries >= maxRetries) throw err;\n      await new Promise(r => setTimeout(r, 1000 * Math.pow(2, retries)));\n    }\n  }\n}"
+      },
+      {
+        jobId: 2, // Weekly Census Data Integration
+        type: "performance",
+        severity: "medium",
+        title: "Parallelize data processing tasks",
+        description: "Data processing is currently single-threaded and could benefit from parallelization",
+        suggestedAction: "Implement worker threads to process data chunks in parallel",
+        estimatedImprovement: {
+          metric: "execution_time",
+          percentage: 60
+        },
+        status: "new",
+        category: "architecture",
+        implementationComplexity: "high",
+        suggestedCode: "const { Worker } = require('worker_threads');\n\nfunction processChunksInParallel(chunks, workerCount = 4) {\n  return Promise.all(chunks.map((chunk, i) => {\n    return new Promise((resolve, reject) => {\n      const worker = new Worker('./worker.js');\n      worker.postMessage(chunk);\n      worker.on('message', resolve);\n      worker.on('error', reject);\n    });\n  }));\n}"
+      }
+    ];
+    
+    // Add optimization suggestions to the map
+    optimizationSuggestions.forEach(suggestion => {
+      const id = this.etlOptimizationSuggestionCurrentId++;
+      const optimizationSuggestion: EtlOptimizationSuggestion = {
+        id,
+        jobId: suggestion.jobId || 1,
+        type: suggestion.type || 'performance',
+        severity: suggestion.severity || 'medium',
+        title: suggestion.title || '',
+        description: suggestion.description || '',
+        suggestedAction: suggestion.suggestedAction || '',
+        estimatedImprovement: suggestion.estimatedImprovement || { metric: 'executionTime', percentage: 0 },
+        status: suggestion.status || 'new',
+        category: suggestion.category || null,
+        implementationComplexity: suggestion.implementationComplexity || null,
+        suggestedCode: suggestion.suggestedCode || null,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      };
+      this.etlOptimizationSuggestionsMap.set(id, optimizationSuggestion);
+    });
+    
+    // Initialize ETL Batch Jobs
+    const batchJobs: InsertEtlBatchJob[] = [
+      {
+        name: "Monthly Full Refresh",
+        description: "Complete refresh of all property data at month end",
+        jobIds: [1, 2, 4], // References to job IDs
+        status: "idle",
+        progress: 0,
+        startedAt: null,
+        completedAt: null
+      },
+      {
+        name: "Annual Tax Assessment Data",
+        description: "Annual processing of tax assessment data",
+        jobIds: [1, 3], // References to job IDs
+        status: "success",
+        progress: 100,
+        startedAt: new Date(Date.now() - 86400000 * 60), // 60 days ago
+        completedAt: new Date(Date.now() - 86400000 * 59) // 59 days ago
+      },
+      {
+        name: "Data Quality Check",
+        description: "Runs validation checks on property data",
+        jobIds: [1, 2, 3, 4], // References to job IDs
+        status: "running",
+        progress: 45,
+        startedAt: new Date(Date.now() - 3600000), // 1 hour ago
+        completedAt: null
+      }
+    ];
+    
+    // Add batch jobs to the map
+    batchJobs.forEach(batchJob => {
+      const id = this.etlBatchJobCurrentId++;
+      const etlBatchJob: EtlBatchJob = {
+        id,
+        name: batchJob.name,
+        description: batchJob.description || null,
+        jobIds: batchJob.jobIds,
+        status: batchJob.status || 'idle',
+        progress: batchJob.progress || 0,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        startedAt: batchJob.startedAt ? new Date(batchJob.startedAt) : null,
+        completedAt: batchJob.completedAt ? new Date(batchJob.completedAt) : null
+      };
+      this.etlBatchJobsMap.set(id, etlBatchJob);
+    });
+    
+    // Initialize ETL Alerts
+    const alerts: InsertEtlAlert[] = [
+      {
+        jobId: 4, // GIS Boundary Update
+        type: "error",
+        message: "Job failed: API request timeout",
+        details: "Connection to Washington State GIS Portal timed out after 30 seconds",
+        isRead: false
+      },
+      {
+        jobId: 1, // Daily Property Update
+        type: "warning",
+        message: "High memory usage detected",
+        details: "Memory usage spiked to 85% during data transformation phase",
+        isRead: true
+      },
+      {
+        jobId: 3, // Historical Sales Data Import
+        type: "info",
+        message: "Job completed successfully",
+        details: "Processed 25,000 records in 24 minutes and 16 seconds",
+        isRead: true
+      },
+      {
+        jobId: 5, // Real-time Property Sales Feed
+        type: "warning",
+        message: "Connection intermittently dropping",
+        details: "Connection to data source has dropped 3 times in the past hour",
+        isRead: false
+      },
+      {
+        jobId: 2, // Weekly Census Data Integration
+        type: "info",
+        message: "Job scheduled for next run",
+        details: "Next execution scheduled for Sunday, April 07, 2025 at 03:00 AM",
+        isRead: true
+      }
+    ];
+    
+    // Add alerts to the map
+    alerts.forEach(alert => {
+      const id = this.etlAlertCurrentId++;
+      const etlAlert: EtlAlert = {
+        id,
+        jobId: alert.jobId,
+        type: alert.type,
+        message: alert.message || '',
+        details: alert.details || null,
+        timestamp: new Date(),
+        isRead: alert.isRead !== undefined ? alert.isRead : false
+      };
+      this.etlAlertsMap.set(id, etlAlert);
     });
   }
 }
