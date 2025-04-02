@@ -18,6 +18,7 @@ import DashboardPage from '@/pages/dashboard';
 import AboutPage from '@/pages/about';
 import GetSmarterPage from '@/pages/get-smarter';
 import ScriptingPage from '@/pages/scripting';
+import ETLPage from '@/pages/etl';
 
 function Router() {
   const [location] = useLocation();
@@ -34,6 +35,7 @@ function Router() {
         <Route path="/trends" component={PropertyTrendsDemo} />
         <Route path="/neighborhoods" component={NeighborhoodTimelineDemo} />
         <Route path="/scripting" component={ScriptingPage} />
+        <Route path="/etl" component={ETLPage} />
         <Route component={NotFound} />
       </Switch>
     </>

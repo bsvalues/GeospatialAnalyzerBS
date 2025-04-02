@@ -1,18 +1,35 @@
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
 import Editor from '@monaco-editor/react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
-import { PlayIcon, XCircleIcon, SaveIcon, FileIcon, BookIcon } from 'lucide-react';
+import { PlayIcon, XCircleIcon, SaveIcon, FileIcon, BookIcon, DatabaseIcon, DownloadIcon, UploadIcon } from 'lucide-react';
 import { Property } from '@shared/schema';
+import ScriptExecutionEngine, { ScriptResult } from './ScriptExecutionEngine';
+import ETLPipeline from '../../services/etl/ETLPipeline';
 
-// Function to safely evaluate a script in a restricted context
-const safeEval = (code: string, context: Record<string, any>) => {
-  // Create a function with context parameters
-  const fn = new Function(...Object.keys(context), code);
-  // Execute with context values
-  return fn(...Object.values(context));
+// Connection to the ETL pipeline for accessing processed data
+const getETLDataSources = () => {
+  return ETLPipeline.getDataSources().map(source => ({
+    id: source.id,
+    name: source.name,
+    type: source.type
+  }));
+};
+
+const getTransformedDataFromETL = (jobId: string = 'property-data-etl') => {
+  const runs = ETLPipeline.getJobRuns(jobId);
+  // Sort to get the latest run
+  const latestRun = runs.sort((a, b) => 
+    new Date(b.startTime).getTime() - new Date(a.startTime).getTime()
+  )[0];
+  
+  if (latestRun?.result) {
+    return latestRun.result;
+  }
+  
+  return undefined;
 };
 
 // Sample/Template scripts that users can select from
@@ -241,6 +258,20 @@ const ScriptingPlayground: React.FC<ScriptingPlaygroundProps> = ({
     }
   };
 
+  // Initialize the script execution engine
+  const [scriptEngine] = useState<ScriptExecutionEngine>(() => {
+    return new ScriptExecutionEngine();
+  });
+  
+  // Get transformed data from ETL pipeline
+  const [transformedData, setTransformedData] = useState<Record<string, any> | undefined>();
+  
+  // Load transformed data when component mounts
+  useEffect(() => {
+    const etlData = getTransformedDataFromETL();
+    setTransformedData(etlData);
+  }, []);
+  
   // Execute the current script
   const executeScript = useCallback(() => {
     setIsExecuting(true);
@@ -251,7 +282,7 @@ const ScriptingPlayground: React.FC<ScriptingPlaygroundProps> = ({
       // Create a context with properties and other helper objects
       const context = {
         properties,
-        // Add helper functions and libraries if needed
+        transformedData,
         utils: {
           formatCurrency: (value: number) => {
             return new Intl.NumberFormat('en-US', {
@@ -262,19 +293,29 @@ const ScriptingPlayground: React.FC<ScriptingPlaygroundProps> = ({
         }
       };
 
-      // Execute the script in a safe environment
-      const result = safeEval(script, context);
+      // Execute the script using our execution engine
+      const result = scriptEngine.executeScript(script, context);
       
-      setScriptResult(result);
-      if (onScriptResult) {
-        onScriptResult(result);
+      if (result.success) {
+        setScriptResult(result.output);
+        if (onScriptResult) {
+          onScriptResult(result.output);
+        }
+        
+        setActiveTab('result');
+        toast({
+          title: "Script Executed",
+          description: `Script executed successfully in ${result.executionTime}ms. View the results tab for details.`
+        });
+      } else {
+        setError(result.error || "Unknown error occurred");
+        toast({
+          title: "Script Error",
+          description: "An error occurred while executing the script. Check the console for details.",
+          variant: "destructive"
+        });
+        console.error("Script execution error:", result.error, result.logs);
       }
-      
-      setActiveTab('result');
-      toast({
-        title: "Script Executed",
-        description: "Script executed successfully. View the results tab for details."
-      });
     } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message : String(err);
       setError(errorMessage);
@@ -287,7 +328,7 @@ const ScriptingPlayground: React.FC<ScriptingPlaygroundProps> = ({
     } finally {
       setIsExecuting(false);
     }
-  }, [script, properties, onScriptResult, toast]);
+  }, [script, properties, transformedData, scriptEngine, onScriptResult, toast]);
 
   // Render JSON results nicely
   const renderResults = () => {
@@ -413,8 +454,16 @@ const ScriptingPlayground: React.FC<ScriptingPlaygroundProps> = ({
                 <code className="block whitespace-pre">
 {`// Available objects:
 properties: Property[] - Array of all properties in the system
+transformedData: Record<string, any> - Data processed by ETL pipeline jobs
 utils: {
   formatCurrency(value: number): string - Format a number as USD currency
+  parsePropertyValue(property: Property): number - Extract numeric value from a property
+  groupBy<T>(array: T[], key: keyof T | ((item: T) => string)): Record<string, T[]> - Group array items by key
+  average(numbers: number[]): number - Calculate average of an array of numbers
+  median(numbers: number[]): number - Calculate median of an array of numbers
+}
+console: {
+  log, error, warn, info - Standard console methods for debugging
 }
 
 // Script requirements:
