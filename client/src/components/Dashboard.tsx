@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { motion } from 'framer-motion';
 import { 
   Home, 
   Map, 
@@ -18,7 +19,12 @@ import {
   ArrowUpRight,
   PieChart,
   DollarSign,
-  Layers
+  Layers,
+  BarChart2,
+  CandlestickChart,
+  LineChart,
+  GitCompare,
+  ArrowRight
 } from 'lucide-react';
 import { OneClickExport } from '@/components/export/OneClickExport';
 import { MapPanel } from './panels/MapPanel';
@@ -35,6 +41,7 @@ import { AdvancedAnalyticsPanel } from './ml/AdvancedAnalyticsPanel';
 import { Property } from '@shared/schema';
 import { useQuery } from '@tanstack/react-query';
 import TabNavigation from './TabNavigation';
+import { Button } from '@/components/ui/button';
 
 export interface DashboardProps {
   className?: string;
@@ -50,33 +57,66 @@ const Dashboard: React.FC<DashboardProps> = ({ className }) => {
   });
 
   return (
-    <div className={`h-full flex flex-col ${className}`} data-testid="dashboard-container">
+    <div className={`h-full flex flex-col ${className} bg-gradient-to-b from-[#f8faff] to-[#e6f2ff]`} data-testid="dashboard-container">
       {/* Tab navigation */}
       <TabNavigation activeTab={activeTab} onTabChange={setActiveTab} />
 
+      {/* Subtle background elements */}
+      <div className="absolute top-1/4 right-1/3 w-[300px] h-[300px] bg-blue-300 rounded-full blur-[130px] opacity-10 z-0 pointer-events-none" />
+      <div className="absolute bottom-1/3 left-1/3 w-[250px] h-[250px] bg-purple-300 rounded-full blur-[100px] opacity-10 z-0 pointer-events-none" />
+
       {/* Panel content */}
-      <div className="flex-grow overflow-hidden bg-gray-50">
+      <div className="flex-grow overflow-hidden relative">
+        {/* Radial gradient overlay for depth */}
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(255,255,255,0)_0%,rgba(255,255,255,0.7)_70%,rgba(255,255,255,0.9)_100%)] z-[1] pointer-events-none" />
+
         {activeTab === 'overview' && (
-          <div className="h-full p-6 overflow-auto">
+          <div className="h-full p-6 overflow-auto relative z-10">
             <div className="max-w-7xl mx-auto">
               <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-8">
                 <div>
-                  <h1 className="text-3xl font-bold mb-2 text-gray-900">Benton County Property Valuation</h1>
-                  <p className="text-gray-600 max-w-3xl">
+                  <motion.h1 
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.5 }}
+                    className="text-3xl font-bold mb-2 bg-clip-text text-transparent bg-gradient-to-r from-blue-700 to-indigo-800"
+                  >
+                    Benton County Property Valuation
+                  </motion.h1>
+                  <motion.p 
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.5, delay: 0.1 }}
+                    className="text-gray-600 max-w-3xl"
+                  >
                     Welcome to the GIS_BS platform. An advanced spatial analysis and visualization toolset for property valuation assessment in Benton County, Washington.
-                  </p>
+                  </motion.p>
                 </div>
-                <div className="mt-4 md:mt-0">
+                <motion.div 
+                  initial={{ opacity: 0, scale: 0.95 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{ duration: 0.5, delay: 0.2 }}
+                  className="mt-4 md:mt-0 relative group"
+                >
+                  <div className="absolute -inset-1 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-xl opacity-70 blur-sm group-hover:opacity-100 transition duration-300 z-0" />
                   <OneClickExport 
                     text="Generate Property Insights"
-                    className="px-4 py-2 shadow-sm"
+                    className="relative px-4 py-2 shadow-sm z-10 bg-gradient-to-r from-blue-600 to-indigo-600 text-white hover:shadow-blue-500/50"
                   />
-                </div>
+                </motion.div>
               </div>
 
-              {/* Quick Stats - Count Cards */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-                <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-100 transition-all duration-200 hover:shadow-md">
+              {/* Quick Stats - Count Cards with glassmorphism */}
+              <motion.div 
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.6, delay: 0.1 }}
+                className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8"
+              >
+                <motion.div 
+                  whileHover={{ y: -5, transition: { duration: 0.2 } }}
+                  className="bg-white/80 backdrop-blur-md rounded-xl shadow-sm p-6 border border-blue-50 transition-all duration-200 hover:shadow-md"
+                >
                   <div className="flex items-start justify-between">
                     <div>
                       <p className="text-sm font-medium text-gray-500">Total Properties</p>
@@ -86,13 +126,16 @@ const Dashboard: React.FC<DashboardProps> = ({ className }) => {
                         +156 from last update
                       </p>
                     </div>
-                    <div className="bg-blue-50 p-3 rounded-lg">
-                      <Building className="h-5 w-5 text-blue-500" />
+                    <div className="bg-gradient-to-br from-blue-400 to-blue-600 p-3 rounded-lg shadow-sm">
+                      <Building className="h-5 w-5 text-white" />
                     </div>
                   </div>
-                </div>
+                </motion.div>
 
-                <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-100 transition-all duration-200 hover:shadow-md">
+                <motion.div 
+                  whileHover={{ y: -5, transition: { duration: 0.2 } }}
+                  className="bg-white/80 backdrop-blur-md rounded-xl shadow-sm p-6 border border-green-50 transition-all duration-200 hover:shadow-md"
+                >
                   <div className="flex items-start justify-between">
                     <div>
                       <p className="text-sm font-medium text-gray-500">Average Value</p>
@@ -102,13 +145,16 @@ const Dashboard: React.FC<DashboardProps> = ({ className }) => {
                         +2.3% this quarter
                       </p>
                     </div>
-                    <div className="bg-green-50 p-3 rounded-lg">
-                      <DollarSign className="h-5 w-5 text-green-500" />
+                    <div className="bg-gradient-to-br from-green-400 to-green-600 p-3 rounded-lg shadow-sm">
+                      <DollarSign className="h-5 w-5 text-white" />
                     </div>
                   </div>
-                </div>
+                </motion.div>
 
-                <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-100 transition-all duration-200 hover:shadow-md">
+                <motion.div 
+                  whileHover={{ y: -5, transition: { duration: 0.2 } }}
+                  className="bg-white/80 backdrop-blur-md rounded-xl shadow-sm p-6 border border-purple-50 transition-all duration-200 hover:shadow-md"
+                >
                   <div className="flex items-start justify-between">
                     <div>
                       <p className="text-sm font-medium text-gray-500">Median Value</p>
@@ -118,13 +164,16 @@ const Dashboard: React.FC<DashboardProps> = ({ className }) => {
                         +1.8% this quarter
                       </p>
                     </div>
-                    <div className="bg-purple-50 p-3 rounded-lg">
-                      <PieChart className="h-5 w-5 text-purple-500" />
+                    <div className="bg-gradient-to-br from-purple-400 to-purple-600 p-3 rounded-lg shadow-sm">
+                      <PieChart className="h-5 w-5 text-white" />
                     </div>
                   </div>
-                </div>
+                </motion.div>
 
-                <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-100 transition-all duration-200 hover:shadow-md">
+                <motion.div 
+                  whileHover={{ y: -5, transition: { duration: 0.2 } }}
+                  className="bg-white/80 backdrop-blur-md rounded-xl shadow-sm p-6 border border-orange-50 transition-all duration-200 hover:shadow-md"
+                >
                   <div className="flex items-start justify-between">
                     <div>
                       <p className="text-sm font-medium text-gray-500">Data Points</p>
@@ -134,22 +183,30 @@ const Dashboard: React.FC<DashboardProps> = ({ className }) => {
                         +12.4K this month
                       </p>
                     </div>
-                    <div className="bg-orange-50 p-3 rounded-lg">
-                      <Layers className="h-5 w-5 text-orange-500" />
+                    <div className="bg-gradient-to-br from-orange-400 to-orange-600 p-3 rounded-lg shadow-sm">
+                      <Layers className="h-5 w-5 text-white" />
                     </div>
                   </div>
-                </div>
-              </div>
+                </motion.div>
+              </motion.div>
 
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
-                {/* Property Statistics Card - redesigned */}
-                <div className="bg-white p-6 rounded-xl border border-gray-100 shadow-sm">
+              <motion.div 
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.6, delay: 0.2 }}
+                className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8"
+              >
+                {/* Property Statistics Card - redesigned with glassmorphism */}
+                <motion.div 
+                  whileHover={{ y: -5, transition: { duration: 0.2 } }}
+                  className="bg-white/80 backdrop-blur-md p-6 rounded-xl border border-blue-50 shadow-[0_8px_16px_rgba(112,144,176,0.08)]"
+                >
                   <div className="flex justify-between items-center mb-6">
-                    <h2 className="text-lg font-semibold text-gray-800 flex items-center">
-                      <BarChart className="h-5 w-5 text-primary mr-2" />
+                    <h2 className="text-lg font-semibold bg-clip-text text-transparent bg-gradient-to-r from-blue-700 to-blue-500 flex items-center">
+                      <BarChart className="h-5 w-5 text-blue-600 mr-2" />
                       Property Statistics
                     </h2>
-                    <button className="text-gray-400 hover:text-primary p-1 rounded-full transition-colors duration-200">
+                    <button className="text-gray-400 hover:text-blue-500 p-1 rounded-full transition-colors duration-200">
                       <Info className="h-4 w-4" />
                     </button>
                   </div>
@@ -180,25 +237,28 @@ const Dashboard: React.FC<DashboardProps> = ({ className }) => {
                     </div>
                   </div>
                   <div className="mt-6">
-                    <button className="text-primary text-sm font-medium hover:text-primary/80 transition-colors duration-200 flex items-center">
+                    <button className="text-blue-600 text-sm font-medium hover:text-blue-800 transition-colors duration-200 flex items-center">
                       View detailed statistics
                       <ChevronRight className="h-3 w-3 ml-1" />
                     </button>
                   </div>
-                </div>
+                </motion.div>
 
-                {/* Value Distribution Card - redesigned */}
-                <div className="bg-white p-6 rounded-xl border border-gray-100 shadow-sm">
+                {/* Value Distribution Card - redesigned with glassmorphism */}
+                <motion.div 
+                  whileHover={{ y: -5, transition: { duration: 0.2 } }}
+                  className="bg-white/80 backdrop-blur-md p-6 rounded-xl border border-purple-50 shadow-[0_8px_16px_rgba(112,144,176,0.08)]"
+                >
                   <div className="flex justify-between items-center mb-6">
-                    <h2 className="text-lg font-semibold text-gray-800 flex items-center">
-                      <TrendingUp className="h-5 w-5 text-primary mr-2" />
+                    <h2 className="text-lg font-semibold bg-clip-text text-transparent bg-gradient-to-r from-purple-700 to-purple-500 flex items-center">
+                      <TrendingUp className="h-5 w-5 text-purple-600 mr-2" />
                       Value Distribution
                     </h2>
-                    <button className="text-gray-400 hover:text-primary p-1 rounded-full transition-colors duration-200">
+                    <button className="text-gray-400 hover:text-purple-500 p-1 rounded-full transition-colors duration-200">
                       <ExternalLink className="h-4 w-4" />
                     </button>
                   </div>
-                  <div className="h-60 flex items-center justify-center bg-gray-50 rounded-lg border border-gray-100">
+                  <div className="h-60 flex items-center justify-center bg-gray-50/80 rounded-lg border border-gray-100">
                     <div className="text-center">
                       <BarChart className="h-10 w-10 text-gray-300 mx-auto mb-2" />
                       <p className="text-gray-500 text-sm max-w-xs mx-auto">
@@ -224,16 +284,19 @@ const Dashboard: React.FC<DashboardProps> = ({ className }) => {
                       <span className="text-xs text-gray-600">Industrial</span>
                     </div>
                   </div>
-                </div>
+                </motion.div>
 
-                {/* Recent Activity Card - redesigned */}
-                <div className="bg-white p-6 rounded-xl border border-gray-100 shadow-sm">
+                {/* Recent Activity Card - redesigned with glassmorphism */}
+                <motion.div 
+                  whileHover={{ y: -5, transition: { duration: 0.2 } }}
+                  className="bg-white/80 backdrop-blur-md p-6 rounded-xl border border-green-50 shadow-[0_8px_16px_rgba(112,144,176,0.08)]"
+                >
                   <div className="flex justify-between items-center mb-6">
-                    <h2 className="text-lg font-semibold text-gray-800 flex items-center">
-                      <Calendar className="h-5 w-5 text-primary mr-2" />
+                    <h2 className="text-lg font-semibold bg-clip-text text-transparent bg-gradient-to-r from-green-700 to-green-500 flex items-center">
+                      <Calendar className="h-5 w-5 text-green-600 mr-2" />
                       Recent Activity
                     </h2>
-                    <button className="text-gray-400 hover:text-primary p-1 rounded-full transition-colors duration-200">
+                    <button className="text-gray-400 hover:text-green-500 p-1 rounded-full transition-colors duration-200">
                       <Info className="h-4 w-4" />
                     </button>
                   </div>
@@ -276,19 +339,24 @@ const Dashboard: React.FC<DashboardProps> = ({ className }) => {
                     </li>
                   </ul>
                   <div className="mt-6">
-                    <button className="text-primary text-sm font-medium hover:text-primary/80 transition-colors duration-200 flex items-center">
+                    <button className="text-green-600 text-sm font-medium hover:text-green-800 transition-colors duration-200 flex items-center">
                       View all activity
                       <ChevronRight className="h-3 w-3 ml-1" />
                     </button>
                   </div>
-                </div>
-              </div>
+                </motion.div>
+              </motion.div>
 
-              {/* Alert Card - redesigned */}
-              <div className="bg-gradient-to-r from-amber-50 to-amber-100 p-6 rounded-xl border border-amber-200 shadow-sm mb-8">
+              {/* Alert Card - redesigned with glassmorphism */}
+              <motion.div 
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.6, delay: 0.3 }}
+                className="bg-gradient-to-r from-amber-50/90 to-amber-100/90 backdrop-blur-md p-6 rounded-xl border border-amber-200 shadow-sm mb-8"
+              >
                 <div className="flex flex-col sm:flex-row sm:items-center">
-                  <div className="flex-shrink-0 bg-amber-200 p-3 rounded-full mb-4 sm:mb-0 sm:mr-5">
-                    <AlertCircle className="h-6 w-6 text-amber-700" />
+                  <div className="flex-shrink-0 bg-gradient-to-br from-amber-300 to-amber-500 p-3 rounded-full mb-4 sm:mb-0 sm:mr-5 shadow-sm">
+                    <AlertCircle className="h-6 w-6 text-white" />
                   </div>
                   <div>
                     <h3 className="text-lg font-semibold text-amber-900 mb-2">Valuation Data Update Available</h3>
@@ -297,141 +365,164 @@ const Dashboard: React.FC<DashboardProps> = ({ className }) => {
                       78 revised valuations. Import this data to keep your analysis current.
                     </p>
                     <div className="flex space-x-4">
-                      <button className="bg-amber-600 hover:bg-amber-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors duration-200">
+                      <Button 
+                        className="bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 shadow-sm hover:shadow-md"
+                      >
                         Import Data Now
-                      </button>
-                      <button className="bg-transparent hover:bg-amber-200 text-amber-800 px-4 py-2 rounded-lg text-sm font-medium transition-colors duration-200">
+                      </Button>
+                      <Button 
+                        variant="outline"
+                        className="bg-transparent hover:bg-amber-200 text-amber-800 border-amber-300 px-4 py-2 rounded-lg text-sm font-medium transition-colors duration-200"
+                      >
                         View Details
-                      </button>
+                      </Button>
                     </div>
                   </div>
                 </div>
-              </div>
+              </motion.div>
 
               {/* Quick Access Cards */}
-              <h2 className="text-xl font-bold mb-4 text-gray-900">Quick Access</h2>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-                <button 
+              <motion.h2 
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.5, delay: 0.4 }}
+                className="text-xl font-bold mb-4 bg-clip-text text-transparent bg-gradient-to-r from-gray-800 to-gray-700"
+              >
+                Quick Access
+              </motion.h2>
+              <motion.div 
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.6, delay: 0.5 }}
+                className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6"
+              >
+                <motion.button 
                   onClick={() => setActiveTab('map')}
-                  className="bg-white p-6 rounded-xl border border-gray-100 shadow-sm hover:shadow-md hover:border-primary/20 transition-all duration-200 text-left"
+                  className="p-6 bg-white/80 backdrop-blur-md rounded-xl border border-blue-50 shadow-[0_8px_16px_rgba(112,144,176,0.08)] hover:shadow-lg hover:-translate-y-1 transition-all duration-200 text-left"
+                  whileHover={{ scale: 1.03 }}
+                  whileTap={{ scale: 0.98 }}
                 >
-                  <div className="bg-primary/10 p-3 rounded-lg inline-block mb-4">
-                    <Map className="h-6 w-6 text-primary" />
+                  <div className="mb-4 bg-gradient-to-br from-blue-400 to-blue-600 w-12 h-12 flex items-center justify-center rounded-lg shadow-sm">
+                    <Map className="h-6 w-6 text-white" />
                   </div>
-                  <h3 className="text-lg font-medium text-gray-900 mb-2">Property Map</h3>
-                  <p className="text-sm text-gray-600">
-                    Visualize properties across Benton County with our interactive mapping tools
-                  </p>
-                </button>
-                <button 
-                  onClick={() => setActiveTab('regression')}
-                  className="bg-white p-6 rounded-xl border border-gray-100 shadow-sm hover:shadow-md hover:border-primary/20 transition-all duration-200 text-left"
+                  <h3 className="text-lg font-semibold text-gray-900 mb-1">Property Map</h3>
+                  <p className="text-sm text-gray-500">Explore properties with interactive spatial visualization</p>
+                </motion.button>
+
+                <motion.button 
+                  onClick={() => setActiveTab('analysis')}
+                  className="p-6 bg-white/80 backdrop-blur-md rounded-xl border border-purple-50 shadow-[0_8px_16px_rgba(112,144,176,0.08)] hover:shadow-lg hover:-translate-y-1 transition-all duration-200 text-left"
+                  whileHover={{ scale: 1.03 }}
+                  whileTap={{ scale: 0.98 }}
                 >
-                  <div className="bg-primary/10 p-3 rounded-lg inline-block mb-4">
-                    <TrendingUp className="h-6 w-6 text-primary" />
+                  <div className="mb-4 bg-gradient-to-br from-purple-400 to-purple-600 w-12 h-12 flex items-center justify-center rounded-lg shadow-sm">
+                    <BarChart2 className="h-6 w-6 text-white" />
                   </div>
-                  <h3 className="text-lg font-medium text-gray-900 mb-2">Regression Tools</h3>
-                  <p className="text-sm text-gray-600">
-                    Create and analyze valuation models with statistical regression tools
-                  </p>
-                </button>
-                <button 
+                  <h3 className="text-lg font-semibold text-gray-900 mb-1">Spatial Analysis</h3>
+                  <p className="text-sm text-gray-500">Analyze property patterns and spatial relationships</p>
+                </motion.button>
+
+                <motion.button 
                   onClick={() => setActiveTab('comparison')}
-                  className="bg-white p-6 rounded-xl border border-gray-100 shadow-sm hover:shadow-md hover:border-primary/20 transition-all duration-200 text-left"
+                  className="p-6 bg-white/80 backdrop-blur-md rounded-xl border border-green-50 shadow-[0_8px_16px_rgba(112,144,176,0.08)] hover:shadow-lg hover:-translate-y-1 transition-all duration-200 text-left"
+                  whileHover={{ scale: 1.03 }}
+                  whileTap={{ scale: 0.98 }}
                 >
-                  <div className="bg-primary/10 p-3 rounded-lg inline-block mb-4">
-                    <Building className="h-6 w-6 text-primary" />
+                  <div className="mb-4 bg-gradient-to-br from-green-400 to-green-600 w-12 h-12 flex items-center justify-center rounded-lg shadow-sm">
+                    <GitCompare className="h-6 w-6 text-white" />
                   </div>
-                  <h3 className="text-lg font-medium text-gray-900 mb-2">Property Comparison</h3>
-                  <p className="text-sm text-gray-600">
-                    Compare similar properties and analyze valuation differentials
-                  </p>
-                </button>
-                <button 
-                  onClick={() => setActiveTab('reports')}
-                  className="bg-white p-6 rounded-xl border border-gray-100 shadow-sm hover:shadow-md hover:border-primary/20 transition-all duration-200 text-left"
+                  <h3 className="text-lg font-semibold text-gray-900 mb-1">Property Comparison</h3>
+                  <p className="text-sm text-gray-500">Compare properties and identify value differentials</p>
+                </motion.button>
+
+                <motion.button 
+                  onClick={() => setActiveTab('modeling')}
+                  className="p-6 bg-white/80 backdrop-blur-md rounded-xl border border-red-50 shadow-[0_8px_16px_rgba(112,144,176,0.08)] hover:shadow-lg hover:-translate-y-1 transition-all duration-200 text-left"
+                  whileHover={{ scale: 1.03 }}
+                  whileTap={{ scale: 0.98 }}
                 >
-                  <div className="bg-primary/10 p-3 rounded-lg inline-block mb-4">
-                    <FileText className="h-6 w-6 text-primary" />
+                  <div className="mb-4 bg-gradient-to-br from-red-400 to-red-600 w-12 h-12 flex items-center justify-center rounded-lg shadow-sm">
+                    <LineChart className="h-6 w-6 text-white" />
                   </div>
-                  <h3 className="text-lg font-medium text-gray-900 mb-2">Generate Reports</h3>
-                  <p className="text-sm text-gray-600">
-                    Create detailed reports for properties, neighborhoods, or trends
-                  </p>
-                </button>
-              </div>
+                  <h3 className="text-lg font-semibold text-gray-900 mb-1">Predictive Modeling</h3>
+                  <p className="text-sm text-gray-500">Create and test property valuation models</p>
+                </motion.button>
+              </motion.div>
+
+              {/* Additional shortcuts */}
+              <motion.div 
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.6, delay: 0.6 }}
+                className="mt-8 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6"
+              >
+                <motion.button 
+                  onClick={() => setActiveTab('regression')}
+                  className="p-6 bg-white/80 backdrop-blur-md rounded-xl border border-indigo-50 shadow-[0_8px_16px_rgba(112,144,176,0.08)] hover:shadow-lg hover:-translate-y-1 transition-all duration-200 text-left"
+                  whileHover={{ scale: 1.03 }}
+                  whileTap={{ scale: 0.98 }}
+                >
+                  <div className="mb-4 bg-gradient-to-br from-indigo-400 to-indigo-600 w-12 h-12 flex items-center justify-center rounded-lg shadow-sm">
+                    <CandlestickChart className="h-6 w-6 text-white" />
+                  </div>
+                  <h3 className="text-lg font-semibold text-gray-900 mb-1">Regression Tools</h3>
+                  <p className="text-sm text-gray-500">Advanced statistical modeling and regression analysis</p>
+                </motion.button>
+
+                <motion.button 
+                  onClick={() => setActiveTab('scripts')}
+                  className="p-6 bg-white/80 backdrop-blur-md rounded-xl border border-cyan-50 shadow-[0_8px_16px_rgba(112,144,176,0.08)] hover:shadow-lg hover:-translate-y-1 transition-all duration-200 text-left"
+                  whileHover={{ scale: 1.03 }}
+                  whileTap={{ scale: 0.98 }}
+                >
+                  <div className="mb-4 bg-gradient-to-br from-cyan-400 to-cyan-600 w-12 h-12 flex items-center justify-center rounded-lg shadow-sm">
+                    <Code className="h-6 w-6 text-white" />
+                  </div>
+                  <h3 className="text-lg font-semibold text-gray-900 mb-1">Custom Scripts</h3>
+                  <p className="text-sm text-gray-500">Write and execute custom analysis scripts</p>
+                </motion.button>
+
+                <motion.button 
+                  onClick={() => setActiveTab('reporting')}
+                  className="p-6 bg-white/80 backdrop-blur-md rounded-xl border border-yellow-50 shadow-[0_8px_16px_rgba(112,144,176,0.08)] hover:shadow-lg hover:-translate-y-1 transition-all duration-200 text-left"
+                  whileHover={{ scale: 1.03 }}
+                  whileTap={{ scale: 0.98 }}
+                >
+                  <div className="mb-4 bg-gradient-to-br from-yellow-400 to-yellow-600 w-12 h-12 flex items-center justify-center rounded-lg shadow-sm">
+                    <FileText className="h-6 w-6 text-white" />
+                  </div>
+                  <h3 className="text-lg font-semibold text-gray-900 mb-1">Reports</h3>
+                  <p className="text-sm text-gray-500">Generate comprehensive property valuation reports</p>
+                </motion.button>
+
+                <motion.button 
+                  onClick={() => setActiveTab('settings')}
+                  className="p-6 bg-white/80 backdrop-blur-md rounded-xl border border-gray-100 shadow-[0_8px_16px_rgba(112,144,176,0.08)] hover:shadow-lg hover:-translate-y-1 transition-all duration-200 text-left"
+                  whileHover={{ scale: 1.03 }}
+                  whileTap={{ scale: 0.98 }}
+                >
+                  <div className="mb-4 bg-gradient-to-br from-gray-400 to-gray-600 w-12 h-12 flex items-center justify-center rounded-lg shadow-sm">
+                    <Settings className="h-6 w-6 text-white" />
+                  </div>
+                  <h3 className="text-lg font-semibold text-gray-900 mb-1">Settings</h3>
+                  <p className="text-sm text-gray-500">Configure application preferences and user settings</p>
+                </motion.button>
+              </motion.div>
             </div>
           </div>
         )}
 
         {activeTab === 'map' && <MapPanel properties={properties} />}
-
-        {activeTab === 'scripts' && <ScriptPanel />}
-
-        {activeTab === 'data' && (
-          <div className="h-full p-6 flex items-center justify-center">
-            <div className="text-center max-w-md">
-              <div className="bg-gray-50 p-5 rounded-full inline-block mb-4">
-                <Database className="w-12 h-12 text-gray-300" />
-              </div>
-              <h3 className="text-xl font-semibold text-gray-800 mb-3">Data Management</h3>
-              <p className="text-gray-600 mb-6">
-                The Data panel will provide tools for importing, exporting, and managing property data.
-              </p>
-              <button className="bg-primary/10 text-primary px-4 py-2 rounded-lg text-sm font-medium hover:bg-primary/20 transition-colors duration-200">
-                Coming Soon
-              </button>
-            </div>
-          </div>
-        )}
-
-        {activeTab === 'regression' && <RegressionPanel />}
-
-        {activeTab === 'predictive' && <PredictiveModelingPanel />}
-
+        {activeTab === 'analysis' && <SpatialAnalysisPanel properties={properties} />}
+        {activeTab === 'comparison' && <PropertyComparisonPanel properties={properties} />}
+        {activeTab === 'regression' && <RegressionPanel properties={properties} />}
+        {activeTab === 'modeling' && <PredictiveModelingPanel properties={properties} />}
         {activeTab === 'timeseries' && <TimeSeriesAnalysisPanel properties={properties} />}
-
-        {activeTab === 'spatial' && (
-          <SpatialAnalysisPanel properties={properties} />
-        )}
-
-        {activeTab === 'comparison' && <PropertyComparisonPanel />}
-
-        {activeTab === 'kpi' && <KPIDashboardPanel />}
-
-        {activeTab === 'advanced' && (
-          <div className="h-full p-6 overflow-auto">
-            <div className="max-w-7xl mx-auto">
-              <div className="mb-8">
-                <h2 className="text-2xl font-bold text-gray-900 mb-2">Advanced Analytics & Machine Learning</h2>
-                <p className="text-gray-600 max-w-3xl">
-                  Leverage machine learning and advanced analytics for precise property valuation, time series forecasting, and spatial intelligence.
-                </p>
-              </div>
-              <AdvancedAnalyticsPanel selectedProperty={properties[0]} allProperties={properties} />
-            </div>
-          </div>
-        )}
-
-        {activeTab === 'reports' && (
-          <div className="h-full p-6 overflow-auto">
-            <div className="max-w-7xl mx-auto">
-              <div className="mb-8">
-                <h2 className="text-2xl font-bold text-gray-900 mb-2">Property Reports</h2>
-                <p className="text-gray-600 max-w-3xl">
-                  Create, customize, and export detailed property reports with the information you need.
-                </p>
-              </div>
-              <ReportGenerator />
-            </div>
-          </div>
-        )}
-
-        {activeTab === 'settings' && (
-          <div className="h-full">
-            <SettingsPanel />
-          </div>
-        )}
+        {activeTab === 'scripts' && <ScriptPanel properties={properties} />}
+        {activeTab === 'reporting' && <ReportGenerator properties={properties} />}
+        {activeTab === 'kpi' && <KPIDashboardPanel taxYear="2025" />}
+        {activeTab === 'analytics' && <AdvancedAnalyticsPanel properties={properties} />}
+        {activeTab === 'settings' && <SettingsPanel />}
       </div>
     </div>
   );
