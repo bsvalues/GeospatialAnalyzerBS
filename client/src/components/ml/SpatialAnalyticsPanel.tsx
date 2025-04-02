@@ -305,7 +305,7 @@ export function SpatialAnalyticsPanel({ selectedProperty, allProperties, classNa
                           </div>
                         </div>
                         <div className="space-y-1">
-                          <Badge variant="success" className="rounded-md px-2.5 py-1 bg-green-100 text-green-800 hover:bg-green-200">
+                          <Badge variant="outline" className="rounded-md px-2.5 py-1 bg-green-100 text-green-800 hover:bg-green-200">
                             {analysisResult.hotspotStatus === 'high' ? 'High Value Area' : 
                              analysisResult.hotspotStatus === 'medium' ? 'Good Location' : 'Developing Area'}
                           </Badge>

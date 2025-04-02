@@ -34,26 +34,25 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { Property } from '@shared/schema';
 import { formatCurrency, formatNumber, formatPercentage } from '@/lib/utils';
-import { 
-  BarChart2, 
-  FileText,
-  Download,
-  PieChart,
-  BarChart,
-  Activity,
-  ArrowDownUp,
-  ArrowUp,
-  ArrowDown,
-  ArrowRight,
-  Scale,
-  Maximize2,
-  Map as MapIcon,
-  Home,
-  Calendar,
-  DollarSign,
-  Ruler,
-  Square
-} from 'lucide-react';
+// Import icons individually to avoid naming conflicts
+import { BarChart2 } from 'lucide-react';
+import { FileText } from 'lucide-react';
+import { Download } from 'lucide-react';
+import { PieChart } from 'lucide-react';
+import { BarChart } from 'lucide-react';
+import { Activity } from 'lucide-react';
+import { ArrowDownUp } from 'lucide-react';
+import { ArrowUp } from 'lucide-react';
+import { ArrowDown } from 'lucide-react';
+import { ArrowRight } from 'lucide-react';
+import { Scale } from 'lucide-react';
+import { Maximize2 } from 'lucide-react';
+import { Map as MapIcon } from 'lucide-react';
+import { Home } from 'lucide-react';
+import { Calendar } from 'lucide-react';
+import { DollarSign } from 'lucide-react';
+import { Ruler } from 'lucide-react';
+import { Square } from 'lucide-react';
 import { findSimilarProperties } from '@/services/comparison/similarityService';
 import { ValueAnalysisResult } from '@/services/comparison/valuationAnalysisService';
 import { PropertyValueAnalysisCard } from './PropertyValueAnalysisCard';

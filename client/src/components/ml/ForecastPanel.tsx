@@ -299,7 +299,7 @@ export function ForecastPanel({ selectedProperty, allProperties, className }: Fo
                         <TrendingUp className="h-3.5 w-3.5 mr-1" />
                         {forecastResult.growthRate}% Annual Growth
                       </Badge>
-                      <Badge variant="success" className="rounded-md px-2.5 py-1 bg-green-100 text-green-800 hover:bg-green-200">
+                      <Badge variant="outline" className="rounded-md px-2.5 py-1 bg-green-100 text-green-800 hover:bg-green-200">
                         {confidenceLevel}% Confidence
                       </Badge>
                     </div>
@@ -410,7 +410,7 @@ export function ForecastPanel({ selectedProperty, allProperties, className }: Fo
                           </div>
                           <div className="flex justify-between text-sm">
                             <span className="text-gray-600">Total Growth</span>
-                            <Badge variant="success" className="bg-green-100 text-green-800 hover:bg-green-200">
+                            <Badge variant="outline" className="bg-green-100 text-green-800 hover:bg-green-200">
                               +{Math.round(forecastResult.growthRate * forecastPeriod)}% in {forecastPeriod} years
                             </Badge>
                           </div>
