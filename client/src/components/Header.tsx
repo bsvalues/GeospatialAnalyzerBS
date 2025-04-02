@@ -114,26 +114,51 @@ export const Header: React.FC<HeaderProps> = ({ taxYear, onTaxYearChange }) => {
         
         {/* Desktop navigation */}
         <div className="hidden md:flex items-center space-x-1 text-white/90">
-          <div className="flex items-center px-3 py-1.5 rounded-md hover:bg-white/10 transition-all duration-200 cursor-pointer">
-            <Map className="h-4 w-4 mr-1.5" />
-            <span className="text-sm font-medium">Layers</span>
-          </div>
-          <div className="flex items-center px-3 py-1.5 rounded-md hover:bg-white/10 transition-all duration-200 cursor-pointer">
-            <Database className="h-4 w-4 mr-1.5" />
-            <span className="text-sm font-medium">Data</span>
-          </div>
-          <div className="flex items-center px-3 py-1.5 rounded-md hover:bg-white/10 transition-all duration-200 cursor-pointer">
-            <Calculator className="h-4 w-4 mr-1.5" />
-            <span className="text-sm font-medium">Analysis</span>
-          </div>
-          <div className="flex items-center px-3 py-1.5 rounded-md hover:bg-white/10 transition-all duration-200 cursor-pointer">
-            <Building className="h-4 w-4 mr-1.5" />
-            <span className="text-sm font-medium">Properties</span>
-          </div>
-          <div className="flex items-center px-3 py-1.5 rounded-md hover:bg-white/10 transition-all duration-200 cursor-pointer">
-            <FileText className="h-4 w-4 mr-1.5" />
-            <span className="text-sm font-medium">Reports</span>
-          </div>
+          <Link href="/layers">
+            <div className={cn(
+              "flex items-center px-3 py-1.5 rounded-md hover:bg-white/10 transition-all duration-200 cursor-pointer",
+              currentLocation === "/layers" ? "bg-white/20" : ""
+            )}>
+              <Map className="h-4 w-4 mr-1.5" />
+              <span className="text-sm font-medium">Layers</span>
+            </div>
+          </Link>
+          <Link href="/data">
+            <div className={cn(
+              "flex items-center px-3 py-1.5 rounded-md hover:bg-white/10 transition-all duration-200 cursor-pointer",
+              currentLocation === "/data" ? "bg-white/20" : ""
+            )}>
+              <Database className="h-4 w-4 mr-1.5" />
+              <span className="text-sm font-medium">Data</span>
+            </div>
+          </Link>
+          <Link href="/analysis">
+            <div className={cn(
+              "flex items-center px-3 py-1.5 rounded-md hover:bg-white/10 transition-all duration-200 cursor-pointer",
+              currentLocation === "/analysis" ? "bg-white/20" : ""
+            )}>
+              <Calculator className="h-4 w-4 mr-1.5" />
+              <span className="text-sm font-medium">Analysis</span>
+            </div>
+          </Link>
+          <Link href="/properties">
+            <div className={cn(
+              "flex items-center px-3 py-1.5 rounded-md hover:bg-white/10 transition-all duration-200 cursor-pointer",
+              currentLocation === "/properties" ? "bg-white/20" : ""
+            )}>
+              <Building className="h-4 w-4 mr-1.5" />
+              <span className="text-sm font-medium">Properties</span>
+            </div>
+          </Link>
+          <Link href="/reports">
+            <div className={cn(
+              "flex items-center px-3 py-1.5 rounded-md hover:bg-white/10 transition-all duration-200 cursor-pointer",
+              currentLocation === "/reports" ? "bg-white/20" : ""
+            )}>
+              <FileText className="h-4 w-4 mr-1.5" />
+              <span className="text-sm font-medium">Reports</span>
+            </div>
+          </Link>
           <Link href="/trends">
             <div className="flex items-center px-3 py-1.5 rounded-md hover:bg-white/10 transition-all duration-200 cursor-pointer">
               <TrendingUp className="h-4 w-4 mr-1.5" />
@@ -273,60 +298,70 @@ export const Header: React.FC<HeaderProps> = ({ taxYear, onTaxYearChange }) => {
             </div>
             
             <nav className="space-y-1">
-              <div 
-                className={cn(
-                  "flex items-center rounded-md py-3 px-3 transition-colors",
-                  "bg-white/10"
-                )}
-                onClick={() => setIsMobileMenuOpen(false)}
-              >
-                <Map className="h-5 w-5 mr-3 text-white/90" />
-                <span className="text-white font-medium">Layers</span>
-              </div>
+              <Link href="/layers">
+                <div 
+                  className={cn(
+                    "flex items-center rounded-md py-3 px-3 transition-colors",
+                    currentLocation === "/layers" ? "bg-white/20" : "hover:bg-white/10"
+                  )}
+                  onClick={() => setIsMobileMenuOpen(false)}
+                >
+                  <Map className="h-5 w-5 mr-3 text-white/90" />
+                  <span className="text-white font-medium">Layers</span>
+                </div>
+              </Link>
               
-              <div 
-                className={cn(
-                  "flex items-center rounded-md py-3 px-3 transition-colors",
-                  "hover:bg-white/10"
-                )}
-                onClick={() => setIsMobileMenuOpen(false)}
-              >
-                <Database className="h-5 w-5 mr-3 text-white/90" />
-                <span className="text-white font-medium">Data</span>
-              </div>
+              <Link href="/data">
+                <div 
+                  className={cn(
+                    "flex items-center rounded-md py-3 px-3 transition-colors",
+                    currentLocation === "/data" ? "bg-white/20" : "hover:bg-white/10"
+                  )}
+                  onClick={() => setIsMobileMenuOpen(false)}
+                >
+                  <Database className="h-5 w-5 mr-3 text-white/90" />
+                  <span className="text-white font-medium">Data</span>
+                </div>
+              </Link>
               
-              <div 
-                className={cn(
-                  "flex items-center rounded-md py-3 px-3 transition-colors",
-                  "hover:bg-white/10"
-                )}
-                onClick={() => setIsMobileMenuOpen(false)}
-              >
-                <Calculator className="h-5 w-5 mr-3 text-white/90" />
-                <span className="text-white font-medium">Analysis</span>
-              </div>
+              <Link href="/analysis">
+                <div 
+                  className={cn(
+                    "flex items-center rounded-md py-3 px-3 transition-colors",
+                    currentLocation === "/analysis" ? "bg-white/20" : "hover:bg-white/10"
+                  )}
+                  onClick={() => setIsMobileMenuOpen(false)}
+                >
+                  <Calculator className="h-5 w-5 mr-3 text-white/90" />
+                  <span className="text-white font-medium">Analysis</span>
+                </div>
+              </Link>
               
-              <div 
-                className={cn(
-                  "flex items-center rounded-md py-3 px-3 transition-colors",
-                  "hover:bg-white/10"
-                )}
-                onClick={() => setIsMobileMenuOpen(false)}
-              >
-                <Building className="h-5 w-5 mr-3 text-white/90" />
-                <span className="text-white font-medium">Properties</span>
-              </div>
+              <Link href="/properties">
+                <div 
+                  className={cn(
+                    "flex items-center rounded-md py-3 px-3 transition-colors",
+                    currentLocation === "/properties" ? "bg-white/20" : "hover:bg-white/10"
+                  )}
+                  onClick={() => setIsMobileMenuOpen(false)}
+                >
+                  <Building className="h-5 w-5 mr-3 text-white/90" />
+                  <span className="text-white font-medium">Properties</span>
+                </div>
+              </Link>
               
-              <div 
-                className={cn(
-                  "flex items-center rounded-md py-3 px-3 transition-colors",
-                  "hover:bg-white/10"
-                )}
-                onClick={() => setIsMobileMenuOpen(false)}
-              >
-                <FileText className="h-5 w-5 mr-3 text-white/90" />
-                <span className="text-white font-medium">Reports</span>
-              </div>
+              <Link href="/reports">
+                <div 
+                  className={cn(
+                    "flex items-center rounded-md py-3 px-3 transition-colors",
+                    currentLocation === "/reports" ? "bg-white/20" : "hover:bg-white/10"
+                  )}
+                  onClick={() => setIsMobileMenuOpen(false)}
+                >
+                  <FileText className="h-5 w-5 mr-3 text-white/90" />
+                  <span className="text-white font-medium">Reports</span>
+                </div>
+              </Link>
               
               <Link href="/trends">
                 <div 

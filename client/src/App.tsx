@@ -21,6 +21,11 @@ import ScriptingPage from '@/pages/scripting';
 import ETLPage from '@/pages/etl';
 import IncomeTestPage from '@/pages/income-test';
 import DataConnectorsPage from '@/pages/DataConnectors';
+import LayersPage from '@/pages/Layers';
+import DataPage from '@/pages/Data';
+import AnalysisPage from '@/pages/Analysis';
+import PropertiesPage from '@/pages/Properties';
+import ReportsPage from '@/pages/Reports';
 
 function Router() {
   const [location] = useLocation();
@@ -40,6 +45,11 @@ function Router() {
         <Route path="/etl" component={ETLPage} />
         <Route path="/income-test" component={IncomeTestPage} />
         <Route path="/data-connectors" component={DataConnectorsPage} />
+        <Route path="/layers" component={LayersPage} />
+        <Route path="/data" component={DataPage} />
+        <Route path="/analysis" component={AnalysisPage} />
+        <Route path="/properties" component={PropertiesPage} />
+        <Route path="/reports" component={ReportsPage} />
         <Route component={NotFound} />
       </Switch>
     </>
