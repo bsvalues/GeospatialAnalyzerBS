@@ -120,32 +120,32 @@ const GoogleMapsConnectorPanel = () => {
 
   return (
     <Card className="w-full">
-      <CardHeader>
-        <CardTitle className="flex items-center">
+      <CardHeader className="p-4 sm:p-6">
+        <CardTitle className="flex items-center text-xl sm:text-2xl">
           <MapIcon className="mr-2 h-5 w-5" />
           Google Maps Data Connector
         </CardTitle>
-        <CardDescription>
+        <CardDescription className="text-xs sm:text-sm mt-1">
           Search for locations and retrieve points of interest data from Google Maps
         </CardDescription>
       </CardHeader>
       
-      <CardContent>
+      <CardContent className="p-4 sm:p-6">
         {isApiAvailable === false && (
-          <Alert variant="destructive" className="mb-4">
+          <Alert variant="destructive" className="mb-4 text-xs sm:text-sm">
             <AlertTriangleIcon className="h-4 w-4" />
-            <AlertTitle>API Key Not Configured</AlertTitle>
-            <AlertDescription>
+            <AlertTitle className="text-sm sm:text-base">API Key Not Configured</AlertTitle>
+            <AlertDescription className="text-xs sm:text-sm">
               The Google Maps Extractor API key is not configured. Please set the RAPIDAPI_KEY environment variable.
             </AlertDescription>
           </Alert>
         )}
         
         {isApiAvailable && (
-          <Alert variant="default" className="mb-4 bg-green-50">
+          <Alert variant="default" className="mb-4 bg-green-50 text-xs sm:text-sm">
             <InfoIcon className="h-4 w-4" />
-            <AlertTitle>API Connected</AlertTitle>
-            <AlertDescription>
+            <AlertTitle className="text-sm sm:text-base">API Connected</AlertTitle>
+            <AlertDescription className="text-xs sm:text-sm">
               Google Maps Extractor API is properly configured and ready to use.
             </AlertDescription>
           </Alert>
@@ -158,7 +158,7 @@ const GoogleMapsConnectorPanel = () => {
           </TabsList>
           
           <TabsContent value="search" className="space-y-4">
-            <div className="flex space-x-2">
+            <div className="flex flex-col sm:flex-row sm:space-x-2 space-y-2 sm:space-y-0">
               <div className="grid flex-1 gap-2">
                 <Label htmlFor="search-query">Location Search</Label>
                 <Input
@@ -169,8 +169,12 @@ const GoogleMapsConnectorPanel = () => {
                   disabled={isLoading || !isApiAvailable}
                 />
               </div>
-              <div className="mt-auto">
-                <Button onClick={handleSearch} disabled={isLoading || !isApiAvailable}>
+              <div className="sm:mt-auto">
+                <Button 
+                  onClick={handleSearch} 
+                  disabled={isLoading || !isApiAvailable}
+                  className="w-full sm:w-auto"
+                >
                   {isLoading ? 'Searching...' : 'Search'}
                   <SearchIcon className="ml-2 h-4 w-4" />
                 </Button>
@@ -179,7 +183,7 @@ const GoogleMapsConnectorPanel = () => {
             
             <div className="mt-4">
               <h3 className="text-sm font-medium mb-2">Search Results ({locations.length})</h3>
-              <ScrollArea className="h-[400px] rounded-md border">
+              <ScrollArea className="h-[300px] sm:h-[400px] rounded-md border">
                 {locations.length === 0 ? (
                   <div className="p-4 text-center text-muted-foreground">
                     {isLoading ? 'Searching...' : 'No results to display. Try searching for a location.'}
@@ -192,15 +196,20 @@ const GoogleMapsConnectorPanel = () => {
                         className={`cursor-pointer hover:bg-slate-50 ${selectedLocation?.id === location.id ? 'border-primary' : ''}`}
                         onClick={() => handleLocationSelect(location)}
                       >
-                        <CardHeader className="p-4 pb-2">
-                          <CardTitle className="text-base">{location.name}</CardTitle>
+                        <CardHeader className="p-3 sm:p-4 pb-1 sm:pb-2">
+                          <CardTitle className="text-sm sm:text-base">{location.name}</CardTitle>
                           <CardDescription className="text-xs">{location.address}</CardDescription>
                         </CardHeader>
-                        <CardContent className="p-4 pt-0">
-                          <div className="flex justify-between text-xs">
+                        <CardContent className="p-3 sm:p-4 pt-0">
+                          <div className="flex flex-col sm:flex-row sm:justify-between text-xs gap-1 sm:gap-0">
                             <span>
                               <MapPinIcon className="h-3 w-3 inline mr-1" />
-                              {location.latitude.toFixed(5)}, {location.longitude.toFixed(5)}
+                              <span className="hidden sm:inline">
+                                {location.latitude.toFixed(5)}, {location.longitude.toFixed(5)}
+                              </span>
+                              <span className="inline sm:hidden">
+                                {location.latitude.toFixed(3)}, {location.longitude.toFixed(3)}
+                              </span>
                             </span>
                             {location.rating > 0 && (
                               <span className="text-yellow-600">
@@ -210,14 +219,14 @@ const GoogleMapsConnectorPanel = () => {
                           </div>
                           {location.placeTypes && location.placeTypes.length > 0 && (
                             <div className="mt-2 flex flex-wrap gap-1">
-                              {location.placeTypes.slice(0, 3).map((type: string, i: number) => (
+                              {location.placeTypes.slice(0, 2).map((type: string, i: number) => (
                                 <Badge key={i} variant="outline" className="text-xs">
                                   {type.replace(/_/g, ' ')}
                                 </Badge>
                               ))}
-                              {location.placeTypes.length > 3 && (
+                              {location.placeTypes.length > 2 && (
                                 <Badge variant="outline" className="text-xs">
-                                  +{location.placeTypes.length - 3} more
+                                  +{location.placeTypes.length - 2} more
                                 </Badge>
                               )}
                             </div>
@@ -235,12 +244,12 @@ const GoogleMapsConnectorPanel = () => {
             {selectedLocation && (
               <>
                 <div className="mb-4">
-                  <h3 className="text-lg font-medium">{selectedLocation.name}</h3>
-                  <p className="text-sm text-muted-foreground">{selectedLocation.address}</p>
+                  <h3 className="text-base sm:text-lg font-medium">{selectedLocation.name}</h3>
+                  <p className="text-xs sm:text-sm text-muted-foreground">{selectedLocation.address}</p>
                   
-                  <div className="flex items-center mt-2">
-                    <MapPinIcon className="h-4 w-4 mr-1 text-muted-foreground" />
-                    <span className="text-sm">
+                  <div className="flex items-center mt-2 overflow-hidden">
+                    <MapPinIcon className="h-4 w-4 mr-1 text-muted-foreground flex-shrink-0" />
+                    <span className="text-xs sm:text-sm truncate">
                       {selectedLocation.latitude.toFixed(5)}, {selectedLocation.longitude.toFixed(5)}
                     </span>
                   </div>
@@ -249,7 +258,7 @@ const GoogleMapsConnectorPanel = () => {
                 <Separator className="my-4" />
                 
                 <div className="space-y-4">
-                  <div className="flex space-x-2">
+                  <div className="flex flex-col sm:flex-row sm:space-x-2 space-y-2 sm:space-y-0">
                     <div className="grid flex-1 gap-2">
                       <Label htmlFor="poi-type">Point of Interest Type</Label>
                       <select
@@ -271,8 +280,12 @@ const GoogleMapsConnectorPanel = () => {
                         <option value="pharmacy">Pharmacies</option>
                       </select>
                     </div>
-                    <div className="mt-auto">
-                      <Button onClick={handleFindNearbyPOIs} disabled={isLoading}>
+                    <div className="sm:mt-auto">
+                      <Button 
+                        onClick={handleFindNearbyPOIs} 
+                        disabled={isLoading}
+                        className="w-full sm:w-auto"
+                      >
                         {isLoading ? 'Searching...' : 'Find Nearby'}
                         <LocateIcon className="ml-2 h-4 w-4" />
                       </Button>
@@ -281,7 +294,7 @@ const GoogleMapsConnectorPanel = () => {
                   
                   <div className="mt-4">
                     <h3 className="text-sm font-medium mb-2">Nearby Points of Interest ({nearbyPOIs.length})</h3>
-                    <ScrollArea className="h-[300px] rounded-md border">
+                    <ScrollArea className="h-[250px] sm:h-[300px] rounded-md border">
                       {nearbyPOIs.length === 0 ? (
                         <div className="p-4 text-center text-muted-foreground">
                           {isLoading ? 'Searching...' : 'No nearby points of interest found. Try searching for different POI types.'}
@@ -290,15 +303,20 @@ const GoogleMapsConnectorPanel = () => {
                         <div className="p-4 space-y-4">
                           {nearbyPOIs.map((poi, index) => (
                             <Card key={poi.id || index} className="hover:bg-slate-50">
-                              <CardHeader className="p-4 pb-2">
-                                <CardTitle className="text-base">{poi.name}</CardTitle>
+                              <CardHeader className="p-3 sm:p-4 pb-1 sm:pb-2">
+                                <CardTitle className="text-sm sm:text-base">{poi.name}</CardTitle>
                                 <CardDescription className="text-xs">{poi.address}</CardDescription>
                               </CardHeader>
-                              <CardContent className="p-4 pt-0">
-                                <div className="flex justify-between text-xs">
+                              <CardContent className="p-3 sm:p-4 pt-0">
+                                <div className="flex flex-col sm:flex-row sm:justify-between text-xs gap-1 sm:gap-0">
                                   <span>
                                     <MapPinIcon className="h-3 w-3 inline mr-1" />
-                                    {poi.latitude.toFixed(5)}, {poi.longitude.toFixed(5)}
+                                    <span className="hidden sm:inline">
+                                      {poi.latitude.toFixed(5)}, {poi.longitude.toFixed(5)}
+                                    </span>
+                                    <span className="inline sm:hidden">
+                                      {poi.latitude.toFixed(3)}, {poi.longitude.toFixed(3)}
+                                    </span>
                                   </span>
                                   {poi.rating > 0 && (
                                     <span className="text-yellow-600">
@@ -308,11 +326,16 @@ const GoogleMapsConnectorPanel = () => {
                                 </div>
                                 {poi.placeTypes && poi.placeTypes.length > 0 && (
                                   <div className="mt-2 flex flex-wrap gap-1">
-                                    {poi.placeTypes.slice(0, 3).map((type: string, i: number) => (
+                                    {poi.placeTypes.slice(0, 2).map((type: string, i: number) => (
                                       <Badge key={i} variant="outline" className="text-xs">
                                         {type.replace(/_/g, ' ')}
                                       </Badge>
                                     ))}
+                                    {poi.placeTypes.length > 2 && (
+                                      <Badge variant="outline" className="text-xs">
+                                        +{poi.placeTypes.length - 2} more
+                                      </Badge>
+                                    )}
                                   </div>
                                 )}
                               </CardContent>
@@ -329,9 +352,9 @@ const GoogleMapsConnectorPanel = () => {
         </Tabs>
       </CardContent>
       
-      <CardFooter className="border-t p-4 flex justify-between">
+      <CardFooter className="border-t p-4 flex flex-col sm:flex-row justify-between items-center space-y-3 sm:space-y-0">
         <div>
-          <p className="text-xs text-muted-foreground">
+          <p className="text-xs text-muted-foreground text-center sm:text-left">
             Data source: Google Maps Extractor API via RapidAPI
           </p>
         </div>
@@ -339,6 +362,7 @@ const GoogleMapsConnectorPanel = () => {
           <Button
             variant="outline"
             size="sm"
+            className="w-full sm:w-auto"
             onClick={() => {
               // Create an ETL job for this location
               const jobId = googleMapsDataConnector.createLocationImportJob(

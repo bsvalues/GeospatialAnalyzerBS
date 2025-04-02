@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { 
   HelpCircle, 
   Bell, 
@@ -12,13 +12,17 @@ import {
   Home,
   Code,
   Settings,
-  Globe
+  Globe,
+  Menu,
+  X,
+  ChevronDown
 } from 'lucide-react';
-import { Link } from 'wouter';
+import { Link, useLocation } from 'wouter';
 import { useMapAccessibility } from '@/contexts/MapAccessibilityContext';
 import { useToast } from '@/hooks/use-toast';
 import { TourButton } from './TourButton';
 import { useTour } from '@/contexts/TourContext';
+import { cn } from '@/lib/utils';
 
 interface HeaderProps {
   taxYear: string;
@@ -27,6 +31,7 @@ interface HeaderProps {
 
 export const Header: React.FC<HeaderProps> = ({ taxYear, onTaxYearChange }) => {
   const availableYears = ['2023', '2024', '2025'];
+  const [currentLocation] = useLocation();
   const { 
     highContrastMode, 
     toggleHighContrastMode,
@@ -45,6 +50,9 @@ export const Header: React.FC<HeaderProps> = ({ taxYear, onTaxYearChange }) => {
   
   // State for accessibility dialog
   const [isAccessibilityDialogOpen, setIsAccessibilityDialogOpen] = React.useState(false);
+  
+  // State for mobile menu
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   
   // Set up the guided tour
   const { startTour, hasSeenTour } = useTour();
@@ -95,6 +103,16 @@ export const Header: React.FC<HeaderProps> = ({ taxYear, onTaxYearChange }) => {
       </div>
       
       <div className="flex items-center space-x-4">
+        {/* Mobile menu toggle button */}
+        <button
+          className="md:hidden text-white hover:text-white p-1.5 rounded-full hover:bg-white/10 transition-all duration-200"
+          onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+          aria-label={isMobileMenuOpen ? "Close menu" : "Open menu"}
+        >
+          {isMobileMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
+        </button>
+        
+        {/* Desktop navigation */}
         <div className="hidden md:flex items-center space-x-1 text-white/90">
           <div className="flex items-center px-3 py-1.5 rounded-md hover:bg-white/10 transition-all duration-200 cursor-pointer">
             <Map className="h-4 w-4 mr-1.5" />
@@ -148,7 +166,7 @@ export const Header: React.FC<HeaderProps> = ({ taxYear, onTaxYearChange }) => {
           </Link>
         </div>
         
-        <div className="mr-4 border-r border-white/20 pr-4">
+        <div className="mr-4 border-r border-white/20 pr-4 hidden sm:block">
           <label htmlFor="taxYear" className="block text-xs text-white/80 mb-1">
             Tax Year
           </label>
@@ -211,6 +229,197 @@ export const Header: React.FC<HeaderProps> = ({ taxYear, onTaxYearChange }) => {
           </div>
         </div>
       </div>
+      
+      {/* Mobile Navigation Drawer */}
+      {isMobileMenuOpen && (
+        <div className="fixed inset-0 z-50 md:hidden">
+          <div className="fixed inset-0 bg-black/50" onClick={() => setIsMobileMenuOpen(false)} />
+          <div className="fixed inset-y-0 left-0 w-3/4 max-w-sm bg-primary shadow-lg p-5 overflow-y-auto transform transition-transform duration-300">
+            <div className="flex justify-between items-center mb-6">
+              <div className="flex items-center">
+                <div className="bg-white p-1.5 rounded-lg shadow-sm mr-2">
+                  <Map className="h-5 w-5 text-primary" />
+                </div>
+                <h2 className="text-lg font-bold tracking-tight text-white">GIS_BS Menu</h2>
+              </div>
+              <button 
+                onClick={() => setIsMobileMenuOpen(false)}
+                className="text-white hover:text-white p-1.5 rounded-full hover:bg-white/10"
+                aria-label="Close menu"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            
+            <div className="mt-2 mb-6">
+              <label htmlFor="mobileTaxYear" className="block text-xs text-white/80 mb-1">
+                Tax Year
+              </label>
+              <select
+                id="mobileTaxYear"
+                className="w-full bg-white/10 border border-white/20 rounded-md px-3 py-2.5 text-sm text-white focus:ring-2 focus:ring-white/30 focus:outline-none"
+                value={taxYear}
+                onChange={(e) => {
+                  onTaxYearChange(e.target.value);
+                  // Don't close menu on tax year change
+                }}
+              >
+                {availableYears.map((year) => (
+                  <option key={year} value={year} className="text-gray-800">
+                    {year}
+                  </option>
+                ))}
+              </select>
+            </div>
+            
+            <nav className="space-y-1">
+              <div 
+                className={cn(
+                  "flex items-center rounded-md py-3 px-3 transition-colors",
+                  "bg-white/10"
+                )}
+                onClick={() => setIsMobileMenuOpen(false)}
+              >
+                <Map className="h-5 w-5 mr-3 text-white/90" />
+                <span className="text-white font-medium">Layers</span>
+              </div>
+              
+              <div 
+                className={cn(
+                  "flex items-center rounded-md py-3 px-3 transition-colors",
+                  "hover:bg-white/10"
+                )}
+                onClick={() => setIsMobileMenuOpen(false)}
+              >
+                <Database className="h-5 w-5 mr-3 text-white/90" />
+                <span className="text-white font-medium">Data</span>
+              </div>
+              
+              <div 
+                className={cn(
+                  "flex items-center rounded-md py-3 px-3 transition-colors",
+                  "hover:bg-white/10"
+                )}
+                onClick={() => setIsMobileMenuOpen(false)}
+              >
+                <Calculator className="h-5 w-5 mr-3 text-white/90" />
+                <span className="text-white font-medium">Analysis</span>
+              </div>
+              
+              <div 
+                className={cn(
+                  "flex items-center rounded-md py-3 px-3 transition-colors",
+                  "hover:bg-white/10"
+                )}
+                onClick={() => setIsMobileMenuOpen(false)}
+              >
+                <Building className="h-5 w-5 mr-3 text-white/90" />
+                <span className="text-white font-medium">Properties</span>
+              </div>
+              
+              <div 
+                className={cn(
+                  "flex items-center rounded-md py-3 px-3 transition-colors",
+                  "hover:bg-white/10"
+                )}
+                onClick={() => setIsMobileMenuOpen(false)}
+              >
+                <FileText className="h-5 w-5 mr-3 text-white/90" />
+                <span className="text-white font-medium">Reports</span>
+              </div>
+              
+              <Link href="/trends">
+                <div 
+                  className={cn(
+                    "flex items-center rounded-md py-3 px-3 transition-colors",
+                    currentLocation === "/trends" ? "bg-white/20" : "hover:bg-white/10"
+                  )}
+                  onClick={() => setIsMobileMenuOpen(false)}
+                >
+                  <TrendingUp className="h-5 w-5 mr-3 text-white/90" />
+                  <span className="text-white font-medium">Trends</span>
+                </div>
+              </Link>
+              
+              <Link href="/neighborhoods">
+                <div 
+                  className={cn(
+                    "flex items-center rounded-md py-3 px-3 transition-colors",
+                    currentLocation === "/neighborhoods" ? "bg-white/20" : "hover:bg-white/10"
+                  )}
+                  onClick={() => setIsMobileMenuOpen(false)}
+                >
+                  <Home className="h-5 w-5 mr-3 text-white/90" />
+                  <span className="text-white font-medium">Neighborhoods</span>
+                </div>
+              </Link>
+              
+              <Link href="/scripting">
+                <div 
+                  className={cn(
+                    "flex items-center rounded-md py-3 px-3 transition-colors",
+                    currentLocation === "/scripting" ? "bg-white/20" : "hover:bg-white/10"
+                  )}
+                  onClick={() => setIsMobileMenuOpen(false)}
+                >
+                  <Code className="h-5 w-5 mr-3 text-white/90" />
+                  <span className="text-white font-medium">Scripting</span>
+                </div>
+              </Link>
+              
+              <Link href="/etl">
+                <div 
+                  className={cn(
+                    "flex items-center rounded-md py-3 px-3 transition-colors",
+                    currentLocation === "/etl" ? "bg-white/20" : "hover:bg-white/10"
+                  )}
+                  onClick={() => setIsMobileMenuOpen(false)}
+                >
+                  <Settings className="h-5 w-5 mr-3 text-white/90" />
+                  <span className="text-white font-medium">ETL</span>
+                </div>
+              </Link>
+              
+              <Link href="/data-connectors">
+                <div 
+                  className={cn(
+                    "flex items-center rounded-md py-3 px-3 transition-colors",
+                    currentLocation === "/data-connectors" ? "bg-white/20" : "hover:bg-white/10"
+                  )}
+                  onClick={() => setIsMobileMenuOpen(false)}
+                >
+                  <Globe className="h-5 w-5 mr-3 text-white/90" />
+                  <span className="text-white font-medium">Connectors</span>
+                </div>
+              </Link>
+            </nav>
+            
+            <div className="mt-8 border-t border-white/10 pt-6">
+              <button 
+                className="w-full flex items-center justify-center px-4 py-3 bg-white/10 hover:bg-white/20 rounded-md text-white font-medium transition-colors duration-200"
+                onClick={() => {
+                  setIsMobileMenuOpen(false);
+                  setIsAccessibilityDialogOpen(true);
+                }}
+              >
+                <Accessibility className="h-5 w-5 mr-2" />
+                Accessibility Settings
+              </button>
+              
+              <button 
+                className="mt-3 w-full flex items-center justify-center px-4 py-3 bg-white/10 hover:bg-white/20 rounded-md text-white font-medium transition-colors duration-200"
+                onClick={() => {
+                  setIsMobileMenuOpen(false);
+                  startTour();
+                }}
+              >
+                <HelpCircle className="h-5 w-5 mr-2" />
+                Start Guided Tour
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       
       {/* Accessibility Dialog */}
       {isAccessibilityDialogOpen && (
