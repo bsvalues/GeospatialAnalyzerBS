@@ -20,6 +20,7 @@ import {
   DollarSign,
   Layers
 } from 'lucide-react';
+import { OneClickExport } from '@/components/export/OneClickExport';
 import { MapPanel } from './panels/MapPanel';
 import ScriptPanel from './panels/ScriptPanel';
 import { SpatialAnalysisPanel } from './panels/SpatialAnalysisPanel';
@@ -28,7 +29,7 @@ import { PropertyComparisonPanel } from './panels/PropertyComparisonPanel';
 import { PredictiveModelingPanel } from './panels/PredictiveModelingPanel';
 import { TimeSeriesAnalysisPanel } from './panels/TimeSeriesAnalysisPanel';
 import { SettingsPanel } from './panels/SettingsPanel';
-import { ReportGenerator } from './export/ReportGenerator';
+import { ReportGenerator } from '@/components/export/ReportGenerator';
 import { KPIDashboardPanel } from './KPIDashboardPanel';
 import { AdvancedAnalyticsPanel } from './ml/AdvancedAnalyticsPanel';
 import { Property } from '@shared/schema';
@@ -66,10 +67,10 @@ const Dashboard: React.FC<DashboardProps> = ({ className }) => {
                   </p>
                 </div>
                 <div className="mt-4 md:mt-0">
-                  <button className="bg-primary text-white px-4 py-2 rounded-lg shadow-sm hover:bg-primary/90 transition-colors duration-200 flex items-center">
-                    <FileText className="h-4 w-4 mr-2" />
-                    Generate Report
-                  </button>
+                  <OneClickExport 
+                    text="Generate Property Insights"
+                    className="px-4 py-2 shadow-sm"
+                  />
                 </div>
               </div>
 

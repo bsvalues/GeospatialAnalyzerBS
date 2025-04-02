@@ -5,7 +5,7 @@ import { formatCurrency } from '@/lib/utils';
 import { saveAs } from 'file-saver';
 import { 
   X, Download, Plus, ArrowDownUp, Home, Calendar, Ruler, Square, 
-  DollarSign, Map, BarChart3, BarChart2, LineChart, Share2, Calculator 
+  DollarSign, Map, BarChart3, BarChart2, LineChart, Share2, Calculator, FileText 
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -18,6 +18,7 @@ import { Badge } from '@/components/ui/badge';
 import { PropertySearchDialog } from './PropertySearchDialog';
 import { EnhancedPropertyComparison } from './EnhancedPropertyComparison';
 import { OneClickPropertyComparison } from './OneClickPropertyComparison';
+import { OneClickPropertyReport } from '../export/OneClickPropertyReport';
 
 /**
  * Component to display a comparison of multiple properties
@@ -378,6 +379,17 @@ export function PropertyComparison() {
                           </Button>
                         </Tooltip>
                         
+                        <Tooltip content="Generate property report">
+                          <div>
+                            <OneClickPropertyReport 
+                              property={property}
+                              variant="ghost"
+                              buttonText=""
+                              className="h-8 w-8 p-0"
+                            />
+                          </div>
+                        </Tooltip>
+
                         <Tooltip content="Remove from comparison">
                           <Button 
                             variant="ghost" 
