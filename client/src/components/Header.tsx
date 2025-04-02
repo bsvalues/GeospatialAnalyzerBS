@@ -91,15 +91,22 @@ export const Header: React.FC<HeaderProps> = ({ taxYear, onTaxYearChange }) => {
   };
   
   return (
-    <header className="bg-gradient-to-r from-primary/90 to-primary/70 text-white shadow-md px-4 py-3 flex justify-between items-center">
+    <header className="bg-gradient-to-r from-[#294D57] to-[#3C5067] text-white shadow-md px-4 py-3 flex justify-between items-center">
       <div className="flex items-center">
         <div className="flex items-center">
-          <div className="bg-white p-1.5 rounded-lg shadow-sm mr-2">
-            <Map className="h-6 w-6 text-primary" />
+          <div className="bg-white p-1.5 rounded-lg shadow-sm mr-2 flex items-center justify-center">
+            <div className="relative">
+              <Map className="h-6 w-6 text-[#00B7C3]" />
+              <div className="absolute -top-1 -right-1 bg-[#4CAF50] text-white text-[8px] font-bold rounded-full h-3.5 w-3.5 flex items-center justify-center">B</div>
+            </div>
           </div>
-          <h1 className="text-xl font-bold tracking-tight">GIS_BS</h1>
+          <h1 className="text-xl font-bold tracking-tight">
+            <span className="text-[#4CAF50]">B</span>-<span className="text-white">GIS</span>
+          </h1>
         </div>
-        <span className="ml-3 text-sm text-white/80 font-light tracking-wide border-l border-white/20 pl-3">Property Valuation & Analysis Platform</span>
+        <span className="ml-3 text-sm text-white/80 font-light tracking-wide border-l border-white/20 pl-3">
+          <span className="hidden sm:inline">Benton County</span> Property Valuation & Analysis Platform
+        </span>
       </div>
       
       <div className="flex items-center space-x-4">
@@ -259,13 +266,18 @@ export const Header: React.FC<HeaderProps> = ({ taxYear, onTaxYearChange }) => {
       {isMobileMenuOpen && (
         <div className="fixed inset-0 z-50 md:hidden">
           <div className="fixed inset-0 bg-black/50" onClick={() => setIsMobileMenuOpen(false)} />
-          <div className="fixed inset-y-0 left-0 w-3/4 max-w-sm bg-primary shadow-lg p-5 overflow-y-auto transform transition-transform duration-300">
+          <div className="fixed inset-y-0 left-0 w-3/4 max-w-sm bg-gradient-to-b from-[#294D57] to-[#3C5067] shadow-lg p-5 overflow-y-auto transform transition-transform duration-300">
             <div className="flex justify-between items-center mb-6">
               <div className="flex items-center">
-                <div className="bg-white p-1.5 rounded-lg shadow-sm mr-2">
-                  <Map className="h-5 w-5 text-primary" />
+                <div className="bg-white p-1.5 rounded-lg shadow-sm mr-2 flex items-center justify-center">
+                  <div className="relative">
+                    <Map className="h-5 w-5 text-[#00B7C3]" />
+                    <div className="absolute -top-1 -right-1 bg-[#4CAF50] text-white text-[7px] font-bold rounded-full h-3 w-3 flex items-center justify-center">B</div>
+                  </div>
                 </div>
-                <h2 className="text-lg font-bold tracking-tight text-white">GIS_BS Menu</h2>
+                <h2 className="text-lg font-bold tracking-tight text-white">
+                  <span className="text-[#4CAF50]">B</span>-<span className="text-white">GIS</span> Menu
+                </h2>
               </div>
               <button 
                 onClick={() => setIsMobileMenuOpen(false)}
