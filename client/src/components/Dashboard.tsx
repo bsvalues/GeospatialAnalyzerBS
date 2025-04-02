@@ -30,6 +30,7 @@ import { TimeSeriesAnalysisPanel } from './panels/TimeSeriesAnalysisPanel';
 import { SettingsPanel } from './panels/SettingsPanel';
 import { ReportGenerator } from './export/ReportGenerator';
 import { KPIDashboardPanel } from './KPIDashboardPanel';
+import { AdvancedAnalyticsPanel } from './ml/AdvancedAnalyticsPanel';
 import { Property } from '@shared/schema';
 import { useQuery } from '@tanstack/react-query';
 import TabNavigation from './TabNavigation';
@@ -396,6 +397,20 @@ const Dashboard: React.FC<DashboardProps> = ({ className }) => {
         {activeTab === 'comparison' && <PropertyComparisonPanel />}
         
         {activeTab === 'kpi' && <KPIDashboardPanel />}
+        
+        {activeTab === 'advanced' && (
+          <div className="h-full p-6 overflow-auto">
+            <div className="max-w-7xl mx-auto">
+              <div className="mb-8">
+                <h2 className="text-2xl font-bold text-gray-900 mb-2">Advanced Analytics & Machine Learning</h2>
+                <p className="text-gray-600 max-w-3xl">
+                  Leverage machine learning and advanced analytics for precise property valuation, time series forecasting, and spatial intelligence.
+                </p>
+              </div>
+              <AdvancedAnalyticsPanel selectedProperty={properties[0]} allProperties={properties} />
+            </div>
+          </div>
+        )}
         
         {activeTab === 'reports' && (
           <div className="h-full p-6 overflow-auto">

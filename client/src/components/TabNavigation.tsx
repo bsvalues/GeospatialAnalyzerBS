@@ -1,5 +1,5 @@
 import React from 'react';
-import { Map, Database, Calculator, Settings, Activity, Workflow, BarChartHorizontal, ChevronRight, Brain, LineChart, BarChart } from 'lucide-react';
+import { Map, Database, Calculator, Settings, Activity, Workflow, BarChartHorizontal, ChevronRight, Brain, LineChart, BarChart, Zap } from 'lucide-react';
 
 interface TabNavigationProps {
   activeTab: string;
@@ -17,6 +17,7 @@ const TabNavigation: React.FC<TabNavigationProps> = ({ activeTab, onTabChange })
     { id: 'timeseries', name: 'Time Series', icon: <LineChart size={16} className="mr-2" /> },
     { id: 'comparison', name: 'Comparison', icon: <BarChartHorizontal size={16} className="mr-2" /> },
     { id: 'kpi', name: 'KPI Dashboard', icon: <BarChart size={16} className="mr-2" /> },
+    { id: 'advanced', name: 'Advanced Analytics', icon: <Zap size={16} className="mr-2" /> },
     { id: 'settings', name: 'Settings', icon: <Settings size={16} className="mr-2" /> }
   ];
   
