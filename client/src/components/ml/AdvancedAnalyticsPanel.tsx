@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Zap, LineChart, BarChart2, Globe, AlertTriangle } from 'lucide-react';
+import { Zap, LineChart, BarChart2, BarChart4, Globe, AlertTriangle } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Property } from '@shared/schema';
 import { ValuationModelPanel } from './ValuationModelPanel';
 import { ForecastPanel } from './ForecastPanel';
 import { SpatialAnalyticsPanel } from './SpatialAnalyticsPanel';
+import { AdvancedRegressionPanel } from './AdvancedRegressionPanel';
 import { OutlierDetectionPanel } from '../analysis/OutlierDetectionPanel';
 
 interface AdvancedAnalyticsPanelProps {
@@ -116,10 +117,14 @@ export function AdvancedAnalyticsPanel({
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="valuation" className="flex items-center">
             <Zap className="h-4 w-4 mr-2" />
             Valuation Model
+          </TabsTrigger>
+          <TabsTrigger value="regression" className="flex items-center">
+            <BarChart4 className="h-4 w-4 mr-2" />
+            Advanced Regression
           </TabsTrigger>
           <TabsTrigger value="forecast" className="flex items-center">
             <LineChart className="h-4 w-4 mr-2" />
@@ -137,6 +142,10 @@ export function AdvancedAnalyticsPanel({
         
         <TabsContent value="valuation" className="mt-4">
           <ValuationModelPanel selectedProperty={selectedProperty} allProperties={allProperties} />
+        </TabsContent>
+        
+        <TabsContent value="regression" className="mt-4">
+          <AdvancedRegressionPanel selectedProperty={selectedProperty} allProperties={allProperties} />
         </TabsContent>
         
         <TabsContent value="forecast" className="mt-4">
