@@ -13,12 +13,6 @@ import 'leaflet/dist/leaflet.css';
 import markerIconPng from 'leaflet/dist/images/marker-icon.png';
 import markerShadowPng from 'leaflet/dist/images/marker-shadow.png';
 
-// Set up the default icon for Leaflet
-L.Icon.Default.mergeOptions({
-  iconUrl: markerIconPng,
-  shadowUrl: markerShadowPng
-});
-
 // Define prop types for the MapComponent
 interface MapComponentProps {
   center?: [number, number];
@@ -43,15 +37,33 @@ export const MapComponent = ({
   
   // Initialize the map when the component mounts
   useEffect(() => {
+    // This ensures Leaflet is only loaded in browser environment, not during SSR
+    if (typeof window !== 'undefined') {
+      // Set up the default icon for Leaflet
+      L.Icon.Default.mergeOptions({
+        iconUrl: markerIconPng,
+        shadowUrl: markerShadowPng
+      });
+    }
+
     if (mapRef.current && !map) {
-      // Create a new Leaflet map instance
-      const mapInstance = L.map(mapRef.current).setView(center, zoom);
+      // Create a new Leaflet map instance with invalidateSize option
+      // This helps avoid the '_leaflet_pos' error
+      const mapInstance = L.map(mapRef.current, {
+        attributionControl: true,
+        zoomControl: true
+      }).setView(center, zoom);
       
       // Add OpenStreetMap tile layer
       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
         maxZoom: 19
       }).addTo(mapInstance);
+      
+      // Force a resize to ensure the map renders correctly
+      setTimeout(() => {
+        mapInstance.invalidateSize();
+      }, 100);
       
       // Store the map instance in state
       setMap(mapInstance);
@@ -67,6 +79,8 @@ export const MapComponent = ({
   useEffect(() => {
     if (map) {
       map.setView(center, zoom);
+      // Force a resize to ensure the map renders correctly after any changes
+      map.invalidateSize();
     }
   }, [map, center, zoom]);
   
