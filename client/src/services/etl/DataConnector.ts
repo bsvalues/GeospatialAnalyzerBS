@@ -1,670 +1,501 @@
 /**
- * ETL Data Connector Service
+ * Data Connector Service
  * 
- * This service handles connections to various data sources including:
- * - PostgreSQL database (property data)
- * - External APIs (GIS data)
- * - File system (CSV, JSON data)
- * 
- * It provides a unified interface for ETL jobs to read from and write to data sources.
+ * This service manages connections to various data sources and provides
+ * a unified interface for data extraction and loading operations.
  */
 
-import { properties } from '@shared/schema';
+import { v4 as uuidv4 } from 'uuid';
+import { DataSource, DataSourceType } from './ETLTypes';
 
-// Connector types supported by the ETL system
-export type ConnectorType = 'database' | 'api' | 'file' | 'memory';
-
-// Base configuration interface for all connector types
-export interface BaseConnectorConfig {
-  type: ConnectorType;
-  name: string;
-  description?: string;
+interface DatabaseConnectionConfig {
+  host: string;
+  port: number;
+  database: string;
+  username: string;
+  password: string;
+  ssl?: boolean;
 }
 
-// Database connector configuration
-export interface DatabaseConnectorConfig extends BaseConnectorConfig {
-  type: 'database';
-  connectionString: string;
-  schema?: string;
-  table?: string;
-}
-
-// API connector configuration
-export interface APIConnectorConfig extends BaseConnectorConfig {
-  type: 'api';
-  url: string;
-  method?: 'GET' | 'POST' | 'PUT' | 'DELETE';
+interface ApiConnectionConfig {
+  baseUrl: string;
+  authType: 'none' | 'basic' | 'bearer' | 'apiKey';
+  authDetails?: {
+    username?: string;
+    password?: string;
+    token?: string;
+    apiKey?: string;
+    apiKeyName?: string;
+    apiKeyLocation?: 'header' | 'query';
+  };
   headers?: Record<string, string>;
-  params?: Record<string, string>;
-  body?: any;
-  authType?: 'none' | 'basic' | 'bearer' | 'api-key';
-  username?: string;
-  password?: string;
-  token?: string;
-  apiKey?: string;
-  apiKeyHeaderName?: string;
 }
 
-// File connector configuration
-export interface FileConnectorConfig extends BaseConnectorConfig {
-  type: 'file';
-  path: string;
-  format: 'csv' | 'json' | 'xml' | 'excel';
-  delimiter?: string; // For CSV
-  sheet?: string; // For Excel
+interface FileConnectionConfig {
+  fileType: 'csv' | 'json' | 'xml' | 'excel' | 'parquet';
+  delimiter?: string; // for CSV
+  hasHeader?: boolean; // for CSV, Excel
+  sheet?: string; // for Excel
   encoding?: string;
 }
 
-// Memory connector configuration (for in-memory data sources)
-export interface MemoryConnectorConfig extends BaseConnectorConfig {
-  type: 'memory';
-  dataKey: string;
-}
-
-// Union type of all connector configurations
-export type ConnectorConfig = 
-  | DatabaseConnectorConfig 
-  | APIConnectorConfig 
-  | FileConnectorConfig 
-  | MemoryConnectorConfig;
-
-/**
- * Interface for data connectors
- */
-export interface IDataConnector {
-  connect(): Promise<void>;
-  disconnect(): Promise<void>;
-  test(): Promise<boolean>;
-  read(query?: any): Promise<any[]>;
-  write(data: any[], options?: any): Promise<number>;
-  getMetadata(): Promise<any>;
-}
-
-/**
- * Database connector for PostgreSQL
- */
-export class PostgreSQLConnector implements IDataConnector {
-  private client: any;
-  private db: any;
-  private config: DatabaseConnectorConfig;
-  private connected: boolean = false;
-
-  constructor(config: DatabaseConnectorConfig) {
-    this.config = config;
-  }
-
-  async connect(): Promise<void> {
-    try {
-      // In a real implementation, we would use a proper PostgreSQL client
-      // For our demo, we'll simulate the connection using the database URL from environment
-      const connectionString = process.env.DATABASE_URL || this.config.connectionString;
-      
-      if (!connectionString) {
-        throw new Error('Database connection string is not provided');
-      }
-
-      // Simulated connection - in a real app, you would connect to the actual database
-      console.log(`Connecting to database: ${this.config.name}`);
-      
-      // Simulate successful connection
-      this.connected = true;
-      
-      return Promise.resolve();
-    } catch (error) {
-      console.error('Error connecting to database:', error);
-      this.connected = false;
-      throw error;
-    }
-  }
-
-  async disconnect(): Promise<void> {
-    if (this.connected) {
-      console.log(`Disconnecting from database: ${this.config.name}`);
-      this.connected = false;
-    }
-    return Promise.resolve();
-  }
-
-  async test(): Promise<boolean> {
-    try {
-      if (!this.connected) {
-        await this.connect();
-      }
-      return true;
-    } catch (error) {
-      return false;
-    }
-  }
-
-  async read(query?: any): Promise<any[]> {
-    if (!this.connected) {
-      await this.connect();
-    }
-
-    // For demo purposes, use the in-memory data instead of actual DB queries
-    // In a real implementation, this would be a real DB query
-    return fetch('/api/properties')
-      .then(response => {
-        if (!response.ok) {
-          throw new Error(`HTTP error! Status: ${response.status}`);
-        }
-        return response.json();
-      })
-      .catch(error => {
-        console.error('Error reading from database:', error);
-        throw error;
-      });
-  }
-
-  async write(data: any[], options?: any): Promise<number> {
-    if (!this.connected) {
-      await this.connect();
-    }
-
-    // For demo purposes, log the write operation
-    console.log(`Writing ${data.length} records to database: ${this.config.name}`);
+export class DataConnector {
+  private dataSources: Map<string, DataSource> = new Map();
+  private activeConnections: Map<string, any> = new Map();
+  
+  /**
+   * Register a new data source
+   */
+  registerDataSource(source: Omit<DataSource, 'id' | 'createdAt' | 'updatedAt'>): DataSource {
+    const id = uuidv4();
+    const now = new Date();
     
-    // Simulate successful write operation
-    return Promise.resolve(data.length);
-  }
-
-  async getMetadata(): Promise<any> {
-    return {
-      name: this.config.name,
-      type: this.config.type,
-      connected: this.connected,
-      tables: ['properties', 'users', 'projects', 'scripts', 'script_groups', 'regression_models'],
-      schema: this.config.schema || 'public'
+    const newSource: DataSource = {
+      id,
+      ...source,
+      createdAt: now,
+      updatedAt: now
     };
+    
+    this.dataSources.set(id, newSource);
+    return newSource;
   }
-}
-
-/**
- * API connector for external REST APIs
- */
-export class APIConnector implements IDataConnector {
-  private config: APIConnectorConfig;
-  private connected: boolean = false;
-
-  constructor(config: APIConnectorConfig) {
-    this.config = config;
+  
+  /**
+   * Get a data source by ID
+   */
+  getDataSource(sourceId: string): DataSource | undefined {
+    return this.dataSources.get(sourceId);
   }
-
-  async connect(): Promise<void> {
+  
+  /**
+   * Get all data sources
+   */
+  getAllDataSources(): DataSource[] {
+    return Array.from(this.dataSources.values());
+  }
+  
+  /**
+   * Update a data source
+   */
+  updateDataSource(sourceId: string, updates: Partial<Omit<DataSource, 'id' | 'createdAt'>>): DataSource | undefined {
+    const source = this.dataSources.get(sourceId);
+    if (!source) return undefined;
+    
+    // If updating connection details, close any active connection
+    if (updates.connectionDetails) {
+      this.closeConnection(sourceId);
+    }
+    
+    const updatedSource: DataSource = {
+      ...source,
+      ...updates,
+      updatedAt: new Date()
+    };
+    
+    this.dataSources.set(sourceId, updatedSource);
+    return updatedSource;
+  }
+  
+  /**
+   * Delete a data source
+   */
+  deleteDataSource(sourceId: string): boolean {
+    // Close any active connection first
+    this.closeConnection(sourceId);
+    
+    return this.dataSources.delete(sourceId);
+  }
+  
+  /**
+   * Connect to a data source
+   */
+  async connect(sourceId: string): Promise<boolean> {
+    const source = this.dataSources.get(sourceId);
+    if (!source) return false;
+    
+    // Check if already connected
+    if (this.activeConnections.has(sourceId)) {
+      return true;
+    }
+    
     try {
-      // Test the API connection
-      const testResponse = await fetch(this.config.url, {
-        method: 'HEAD',
-        headers: this.getHeaders()
-      });
+      let connection;
       
-      if (testResponse.ok) {
-        this.connected = true;
-        console.log(`Connected to API: ${this.config.name} (${this.config.url})`);
-      } else {
-        throw new Error(`Failed to connect to API: ${testResponse.status} ${testResponse.statusText}`);
+      switch (source.type) {
+        case 'database':
+          connection = await this.connectToDatabase(source);
+          break;
+        case 'api':
+          connection = await this.connectToApi(source);
+          break;
+        case 'file':
+          connection = await this.connectToFile(source);
+          break;
+        case 'memory':
+          connection = this.createMemoryConnection();
+          break;
+        default:
+          throw new Error(`Unsupported data source type: ${source.type}`);
       }
-    } catch (error) {
-      console.error('Error connecting to API:', error);
-      this.connected = false;
-      throw error;
-    }
-  }
-
-  private getHeaders(): Record<string, string> {
-    const headers: Record<string, string> = {
-      ...this.config.headers,
-      'Content-Type': 'application/json'
-    };
-
-    // Add authentication headers if needed
-    if (this.config.authType === 'basic' && this.config.username && this.config.password) {
-      const credentials = btoa(`${this.config.username}:${this.config.password}`);
-      headers['Authorization'] = `Basic ${credentials}`;
-    } else if (this.config.authType === 'bearer' && this.config.token) {
-      headers['Authorization'] = `Bearer ${this.config.token}`;
-    } else if (this.config.authType === 'api-key' && this.config.apiKey && this.config.apiKeyHeaderName) {
-      headers[this.config.apiKeyHeaderName] = this.config.apiKey;
-    }
-
-    return headers;
-  }
-
-  async disconnect(): Promise<void> {
-    this.connected = false;
-    return Promise.resolve();
-  }
-
-  async test(): Promise<boolean> {
-    try {
-      if (!this.connected) {
-        await this.connect();
-      }
+      
+      this.activeConnections.set(sourceId, connection);
       return true;
     } catch (error) {
+      console.error(`Failed to connect to data source ${source.name}:`, error);
       return false;
     }
   }
-
-  async read(query?: any): Promise<any[]> {
-    if (!this.connected) {
-      await this.connect();
-    }
-
+  
+  /**
+   * Close connection to a data source
+   */
+  closeConnection(sourceId: string): void {
+    const connection = this.activeConnections.get(sourceId);
+    if (!connection) return;
+    
+    const source = this.dataSources.get(sourceId);
+    if (!source) return;
+    
     try {
-      const url = new URL(this.config.url);
-      
-      // Add query parameters if provided
-      if (query && typeof query === 'object') {
-        Object.entries(query).forEach(([key, value]) => {
-          url.searchParams.append(key, String(value));
-        });
+      // Perform type-specific cleanup
+      switch (source.type) {
+        case 'database':
+          // Close database connection
+          if (connection.end) connection.end();
+          break;
+        case 'api':
+          // API connections typically don't need explicit cleanup
+          break;
+        case 'file':
+          // Close file handles if any
+          if (connection.close) connection.close();
+          break;
+        case 'memory':
+          // Clear memory references
+          break;
       }
-      
-      const response = await fetch(url.toString(), {
-        method: this.config.method || 'GET',
-        headers: this.getHeaders(),
-      });
-
-      if (!response.ok) {
-        throw new Error(`API request failed: ${response.status} ${response.statusText}`);
-      }
-
-      const data = await response.json();
-      return Array.isArray(data) ? data : [data];
     } catch (error) {
-      console.error('Error reading from API:', error);
+      console.error(`Error closing connection to ${source.name}:`, error);
+    } finally {
+      this.activeConnections.delete(sourceId);
+    }
+  }
+  
+  /**
+   * Extract data from a source
+   */
+  async extractData(sourceId: string, query: string): Promise<any[]> {
+    // Ensure connection is active
+    if (!this.activeConnections.has(sourceId)) {
+      const connected = await this.connect(sourceId);
+      if (!connected) {
+        throw new Error(`Failed to connect to data source ${sourceId}`);
+      }
+    }
+    
+    const source = this.dataSources.get(sourceId);
+    if (!source) {
+      throw new Error(`Unknown data source ${sourceId}`);
+    }
+    
+    const connection = this.activeConnections.get(sourceId);
+    
+    try {
+      switch (source.type) {
+        case 'database':
+          return await this.queryDatabase(connection, query);
+        case 'api':
+          return await this.queryApi(connection, query, source);
+        case 'file':
+          return await this.queryFile(connection, query);
+        case 'memory':
+          return this.queryMemory(connection, query);
+        default:
+          throw new Error(`Unsupported data source type: ${source.type}`);
+      }
+    } catch (error) {
+      console.error(`Error extracting data from ${source.name}:`, error);
       throw error;
     }
   }
-
-  async write(data: any[], options?: any): Promise<number> {
-    if (!this.connected) {
-      await this.connect();
+  
+  /**
+   * Load data to a target
+   */
+  async loadData(targetId: string, data: any[]): Promise<number> {
+    // Ensure connection is active
+    if (!this.activeConnections.has(targetId)) {
+      const connected = await this.connect(targetId);
+      if (!connected) {
+        throw new Error(`Failed to connect to target ${targetId}`);
+      }
     }
-
+    
+    const target = this.dataSources.get(targetId);
+    if (!target) {
+      throw new Error(`Unknown target ${targetId}`);
+    }
+    
+    const connection = this.activeConnections.get(targetId);
+    
     try {
-      const method = options?.method || this.config.method || 'POST';
-      const url = options?.url || this.config.url;
-
-      // For bulk operations, make individual requests for each item
-      // In a real system, this could be optimized based on the API's capabilities
-      const promises = data.map(item => 
-        fetch(url, {
-          method,
-          headers: this.getHeaders(),
-          body: JSON.stringify(item)
-        })
-      );
-
-      const results = await Promise.allSettled(promises);
-      const successful = results.filter(r => r.status === 'fulfilled').length;
-
-      return successful;
+      switch (target.type) {
+        case 'database':
+          return await this.loadToDatabase(connection, data, target);
+        case 'api':
+          return await this.loadToApi(connection, data, target);
+        case 'file':
+          return await this.loadToFile(connection, data, target);
+        case 'memory':
+          return this.loadToMemory(connection, data);
+        default:
+          throw new Error(`Unsupported target type: ${target.type}`);
+      }
     } catch (error) {
-      console.error('Error writing to API:', error);
+      console.error(`Error loading data to ${target.name}:`, error);
       throw error;
     }
   }
-
-  async getMetadata(): Promise<any> {
+  
+  /**
+   * Test connection to a data source
+   */
+  async testConnection(sourceId: string): Promise<{ success: boolean; message: string }> {
+    try {
+      const connected = await this.connect(sourceId);
+      if (!connected) {
+        return { success: false, message: "Failed to establish connection" };
+      }
+      
+      // Try a simple query to verify connection works
+      const source = this.dataSources.get(sourceId);
+      if (!source) {
+        return { success: false, message: "Data source not found" };
+      }
+      
+      switch (source.type) {
+        case 'database':
+          await this.queryDatabase(this.activeConnections.get(sourceId), "SELECT 1");
+          break;
+        case 'api':
+          // Send test request
+          break;
+        case 'file':
+          // Verify file access
+          break;
+        case 'memory':
+          // Memory source is always accessible
+          break;
+      }
+      
+      // Close the test connection
+      this.closeConnection(sourceId);
+      
+      return { success: true, message: "Connection successful" };
+    } catch (error) {
+      return { 
+        success: false, 
+        message: `Connection test failed: ${error instanceof Error ? error.message : String(error)}` 
+      };
+    }
+  }
+  
+  // Private methods for different connection types
+  
+  private async connectToDatabase(source: DataSource): Promise<any> {
+    const config = source.connectionDetails as DatabaseConnectionConfig;
+    
+    // In a real implementation, this would create an actual database connection
+    // For this demo, we'll simulate a connection
+    console.log(`Connecting to database ${config.database} at ${config.host}:${config.port}`);
+    
+    // Simulate connection delay
+    await new Promise(resolve => setTimeout(resolve, 500));
+    
     return {
-      name: this.config.name,
-      type: this.config.type,
-      url: this.config.url,
-      method: this.config.method || 'GET',
-      connected: this.connected
-    };
-  }
-}
-
-/**
- * File connector for file-based data sources (CSV, JSON, etc.)
- */
-export class FileConnector implements IDataConnector {
-  private config: FileConnectorConfig;
-  private connected: boolean = false;
-  private data: any[] = [];
-
-  constructor(config: FileConnectorConfig) {
-    this.config = config;
-  }
-
-  async connect(): Promise<void> {
-    try {
-      // In a browser environment, we would use the File API or similar
-      // For our demo, we'll simulate file reading with fetch
-      console.log(`Reading file: ${this.config.path}`);
-      
-      // Simulate successful connection
-      this.connected = true;
-      
-      return Promise.resolve();
-    } catch (error) {
-      console.error('Error connecting to file:', error);
-      this.connected = false;
-      throw error;
-    }
-  }
-
-  async disconnect(): Promise<void> {
-    this.connected = false;
-    return Promise.resolve();
-  }
-
-  async test(): Promise<boolean> {
-    try {
-      if (!this.connected) {
-        await this.connect();
-      }
-      return true;
-    } catch (error) {
-      return false;
-    }
-  }
-
-  async read(query?: any): Promise<any[]> {
-    if (!this.connected) {
-      await this.connect();
-    }
-
-    try {
-      // For demo purposes, simulate reading from a file
-      // In a real app, this would read and parse the actual file
-      
-      // Generate some sample data based on the file type
-      if (this.config.format === 'csv') {
-        // Simulate CSV data
-        return Array.from({ length: 20 }, (_, i) => ({
+      query: async (sql: string) => {
+        // Simulate query execution
+        console.log(`Executing SQL query: ${sql}`);
+        await new Promise(resolve => setTimeout(resolve, 300));
+        
+        // Return mock data
+        return Array.from({ length: 10 }, (_, i) => ({
           id: i + 1,
           name: `Record ${i + 1}`,
-          value: Math.floor(Math.random() * 1000),
-          category: ['A', 'B', 'C'][Math.floor(Math.random() * 3)]
+          value: Math.floor(Math.random() * 1000)
         }));
-      } else if (this.config.format === 'json') {
-        // Simulate JSON data
-        return Array.from({ length: 15 }, (_, i) => ({
-          id: `json-${i + 1}`,
-          properties: {
-            name: `Item ${i + 1}`,
-            attributes: {
-              color: ['red', 'green', 'blue'][Math.floor(Math.random() * 3)],
-              size: Math.floor(Math.random() * 100)
-            }
-          },
-          metadata: {
-            createdAt: new Date().toISOString(),
-            version: '1.0'
-          }
-        }));
-      } else {
-        // Default case
-        return [];
+      },
+      end: () => {
+        console.log(`Disconnecting from database ${config.database}`);
       }
-    } catch (error) {
-      console.error('Error reading from file:', error);
-      throw error;
-    }
-  }
-
-  async write(data: any[], options?: any): Promise<number> {
-    if (!this.connected) {
-      await this.connect();
-    }
-
-    try {
-      // For demo purposes, log the write operation
-      console.log(`Writing ${data.length} records to file: ${this.config.path}`);
-      
-      // Store data in memory for demo purposes
-      this.data = data;
-      
-      // Simulate successful write operation
-      return Promise.resolve(data.length);
-    } catch (error) {
-      console.error('Error writing to file:', error);
-      throw error;
-    }
-  }
-
-  async getMetadata(): Promise<any> {
-    return {
-      name: this.config.name,
-      type: this.config.type,
-      path: this.config.path,
-      format: this.config.format,
-      connected: this.connected,
-      recordCount: this.data.length
     };
   }
-}
-
-/**
- * Memory connector for in-memory data sources
- */
-export class MemoryConnector implements IDataConnector {
-  private config: MemoryConnectorConfig;
-  private connected: boolean = false;
-  private data: any[] = [];
-
-  constructor(config: MemoryConnectorConfig) {
-    this.config = config;
-  }
-
-  async connect(): Promise<void> {
-    // Memory connectors are always connected
-    this.connected = true;
-    return Promise.resolve();
-  }
-
-  async disconnect(): Promise<void> {
-    // Clear the data when disconnecting
-    this.data = [];
-    this.connected = false;
-    return Promise.resolve();
-  }
-
-  async test(): Promise<boolean> {
-    return true; // Memory connectors always pass the test
-  }
-
-  async read(query?: any): Promise<any[]> {
-    if (!this.connected) {
-      await this.connect();
-    }
-
-    // Return a copy of the data to prevent direct mutations
-    return [...this.data];
-  }
-
-  async write(data: any[], options?: any): Promise<number> {
-    if (!this.connected) {
-      await this.connect();
-    }
-
-    // Replace or append the data based on options
-    if (options?.append) {
-      this.data = [...this.data, ...data];
-    } else {
-      this.data = [...data];
-    }
-
-    return this.data.length;
-  }
-
-  async getMetadata(): Promise<any> {
+  
+  private async connectToApi(source: DataSource): Promise<any> {
+    const config = source.connectionDetails as ApiConnectionConfig;
+    
+    // In a real implementation, this would create an API client
+    console.log(`Setting up API client for ${config.baseUrl}`);
+    
+    // Simulate connection delay
+    await new Promise(resolve => setTimeout(resolve, 300));
+    
     return {
-      name: this.config.name,
-      type: this.config.type,
-      connected: this.connected,
-      recordCount: this.data.length,
-      dataKey: this.config.dataKey
+      request: async (endpoint: string, method = 'GET') => {
+        // Simulate API request
+        console.log(`Making ${method} request to ${config.baseUrl}${endpoint}`);
+        await new Promise(resolve => setTimeout(resolve, 500));
+        
+        // Return mock data
+        return Array.from({ length: 10 }, (_, i) => ({
+          id: i + 1,
+          title: `Item ${i + 1}`,
+          completed: Math.random() > 0.5
+        }));
+      }
     };
   }
-}
-
-/**
- * Factory class to create appropriate connector based on configuration
- */
-export class ConnectorFactory {
-  static createConnector(config: ConnectorConfig): IDataConnector {
-    switch (config.type) {
-      case 'database':
-        return new PostgreSQLConnector(config);
-      case 'api':
-        return new APIConnector(config);
-      case 'file':
-        return new FileConnector(config);
-      case 'memory':
-        return new MemoryConnector(config);
-      default:
-        throw new Error(`Unsupported connector type: ${(config as any).type}`);
-    }
-  }
-}
-
-/**
- * DataConnector service for managing all ETL data connections
- */
-export class DataConnectorService {
-  private connectors: Map<string, IDataConnector> = new Map();
-  private configs: Map<string, ConnectorConfig> = new Map();
   
-  private static instance: DataConnectorService;
-  
-  private constructor() {
-    // Private constructor for singleton pattern
-  }
-  
-  /**
-   * Get the singleton instance
-   */
-  public static getInstance(): DataConnectorService {
-    if (!DataConnectorService.instance) {
-      DataConnectorService.instance = new DataConnectorService();
-    }
-    return DataConnectorService.instance;
-  }
-  
-  /**
-   * Register a new connector
-   */
-  public registerConnector(id: string, config: ConnectorConfig): void {
-    const connector = ConnectorFactory.createConnector(config);
-    this.connectors.set(id, connector);
-    this.configs.set(id, config);
-  }
-  
-  /**
-   * Get a connector by ID
-   */
-  public getConnector(id: string): IDataConnector | undefined {
-    return this.connectors.get(id);
-  }
-  
-  /**
-   * Get all registered connectors
-   */
-  public getAllConnectors(): Map<string, IDataConnector> {
-    return this.connectors;
-  }
-  
-  /**
-   * Get connector configuration
-   */
-  public getConnectorConfig(id: string): ConnectorConfig | undefined {
-    return this.configs.get(id);
-  }
-  
-  /**
-   * Get all connector configurations
-   */
-  public getAllConnectorConfigs(): Map<string, ConnectorConfig> {
-    return this.configs;
-  }
-  
-  /**
-   * Remove a connector
-   */
-  public removeConnector(id: string): boolean {
-    const connector = this.connectors.get(id);
-    if (connector) {
-      connector.disconnect().catch(error => {
-        console.error(`Error disconnecting connector ${id}:`, error);
-      });
-      this.connectors.delete(id);
-      this.configs.delete(id);
-      return true;
-    }
-    return false;
-  }
-  
-  /**
-   * Initialize built-in connectors
-   */
-  public initializeBuiltInConnectors(): void {
-    // Register a database connector for property data
-    this.registerConnector('property-db', {
-      type: 'database',
-      name: 'Property Database',
-      description: 'Main PostgreSQL database for property data',
-      connectionString: process.env.DATABASE_URL || 'postgresql://localhost:5432/properties',
-      schema: 'public',
-      table: 'properties'
-    });
+  private async connectToFile(source: DataSource): Promise<any> {
+    const config = source.connectionDetails as FileConnectionConfig;
     
-    // Register a GIS API connector
-    this.registerConnector('gis-api', {
-      type: 'api',
-      name: 'GIS Data API',
-      description: 'External API for GIS data',
-      url: 'https://api.gis.example.com/data',
-      method: 'GET',
-      authType: 'api-key',
-      apiKeyHeaderName: 'X-API-Key'
-    });
+    // In a real implementation, this would open a file stream
+    console.log(`Opening ${config.fileType} file`);
     
-    // Register a demographic data file connector
-    this.registerConnector('demographic-data', {
-      type: 'file',
-      name: 'Demographic Data',
-      description: 'CSV file with demographic data by census tract',
-      path: '/data/demographics.csv',
-      format: 'csv',
-      delimiter: ','
-    });
+    // Simulate file opening delay
+    await new Promise(resolve => setTimeout(resolve, 200));
     
-    // Register an in-memory connector for script execution results
-    this.registerConnector('script-results', {
-      type: 'memory',
-      name: 'Script Execution Results',
-      description: 'In-memory storage for script execution results',
-      dataKey: 'scriptResults'
-    });
-  }
-  
-  /**
-   * Test all connectors
-   */
-  public async testAllConnectors(): Promise<Map<string, boolean>> {
-    const results = new Map<string, boolean>();
-    
-    // Use Array.from to avoid for...of on Map.entries() compatibility issues
-    const entries = Array.from(this.connectors.entries());
-    for (let i = 0; i < entries.length; i++) {
-      const [id, connector] = entries[i];
-      try {
-        const result = await connector.test();
-        results.set(id, result);
-      } catch (error) {
-        console.error(`Error testing connector ${id}:`, error);
-        results.set(id, false);
+    return {
+      read: async () => {
+        // Simulate file reading
+        console.log(`Reading ${config.fileType} file`);
+        await new Promise(resolve => setTimeout(resolve, 400));
+        
+        // Return mock data
+        return Array.from({ length: 10 }, (_, i) => ({
+          id: i + 1,
+          column1: `Value ${i + 1}`,
+          column2: i * 10
+        }));
+      },
+      write: async (data: any[]) => {
+        // Simulate file writing
+        console.log(`Writing ${data.length} records to ${config.fileType} file`);
+        await new Promise(resolve => setTimeout(resolve, 400));
+        
+        return data.length;
+      },
+      close: () => {
+        console.log(`Closing ${config.fileType} file`);
       }
+    };
+  }
+  
+  private createMemoryConnection(): any {
+    // In-memory data store
+    const dataStore: any[] = [];
+    
+    return {
+      data: dataStore,
+      query: (filter: string) => {
+        console.log(`Querying in-memory data with filter: ${filter}`);
+        // Simple filtering logic
+        if (filter === "*") {
+          return [...dataStore];
+        }
+        
+        // Parse simple filter expressions
+        // This is a very simplified implementation
+        const match = filter.match(/(\w+)\s*=\s*['"]?([^'"]+)['"]?/);
+        if (match) {
+          const [_, field, value] = match;
+          return dataStore.filter(item => item[field] == value);
+        }
+        
+        return [...dataStore];
+      },
+      write: (data: any[]) => {
+        dataStore.push(...data);
+        return data.length;
+      },
+      clear: () => {
+        dataStore.length = 0;
+      }
+    };
+  }
+  
+  private async queryDatabase(connection: any, query: string): Promise<any[]> {
+    // Execute query on database connection
+    return await connection.query(query);
+  }
+  
+  private async queryApi(connection: any, query: string, source: DataSource): Promise<any[]> {
+    // Parse the query string to determine API endpoint and method
+    // This is a simplified parsing logic
+    const config = source.connectionDetails as ApiConnectionConfig;
+    let endpoint = query;
+    let method = 'GET';
+    
+    if (query.startsWith('GET ')) {
+      endpoint = query.substring(4);
+    } else if (query.startsWith('POST ')) {
+      endpoint = query.substring(5);
+      method = 'POST';
     }
     
-    return results;
+    return await connection.request(endpoint, method);
+  }
+  
+  private async queryFile(connection: any, query: string): Promise<any[]> {
+    // For files, the query might be a filter expression
+    // For simplicity, we'll just read all data
+    const data = await connection.read();
+    
+    // Apply simple filtering if query is not "*"
+    if (query !== "*") {
+      // Implement simple filtering logic here
+      // For now, just return all data
+    }
+    
+    return data;
+  }
+  
+  private queryMemory(connection: any, query: string): any[] {
+    // Execute query on in-memory data
+    return connection.query(query);
+  }
+  
+  private async loadToDatabase(connection: any, data: any[], target: DataSource): Promise<number> {
+    // In a real implementation, this would insert/update data in the database
+    console.log(`Loading ${data.length} records to database ${target.name}`);
+    
+    // Simulate loading delay
+    await new Promise(resolve => setTimeout(resolve, 800));
+    
+    return data.length;
+  }
+  
+  private async loadToApi(connection: any, data: any[], target: DataSource): Promise<number> {
+    // In a real implementation, this would send data to an API
+    console.log(`Sending ${data.length} records to API ${target.name}`);
+    
+    // Simulate API calls
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    
+    return data.length;
+  }
+  
+  private async loadToFile(connection: any, data: any[], target: DataSource): Promise<number> {
+    // Write data to file
+    return await connection.write(data);
+  }
+  
+  private loadToMemory(connection: any, data: any[]): number {
+    // Write data to in-memory store
+    return connection.write(data);
   }
 }
 
 // Export singleton instance
-export default DataConnectorService.getInstance();
+export const dataConnector = new DataConnector();
