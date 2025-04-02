@@ -47,6 +47,7 @@ import { ArrowDown } from 'lucide-react';
 import { ArrowRight } from 'lucide-react';
 import { Scale } from 'lucide-react';
 import { Maximize2 } from 'lucide-react';
+// Explicitly renamed to avoid conflict with JavaScript's built-in Map class
 import { Map as MapIcon } from 'lucide-react';
 import { Home } from 'lucide-react';
 import { Calendar } from 'lucide-react';
