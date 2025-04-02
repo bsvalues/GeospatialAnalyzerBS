@@ -1,0 +1,1587 @@
+
+
+
+
+
+
+
+
+Income Approach Grouping
+
+Software Design Specification
+
+Version 1.18
+
+July 10, 2015
+ 
+Contents
+1.0  Revision History	3
+1.1  Use Case Overview	5
+1.1.0  Use Cases	5
+1.1.1  Use Case Checklist	5
+1.1.2  Business Rules and Other Information	5
+1.1.3  Florida Legislative Requirements	5
+1.1.4  Dependencies	5
+1.2  Database Design	7
+1.3  User Interface Design	12
+1.3.1  Income Details Dialog Modifications	12
+1.3.2  Lease Up Cost Modifications	18
+1.3.3  Income Valuation for Hotels/Motels	31
+
+
+
+
+ 
+1.0  Revision History
+Name	Date	Reason For Changes	Version	BA Signoff
+Rich Arakelian	08/23/2013	Initial Design Document	1.0	
+Rich Arakelian	04/01/2014	Added links and time estimates	1.1	
+Rich Arakelian	06/13/2014	Replaced screen mockup for Figure 1.32b so calculations are correct.	1.2	
+Rich Arakelian	08/22/2014	Broke the [income_hotel_motel] table up	1.3	
+Rich Arakelian	08/28/2014	Removed Change Log as there is no requirement for tracking Income related fields and no existing way to view the changes.	1.4	
+Rich Arakelian	09/09/2014	Added new database fields for the Statistics section	1.5	
+Rich Arakelian	09/10/2014	Made Tax Rate Percentage column enabled	1.6	
+Rich Arakelian	09/15/2014	Added additional columns to the [income_hotel_motel_detail] table to track which column the user changed to retain shading	1.7	
+Rich Arakelian	09/18/2014	Added display formats for the Income Hotel Motels panel
+Added all grid fields aside from Income Value – Reconciled to be shaded if user enters a value	1.8	
+Rich Arakelian	10/01/2014	Added display formats for the Lease Up Dialog fields/grids.
+Added calculations for the Annual panel fields	1.9	
+Rich Arakelian	10/02/2014	Changed Sqft labels to SF
+Changed max values
+Changed logic for SF Available column in Monthly grid	1.10	
+Rich Arakelian	10/03/2014	Updated mockup for Lease Up Annual panel to show text boxes instead of labels for fields	1.11	
+Rich Arakelian	10/20/2014	Replaced all occurrences of indicated_value_reconciled with income_value_reconciled for the [income_hotel_motel] table	1.12	
+Rich Arakelian	10/21/2014	Updated panel to be expanded by default	1.13	
+Rich Arakelian	10/22/2014	Updated to indicate Tenant Finish Allowance for Monthly Lease Ups	1.14	
+Rich Arakelian	10/27/2014	Updated to fix the calculation for Hotels/Motels Cap Income	1.15	
+Rich Arakelian	01/02/2015	Updated to change current_occupancy_pct and stabilized_occupancy_pct to 2 decimal places.  Corrected Commissions calculation	1.16	
+Rich Arakelian	01/30/2015	Updated Hotels/Motels Information grid to have a toolstrip so the user can reset the Total Expenses values if needed	1.17	
+Rich Arakelian	07/10/2015	Modified Hotels/Motels information grid to require positive values instead of negative for the Vacancy & Collection Loss value and percentage fields	1.18	
+
+ 
+1.1  Use Case Overview
+This document describes the modifications needed to support the new Hotels/Motels Income Approach valuation method, Lease Up Cost dialog, Income Worksheet and other user interface changes.  
+
+
+1.1.0  Use Cases
+
+Theme	Document Name	Comments
+Income Approach	Create an Income Valuation for Hotel_Motels	Excludes Split/Merge and Worksheet related changes
+Income Approach	Create an Income Valuation	The Lease Up Changes for Apartments and Commercial are virtually identical so links are only made to the Commercial portion.
+
+
+
+1.1.1  Use Case Checklist
+
+•	Add new Hotels/Motels panel to Income Detail Dialog
+•	Modify Income Detail Dialog
+•	Modify Lease Up Cost Dialog
+•	Modify Income Worksheet to support Hotels/Motels Valuation Method
+
+1.1.2  Business Rules and Other Information
+
+•	
+
+1.1.3  Florida Legislative Requirements
+
+•	
+
+1.1.4  Dependencies
+
+•	Calculating Property Values
+
+ 
+1.1.5  Time Estimates
+
+Section	Time Estimates (in Hours)
+1.3.1 – Income Details Dialog Modifications	24.00
+1.3.2 – Lease Up Cost Modifications	32.00
+1.3.3 – Income Valuation for Hotels/Motels	40.00
+Total	96.00
+
+
+ 
+1.2  Database Design
+
+New tables to be created:
+
+[income_hotel_motel]
+Column	Type	Description
+income_yr	numeric(4,0)  NOT NULL, PK	Income Year
+sup_num	int  NOT NULL, PK	Supplement Number
+income_id	int  NOT NULL, PK	Income ID
+size_in_sqft	numeric(8,0)  NOT NULL  default(0)	Size in Square Feet
+average_daily_room_rate	numeric(9,2)  NOT NULL  default(0)	Average Daily Room Rate (ADR)
+number_of_rooms	numeric(4,0)  NOT NULL  default(0)	Number of Rooms
+number_of_room_nights	numeric(8,0)  NOT NULL  default(0)	Number of Room Nights
+income_value_reconciled	numeric(9,0)  NOT NULL  default(0)	Income Value Reconciled
+income_value_per_room	numeric(14,2)  NOT NULL default(0)	Value per Room – Income
+assessment_value_per_room	numeric(14,2)  NOT NULL default(0)	Value per Room – Assessment
+income_value_per_sqft	numeric(14,2)  NOT NULL default(0)	Value per Sqft – Income Value
+assessment_value_per_sqft	numeric(14,2)  NOT NULL default(0)	Value per Sqft - Assessment
+Figure 1.2a - [income_hotel_motel] Database Table Definition
+
+[income_hotel_motel_detail]
+Column	Type	Description
+income_yr	numeric(4,0)  NOT NULL, PK	Income Year
+sup_num	int  NOT NULL, PK	Supplement Number
+income_id	int  NOT NULL, PK,
+FK to [income_hotel_motel] on income_yr, sup_num, income_id	Income ID
+value_type	varchar(1)  NOT NULL, PK	Value Type
+A= Actual
+P = Proforma
+room_revenue	numeric(9,0)  NOT NULL  default(0)	Room Revenue
+room_revenue_pct	numeric(5,2)  NOT NULL  default(0)	Room Revenue Percent
+room_revenue_update	varchar(1)  NOT NULL  default(‘’)	Indicator for which Room Revenue field was updated by user
+‘’ = No field updated
+V = Value
+P = Percentage
+vacancy_collection_loss	numeric(9,0)  NOT NULL  default(0)	Vacancy & Collection Loss
+vacancy_collection_loss_pct	numeric(5,2)  NOT NULL  default(0)	Vacancy & Collection Loss Percent
+vacancy_collection_loss_update	varchar(1)  NOT NULL  default(‘’)	Indicator for which Vacancy & Collection Loss field was updated by user
+‘’ = No field updated
+V = Value
+P = Percentage
+food_beverage_income	numeric(9,0)  NOT NULL  default(0)	Food & Beverage Income
+food_beverage_income_pct	numeric(5,2)  NOT NULL  default(0)	Food & Beverage Income Percent
+food_beverage_income_update	varchar(1)  NOT NULL  default(‘’)	Indicator for which Food & Beverage Income field was updated by the user
+‘’ = No field updated
+V = Value
+P = Percentage
+misc_income	numeric(9,0)  NOT NULL  default(0)	Miscellaneous Income
+misc_income_pct	numeric(5,2)  NOT NULL  default(0)	Miscellaneous Income Percent
+misc_income_update	varchar(1)  NOT NULL  default(‘’)	Indicator for which Misc Income field was updated by the user
+‘’ = No field updated
+V = Value
+P = Percentage
+effective_gross_income	numeric(9,0)  NOT NULL  default(0)	Effective Gross Income
+effective_gross_income_pct	numeric(5,2)  NOT NULL  default(0)	Effective Gross Income Percent
+utilities	numeric(9,0)  NOT NULL  default(0)	Utilities
+utilities_pct	numeric(5,2)  NOT NULL  default(0)	Utilities Percent
+utilities_update	varchar(1)  NOT NULL  default(‘’)	Indicator for which Utilities field was updated by the user
+‘’ = No field updated
+V = Value
+P = Percentage
+maintenance_repair	numeric(9,0)  NOT NULL  default(0)	Maintenance & Repair
+maintenance_repair_pct	numeric(5,2)  NOT NULL  default(0)	Maintenance & Repair Pct
+maintenance_repair_update	varchar(1)  NOT NULL  default(‘’)	Indicator for which Maintenance & Repair field was updated by the user
+‘’ = No field updated
+V = Value
+P = Percentage
+department_expenses	numeric(9,0)  NOT NULL  default(0)	Department Expenses
+department_expenses_pct	numeric(5,2)  NOT NULL  default(0)	Department Expenses Pct
+department_expenses_update	varchar(1)  NOT NULL  default(‘’)	Indicator for which Department Expenses field was updated by the user
+‘’ = No field updated
+V = Value
+P = Percentage
+management	numeric(9,0)  NOT NULL  default(0)	Management
+management_pct	numeric(5,2)  NOT NULL  default(0)	Management Pct
+management_update	varchar(1)  NOT NULL  default(‘’)	Indicator for which Management field was updated by the user
+‘’ = No field updated
+V = Value
+P = Percentage
+administrative	numeric(9,0)  NOT NULL  default(0)	Administrative
+administrative_pct	numeric(5,2)  NOT NULL  default(0)	Administrative Pct
+administrative_update	varchar(1)  NOT NULL  default(‘’)	Indicator for which Administrative field was updated by the user
+‘’ = No field updated
+V = Value
+P = Percentage
+payroll	numeric(9,0)  NOT NULL  default(0)	Payroll
+payroll_pct	numeric(5,2)  NOT NULL  default(0)	Payroll Pct
+payroll_update	varchar(1)  NOT NULL  default(‘’)	Indicator for which Payroll field was updated by the user
+‘’ = No field updated
+V = Value
+P = Percentage
+insurance	numeric(9,0)  NOT NULL  default(0)	Insurance
+insurance_pct	numeric(5,2)  NOT NULL  default(0)	Insurance Pct
+insurance_update	varchar(1)  NOT NULL  default(‘’)	Indicator for which Insurance field was updated by the user
+‘’ = No field updated
+V = Value
+P = Percentage
+marketing	numeric(9,0)  NOT NULL  default(0)	Marketing
+marketing_pct	numeric(5,2)  NOT NULL  default(0)	Marketing Pct
+marketing_update	varchar(1)  NOT NULL  default(‘’)	Indicator for which Marketing field was updated by the user
+‘’ = No field updated
+V = Value
+P = Percentage
+real_estate_tax	numeric(9,0)  NOT NULL  default(0)	Real Estate Tax
+real_estate_tax_pct	numeric(5,2)  NOT NULL  default(0)	Real Estate Tax Pct
+real_estate_tax_update	varchar(1)  NOT NULL  default(‘’)	Indicator for which Real Estate Tax field was updated by the user
+‘’ = No field updated
+V = Value
+P = Percentage
+franchise_fee	numeric(9,0)  NOT NULL  default(0)	Franchise Fee
+franchise_fee_pct	numeric(5,2)  NOT NULL  default(0)	Franchise Fee Pct
+franchise_fee_update	varchar(1)  NOT NULL  default(‘’)	Indicator for which Franchise Fee field was updated by the user
+‘’ = No field updated
+V = Value
+P = Percentage
+other	numeric(9,0)  NOT NULL  default(0)	Other
+other_pct	numeric(5,2)  NOT NULL  default(0)	Other Pct
+other_update	varchar(1)  NOT NULL  default(‘’)	Indicator for which Other field was updated by the user
+‘’ = No field updated
+V = Value
+P = Percentage
+total_expenses	numeric(9,0)  NOT NULL  default(0)	Total Expenses
+total_expenses_pct	numeric(5,2)  NOT NULL  default(0)	Total Expenses Pct
+total_expenses_update	varchar(1)  NOT NULL  default(‘’)	Indicator for which Total Expenses field was updated by the user
+‘’ = No field updated
+V = Value
+P = Percentage
+net_operating_income	numeric(9,0)  NOT NULL  default(0)	Net Operating Income
+net_operating_income_pct	numeric(5,2)  NOT NULL  default(0)	Net Operating Income Pct
+cap_rate	numeric(4,2)  NOT NULL  default(0)	Cap Rate
+cap_rate_update	varchar(1)  NOT NULL  default(‘’)	Indicator for which Cap Rate field was updated by the user
+‘’ = No field updated
+P = Percentage
+tax_rate	numeric(4,2)  NOT NULL  default(0)	Tax Rate
+tax_rate_update	varchar(1)  NOT NULL  default(‘’)	Indicator for which Tax Rate field was updated by the user
+‘’ = No field updated
+P = Percentage
+overall_cap_rate	numeric(4,2)  NOT NULL  default(0)	Overall Cap Rate
+income_value	numeric(9,0)  NOT NULL  default(0)	Income Value
+personal_property_value	numeric(9,0)  NOT NULL  default(0)	Personal Property
+personal_property_value_update	varchar(1)  NOT NULL  default(‘’)	Indicator for which Personal Property Value was updated by the user
+‘’ = No field updated
+V = Value
+other_value	numeric(9,0)  NOT NULL  default(0)	Other Value
+other_value_update	varchar(1)  NOT NULL  default(‘’)	Indicator for which Other Value field was updated by the user
+‘’ = No field updated
+V = Value
+indicated_income_value	numeric(9,0)  NOT NULL  default(0)	Indicated Income Value
+Figure 1.2b – [income_hotel_motel_detail] Database Table Definition
+
+ [income_lease_up]
+Column	Type	Description
+income_lease_up_id	int  NOT NULL,  PK	Income Lease Up ID
+income_yr	numeric(4,0)  NOT NULL	Income Year
+sup_num	int  NOT NULL	Supplement Number
+income_id	int  NOT NULL
+FK Constraint to [income]	Income ID
+frequency	varchar(1)  NOT NULL default("A")	Frequency of Lease
+A = Annual
+M = Monthly
+lease_type	varchar(1)	Type of Lease
+A = Apartment
+C = Commercial
+unit_of_measure	varchar(1)	Unit of Measure
+S = Square Feet
+U = Units
+rent_loss_area_sqft	numeric(14,0)	Rent Loss Area Sq Ft
+rent_sqft	numeric(14,2)	Rent Sq Ft
+rent_number_of_years	numeric(5,2)	Rent Number of Years
+rent_total	numeric(14,0)	Rent Total
+lease_pct	numeric(5,2)	Lease Percent
+lease_total	numeric(14,0)	Lease Total
+total_finish_out_sqft	numeric(14,2)	Total Finish Out Sq Ft
+total_finish_out_total	numeric(14,0)	Total Finish Out Total
+discount_rate	numeric(5,2)	Discount Rate
+number_of_years	numeric(5,2)	Number of Years
+lease_up_cost	numeric(14,0)	Lease Up Cost
+lease_up_cost_override	bit  NOT NULL default(0)	Lease Up Cost Override
+net_rentable_area	numeric(9,0)  NOT NULL default(0)	Net Rentable Area
+current_occupancy_pct	numeric(5,2)  NOT NULL default(100)	Current Occupancy %
+stabilized_occupancy_pct	numeric(5,2)  NOT NULL default(0)	Stabilized Occupancy %
+stabilized_occupancy	numeric(9,0)  NOT NULL default(0)	Stabilized Occupancy (SF or Units)
+space_to_be_absorbed	numeric(9,0)  NOT NULL default(0)	Space to be Absorbed
+absorption_period_in_months	numeric(2,0)  NOT NULL default(0)	Absorption Period in Months
+estimated_absorption_per_year	numeric(9,0)  NOT NULL default(0)	Estimated Absorption Per Year
+estimated_absorption_per_month	numeric(9,0)  NOT NULL default(0)	Estimated Absorption Per Month
+leasing_commissions_pct	numeric(2,0)  NOT NULL default(0)	Leasing Commissions
+gross_rent_loss_per_sqft	numeric(7,2)  NOT NULL default(0)	Gross Rent Loss per Sq Ft
+tenant_finish_allowance_per_sqft	numeric(7,2)  NOT NULL default(0)	Tenant Finish Allowance Per Sq Ft
+discount_rate	numeric(4,2)  NOT NULL default(0)	Discount Rate
+Figure 1.2b – [income_lease_up] Database Table Definition
+
+NOTE:  The shaded cells indicate changes needed in the existing schema of the database.
+
+
+[income_lease_up_month_listing]
+Column	Type	Description
+income_lease_up_month_listing_id	int  NOT NULL  PK	Income Lease Up Month Listing ID
+income_lease_up_id	int  NOT NULL
+FK to [income_lease_up]	Income Lease Up ID
+year_number	int  NOT NULL	Year Number
+month_number	int  NOT NULL	Month Number
+available	numeric(9,1)  NOT NULL  default(0)	Available (Sq Ft or Units)
+rent_loss	numeric(14,2)  NOT NULL  default(0)	Rent Loss
+finish_allowance	numeric(14,2)  NOT NULL  default(0)	Finish Allowance
+commissions	numeric(14,0)  NOT NULL  default(0)	Commissions
+present_value_factor	numeric(9,8)  NOT NULL  default(0)	Present Value Factor
+net_present_value	numeric(14,0)  NOT NULL  default(0)	Net Present Value
+Figure 1.2c – [income_lease_up_month_listing] Database Table Definition
+
+Existing tables to be modified:
+
+[income]
+Column	Type	Description
+DC_CRR	numeric(5,2)  NOT NULL, default(0)	Direct Cap Capitalization Rate %
+DC_TRR	numeric(5,2)  NOT NULL, default(0)	Direct Cap Tax Rate %
+SCH_CRR	numeric(5,2)  NOT NULL, default(0)	Schedule (Property Level) Capitalization Rate %
+SCH_TRR	numeric(5,2)  NOT NULL, default(0)	Schedule (Property Level) Tax Rate %
+hm_indicated_value	numeric(14,0)  NOT NULL, default(0)	Hotel/Motel Indicated Value
+lu_rent_loss_area		DROPPED
+lu_rent_sf		DROPPED
+lu_rent_num_year		DROPPED
+lu_rent_total		DROPPED
+lu_lease_pct		DROPPED
+lu_lease_total		DROPPED
+lu_tfo_sf		DROPPED
+lu_tfo_total		DROPPED
+lu_disc_rate		DROPPED
+lu_num_year		DROPPED
+Figure 1.2d – [income] Database Table Modifications
+
+
+
+
+
+1.3  User Interface Design
+
+1.3.1  Income Details Dialog Modifications
+
+In order to maximize screen real estate, the Fixed Panel at the top of the dialog will be changed to be a normal collapsible panel.  In addition a couple of new rates will be added to Direct Cap and the Schedule – Property Level grids.
+
+ 
+Figure 1.3.1a – Income Details Dialog
+
+The user reaches this dialog by opening a Property, going to the Income and Characteristics Panel and clicking the Add/Details button from the grid tool strip of the Income Valuations grid.
+
+Modifications done to the dialog:
+
+1.	The top panel will be changed from a Fixed Panel to a normal Panel which can collapse and expand and be labeled General.
+a.	For new Income Valuations, the General Panel will be expanded by default.
+b.	For existing Income Valuations:
+i.	The panel to be expanded by default will be the one associated with the Value Method chosen in Figure 1.3.1d.
+ii.	If there is not a panel associated with the Value Method, such as Flat, the General Panel will be expanded.
+2.	The Discount Cash Flow panel will be removed as it is not implemented for Florida
+3.	The Improvements & Land Designations panel, its values and options will have no effect with regards to the new Hotels/Motels value option.
+4.	The Lease Up functionality and value will not apply to the new Hotels/Motels value option.
+
+
+
+ 
+Figure 1.3.1b – Income Grid Modifications (Relevant modified portion shown only)
+
+The user reaches this grid by expanding either the Direct Cap or Schedule – Property Level panel from 1.3.1a.
+
+Grid Modifications:
+
+1.	Capitalization Rate
+a.	This new row will appear after the Net Operating Income row.
+b.	The cell in the Percent column will be enabled so the user can enter the Capitalization Rate
+c.	The user may enter a value between 0.00 and 100.00
+d.	The value will be stored in
+i.	[income].DC_CRR for the Direct Cap grid
+ii.	[income].SCH_CRR for the Schedule – Property Level grid
+2.	Tax Rate
+a.	This new row will appear under the Capitalization Rate row
+b.	The cell in the Percent column will be enabled
+c.	The user may enter a value between 0.00 and 100.00
+d.	The default value will be the current Tax Rate of the property from the sum of the Taxing Authorities of the Property
+e.	The value will be stored in
+i.	[income].DC_TRR for the Direct Cap grid
+ii.	[income].SCH_TRR for the Schedule – Property Level grid
+3.	Overall Capitalization Rate
+a.	This existing field will no longer be editable
+b.	It will be the sum of the new Capitalization Rate and Tax Rate fields
+
+
+ 
+Figure 1.3.1c – Summary Breakdown Paragraph
+
+The user reaches this paragraph by expanding the Summary panel in Figure 1.3.1a.
+
+The grid will have a new Hotels/Motels column added.
+
+1.	Net Square Feet
+a.	This value will be taken from [income_hotel_motel].size_in_sqft
+2.	EGI RSF
+a.	This value will be calculated by taking [income_hotel_motel_detail]. effective_gross_income where value_type = 'A' and divided by [income_hotel_motel].size_in_sqft
+3.	EGI
+a.	This value will be taken from [income_hotel_motel_detail]. effective_gross_income where value_type = 'A'
+4.	Expense RSF
+a.	This value will be calculated by taking [income_hotel_motel_detail].total_expenses where value_type = 'A' and divided by [income_hotel_motel].size_in_sqft
+5.	Expense
+a.	This value will be taken from [income_hotel_motel_detail].total_expenses where value_type = 'A'
+6.	Net Operating Income (NOI)
+a.	This value will be taken from [income_hotel_motel_detail].net_operating_income where value_type = 'A
+7.	Cap Rate
+a.	This value will be taken from [income_hotel_motel_detail].overall_cap_rate where value_type = 'A'
+8.	Cap Income
+a.	This value will be calculated by taking [income_hotel_motel_detail].net_operating_income / [income_hotel_motel_detail].overall_cap_rate / 100 where value_type = 'A'
+9.	Other Personal Property
+a.	This value will be taken from [income_hotel_motel_detail].personal_property_value where value_type = 'A'
+10.	Leaseup Costs
+a.	This will not apply to Hotels/Motels
+11.	Excess Land Value
+a.	This value will be taken from [income].land_excess_value
+12.	Other Value
+a.	This value will be taken from [income_hotel_motel_detail].other_value where value_type = 'A'
+13.	Indicated Value
+a.	This value will be taken from [income_hotel_motel].income_value_reconciled
+
+The grid will have the following column removed:
+
+1.	DCF or Discount Cash Flow
+a.	This is not implemented for Florida, so it will be removed
+
+
+
+ 
+Figure 1.3.1d – Value Information Paragraph
+
+The user reaches this paragraph by going to Figure 1.3.1a and expanding the Summary Panel
+
+The paragraph will have the following added:
+
+1.	Hotels/Motels
+a.	This new field will be added above GRM/GIM – Schedule
+b.	It will have the following column values
+i.	Value
+1.	The value displayed here will come from [income_hotel_motel].income_value_reconciled
+ii.	Per Sq. Ft.
+1.	The value displayed here will be calculated by taking [income_hotel_motel].income_value_reconciled / [income_hotel_motel].size_in_sqft
+iii.	Per Unit
+1.	The value displayed here will be calculated by taking [income_hotel_motel].income_value_reconciled / [income_hotel_motel].number_of_rooms
+
+The paragraph will have the following removed:
+
+1.	Discount Cash Flow
+a.	This is not implemented for Florida, so it will be removed.
+ 
+1.3.2  Lease Up Cost Modifications
+
+There will be a number of changes to determine the proper Lease Up Cost for Income Valuations based upon the type of Property.  The existing dialog will be used for Annual Commercial only as opposed to Annual and Monthly.  There will be new functionality for Monthly Commercial and Monthly Apartment added to the dialog.
+
+ 
+Figure 1.3.2a – Lease Up Costs (Annual Panel)
+
+The user reaches this dialog by clicking the Lease Up button in Figure 1.3.1a.
+
+Additions:
+
+1.	A new General Panel
+a.	The General Panel will apply to all Lease Up Cost scenarios.
+b.	Title
+i.	The title will display
+1.	Text:  "Income Valuation"
+2.	XXX:  Income ID
+3.	SS:  Roll Correction Number
+4.	YYYY: Year Layer
+5.	Name():  Property Name from Figure 1.3.1a General Paragraph Property Name field.
+c.	Frequency
+i.	This field will allow the user to choose the Frequency of the Lease Up.
+ii.	There will be two options to choose from
+1.	Annual
+a.	The user will choose this option for the existing Lease Up functionality
+b.	This will be the default option.
+c.	The value for this field will be stored in [income_lease_up].frequency with a value of "A"
+d.	When this option is checked, the new Annual Panel will be expanded automatically.
+2.	Monthly
+a.	The user will choose this option for new Monthly Lease Up functionality
+b.	The value for this field will be stored in [income_lease_up].frequency with a value of "M"
+c.	When this option is checked, the new Monthly Panel will be expanded automatically.
+d.	Type
+i.	This field will allow the user to choose the Type of Lease Up
+ii.	There will be two options to choose from
+1.	Commercial
+a.	For Commercial properties, the user should choose this option.
+b.	This will be the default option
+c.	The value for this field will be stored in [income_lease_up].lease_type with a value of "C"
+2.	Apartment
+a.	For Apartment properties, the user should choose this option.
+b.	The value for this field will be stored in [income_lease_up].lease_type  with a value of "A"
+iii.	This field will only be enabled if the user chooses a Frequency of Monthly
+iv.	This field is required when enabled
+e.	Unit of Measure
+i.	This field will allow the user to choose the Unit of Measure
+ii.	There will be 2 secondary options that can be chosen with this option
+1.	Square Feet
+a.	For Square Foot based calculations, the user should choose this option.
+b.	This will be the default option
+c.	The value for this field will be stored in [income_lease_up].unit_of_measure with a value of "S"
+2.	Units
+a.	For Units based calculations, the user should choose this option.
+b.	The value for this field will be stored in [income_lease_up].unit_of_measure with a value of "U"
+iii.	This field will only be enabled if the user chooses a Frequency of Monthly
+iv.	This field is required when enabled
+2.	A new Annual Panel
+a.	This new panel will display the existing fields prior to any modifications.
+b.	If the user does not choose the Annual option from the General Panel, this panel will be disabled.
+c.	Although the fields will be the same, the location where the data is stored will be moved from the [income] table to the [income_lease_up] table.
+d.	Here are the fields and their new locations
+i.	Rent Information Paragraph
+1.	Rent Loss Area Sq Ft
+a.	[income_lease_up].rent_loss_area_sqft
+b.	This field should be formatted for display using the “n0” format.
+2.	Rent Sq Ft
+a.	[income_lease_up].rent_sqft
+b.	This field should be formatted for display using the “n2” format.
+3.	Number of Years
+a.	[income_lease_up].rent_number_of_years
+b.	This field should be formatted for display using the “n2” format.
+4.	Rent Total
+a.	[income_lease_up].rent_total
+b.	This field should be formatted for display using the “n0” format.
+c.	This field should be calculated by using the following formula:
+i.	Rent Loss Area Sq Ft * Rent Sq Ft * Number of Years
+ii.	If any of the fields used in this calculation are updated, the Rent Total should be updated.
+iii.	The Rent Total field should be updated in the Total Information Paragraph as well
+ii.	Lease Information Paragraph
+1.	Lease Pct
+a.	[income_lease_up].lease_pct
+b.	This field should be formatted for display using the “n2” format.
+2.	Lease Total
+a.	[income_lease_up].lease_total
+b.	This field should be formatted for display using the “n0” format.
+c.	This field should be calculated by using the following formula:
+i.	Rent Total * (Lease Pct / 100)
+ii.	If any of the fields used in this calculation are updated, the Lease Total should be updated.
+iii.	The Lease Total field should be updated in the Total Information paragraph as well
+iii.	Total Finish Out Information Paragraph
+1.	TFO Sq Ft
+a.	[income_lease_up].total_finish_out_sqft
+b.	This field should be formatted for display using the “n2” format.
+2.	TFO Total
+a.	[income_lease_up].total_finish_out_total
+b.	This field should be formatted for display using the “n0” format.
+c.	This field should be calculated by using the following formula:
+i.	Rent Loss Area Sq Ft * TFO Sq Ft
+d.	The TFO Total field should be updated in the Total Information paragraph as well
+iv.	Total Information Paragraph
+1.	Rent Total
+a.	[income_lease_up].rent_total
+b.	This field should be formatted for display using the “n0” format.
+2.	Lease Total
+a.	[income_lease_up].lease_total
+b.	This field should be formatted for display using the “n0” format.
+3.	TFO Total
+a.	[income_lease_up].total_finish_out_total
+b.	This field should be formatted for display using the “n0” format.
+4.	Subtotal
+a.	This field is calculated
+b.	Rent Total + Lease Total + TFO Total
+c.	This field is not stored
+d.	This field should be formatted for display using the “n0” format.
+e.	This field should be updated whenever any of the fields in the calculation are updated.
+5.	Discount Rate
+a.	[income_lease_up].discount_rate
+b.	This field should be formatted for display using the “n2” format.
+6.	Number of Years
+a.	[income_lease_up].number_of_years
+b.	This field should be formatted for display using the “n2” format.
+7.	Lease Up Costs
+a.	[income_lease_up].lease_up_cost
+b.	This field should be formatted for display using the “n0” format.
+c.	This field should be calculated using the following formula if the Override Value checkbox is NOT checked
+i.	(Subtotal) / (1 + (Discount Rate / 100))Number of Years
+1.	Example:
+a.	Subtotal = 25,000
+b.	Discount Rate = 15
+c.	Number of Years = 20
+d.	(25,000) / (1 + (15 / 100))20
+e.	(25,000) / (1 + (0.15))20
+f.	(25,000) / (1.15)20
+g.	(25,000) / 16.36653739294…
+h.	1,528 
+d.	If the checkbox was checked, and then unchecked, it should recalculate the value.
+e.	If the Override Value checkbox is checked, this field should be enabled and the user should be able to enter a value between 0 and 99,999,999,999,999
+8.	Override Value
+a.	[income_lease_up].lease_up_cost_override
+b.	When the user checks this checkbox, the following fields will be set to Read Only, otherwise they will be enabled
+i.	In the Rent Information paragraph
+1.	Rent Loss Area Sq. Ft.
+2.	Rent Sq. Ft.
+3.	Number of Years
+ii.	In the Lease Information paragraph
+1.	Lease Pct
+2.	Lease Total
+iii.	In the Total Finish Out Information paragraph
+1.	TFO Sq. Ft.
+iv.	In the Total Information paragraph
+1.	Discount Rate
+2.	Number of Years
+c.	When the user checks this checkbox, the following fields will be enabled, otherwise they will be Read Only
+i.	Lease Up Costs
+3.	A new Monthly Panel
+a.	This new panel will be enabled when the use chooses the Monthly option in the General Panel
+b.	If the Monthly option is not enabled, the panel will be disabled.
+
+ 
+Figure 1.3.2b – Lease Up Costs Dialog (Monthly Commercial Panel)
+
+The user reaches this panel by expanding the Monthly Panel in Figure 1.3.2a.
+
+This panel is basically the same for:
+
+Frequency	Type	Unit of Measure
+Monthly	Commercial	Square Feet
+Monthly	Commercial	Units
+Monthly	Apartment	Square Feet
+Monthly	Apartment	Units
+
+The key differences are:
+
+1.	Monthly – Commercial : Square Feet
+a.	In the General Panel, there will be a Tenant Finish Allowance per SF field above Discount Rate
+b.	In the General Panel, the first field will be labeled Net Rentable Area
+c.	All values are based upon SF (square feet)
+d.	In the Month Listing grid
+i.	The 3rd column is labeled SF Available
+ii.	An extra column between Rent Loss and Commissions will be labeled Finish Allowance
+2.	Monthly – Commercial : Units
+a.	In the General Panel, there will be a Tenant Finish Allowance per Unit field above Discount Rate
+b.	In the General Panel, the first field will be labeled Rentable Units
+c.	All values are based upon Units
+i.	Instead of Rentable SF, it will be Rentable Units
+ii.	Instead of SF to be Absorbed, it will be Units to be Absorbed
+iii.	Instead of Estimated Absorption per Year in SF, it will be per Unit
+iv.	Instead of Estimated Absorption per Month in SF, it will be per Unit
+v.	Instead of Gross Rent Loss per SF, it will be Gross Rent Loss per Unit
+vi.	Instead of Stabilized Occupancy in SF, it will be per Unit
+d.	In the Month Listing grid
+i.	The 3rd column is labeled Units Available
+e.	An extra column between Rent Loss and Commissions will be labeled Finish Allowance
+3.	Monthly – Apartment : Square Feet
+a.	In the General Panel, there will not be a Tenant Finish Allowance per SF field above Discount Rate
+b.	In the General Panel, the first field will be labeled Rentable SF
+c.	All values are based upon SF (square feet)
+d.	In the Month Listing Grid
+i.	The 3rd column is labeled SF Available
+ii.	There is no Finish Allowance column
+4.	Monthly – Apartment : Units
+a.	In the General Panel, there will not be a Tenant Finish Allowance per SF field above Discount Rate
+b.	In the General Panel, the first field will be labeled Rentable Units
+c.	All values are based upon Units
+i.	Instead of Rentable SF, it will be Rentable Units
+ii.	Instead of SF to be Absorbed, it will be Units to be Absorbed
+iii.	Instead of Estimated Absorption per Year in SF, it will be per Unit
+iv.	Instead of Estimated Absorption per Month in SF, it will be per Unit
+v.	Instead of Gross Rent Loss per SF, it will be Gross Rent Loss per Unit
+vi.	Instead of Stabilized Occupancy in SF, it will be per Unit
+d.	In the Month Listing Grid
+i.	The 3rd column is labeled Units Available
+ii.	There is no Finish Allowance column
+
+General Paragraph
+
+1.	Net Rentable Area
+a.	The user will be able to enter the Net Rentable Area in square feet.
+b.	The value for this field will be stored in [income_lease_up].net_rentable_area
+c.	This field is required
+d.	The default value for this field is 0.
+e.	Valid values are from 0 to 999,999,999
+f.	This field will be labeled differently for Monthly Apartment
+i.	When the Square Feet option is set in Figure 1.3.2a 1.e.ii.1, it will be labeled Rentable SF.
+ii.	When the Units option is set in Figure 1.3.2a 1.e.ii.2, it will be labeled Rentable Units.
+g.	This field will be formatted for display using the “n0” format.
+2.	Current Occupancy
+a.	The user will be able to enter the Current Occupancy percentage in this field.
+b.	The value for this field will be stored in [income_lease_up].current_occupancy_pct
+c.	This field is required
+d.	The default value for this field is 100.00.
+e.	Valid values are from 0.00 to 100.00
+f.	This field will be formatted for display using the “n2” format.
+3.	Stabilized Occupancy (%)
+a.	The user will be able to enter the Stabilized Occupancy percentage in this field.
+b.	The value for this field will be stored in [income_lease_up].stabilized_occupancy_pct
+c.	This field is required
+d.	The default value for this field is 0.00
+e.	Valid values are from 0.00 to 100.00
+f.	This field will be formatted for display using the “n2” format.
+4.	Stabilized Occupancy (SF)
+a.	This is a calculated field to display the Stabilized Occupancy in Square Feet
+b.	The value for this field will be stored in [income_lease_up].stabilized_occupancy
+c.	The calculation will be Net Rentable Area * (Stabilized Occupancy % / 100)
+d.	The default value for this field is 0
+e.	This field will be labeled differently for 
+i.	When the Square Feet option is set in Figure 1.3.2a 1.b.ii.2.b.iii.1, it will be labeled Stabilized Occupancy (SF).
+ii.	When the Units option is set in Figure 1.3.2a 1.b.ii.2.b.iii.2, it will be labeled Stabilized Occupancy (Units)
+f.	This field will be formatted for display using the “n0” format.
+5.	Space to be Absorbed
+a.	This is a calculated field to display the Space to be Absorbed in Square Feet
+b.	The value for this field will be stored in [income_lease_up].space_to_be_absorbed
+c.	The calculation will be Stabilized Occupancy (SF) – (Net Rentable Area * (Current Occupancy / 100))
+d.	This field will default to 0
+e.	This field will be labeled differently for Monthly Apartment
+i.	When the Square Feet option is set in Figure 1.3.2a 1.b.ii.2.b.iii.1, it will be labeled SF to be Absorbed.
+ii.	When the Units option is set in Figure 1.3.2a 1.b.ii.2.b.iii.2, it will be labeled Units to be Absorbed
+f.	This field will be formatted for display using the “n0” format.
+6.	Absorption Period (in Months)
+a.	The user will be able to enter the number of months of the Absorption Period
+b.	The value for this field will be stored in [income_lease_up].absorption_period_in_months
+c.	This field will be required
+d.	The default value for this field is 0
+e.	Valid values are 0 to 99
+f.	This field will be formatted for display using the “n0” format.
+7.	Estimated Absorption per Year
+a.	This is a calculated field to display the Estimated Absorption per Year
+b.	The value for this field will be stored in [income_lease_up].estimated_absorption_per_year
+c.	The calculation will be (Space to be Absorbed / Absorption Period (in Months)) * 12
+d.	The default value for this field is 0
+e.	This field will be formatted for display using the “n0” format.
+8.	Estimated Absorption per Month
+a.	This is a calculated field to display the Estimated Absorption per Month
+b.	The value for this field will be stored in [income_lease_up].estimated_absorption_per_month
+c.	The calculation will be (Space to be Absorbed / Absorption Period (in Months))
+d.	The default value for this field is 0
+e.	This field will be formatted for display using the “n0” format.
+9.	Leasing Commissions
+a.	The user will be able to enter the Leasing Commissions percentage in this field
+b.	The value for this field will be stored in [income_lease_up].leasing_commissions_pct
+c.	This field will be required
+d.	The default value for this field is 0
+e.	Valid values are 0 to 99
+f.	This field will be formatted for display using the “n0” format.
+10.	Gross Rent Loss per SF
+a.	The user will be able to enter the Gross Rent Loss per SF in this field
+b.	The value for this field will be stored in [income_lease_up].gross_rent_loss_per_sqft]
+c.	This field will be required
+d.	The default value for this field is 0.00
+e.	Valid values are 0.00 to 99,999.99
+f.	This field will be labeled differently for Monthly Apartment
+i.	When the Square Feet option is set in Figure 1.3.2a 1.b.ii.2.b.iii.1, it will be labeled Gross Rent Loss per SF.
+ii.	When the Units option is set in Figure 1.3.2a 1.b.ii.2.b.iii.2, it will be labeled Gross rent Loss per Unit
+g.	This field will be formatted for display using the “n2” format.
+11.	Tenant Finish Allowance per SF
+a.	The user will be able to enter the Tenant Finish Allowance per Square Foot in this field
+b.	The value of this field will be stored in [income_lease_up].tenant_finish_allowance_per_sqft
+c.	This field is not required
+d.	The default value for this field is 0.00
+e.	Valid values are 0.00 to 99,999.99
+f.	This field will be labeled differently based upon the Unit of Measure set in Figure 1.3.2a #1.e
+i.	If the Unit of Measure is Square Feet, then it will be labeled Tenant Finish Allowance per SF
+ii.	If the Unit of Measure is Units, then it will be labeled Tenant Finish Allowance per Unit
+g.	This field will be formatted for display using the “n2” format.
+h.	This field will NOT be visible for a type of Apartment (Figure 1.3.2a #1.d)
+12.	Discount Rate
+a.	The user will be able to enter the Discount Rate in this field
+b.	The value of this field will be stored in [income_lease_up].discount_rate
+c.	This field is required
+d.	The default value for this field is 0.00
+e.	Valid values are 0.00 to 99.99
+f.	This field will be formatted for display using the “n2” format.
+
+Monthly Listing Paragraph
+
+The monthly listing grid will contain the values needed to determine the Total Lease Up Cost based upon what the user entered in the General Paragraph.  The grid will have the following columns:
+
+1.	Year #
+a.	This field will be the Year number
+b.	The value for this column will start at 1 and increment every 12 months.
+c.	So for Months 1-12, the value will be 1.  For Months 13-24 it will be 2, etc.
+d.	The value for this field will be stored in [income_lease_up_month_listing].year_number
+e.	This field will be read-only
+f.	This field will be formatted for display using the “f0” format.
+i.	No decimal places.
+ii.	No commas
+iii.	Left justified
+2.	Month
+a.	This field will be the Month number
+b.	The value for this column will start at 1 and go until it reaches the value entered in Absorption Period (in Months) (Figure 1.3.2b 6)
+c.	The value for this field will be stored in [income_lease_up_month_listing].month_number
+d.	This field will be read-only
+e.	This field will be formatted for display using the “f0” format.
+i.	No decimal places
+ii.	No commas
+iii.	Left justified
+3.	SF Available
+a.	This field will be the Square Foot available based upon the Month Number
+b.	The value for this column will start at the value in Space to be Absorbed (Figure 1.3.2b 5)
+i.	For each row after, it will decrease by Estimated Absorption per Month (Figure 1.3.2b 8)
+ii.	If the value calculated is less than Estimated Absorption per Month, the value displayed will be 0.
+c.	The value for this field will be stored in [income_lease_up_month_listing].available
+d.	This field will be read-only
+e.	This field will be formatted for display using the “n1” format.
+i.	Right justified
+4.	Rent Loss
+a.	This field will be the Rent Loss based upon the SF Available
+b.	The calculation will be (Gross Rent Loss per SF / 12) * SF Available.  The Gross Rent Loss per SF field is in Figure 1.3.2b 10)
+c.	The value for this field will be stored in [income_lease_up_month_listing].rent_loss
+d.	This field will be read-only
+e.	This field will be formatted for display using the “n2” format
+i.	Right justified
+5.	Finish Allowance
+a.	This field will be the Finish Allowance
+b.	The calculation will be Estimated Absorption per Month * Tenant Finish Allowance.  Those fields are in Figure 1.3.2b 8 and 11 respectively.
+c.	The value for this field will be stored in [income_lease_up_month_listing].finish_allowance
+d.	This field will be read-only
+e.	This field will be formatted for display using the “n2” format
+i.	Right justified
+f.	This column will not be visible for a Type of Apartment (Figure 1.3.2a #1.d)
+6.	Commissions
+a.	This field will be the Commissions amount
+b.	The calculation will be (Leasing Commissions Percentage / 100) * (Estimated Absorption per Month * Gross Rent Loss per SF).  The non-Grid fields are in figure 1.3.2b 8 and 10 respectively
+c.	The value for this field will be stored in [income_lease_up_month_listing].commissions
+d.	This field will be read-only
+e.	This field will be formatted for display using the “n0” format
+i.	Right justified
+7.	Present Value Factor
+a.	This field will be the Net Present Value Factor
+b.	The calculation will be 1 / (1 + r)n where r = Discount Rate / 12 / 100 (Figure 1.3.2b 12) and n = Month #
+c.	The value for this field will be stored in [income_lease_up_month_listing].present_value_factor
+d.	This field will be read-only
+e.	This field will be formatted for display using the “n8” format
+i.	Right justified
+8.	Net Present Value
+a.	This field will be the Net Present Value
+b.	The calculation will be (Rent Loss + Finish Allowance + Commissions) * Present Value Factor
+c.	The value for this field will be stored in [income_lease_up_month_listing].net_present_value
+d.	This field will be read-only
+e.	This field will be totaled in the Summary area displayed at the bottom of the grid and labeled Total Lease Up Cost.
+i.	This value is what will be propagated back to the Income Detail Dialog and used in the existing Income Valuation calculations.
+ii.	It will be stored in [income].lu_cost
+f.	This field will be formatted for display using the “n0” format
+i.	Right justified
+
+The following are screen mockups of the two Apartment Lease Up options.  The dialog will perform the same as described above for Figure 1.3.2b.
+ 
+Figure 1.3.2c - Lease Up Costs Dialog (Monthly Apartment Square Feet Panel)
+
+The user reaches this panel by choosing a Frequency of Monthly, a Type of Apartment and a Unit of Measure of Square Feet in the General Paragraph.
+ 
+Figure 1.3.2d - Lease Up Costs Dialog (Monthly Apartment Units Panel)
+
+The user reaches this panel by choosing a Frequency of Monthly, a Type of Apartment and a Unit of Measure of Units in the General Paragraph.
+ 
+1.3.3  Income Valuation for Hotels/Motels
+
+There will need to be a new Income Valuation method to value Hotels and Motels in Florida.
+
+ 
+Figure 1.3.3a – Income Details Dialog (Hotels/Motels Panel)
+
+The user reaches this panel by opening an Income Valuation and expanding the Hotels/Motels panel.
+
+The panel will have 3 paragraphs:
+
+General
+
+The following fields will be available:
+
+1.	Size in Sqft
+a.	The user will enter the total Square Feet of the Property here
+b.	The value of this field will be stored in [income_hotel_motel].size_in_sqft
+c.	This field will be required
+d.	The default value will be 0
+e.	Valid values will be 0 to 99,999,999
+f.	This field should be formatted for display using the “n0” format.
+2.	Average Daily Room Rate (ADR)
+a.	The user will enter the Average Daily Room Rate here
+b.	The value of this field will be stored in [income_hotel_motel].average_daily_room_rate
+c.	This field will be required
+d.	The default value will be 0
+e.	Valid values will be 0 to 9,999,999.99
+f.	This field should be formatted for display using the “c0” format.
+3.	# of Rooms
+a.	The user will enter the number of rooms in the hotel/motel here
+b.	The value of this field will be stored in [income_hotel_motel].number_of_rooms
+c.	This field will be required
+d.	The default value will be 0
+e.	Valid values will be 0 to 9,999
+f.	This field should be formatted for display using the “n0” format.
+4.	# of Room Nights
+a.	This field will display the number of room nights for a year
+b.	The calculation will be # of Rooms * 365
+c.	The value of this field will be stored in [income_hotel_motel].number_of_room_nights
+d.	This field will be read-only
+e.	This field should be formatted for display using the “n0” format.
+
+
+Hotel/Motel Information
+
+This paragraph will contain a grid that will have all the necessary data broken down by section and by Actual versus Proforma.  All calculated values will be determined during the Property Recalc process which will be implemented in the Calculations grouping.  Any grid cells the user enters data in will be shaded green to indicate it was a user entered value versus a calculated one except for Income Value - Reconciled.
+
+1.	Grid Toolstrip
+a.	There will be a single button called Reset Total Expenses that will allow the user to remove any user entered overrides so PACS can calculate the running totals
+i.	The button will be labeled Reset Total Expenses
+ii.	The button will be enabled if the user can edit the grid
+iii.	When the user clicks this button
+1.	The ProForma Total Expenses Value will be set to 0
+2.	The ProForma Total Expenses Percent will be set to 0
+3.	Any green shading for the above values will be removed.
+2.	Income Section
+a.	This section will have values and percentage columns for both Actual and Proforma
+b.	This section will have the following rows
+i.	Room Revenue
+1.	Actual Value
+a.	The user will enter the Actual Value for Room Revenue here
+b.	The value of this field will be stored in [income_hotel_motel_detail].room_revenue where value_type = 'A'
+c.	The default value will be 0
+d.	Valid values are 0 to 999,999,999
+e.	When the user enters a value in this field, the [income_hotel_motel_detail].room_revenue_update field will be set to ‘V’ where value_type = ‘A’
+f.	This field should be formatted for display using the “n0” format
+2.	Actual Percentage
+a.	This field will be calculated
+b.	The value of this field will be stored in [income_hotel_motel_detail].room_revenue_pct where value_type = 'A'
+c.	This field will be read-only
+d.	This field should be formatted for display using the “P2” format
+3.	Proforma Value
+a.	This field will be calculated
+b.	The value of this field will be stored in [income_hotel_motel_detail].room_revenue where value_type = 'P'
+c.	This field will be read-only
+d.	This field should be formatted for display using the “n0” format
+4.	Proforma Percentage
+a.	This field will be calculated
+b.	The value of this field will be stored in [income_hotel_motel_detail].room_revenue_pct where value_type = 'P'
+c.	This field will be read-only
+d.	This field should be formatted for display using the “P2” format
+ii.	Vacancy & Collection Loss
+1.	Actual Value
+a.	The user will enter the Actual Value for Vacancy & Collection Loss here
+b.	The value of this field will be stored in [income_hotel_motel_detail].vacancy_collection_loss where value_type = 'A'
+c.	The default value will be 0
+d.	Valid values are 0 to 999,999,999
+e.	When the user enters a value in this field, the [income_hotel_motel_detail].vacancy_collection_loss_update field will be set to ‘V’ where value_type = ‘A’
+f.	This field should be formatted for display using the “n0” format
+2.	Actual Percentage
+a.	This field will be calculated
+b.	The value of this field will be stored in [income_hotel_motel_detail].vacancy_collection_loss_pct where value_type = 'A'
+c.	This field will be read-only
+d.	This field should be formatted for display using the “P2” format
+3.	Proforma Value
+a.	The user will enter the Proforma Value for Vacancy & Collection Loss here
+i.	When a value is entered, the corresponding Percentage field will be zeroed out.
+ii.	The user may enter a value in the Value or Percentage column and the other will be calculated
+b.	The value of this field will be stored in [income_hotel_motel_detail].vacancy_collection_loss where value_type = 'P'
+c.	The default value will be 0
+d.	Valid values are 0 to 999,999,999
+e.	When the user enters a value in this field, the [income_hotel_motel_detail].vacancy_collection_loss_update field will be set to ‘V’ where value_type = ‘P’
+f.	This field should be formatted for display using the “n0” format
+4.	Proforma Percentage
+a.	The user will enter the Proforma Percentage for Vacancy & Collection Loss here
+i.	When a value is entered, the corresponding Value field will be zeroed out.
+ii.	The user may enter a value in the Value or Percentage column and the other will be calculated 
+b.	The value of this field will be stored in [income_hotel_motel_detail].vacancy_collection_loss_pct where value_type = 'P'
+c.	The default value will be 0
+d.	Valid values are 0 to 999.99
+e.	When the user enters a value in this field, the [income_hotel_motel_detail].vacancy_collection_loss_update field will be set to ‘P’ where value_type = ‘P’
+f.	This field should be formatted for display using the “P2” format
+iii.	Food & Beverage Income
+1.	Actual Value
+a.	The user will enter the Actual Value for Food & Beverage Income here
+b.	The value of this field will be stored in [income_hotel_motel_detail].food_beverage_income where value_type = 'A'
+c.	The default value will be 0
+d.	Valid values are 0 to 999,999,999
+e.	When the user enters a value in this field, the [income_hotel_motel_detail].food_beverage_income_update field will be set to ‘V’ where value_type = ‘A’
+f.	This field should be formatted for display using the “n0” format
+2.	Actual Percentage
+a.	This field will be calculated
+b.	The value of this field will be stored in [income_hotel_motel_detail].food_beverage_income_pct where value_type = 'A'
+c.	This field will be read-only
+d.	This field should be formatted for display using the “P2” format
+3.	Proforma Value
+a.	The user will enter the Proforma Value for Food & Beverage Income here
+i.	When a value is entered, the corresponding Percentage field will be zeroed out.
+ii.	The user may enter a value in the Value or Percentage column and the other will be calculated
+b.	The value of this field will be stored in [income_hotel_motel_detail].food_beverage_income where value_type = 'P'
+c.	The default value will be 0
+d.	Valid values are 0 to 999,999,999
+e.	When the user enters a value in this field, the [income_hotel_motel_detail].food_beverage_income_update field will be set to ‘V’ where value_type = ‘P’
+f.	This field should be formatted for display using the “n0” format
+4.	Proforma Percentage
+a.	The user will enter the Proforma Percentage for Food & Beverage Income here
+i.	When a value is entered, the corresponding Value field will be zeroed out.
+ii.	The user may enter a value in the Value or Percentage column and the other will be calculated
+b.	The value of this field will be stored in [income_hotel_motel_detail].room_revenue_pct where value_type = 'P'
+c.	The default value will be 0
+d.	Valid values are 0.00 to 100.00
+e.	When the user enters a value in this field, the [income_hotel_motel_detail].food_beverage_income_update field will be set to ‘P’ where value_type = ‘P’
+f.	This field should be formatted for display using the “P2” format
+iv.	Misc. Income
+1.	Actual Value
+a.	The user will enter the Actual Value for Misc. Income here
+b.	The value of this field will be stored in [income_hotel_motel_detail].misc_income where value_type = 'A'
+c.	The default value will be 0
+d.	Valid values are 0 to 999,999,999
+e.	When the user enters a value in this field, the [income_hotel_motel_detail].misc_income_update field will be set to ‘V’ where value_type = ‘A’
+f.	This field should be formatted for display using the “n0” format
+2.	Actual Percentage
+a.	This field will be calculated
+b.	The value of this field will be stored in [income_hotel_motel_detail].misc_income_pct where value_type = 'A'
+c.	This field will be read-only
+d.	This field should be formatted for display using the “P2” format
+3.	Proforma Value
+a.	The user will enter the Proforma Value for Misc. Income here
+i.	When a value is entered, the corresponding Percentage field will be zeroed out.
+ii.	The user may enter a value in the Value or Percentage column and the other will be calculated
+b.	The value of this field will be stored in [income_hotel_motel_detail].misc_income where value_type = 'P'
+c.	The default value will be 0
+d.	Valid values are 0 to 999,999,999
+e.	When the user enters a value in this field, the [income_hotel_motel_detail].misc_income_update field will be set to ‘V’ where value_type = ‘P’
+f.	This field should be formatted for display using the “n0” format
+4.	Proforma Percentage
+a.	The user will enter the Proforma Percentage for Misc. Income here
+i.	When a value is entered, the corresponding Value field will be zeroed out.
+ii.	The user may enter a value in the Value or Percentage column and the other will be calculated 
+b.	The value of this field will be stored in [income_hotel_motel_detail].room_revenue_pct where value_type = 'P'
+c.	The default value will be 0
+d.	Valid values are 0 to 100.00
+e.	When the user enters a value in this field, the [income_hotel_motel_detail].misc_income_update field will be set to ‘P’ where value_type = ‘P’
+f.	This field should be formatted for display using the “P2” format
+v.	Effective Gross Income
+1.	Actual Value
+a.	This field will be calculated
+b.	The value of this field will be stored in [income_hotel_motel_detail].effective_gross_income where value_type = 'A'
+c.	This field will be read-only
+d.	This field should be formatted for display using the “n0” format
+2.	Actual Percentage
+a.	This field will be calculated
+b.	The value of this field will be stored in [income_hotel_motel_detail].effective_gross_income_pct where value_type = 'A'
+c.	This field will be read-only
+d.	This field should be formatted for display using the “P2” format
+3.	Proforma Value
+a.	This field will be calculated
+b.	The value of this field will be stored in [income_hotel_motel_detail].effective_gross_income where value_type = 'P'
+c.	This field will be read-only
+d.	This field should be formatted for display using the “n0” format.
+4.	Proforma Percentage
+a.	This field will be calculated
+b.	The value of this field will be stored in [income_hotel_motel_detail].effective_gross_income_pct where value_type = 'P'
+c.	This field will be read-only
+d.	This field should be formatted for display using the “P2” format
+3.	Expense Section
+a.	Utilities
+i.	Actual Value
+1.	The user will enter the Actual Value for Utilities here
+2.	The value of this field will be stored in [income_hotel_motel_detail].utilities where value_type = 'A'
+3.	The default value will be 0
+4.	Valid values are 0 to 999,999,999
+5.	When the user enters a value in this field, the [income_hotel_motel_detail].utilities_update field will be set to ‘V’ where value_type = ‘A’
+6.	This field should be formatted for display using the “n0” format
+ii.	Actual Percentage
+1.	This field will be calculated
+2.	The value of this field will be stored in [income_hotel_motel_detail].utilities_pct where value_type = 'A'
+3.	This field will be read-only
+4.	This field should be formatted for display using the “P2” format
+iii.	Proforma Value
+1.	The user will enter the Proforma Value for Utilities here
+a.	When a value is entered, the corresponding Percentage field will be zeroed out.
+b.	The user may enter a value in the Value or Percentage column and the other will be calculated
+2.	The value of this field will be stored in [income_hotel_motel_detail].utilities where value_type = 'P'
+3.	The default value will be 0
+4.	Valid values are 0 to 999,999,999
+5.	When the user enters a value in this field, the [income_hotel_motel_detail].utilities_update field will be set to ‘V’ where value_type = ‘P’
+6.	This field should be formatted for display using the “n0” format
+iv.	Proforma Percentage
+1.	The user will enter the Proforma Percentage for Utilities here
+a.	When a value is entered, the corresponding Value field will be zeroed out.
+b.	The user may enter a value in the Value or Percentage column and the other will be calculated 
+2.	The value of this field will be stored in [income_hotel_motel_detail].utilities_pct where value_type = 'P'
+3.	The default value will be 0
+4.	Valid values are 0.00 to 100.00
+5.	When the user enters a value in this field, the [income_hotel_motel_detail].utilities_update field will be set to ‘P’ where value_type = ‘P’
+6.	This field should be formatted for display using the “P2” format
+b.	Maintenance & Repair
+i.	Actual Value
+1.	The user will enter the Actual Value for Maintenance & Repair here
+2.	The value of this field will be stored in [income_hotel_motel_detail].maintenance_repair where value_type = 'A'
+3.	The default value will be 0
+4.	Valid values are 0 to 999,999,999
+5.	When the user enters a value in this field, the [income_hotel_motel_detail].maintenance_repair_update will be set to ‘V’ where value_type = ‘A’
+6.	This field should be formatted for display using the “n0” format
+ii.	Actual Percentage
+1.	This field will be calculated
+2.	The value of this field will be stored in [income_hotel_motel_detail].maintenance_repair_pct where value_type = 'A'
+3.	This field will be read-only
+4.	This field should be formatted for display using the “P2” format
+iii.	Proforma Value
+1.	The user will enter the Proforma Value for Maintenance & Repair here
+a.	When a value is entered, the corresponding Percentage field will be zeroed out.
+b.	The user may enter a value in the Value or Percentage column and the other will be calculated
+2.	The value of this field will be stored in [income_hotel_motel_detail].maintenance_repair where value_type = 'P'
+3.	The default value will be 0
+4.	Valid values are 0 to 999,999,999
+5.	When the user enters a value in this field, the [income_hotel_motel_detail].maintenance_repair_update will be set to ‘V’ where value_type = ‘P’
+6.	This field should be formatted for display using the “n0” format.
+iv.	Proforma Percentage
+1.	The user will enter the Proforma Percentage for Maintenance & Repair here
+a.	When a value is entered, the corresponding Value field will be zeroed out.
+b.	The user may enter a value in the Value or Percentage column and the other will be calculated 
+2.	The value of this field will be stored in [income_hotel_motel_detail].maintenance_repair_pct where value_type = 'P'
+3.	The default value will be 0
+4.	Valid values are 0.00 to 100.00
+5.	When the user enters a value in this field, the [income_hotel_motel_detail].maintenance_repair_update will be set to ‘P’ where value_type = ‘P’
+6.	This field should be formatted for display using the “P2” format
+c.	Department Expenses
+i.	Actual Value
+1.	The user will enter the Actual Value for Department Expenses here
+2.	The value of this field will be stored in [income_hotel_motel_detail].department_expenses where value_type = 'A'
+3.	The default value will be 0
+4.	Valid values are 0 to 999,999,999
+5.	When the user enters a value in this field, the [income_hotel_motel_detail].department_expenses_update field will be set to ‘V’ where value_type = ‘A’
+6.	This field should be formatted for display using the “n0” format
+ii.	Actual Percentage
+1.	This field will be calculated
+2.	The value of this field will be stored in [income_hotel_motel_detail].department_expenses_pct where value_type = 'A'
+3.	This field will be read-only
+4.	This field should be formatted for display using the “P2” format
+iii.	Proforma Value
+1.	The user will enter the Proforma Value for Department Expenses here
+a.	When a value is entered, the corresponding Percentage field will be zeroed out.
+b.	The user may enter a value in the Value or Percentage column and the other will be calculated
+2.	The value of this field will be stored in [income_hotel_motel_detail].department_expenses where value_type = 'P'
+3.	The default value will be 0
+4.	Valid values are 0 to 999,999,999
+5.	When the user enters a value in this field, the [income_hotel_motel_detail].expenses_update field will be set to ‘V’ where value_type = ‘P’
+6.	This field should be formatted for display using the “n0” format
+iv.	Proforma Percentage
+1.	The user will enter the Proforma Percentage for Department Expenses here
+a.	When a value is entered, the corresponding Value field will be zeroed out.
+b.	The user may enter a value in the Value or Percentage column and the other will be calculated 
+2.	The value of this field will be stored in [income_hotel_motel_detail].department_expenses_pct where value_type = 'P'
+3.	The default value will be 0
+4.	Valid values are 0.00 to 100.00
+5.	When the user enters a value in this field, the [income_hotel_motel_detail].expenses_update field will be set to ‘P’ where value_type = ‘P’
+6.	This field should be formatted for display using the “P2” format
+d.	Management
+i.	Actual Value
+1.	The user will enter the Actual Value for Management here
+2.	The value of this field will be stored in [income_hotel_motel_detail].management where value_type = 'A'
+3.	The default value will be 0
+4.	Valid values are 0 to 999,999,999
+5.	When the user enters a value in this field, the [income_hotel_motel_detail].management_update field will be set to ‘V’ where value_type = ‘A’
+6.	This field should be formatted for display using the “n0” format
+ii.	Actual Percentage
+1.	This field will be calculated
+2.	The value of this field will be stored in [income_hotel_motel_detail].management_pct where value_type = 'A'
+3.	This field will be read-only
+4.	This field should be formatted for display using the “P2” format
+iii.	Proforma Value
+1.	The user will enter the Proforma Value for Management here
+a.	When a value is entered, the corresponding Percentage field will be zeroed out.
+b.	The user may enter a value in the Value or Percentage column and the other will be calculated
+2.	The value of this field will be stored in [income_hotel_motel_detail].management where value_type = 'P'
+3.	The default value will be 0
+4.	Valid values are 0 to 999,999,999
+5.	When the user enters a value in this field, the [income_hotel_motel_detail].management_update field will be set to ‘V’ where value_type = ‘P’
+6.	This field should be formatted for display using the “n0” format
+iv.	Proforma Percentage
+1.	The user will enter the Proforma Percentage for Management here
+a.	When a value is entered, the corresponding Value field will be zeroed out.
+b.	The user may enter a value in the Value or Percentage column and the other will be calculated
+2.	The value of this field will be stored in [income_hotel_motel_detail].management_pct where value_type = 'P'
+3.	The default value will be 0
+4.	Valid values are 0.00 to 100.00
+5.	When the user enters a value in this field, the [income_hotel_motel_detail].management_update field will be set to ‘P’ where value_type = ‘P’
+6.	This field should be formatted for display using the “P2” format
+e.	Administrative
+i.	Actual Value
+1.	The user will enter the Actual Value for Administrative here
+2.	The value of this field will be stored in [income_hotel_motel_detail].administrative where value_type = 'A'
+3.	The default value will be 0
+4.	Valid values are 0 to 999,999,999
+5.	When the user enters a value in this field, the [income_hotel_motel_detail].administrative_update field will be set to ‘V’ where value_type = ‘A’
+6.	This field should be formatted for display using the “n0” format
+ii.	Actual Percentage
+a.	This field will be calculated
+2.	The value of this field will be stored in [income_hotel_motel_detail].administrative_pct where value_type = 'A'
+3.	This field will be read-only
+4.	This field should be formatted for display using the “P2” format
+iii.	Proforma Value
+1.	The user will enter the Proforma Value for Administrative here
+a.	When a value is entered, the corresponding Percentage field will be zeroed out.
+b.	The user may enter a value in the Value or Percentage column and the other will be calculated
+2.	The value of this field will be stored in [income_hotel_motel_detail].administrative where value_type = 'P'
+3.	The default value will be 0
+4.	Valid values are 0 to 999,999,999
+5.	When the user enters a value in this field, the [income_hotel_motel_detail].administrative_update field will be set to ‘V’ where value_type = ‘P’
+6.	This field should be formatted for display using the “n0” format
+iv.	Proforma Percentage
+1.	The user will enter the Proforma Percentage for Administrative here
+a.	When a value is entered, the corresponding Value field will be zeroed out.
+b.	The user may enter a value in the Value or Percentage column and the other will be calculated 
+2.	The value of this field will be stored in [income_hotel_motel_detail].administrative_pct where value_type = 'P'
+3.	The default value will be 0
+4.	Valid values are 0.00 to 100.00
+5.	When the user enters a value in this field, the [income_hotel_motel_detail].administrative_update field will be set to ‘P’ where value_type = ‘P’
+6.	This field should be formatted for display using the “P2” format
+f.	Payroll
+i.	Actual Value
+1.	The user will enter the Actual Value for Payroll here
+2.	The value of this field will be stored in [income_hotel_motel_detail].payroll where value_type = 'A'
+3.	The default value will be 0
+4.	Valid values are 0 to 999,999,999
+5.	When the user enters a value in this field, the [income_hotel_motel_detail].payroll_update field will be set to ‘V’ where value_type = ‘A’
+6.	This field should be formatted for display using the “n0” format
+ii.	Actual Percentage
+1.	This field will be calculated
+2.	The value of this field will be stored in [income_hotel_motel_detail].payroll_pct where value_type = 'A'
+3.	This field will be read-only
+4.	This field should be formatted for display using the “P2” format
+iii.	Proforma Value
+1.	The user will enter the Proforma Value for Payroll here
+a.	When a value is entered, the corresponding Percentage field will be zeroed out.
+b.	The user may enter a value in the Value or Percentage column and the other will be calculated
+2.	The value of this field will be stored in [income_hotel_motel_detail].payroll where value_type = 'P'
+3.	The default value will be 0
+4.	Valid values are 0 to 999,999,999
+5.	When the user enters a value in this field, the [income_hotel_motel_detail].payroll_update field will be set to ‘V’ where value_type = ‘P’
+6.	This field should be formatted for display using the “n0” format
+iv.	Proforma Percentage
+1.	The user will enter the Proforma Percentage for Payroll here
+a.	When a value is entered, the corresponding Value field will be zeroed out.
+b.	The user may enter a value in the Value or Percentage column and the other will be calculated 
+2.	The value of this field will be stored in [income_hotel_motel_detail].payroll_pct where value_type = 'P'
+3.	The default value will be 0
+4.	Valid values are 0.00 to 100.00
+5.	When the user enters a value in this field, the [income_hotel_motel_detail].payroll_update field will be set to ‘P’ where value_type = ‘P’
+6.	This field should be formatted for display using the “P2” format
+g.	Insurance
+i.	Actual Value
+1.	The user will enter the Actual Value for Insurance here
+2.	The value of this field will be stored in [income_hotel_motel_detail].insurance where value_type = 'A'
+3.	The default value will be 0
+4.	Valid values are 0 to 999,999,999
+5.	When the user enters a value in this field, the [income_hotel_motel_detail].insurance_update field will be set to ‘V’ where value_type = ‘A’
+6.	This field should be formatted for display using the “n0” format
+ii.	Actual Percentage
+1.	This field will be calculated
+2.	The value of this field will be stored in [income_hotel_motel_detail].insurance_pct where value_type = 'A'
+3.	This field will be read-only
+4.	This field should be formatted for display using the “P2” format
+iii.	Proforma Value
+1.	The user will enter the Proforma Value for Insurance here
+a.	When a value is entered, the corresponding Percentage field will be zeroed out.
+b.	The user may enter a value in the Value or Percentage column and the other will be calculated
+2.	The value of this field will be stored in [income_hotel_motel_detail].insurance where value_type = 'P'
+3.	The default value will be 0
+4.	Valid values are 0 to 999,999,999
+5.	When the user enters a value in this field, the [income_hotel_motel_detail].insurance_update field will be set to ‘V’ where value_type= ‘P’
+6.	This field should be formatted for display using the “n0” format
+iv.	Proforma Percentage
+1.	The user will enter the Proforma Percentage for Insurance here
+a.	When a value is entered, the corresponding Value field will be zeroed out.
+b.	The user may enter a value in the Value or Percentage column and the other will be calculated 
+2.	The value of this field will be stored in [income_hotel_motel_detail].insurance_pct where value_type = 'P'
+3.	The default value will be 0
+4.	Valid values are 0.00 to 100.00
+5.	When the user enters a value in this field, the [income_hotel_motel_detail].insurance_update field will be set to ‘P’ where value_type  = ‘P’
+6.	This field should be formatted for display using the “P2” format
+h.	Marketing
+i.	Actual Value
+1.	The user will enter the Actual Value for Marketing here
+2.	The value of this field will be stored in [income_hotel_motel_detail].marketing where value_type = 'A'
+3.	The default value will be 0
+4.	Valid values are 0 to 999,999,999
+5.	When the user enters a value in this field, the [income_hotel_motel_detail].marketing_update field will be set to ‘V’ where value_type = ‘A’
+6.	This field should be formatted for display using the “n0” format
+ii.	Actual Percentage
+1.	This field will be calculated
+2.	The value of this field will be stored in [income_hotel_motel_detail].marketing_pct where value_type = 'A'
+3.	This field will be read-only
+4.	This field should be formatted for display using the “P2” format
+iii.	Proforma Value
+1.	The user will enter the Proforma Value for Marketing here
+a.	When a value is entered, the corresponding Percentage field will be zeroed out.
+b.	The user may enter a value in the Value or Percentage column and the other will be calculated
+2.	The value of this field will be stored in [income_hotel_motel_detail].marketing where value_type = 'P'
+3.	The default value will be 0
+4.	Valid values are 0 to 999,999,999
+5.	When the user enters a value in this field, the [income_hotel_motel_detail].marketing_update field will be set to ‘V’ where value_type = ‘P’
+6.	This field should be formatted for display using the “n0” format
+iv.	Proforma Percentage
+1.	The user will enter the Proforma Percentage for Marketing here
+a.	When a value is entered, the corresponding Value field will be zeroed out.
+b.	The user may enter a value in the Value or Percentage column and the other will be calculated 
+2.	The value of this field will be stored in [income_hotel_motel_detail].marketing_pct where value_type = 'P'
+3.	The default value will be 0
+4.	Valid values are 0.00 to 100.00
+5.	When the user enters a value in this field, the [income_hotel_motel_detail].marketing_update field will be set to ‘P’ where value_type = ‘P’
+6.	This field should be formatted for display using the “P2” format
+i.	Real Estate Tax
+i.	Actual Value
+1.	The user will enter the Actual Value for Real Estate Tax here
+2.	The value of this field will be stored in [income_hotel_motel_detail].real_estate_tax where value_type = 'A'
+3.	The default value will be 0
+4.	Valid values are 0 to 999,999,999
+5.	When the user enters a value in this field, the [income_hotel_motel_detail].real_estate_tax_update field will be set to ‘V’ where value_type = ‘A’
+6.	This field should be formatted for display using the “n0” format
+ii.	Actual Percentage
+1.	This field will be calculated
+2.	The value of this field will be stored in [income_hotel_motel_detail].real_estate_tax_pct where value_type = 'A'
+3.	This field will be read-only
+4.	This field should be formatted for display using the “P2” format
+iii.	Proforma Value
+1.	The user will enter the Proforma Value for Real Estate Tax here
+a.	When a value is entered, the corresponding Percentage field will be zeroed out.
+b.	The user may enter a value in the Value or Percentage column and the other will be calculated
+2.	The value of this field will be stored in [income_hotel_motel_detail].real_estate_tax where value_type = 'P'
+3.	The default value will be 0
+4.	Valid values are 0 to 999,999,999
+5.	When the user enters a value in this field, the [income_hotel_motel_detail].real_estate_tax_update field will be set to ‘V’ where value_type = ‘P’
+6.	This field should be formatted for display using the “n0” format
+iv.	Proforma Percentage
+1.	The user will enter the Proforma Percentage for Real Estate Tax here
+a.	When a value is entered, the corresponding Value field will be zeroed out.
+b.	The user may enter a value in the Value or Percentage column and the other will be calculated 
+2.	The value of this field will be stored in [income_hotel_motel_detail].real_estate_tax_pct where value_type = 'P'
+3.	The default value will be 0
+4.	Valid values are 0.00 to 100.00
+5.	When the user enters a value in this field, the [income_hotel_motel_detail].real_estate_tax_update field will be set to ‘P’ where value_type = ‘P’
+6.	This field should be formatted for display using the “P2” format
+j.	Franchise Fee
+i.	Actual Value
+1.	The user will enter the Actual Value for Franchise Fee here
+2.	
+3.	The value of this field will be stored in [income_hotel_motel_detail].franchise_fee where value_type = 'A'
+4.	The default value will be 0
+5.	Valid values are 0 to 999,999,999
+6.	When the user enters a value in this field, the [income_hotel_motel_detail].franchise_fee_update field will be set to ‘V’ where value_type = ‘A’
+7.	This field should be formatted for display using the “n0” format
+ii.	Actual Percentage
+1.	This field will be calculated
+2.	The value of this field will be stored in [income_hotel_motel_detail].franchise_fee_pct where value_type = 'A'
+3.	This field will be read-only
+4.	This field should be formatted for display using the “P2” format
+iii.	Proforma Value
+1.	The user will enter the Proforma Value for Franchise Fee here
+a.	When a value is entered, the corresponding Percentage field will be zeroed out.
+b.	The user may enter a value in the Value or Percentage column and the other will be calculated
+2.	The value of this field will be stored in [income_hotel_motel_detail].franchise_fee where value_type = 'P'
+3.	The default value will be 0
+4.	Valid values are 0 to 999,999,999
+5.	When the user enters a value in this field, the [income_hotel_motel_detail].franchise_fee_update field will be set to ‘V’ where value_type = ‘P’
+6.	This field should be formatted for display using the “n0” format
+iv.	Proforma Percentage
+1.	The user will enter the Proforma Percentage for Franchise Fee here
+a.	When a value is entered, the corresponding Value field will be zeroed out.
+b.	The user may enter a value in the Value or Percentage column and the other will be calculated 
+2.	The value of this field will be stored in [income_hotel_motel_detail].franchise_fee_pct where value_type = 'P'
+3.	The default value will be 0
+4.	Valid values are 0.00 to 100.00
+5.	When the user enters a value in this field, the [income_hotel_motel_detail].franchise_fee_update field will be set to ‘P’ where value_type = ‘P’
+6.	This field should be formatted for display using the “P2” format
+k.	Other
+i.	Actual Value
+1.	The user will enter the Actual Value for Other here
+2.	The value of this field will be stored in [income_hotel_motel_detail].other where value_type = 'O'
+3.	The default value will be 0
+4.	Valid values are 0 to 999,999,999
+5.	When the user enters a value in this field, the [income_hotel_motel_detail].other_update field will be set to ‘V’ where value_type = ‘A’
+6.	This field should be formatted for display using the “n0” format
+ii.	Actual Percentage
+1.	This field will be calculated
+2.	The value of this field will be stored in [income_hotel_motel_detail].other_pct where value_type = 'A'
+3.	This field will be read-only
+4.	This field should be formatted for display using the “P2” format
+iii.	Proforma Value
+1.	The user will enter the Proforma Value for Other here
+a.	When a value is entered, the corresponding Percentage field will be zeroed out.
+b.	The user may enter a value in the Value or Percentage column and the other will be calculated
+2.	The value of this field will be stored in [income_hotel_motel_detail].other where value_type = 'P'
+3.	The default value will be 0
+4.	Valid values are 0 to 999,999,999
+5.	When the user enters a value in this field, the [income_hotel_motel_detail].other_update field will be set to ‘V’ where value_type = ‘P’
+6.	This field should be formatted for display using the “n0” format
+iv.	Proforma Percentage
+1.	The user will enter the Proforma Percentage for Other here
+a.	When a value is entered, the corresponding Value field will be zeroed out.
+b.	The user may enter a value in the Value or Percentage column and the other will be calculated 
+2.	The value of this field will be stored in [income_hotel_motel_detail].other_pct where value_type = 'P'
+3.	The default value will be 0
+4.	Valid values are 0.00 to 100.00
+5.	When the user enters a value in this field, the [income_hotel_motel_detail].other_update field will be set to ‘P’ where value_type = ‘P’
+6.	This field should be formatted for display using the “P2” format
+l.	Total Expenses
+i.	Actual Value
+1.	This field will be calculated
+2.	The value of this field will be stored in [income_hotel_motel_detail].total_expenses where value_type = 'A'
+3.	This field will be read-only
+4.	This field should be formatted for display using the “n0” format
+ii.	Actual Percentage
+1.	This field will be calculated
+2.	The value of this field will be stored in [income_hotel_motel_detail].total_expenses_pct where value_type = 'A'
+3.	This field will be read-only
+4.	This field should be formatted for display using the “P2” format
+iii.	Proforma Value
+1.	The user will enter the Proforma Value of Total Expenses here
+a.	When a value is entered, the corresponding Percentage field will be zeroed out.
+b.	The user may enter a value in the Value or Percentage column and the other will be calculated
+2.	The value of this field will be stored in [income_hotel_motel_detail].total_expenses where value_type = 'P'
+3.	The default value will be 0
+4.	Valid values are 0 to 999,999,999
+5.	When the user enters a value in this field, the [income_hotel_motel_detail].total_expenses_update field will be set to ‘V’ where value_type = ‘P’
+6.	This field should be formatted for display using the “n0” format
+iv.	Proforma Percentage
+1.	The user will enter the Proforma Percentage of Total Expenses here
+a.	When a value is entered, the corresponding Value field will be zeroed out.
+b.	The user may enter a value in the Value or Percentage column and the other will be calculated 
+2.	The value of this field will be stored in [income_hotel_motel_detail].total_expenses_pct where value_type = 'P'
+3.	The default value will be 0
+4.	Valid values are 0.00 to 100.00
+5.	When the user enters a value in this field, the [income_hotel_motel_detail].total_expenses_update field will be set to ‘P’ where value_type = ‘P’
+6.	This field should be formatted for display using the “P2” format
+4.	Net Operating Income
+a.	Actual Value
+i.	This field will be calculated
+ii.	The value of this field will be stored in [income_hotel_motel_detail].net_operating_income where value_type = 'A'
+iii.	This field will be read-only
+iv.	This field should be formatted for display using the “n0” format
+b.	Actual Percentage
+i.	This field will be calculated
+ii.	The value of this field will be stored in [income_hotel_motel_detail].net_operating_income_pct where value_type = 'A'
+iii.	This field will be read-only
+iv.	This field should be formatted for display using the “P2” format
+c.	Proforma Value
+i.	This field will be calculated
+ii.	The value of this field will be stored in [income_hotel_motel_detail].net_operating_income where value_type = 'P'
+iii.	This field will be read-only
+iv.	This field should be formatted for display using the “n0” format
+d.	Proforma Percentage
+i.	This field will be calculated
+ii.	The value of this field will be stored in [income_hotel_motel_detail].net_operating_income_pct where value_type = 'P'
+iii.	This field will be read-only
+iv.	This field should be formatted for display using the “P2” format
+5.	Cap Rate
+a.	Actual Percentage
+i.	This field will be the Cap Rate without the Tax Rate component
+ii.	The value of this field will be stored in [income_hotel_motel_detail].cap_rate where value_type = 'A'
+iii.	The default value will be 0
+iv.	Valid values will be 0 to 99.99
+v.	When the user enters a value in this field, the [income_hotel_motel_detail].cap_rate_update field will be set to ‘P’ where value_type = ‘A’
+vi.	This field should be formatted for display using the “n2” format
+b.	Proforma Percentage
+i.	This field will be the Cap Rate without the Tax Rate component
+ii.	The value of this field will be stored in [income_hotel_motel_detail].cap_rate where value_type = 'P'
+iii.	The default value will be 0
+iv.	Valid values will be 0 to 99.99
+v.	When the user enters a value in this field, the [income_hotel_motel_detail].cap_rate_update field will be set to ‘P’ where value_type = ‘P’
+vi.	This field should be formatted for display using the “n2” format
+6.	Tax Rate
+a.	Actual Percentage
+i.	This field will be the Tax Rate
+ii.	The value of this field will be stored in [income_hotel_motel_detail].tax_rate where value_type = 'A'
+iii.	The default value will be the Tax Rate for the Property based off the Taxing Authorities
+iv.	Valid values will be 0 to 99.99
+v.	When the user enters a value in this field, the [income_hotel_motel_detail].tax_rate_update field will be set to ‘P’ where value_type = ‘A’
+vi.	This field should be formatted for display using the “n2” format
+b.	Proforma Percentage
+i.	This field will be the Tax Rate
+ii.	The value of this field will be stored in [income_hotel_motel_detail].tax_rate where value_type = 'P'
+iii.	The default value will be the Tax Rate for the Property based off the Taxing Authorities
+iv.	Valid values will be 0 to 99.99
+v.	When the user enters a value in this field, the [income_hotel_motel_detail].tax_rate_update field will be set to ‘P’ where value_type = ‘P’
+vi.	This field should be formatted for display using the “n2” format
+7.	Overall Cap Rate
+a.	Actual Percentage
+i.	This field will be calculated
+ii.	The value of this field will be stored in [income_hotel_motel_detail].overall_cap_rate where value_type = 'A'
+iii.	This field will be read-only
+iv.	This field should be formatted for display using the “n2” format
+b.	Proforma Percentage
+i.	This field will be calculated
+ii.	The value of this field will be stored in [income_hotel_motel_detail].overall_cap_rate where value_type = 'P'
+iii.	This field will be read-only
+iv.	This field should be formatted for display using the “n2” format
+8.	Income Value
+a.	Actual Value
+i.	This field will be calculated
+ii.	The value of this field will be stored in [income_hotel_motel_detail].income_value where value_type = 'A'
+iii.	This field will be read-only
+iv.	This field should be formatted for display using the “n0” format
+b.	Proforma Value
+i.	This field will be calculated
+ii.	The value of this field will be stored in [income_hotel_motel_detail].income_value where value_type = 'P'
+iii.	This field will be read-only
+iv.	This field should be formatted for display using the “n0” format
+9.	Personal Property
+a.	Actual Value
+i.	The user will enter the Actual Personal Property Value here
+ii.	The value of this field will be stored in [income_hotel_motel_detail].personal_property_value where value_type = 'A'
+iii.	The default value will be 0
+iv.	Valid values will be 0 to 999,999,999
+v.	When the user enters a value in this field, the [income_hotel_motel_detail].personal_property_value_update field will be set to ‘V’ where value_type = ‘A’
+vi.	This field should be formatted for display using the “n0” format
+b.	Proforma Value
+i.	The user will enter the Proforma Personal Property Value here
+ii.	The value of this field will be stored in [income_hotel_motel_detail].personal_property_value where value_type = 'P'
+iii.	The default value will be 0
+iv.	Valid values will be 0 to 999,999,999
+v.	When the user enters a value in this field, the [income_hotel_motel_detail].personal_property_value_update field will be set to ‘V’ where value_type = ‘P’
+vi.	This field should be formatted for display using the “n0” format
+10.	Other Value
+a.	Actual Value
+i.	The user will enter the Actual Other Value here
+ii.	The value of this field will be stored in [income_hotel_motel_detail].other_value where value_type = 'A'
+iii.	The default value will be 0
+iv.	Valid values will be -999,999,999 to 999,999,999
+v.	When the user enters a value in this field, the [income_hotel_motel_detail].other_value_update field will be set to ‘V’ where value_type = ‘A’
+vi.	This field should be formatted for display using the “n0” format
+b.	Proforma Value
+i.	The user will enter the Proforma Other Value here
+ii.	The value of this field will be stored in [income_hotel_motel_detail].other_value where value_type = 'P'
+iii.	The default value will be 0
+iv.	Valid values will be -999,999,999 to 999,999,999
+v.	When the user enters a value in this field, the [income_hotel_motel_detail].other_value_update field will be set to ‘V’ where value_type = ‘P’
+vi.	This field should be formatted for display using the “n0” format
+11.	Excess Land
+a.	Actual Value
+i.	This field will display the Excess Land Value of the Income Valuation from the Income Details Dialog in the Metrics paragraph of the General Panel
+ii.	The value of this field will be stored in [income].land_excess_value
+iii.	This field will be read-only
+iv.	This field should be formatted for display using the “n0” format
+b.	Proforma Value
+i.	This field will display the Excess Land Value of the Income Valuation from the Income Details Dialog in the Metrics paragraph of the General Panel
+ii.	The value of this field will be stored in [income].land_excess_value
+iii.	This field will be read-only
+iv.	This field should be formatted for display using the “n0” format
+12.	Indicated Income Value
+a.	Actual Value
+i.	This field will be calculated
+ii.	The value of this field will be stored in [income_hotel_motel_detail].indicated_income_value where value_type = 'A'
+iii.	This field will be read-only
+iv.	This field should be formatted for display using the “n0” format
+b.	Proforma Value
+i.	This field will be calculated
+ii.	The value of this field will be stored in [income_hotel_motel_detail].indicated_income_value where value_type = 'P'
+iii.	This field will be read-only
+iv.	This field should be formatted for display using the “n0” format
+13.	Income Value – Reconciled
+a.	Actual Value
+i.	The user will enter the Income Value – Reconciled Value here
+ii.	The value of this field will be stored in [income_hotel_motel].income_value_reconciled
+iii.	The default value will be 0
+iv.	Valid values will be 0 to 999,999,999
+v.	This field is required
+vi.	This field should be formatted for display using the “n0” format
+
+
+Statistics Information
+
+1.	Assessed Value
+a.	This field will display the current Property's Assessed Value for the Year.
+b.	The value for this field will come from [property_val].assessed_val
+c.	This field will be read-only
+d.	This field should be formatted for display using the “n0” format
+2.	Value per Room – Income
+a.	This field will be calculated by dividing Income Value – Reconciled by Number of Rooms
+i.	The value for this field will come from [income_hotel_motel].income_value_per_room
+ii.	The actual calculation will be done as part of the Calculations group to be implemented later
+b.	This field will not be stored
+c.	This field will be read-only
+d.	This field should be formatted for display using the “n2” format
+3.	Value per Room – Assessment
+a.	This field will be calculated by dividing Assessment Value by Number of Rooms
+i.	The value for this field will come from [income_hotel_motel].assessment_value_per_room
+ii.	The actual calculation will be done as part of the Calculations group to be implemented later
+b.	This field will not be stored
+c.	This field will be read-only
+d.	This field should be formatted for display using the “n2” format
+4.	Value per Sqft – Income
+a.	This field will be calculated by dividing Income Value – Reconciled by Size in Sqft
+i.	The value for this field will come from [income_hotel_motel].income_value_per_sqft
+ii.	The actual calculation will be done as part of the Calculations group to be implemented later
+b.	This field will not be stored
+c.	This field will be read-only
+d.	This field should be formatted for display using the “n2” format
+5.	Value per Sqft – Assessment
+a.	This field will be calculated by dividing Assessment Value by Size in Sqft
+i.	The value for this field will come from [income_hotel_motel].assessment_value_per_sqft
+ii.	The actual calculation will be done as part of the Calculations group to be implemented later
+b.	This field will not be stored
+c.	This field will be read-only
+d.	This field should be formatted for display using the “n2” format
+
+
