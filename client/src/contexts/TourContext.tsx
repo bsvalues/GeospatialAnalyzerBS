@@ -169,6 +169,7 @@ export const TourProvider: React.FC<TourProviderProps> = ({ children }) => {
   );
 };
 
+// Only use named exports for consistency
 export const useTour = (): TourContextProps => {
   const context = useContext(TourContext);
   if (!context) {
@@ -176,5 +177,3 @@ export const useTour = (): TourContextProps => {
   }
   return context;
 };
-
-export default TourProvider;

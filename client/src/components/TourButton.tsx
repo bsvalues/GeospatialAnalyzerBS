@@ -3,6 +3,13 @@ import { Button } from '@/components/ui/button';
 import { useTour } from '@/contexts/TourContext';
 import { HelpCircle } from 'lucide-react';
 import Tooltip from '@/components/ui/tooltip';
+import { 
+  mainTourSteps, 
+  comparisonTourSteps, 
+  heatmapTourSteps, 
+  mapTourSteps, 
+  exportTourSteps 
+} from '@/services/tourService';
 
 interface TourButtonProps {
   className?: string;
@@ -22,7 +29,6 @@ export function TourButton({
   tourSteps = 'main'
 }: TourButtonProps) {
   const { startTour, steps, setSteps } = useTour();
-  const { mainTourSteps, comparisonTourSteps, heatmapTourSteps, mapTourSteps, exportTourSteps } = require('@/services/tourService');
   
   const handleStartTour = () => {
     // Set the appropriate tour steps based on the context
