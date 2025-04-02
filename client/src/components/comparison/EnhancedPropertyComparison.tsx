@@ -63,6 +63,9 @@ import { PropertyComparisonTable } from './PropertyComparisonTable';
 import { PropertyAttributesTable } from './PropertyAttributesTable';
 import { MarketPositionScatter } from './MarketPositionScatter';
 
+// Ensure proper reference to JavaScript's built-in Map class
+const JavaScriptMap = globalThis.Map;
+
 // Helper functions
 const calculateDifference = (value1: number, value2: number): { percentage: number, direction: 'up' | 'down' | 'same' } => {
   if (value1 === value2) return { percentage: 0, direction: 'same' };
