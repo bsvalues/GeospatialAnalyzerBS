@@ -10,7 +10,7 @@ import { etlPipelineManager } from './ETLPipelineManager';
 import { dataConnector } from './DataConnector';
 
 // API configuration
-const RAPIDAPI_HOST = 'zillow-com-property-data.p.rapidapi.com';
+const RAPIDAPI_HOST = 'realty-in-us.p.rapidapi.com';
 // The API key is retrieved from environment variables for security
 
 interface ZillowPropertyData {
@@ -48,6 +48,34 @@ interface ZillowSearchParams {
   home_types?: string;
   searchType?: 'forsale' | 'forrent';
   page?: number;
+}
+
+/**
+ * Interface for similar homes parameters
+ */
+interface SimilarHomesParams {
+  property_id: string;
+}
+
+/**
+ * Interface for similar rental homes parameters
+ */
+interface SimilarRentalHomesParams {
+  property_id: string;
+  postal_code: string;
+}
+
+/**
+ * Interface for mortgage rate parameters
+ */
+interface MortgageRateParams {
+  creditScore: string; // excellent, good, fair, poor
+  points?: string; // all, zero
+  loanPurpose?: string; // purchase, refinance
+  loanTypes?: string; // conventional, fha, va, usda
+  loanPercent?: string; // loan to value ratio (e.g., "80")
+  propertyPrice: string; // property price (e.g., "250000")
+  zip: string; // zip code
 }
 
 /**
@@ -244,6 +272,118 @@ class ZillowDataConnector {
       return job.id;
     } catch (error) {
       console.error('Error creating Zillow import job:', error);
+      return null;
+    }
+  }
+  
+  /**
+   * Get similar homes for a property
+   */
+  async getSimilarHomes(params: SimilarHomesParams): Promise<any[]> {
+    try {
+      // First check if API is available
+      const isApiAvailable = await this.isZillowApiAvailable();
+      
+      if (!isApiAvailable) {
+        console.error('Zillow API key is not configured on the server');
+        return [];
+      }
+      
+      // Use our secure proxy endpoint for similar homes
+      const response = await fetch('/api/zillow/similar-homes', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(params)
+      });
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      
+      if (!data.homes || !Array.isArray(data.homes)) {
+        return [];
+      }
+      
+      return data.homes.map((item: any) => this.transformPropertyData(item));
+    } catch (error) {
+      console.error('Error fetching similar homes from Zillow:', error);
+      return [];
+    }
+  }
+  
+  /**
+   * Get similar rental homes for a property
+   */
+  async getSimilarRentalHomes(params: SimilarRentalHomesParams): Promise<any[]> {
+    try {
+      // First check if API is available
+      const isApiAvailable = await this.isZillowApiAvailable();
+      
+      if (!isApiAvailable) {
+        console.error('Zillow API key is not configured on the server');
+        return [];
+      }
+      
+      // Use our secure proxy endpoint for similar rental homes
+      const response = await fetch('/api/zillow/similar-rentals', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(params)
+      });
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      
+      if (!data.homes || !Array.isArray(data.homes)) {
+        return [];
+      }
+      
+      return data.homes.map((item: any) => this.transformPropertyData(item));
+    } catch (error) {
+      console.error('Error fetching similar rental homes from Zillow:', error);
+      return [];
+    }
+  }
+  
+  /**
+   * Check mortgage rates for a property
+   */
+  async checkMortgageRates(params: MortgageRateParams): Promise<any> {
+    try {
+      // First check if API is available
+      const isApiAvailable = await this.isZillowApiAvailable();
+      
+      if (!isApiAvailable) {
+        console.error('Zillow API key is not configured on the server');
+        return null;
+      }
+      
+      // Use our secure proxy endpoint for mortgage rates
+      const response = await fetch('/api/zillow/mortgage-rates', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(params)
+      });
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      return data;
+    } catch (error) {
+      console.error('Error checking mortgage rates from Zillow:', error);
       return null;
     }
   }

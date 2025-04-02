@@ -15,7 +15,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json(clientConfig);
   });
   
-  // API route to proxy Zillow API requests to protect the API key
+  // API route to proxy Zillow API property details
   app.post('/api/zillow/property-data', async (req, res) => {
     try {
       const { zpid, data: dataType } = req.body;
@@ -28,16 +28,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(500).json({ error: 'API key not configured' });
       }
       
-      // Build URL with optional data parameter
-      let url = `https://zillow-com-property-data.p.rapidapi.com/property_data.php?zpid=${zpid}`;
-      if (dataType) {
-        url += `&data=${dataType}`;
-      }
+      // Use the Realty in US API for property details
+      const url = `https://realty-in-us.p.rapidapi.com/properties/v3/detail?zpid=${zpid}`;
       
       const response = await fetch(url, {
         method: 'GET',
         headers: {
-          'x-rapidapi-host': 'zillow-com-property-data.p.rapidapi.com',
+          'x-rapidapi-host': 'realty-in-us.p.rapidapi.com',
           'x-rapidapi-key': process.env.RAPIDAPI_KEY
         }
       });
@@ -70,20 +67,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Build query string
       const params = new URLSearchParams();
       params.append('location', location);
-      if (searchType) params.append('searchType', searchType);
+      if (searchType) params.append('searchType', searchType || 'forsale');
       if (page) params.append('page', page.toString());
       if (price_min) params.append('price_min', price_min.toString());
       if (price_max) params.append('price_max', price_max.toString());
       if (beds_min) params.append('beds_min', beds_min.toString());
       if (baths_min) params.append('baths_min', baths_min.toString());
-      if (home_types) params.append('home_types', home_types);
+      if (home_types) params.append('home_type', home_types);
       
-      const url = `https://zillow-com-property-data.p.rapidapi.com/extended_search.php?${params.toString()}`;
+      const url = `https://realty-in-us.p.rapidapi.com/properties/v2/list-for-sale?${params.toString()}`;
       
       const response = await fetch(url, {
         method: 'GET',
         headers: {
-          'x-rapidapi-host': 'zillow-com-property-data.p.rapidapi.com',
+          'x-rapidapi-host': 'realty-in-us.p.rapidapi.com',
           'x-rapidapi-key': process.env.RAPIDAPI_KEY
         }
       });
@@ -97,6 +94,129 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('Error searching properties from Zillow API:', error);
       res.status(500).json({ error: 'Failed to search properties from Zillow' });
+    }
+  });
+  
+  // API route to get similar homes
+  app.post('/api/zillow/similar-homes', async (req, res) => {
+    try {
+      const { property_id } = req.body;
+      
+      if (!property_id) {
+        return res.status(400).json({ error: 'Missing required parameter: property_id' });
+      }
+      
+      if (!process.env.RAPIDAPI_KEY) {
+        return res.status(500).json({ error: 'API key not configured' });
+      }
+      
+      const url = `https://realty-in-us.p.rapidapi.com/properties/v2/list-similar-homes?property_id=${property_id}`;
+      
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'x-rapidapi-host': 'realty-in-us.p.rapidapi.com',
+          'x-rapidapi-key': process.env.RAPIDAPI_KEY
+        }
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Zillow API error: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      res.json(data);
+    } catch (error) {
+      console.error('Error fetching similar homes from Zillow API:', error);
+      res.status(500).json({ error: 'Failed to fetch similar homes' });
+    }
+  });
+  
+  // API route to get similar rental homes
+  app.post('/api/zillow/similar-rentals', async (req, res) => {
+    try {
+      const { postal_code, property_id } = req.body;
+      
+      if (!postal_code || !property_id) {
+        return res.status(400).json({ error: 'Missing required parameters: postal_code and property_id' });
+      }
+      
+      if (!process.env.RAPIDAPI_KEY) {
+        return res.status(500).json({ error: 'API key not configured' });
+      }
+      
+      const url = `https://realty-in-us.p.rapidapi.com/properties/v2/list-similar-rental-homes?postal_code=${postal_code}&property_id=${property_id}`;
+      
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'x-rapidapi-host': 'realty-in-us.p.rapidapi.com',
+          'x-rapidapi-key': process.env.RAPIDAPI_KEY
+        }
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Zillow API error: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      res.json(data);
+    } catch (error) {
+      console.error('Error fetching similar rental homes from Zillow API:', error);
+      res.status(500).json({ error: 'Failed to fetch similar rental homes' });
+    }
+  });
+  
+  // API route to check mortgage rates
+  app.post('/api/zillow/mortgage-rates', async (req, res) => {
+    try {
+      const { 
+        creditScore, 
+        points, 
+        loanPurpose, 
+        loanTypes, 
+        loanPercent, 
+        propertyPrice, 
+        zip 
+      } = req.body;
+      
+      if (!creditScore || !propertyPrice || !zip) {
+        return res.status(400).json({ error: 'Missing required parameters' });
+      }
+      
+      if (!process.env.RAPIDAPI_KEY) {
+        return res.status(500).json({ error: 'API key not configured' });
+      }
+      
+      // Build query string
+      const params = new URLSearchParams();
+      params.append('creditScore', creditScore);
+      params.append('points', points || 'all');
+      params.append('loanPurpose', loanPurpose || 'purchase');
+      params.append('loanTypes', loanTypes || 'ALL');
+      params.append('loanPercent', loanPercent || '80');
+      params.append('propertyPrice', propertyPrice);
+      params.append('zip', zip);
+      
+      const url = `https://realty-in-us.p.rapidapi.com/mortgage/check-rates?${params.toString()}`;
+      
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'x-rapidapi-host': 'realty-in-us.p.rapidapi.com',
+          'x-rapidapi-key': process.env.RAPIDAPI_KEY
+        }
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Zillow API error: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      res.json(data);
+    } catch (error) {
+      console.error('Error fetching mortgage rates from Zillow API:', error);
+      res.status(500).json({ error: 'Failed to fetch mortgage rates' });
     }
   });
   // Sample property data (simulating database)
