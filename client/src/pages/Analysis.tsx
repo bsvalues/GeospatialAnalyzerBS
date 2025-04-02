@@ -1,12 +1,46 @@
-import React from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Calculator, BarChart, TrendingUp, Landmark, PieChart, LineChart, ArrowRight } from "lucide-react";
+import { Calculator, BarChart, TrendingUp, Landmark, PieChart, LineChart, ArrowRight, Map } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
+import MarketTrendsHeatMap from '@/components/map/MarketTrendsHeatMap';
+import L from 'leaflet';
+import 'leaflet/dist/leaflet.css';
 
 const AnalysisPage = () => {
+  const [map, setMap] = useState<L.Map | null>(null);
+  const mapContainerRef = useRef<HTMLDivElement | null>(null);
+  
+  // Initialize map
+  useEffect(() => {
+    if (mapContainerRef.current && !map) {
+      // Create map instance
+      const mapInstance = L.map(mapContainerRef.current, {
+        center: [46.2085, -119.1372], // Benton County, WA coordinates
+        zoom: 12,
+        zoomControl: true,
+        attributionControl: true,
+      });
+      
+      // Add base tile layer
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+        maxZoom: 19
+      }).addTo(mapInstance);
+      
+      // Save map instance to state
+      setMap(mapInstance);
+      
+      // Clean up on unmount
+      return () => {
+        mapInstance.remove();
+        setMap(null);
+      };
+    }
+  }, []);
+  
   return (
     <div className="container mx-auto px-4 sm:px-6 py-4 sm:py-6 space-y-4 sm:space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center">
@@ -156,6 +190,32 @@ const AnalysisPage = () => {
         
         <TabsContent value="market" className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Card className="md:col-span-2">
+              <CardHeader className="pb-2">
+                <div className="flex justify-between items-center">
+                  <div>
+                    <CardTitle className="flex items-center">
+                      <Map className="h-5 w-5 mr-2" />
+                      Interactive Heat Map
+                    </CardTitle>
+                    <CardDescription>
+                      Visualize property market trends geospatially
+                    </CardDescription>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent>
+                {/* Map container */}
+                <div 
+                  ref={mapContainerRef} 
+                  className="h-[400px] w-full rounded-md border mb-4"
+                ></div>
+                
+                {/* Heat Map Controls */}
+                <MarketTrendsHeatMap map={map} className="mt-4" />
+              </CardContent>
+            </Card>
+            
             <Card>
               <CardHeader className="pb-2">
                 <CardTitle>Market Trends</CardTitle>
@@ -164,13 +224,7 @@ const AnalysisPage = () => {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="aspect-[4/3] bg-slate-100 rounded-lg flex items-center justify-center">
-                  <div className="text-center p-4">
-                    <TrendingUp className="h-10 w-10 text-slate-400 mx-auto mb-3" />
-                    <p className="text-slate-500 text-sm">Market trend visualization will appear here</p>
-                  </div>
-                </div>
-                <div className="mt-4 grid grid-cols-2 gap-2">
+                <div className="mt-2 grid grid-cols-2 gap-2">
                   <div className="border rounded-md p-3">
                     <p className="text-xs text-muted-foreground">Average Price Growth</p>
                     <p className="text-xl font-bold text-primary mt-1">+4.8%</p>
@@ -180,6 +234,16 @@ const AnalysisPage = () => {
                     <p className="text-xs text-muted-foreground">Sales Volume</p>
                     <p className="text-xl font-bold mt-1">1,241</p>
                     <p className="text-xs text-muted-foreground">Last 12 months</p>
+                  </div>
+                  <div className="border rounded-md p-3">
+                    <p className="text-xs text-muted-foreground">Avg. Days on Market</p>
+                    <p className="text-xl font-bold mt-1">26</p>
+                    <p className="text-xs text-muted-foreground">Last 90 days</p>
+                  </div>
+                  <div className="border rounded-md p-3">
+                    <p className="text-xs text-muted-foreground">Avg. Price / Sq Ft</p>
+                    <p className="text-xl font-bold mt-1">$246</p>
+                    <p className="text-xs text-muted-foreground">County-wide</p>
                   </div>
                 </div>
               </CardContent>
