@@ -1,167 +1,145 @@
 import React from 'react';
-import { Property } from '@shared/schema';
-import { formatCurrency } from '../../lib/utils';
-import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '@/components/ui/table';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { Badge } from '@/components/ui/badge';
-import { SimilarityScoreIndicator } from './SimilarityScoreIndicator';
-import { ComparablePropertyResult } from '../../services/comparison/comparablesService';
+import { Property } from '@shared/schema';
+import { formatCurrency } from '@/lib/utils';
 
 interface PropertyComparisonTableProps {
   baseProperty: Property;
   selectedProperties: Property[];
-  similarityScores?: Record<number | string, number>;
-  className?: string;
+  similarityScores: Record<string | number, number>;
 }
 
-/**
- * Table component for side-by-side property comparison
- */
-export const PropertyComparisonTable: React.FC<PropertyComparisonTableProps> = ({
-  baseProperty,
-  selectedProperties,
-  similarityScores,
-  className = ''
-}) => {
-  // Filter out the base property if it's included in selectedProperties
-  const comparableProperties = selectedProperties.filter(p => p.id !== baseProperty.id);
-  
-  // All properties to display (base property first)
-  const allProperties = [baseProperty, ...comparableProperties];
-  
-  // Get similarity score for a property
-  const getScore = (property: Property): number => {
-    if (property.id === baseProperty.id) return 100; // Base property is 100% similar to itself
-    return similarityScores?.[property.id] || 0;
-  };
-  
-  // Format field values for comparison
-  const formatField = (property: Property, field: keyof Property): React.ReactNode => {
-    if (property[field] === undefined || property[field] === null) return '—';
+export function PropertyComparisonTable({ 
+  baseProperty, 
+  selectedProperties, 
+  similarityScores 
+}: PropertyComparisonTableProps) {
+  // Extract property value as a number
+  const getPropertyValue = (property: Property): number => {
+    if (!property.value) return 0;
     
-    // Format based on field type
-    switch (field) {
-      case 'value':
-      case 'salePrice':
-      case 'taxAssessment':
-        return formatCurrency(parseFloat(property[field] as string || '0'));
-      
-      case 'propertyType':
-        return (
-          <Badge variant="outline" className="capitalize">
-            {property[field] as string}
-          </Badge>
-        );
-        
-      case 'lastSaleDate':
-        try {
-          const date = new Date(property[field] as string);
-          return date.toLocaleDateString();
-        } catch (e) {
-          return property[field];
-        }
-        
-      case 'squareFeet':
-      case 'lotSize':
-        return `${property[field]?.toLocaleString()} sq.ft.`;
-      
-      default:
-        return property[field];
-    }
+    return typeof property.value === 'string'
+      ? parseFloat(property.value.replace(/[^0-9.-]+/g, ''))
+      : property.value;
   };
   
-  // Field groups for the table
-  const fieldGroups = [
-    {
-      title: 'Basic Info',
-      fields: [
-        { key: 'address' as keyof Property, label: 'Address' },
-        { key: 'parcelId' as keyof Property, label: 'Parcel ID' },
-        { key: 'owner' as keyof Property, label: 'Owner' },
-        { key: 'neighborhood' as keyof Property, label: 'Neighborhood' },
-        { key: 'propertyType' as keyof Property, label: 'Property Type' },
-        { key: 'zoning' as keyof Property, label: 'Zoning' },
-      ]
-    },
-    {
-      title: 'Property Details',
-      fields: [
-        { key: 'squareFeet' as keyof Property, label: 'Square Feet' },
-        { key: 'bedrooms' as keyof Property, label: 'Bedrooms' },
-        { key: 'bathrooms' as keyof Property, label: 'Bathrooms' },
-        { key: 'yearBuilt' as keyof Property, label: 'Year Built' },
-        { key: 'lotSize' as keyof Property, label: 'Lot Size' },
-      ]
-    },
-    {
-      title: 'Valuation',
-      fields: [
-        { key: 'value' as keyof Property, label: 'Value' },
-        { key: 'salePrice' as keyof Property, label: 'Sale Price' },
-        { key: 'lastSaleDate' as keyof Property, label: 'Last Sale Date' },
-        { key: 'taxAssessment' as keyof Property, label: 'Tax Assessment' },
-      ]
-    },
-  ];
+  // Calculate price per square foot
+  const getPricePerSqFt = (property: Property): number | null => {
+    const value = getPropertyValue(property);
+    if (!value || !property.squareFeet) return null;
+    
+    return value / property.squareFeet;
+  };
+  
+  // Format price per square foot
+  const formatPricePerSqFt = (ppsf: number | null): string => {
+    if (ppsf === null) return 'N/A';
+    return formatCurrency(ppsf);
+  };
+  
+  // Calculate the difference (as a percentage) from the base property
+  const calculateDifference = (baseValue: number, compValue: number): { value: number, isHigher: boolean } => {
+    if (!baseValue || !compValue) return { value: 0, isHigher: false };
+    
+    const diff = compValue - baseValue;
+    const percentage = Math.abs((diff / baseValue) * 100);
+    
+    return {
+      value: Math.round(percentage * 10) / 10, // Round to 1 decimal place
+      isHigher: diff > 0
+    };
+  };
+  
+  // Format the difference for display with + or - sign
+  const formatDifference = (diff: { value: number, isHigher: boolean }): JSX.Element | string => {
+    if (diff.value === 0) return '--';
+    
+    return (
+      <span className={diff.isHigher ? 'text-green-600' : 'text-red-600'}>
+        {diff.isHigher ? '+' : '-'}{diff.value}%
+      </span>
+    );
+  };
   
   return (
-    <div className={`overflow-x-auto ${className}`}>
+    <div className="border rounded-md">
       <Table>
-        <TableHeader>
+        <TableHeader className="bg-muted/50">
           <TableRow>
-            <TableHead className="w-36">Property</TableHead>
-            {allProperties.map((property, index) => (
-              <TableHead 
-                key={property.id} 
-                className={`min-w-[200px] ${index === 0 ? 'bg-primary/5' : ''}`}
-              >
-                <div className="font-medium truncate mb-1">
-                  {property.address}
-                </div>
-                <div className="text-xs text-gray-500 font-normal">
-                  {property.parcelId}
-                </div>
-                {index > 0 && similarityScores && (
-                  <div className="mt-2">
-                    <SimilarityScoreIndicator 
-                      score={getScore(property)} 
-                      size="sm"
-                    />
-                  </div>
-                )}
-              </TableHead>
-            ))}
+            <TableHead className="w-[200px]">Property</TableHead>
+            <TableHead>Value</TableHead>
+            <TableHead>Diff</TableHead>
+            <TableHead>Square Feet</TableHead>
+            <TableHead>Diff</TableHead>
+            <TableHead>$/SqFt</TableHead>
+            <TableHead>Year Built</TableHead>
+            <TableHead>Bedrooms</TableHead>
+            <TableHead>Bathrooms</TableHead>
+            <TableHead>Lot Size</TableHead>
+            <TableHead>Neighborhood</TableHead>
           </TableRow>
         </TableHeader>
-        
         <TableBody>
-          {fieldGroups.map((group) => (
-            <React.Fragment key={group.title}>
-              <TableRow className="bg-gray-50">
-                <TableCell 
-                  colSpan={allProperties.length + 1} 
-                  className="font-medium py-2"
-                >
-                  {group.title}
+          {selectedProperties.map((property, index) => {
+            const isBaseProperty = property.id === baseProperty.id;
+            const basePropValue = getPropertyValue(baseProperty);
+            const currentPropValue = getPropertyValue(property);
+            const valueDiff = calculateDifference(basePropValue, currentPropValue);
+            
+            const baseSqFt = baseProperty.squareFeet || 0;
+            const currentSqFt = property.squareFeet || 0;
+            const sqFtDiff = calculateDifference(baseSqFt, currentSqFt);
+            
+            return (
+              <TableRow key={property.id} className={isBaseProperty ? 'bg-primary/5' : ''}>
+                <TableCell className="font-medium">
+                  <div className="flex flex-col">
+                    <span>{property.address}</span>
+                    {!isBaseProperty && similarityScores[property.id] && (
+                      <Badge variant="outline" className="w-fit mt-1 text-xs">
+                        {Math.round(similarityScores[property.id] * 100)}% Similar
+                      </Badge>
+                    )}
+                    {isBaseProperty && (
+                      <Badge className="w-fit mt-1 text-xs">Base Property</Badge>
+                    )}
+                  </div>
                 </TableCell>
+                <TableCell>{formatCurrency(currentPropValue)}</TableCell>
+                <TableCell>
+                  {isBaseProperty ? (
+                    '--'
+                  ) : (
+                    formatDifference(valueDiff)
+                  )}
+                </TableCell>
+                <TableCell>{property.squareFeet ? property.squareFeet.toLocaleString() : 'N/A'}</TableCell>
+                <TableCell>
+                  {isBaseProperty ? (
+                    '--'
+                  ) : (
+                    formatDifference(sqFtDiff)
+                  )}
+                </TableCell>
+                <TableCell>{formatPricePerSqFt(getPricePerSqFt(property))}</TableCell>
+                <TableCell>{property.yearBuilt || 'N/A'}</TableCell>
+                <TableCell>{property.bedrooms || 'N/A'}</TableCell>
+                <TableCell>{property.bathrooms || 'N/A'}</TableCell>
+                <TableCell>{property.lotSize ? property.lotSize.toLocaleString() + ' sq ft' : 'N/A'}</TableCell>
+                <TableCell>{property.neighborhood || 'N/A'}</TableCell>
               </TableRow>
-              
-              {group.fields.map((field) => (
-                <TableRow key={field.key as string}>
-                  <TableCell className="font-medium">{field.label}</TableCell>
-                  {allProperties.map((property, index) => (
-                    <TableCell 
-                      key={`${property.id}-${field.key}`}
-                      className={index === 0 ? 'bg-primary/5' : ''}
-                    >
-                      {formatField(property, field.key)}
-                    </TableCell>
-                  ))}
-                </TableRow>
-              ))}
-            </React.Fragment>
-          ))}
+            );
+          })}
         </TableBody>
       </Table>
     </div>
   );
-};
+}

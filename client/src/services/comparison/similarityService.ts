@@ -1,192 +1,195 @@
 import { Property } from '@shared/schema';
-import { haversineDistance } from '../../lib/utils';
 
 /**
- * Weight configuration for similarity calculation
+ * Weights for calculating property similarity
  */
 export interface SimilarityWeights {
-  location: number;  // Weight for location-related factors
-  features: number;  // Weight for property features (bedrooms, bathrooms, etc.)
-  size: number;      // Weight for property size-related factors
-  age: number;       // Weight for property age and condition
+  propertyType?: number;
+  squareFeet?: number;
+  yearBuilt?: number;
+  bedrooms?: number;
+  bathrooms?: number;
+  lotSize?: number;
+  neighborhood?: number;
+  location?: number;  // For geographic distance
 }
 
 /**
- * Default weights for similarity calculation
+ * Alias for backward compatibility
  */
-export const DEFAULT_WEIGHTS: SimilarityWeights = {
-  location: 0.4,     // Location is very important for property value
-  features: 0.25,    // Features are quite important
-  size: 0.25,        // Size is also quite important
-  age: 0.1           // Age is less important than other factors
-};
+export const calculateSimilarityScore = calculateSimilarity;
 
-/**
- * Maximum distance in kilometers for location similarity
- */
-const MAX_DISTANCE = 10;
-
-/**
- * Calculate similarity score between two properties
- * @param baseProperty The reference property
- * @param compareProperty The property to compare with
- * @param weights Optional custom weights for the similarity calculation
- * @returns Similarity score between 0-100, where 100 is identical
- */
-export function calculateSimilarityScore(
+// Calculates similarity score between two properties
+export function calculateSimilarity(
   baseProperty: Property,
   compareProperty: Property,
-  weights: Partial<SimilarityWeights> = {}
+  customWeights?: SimilarityWeights
 ): number {
-  // Merge provided weights with defaults
-  const calculationWeights: SimilarityWeights = {
-    ...DEFAULT_WEIGHTS,
-    ...weights
+  // Skip the same property
+  if (baseProperty.id === compareProperty.id) {
+    return 0;
+  }
+
+  // Define default feature weights
+  const defaultWeights = {
+    propertyType: 0.15,
+    squareFeet: 0.20,
+    yearBuilt: 0.15,
+    bedrooms: 0.10,
+    bathrooms: 0.10,
+    lotSize: 0.10,
+    neighborhood: 0.20,
+    location: 0.0 // By default, don't consider location
   };
   
-  // Normalize weights to ensure they sum to 1
-  const weightSum = Object.values(calculationWeights).reduce((sum, weight) => sum + weight, 0);
-  const normalizedWeights: SimilarityWeights = {
-    location: calculationWeights.location / weightSum,
-    features: calculationWeights.features / weightSum,
-    size: calculationWeights.size / weightSum,
-    age: calculationWeights.age / weightSum
-  };
-  
-  // Calculate individual similarity scores
-  const locationScore = calculateLocationSimilarity(baseProperty, compareProperty);
-  const featureScore = calculateFeatureSimilarity(baseProperty, compareProperty);
-  const sizeScore = calculateSizeSimilarity(baseProperty, compareProperty);
-  const ageScore = calculateAgeSimilarity(baseProperty, compareProperty);
-  
-  // Apply weights to each score and sum
-  const weightedScore = 
-    (locationScore * normalizedWeights.location) +
-    (featureScore * normalizedWeights.features) +
-    (sizeScore * normalizedWeights.size) +
-    (ageScore * normalizedWeights.age);
-  
-  // Return score rounded to nearest integer
-  return Math.round(weightedScore);
+  // Combine default weights with custom weights
+  const weights = customWeights 
+    ? { ...defaultWeights, ...customWeights }
+    : defaultWeights;
+
+  let totalScore = 0;
+  let totalWeightApplied = 0;
+
+  // Compare property type (exact match)
+  if (baseProperty.propertyType && compareProperty.propertyType) {
+    const weight = weights.propertyType;
+    totalWeightApplied += weight;
+    
+    if (baseProperty.propertyType === compareProperty.propertyType) {
+      totalScore += weight;
+    }
+  }
+
+  // Compare neighborhood (exact match)
+  if (baseProperty.neighborhood && compareProperty.neighborhood) {
+    const weight = weights.neighborhood;
+    totalWeightApplied += weight;
+    
+    if (baseProperty.neighborhood === compareProperty.neighborhood) {
+      totalScore += weight;
+    }
+  }
+
+  // Compare square feet (normalized difference)
+  if (baseProperty.squareFeet && compareProperty.squareFeet) {
+    const weight = weights.squareFeet;
+    totalWeightApplied += weight;
+    
+    const percentDiff = Math.abs(baseProperty.squareFeet - compareProperty.squareFeet) / baseProperty.squareFeet;
+    const similarityScore = Math.max(0, 1 - percentDiff); // 0 to 1 score
+    
+    totalScore += similarityScore * weight;
+  }
+
+  // Compare year built (normalized difference, max 50 years)
+  if (baseProperty.yearBuilt && compareProperty.yearBuilt) {
+    const weight = weights.yearBuilt;
+    totalWeightApplied += weight;
+    
+    const yearDiff = Math.abs(baseProperty.yearBuilt - compareProperty.yearBuilt);
+    const normalizedDiff = Math.min(yearDiff, 50) / 50; // Normalize to 0-1
+    const similarityScore = 1 - normalizedDiff;
+    
+    totalScore += similarityScore * weight;
+  }
+
+  // Compare bedrooms (exact match, or close)
+  if (baseProperty.bedrooms && compareProperty.bedrooms) {
+    const weight = weights.bedrooms;
+    totalWeightApplied += weight;
+    
+    const bedroomDiff = Math.abs(baseProperty.bedrooms - compareProperty.bedrooms);
+    
+    if (bedroomDiff === 0) {
+      totalScore += weight;
+    } else if (bedroomDiff === 1) {
+      totalScore += weight * 0.8;
+    } else if (bedroomDiff === 2) {
+      totalScore += weight * 0.4;
+    }
+  }
+
+  // Compare bathrooms (exact match, or close)
+  if (baseProperty.bathrooms && compareProperty.bathrooms) {
+    const weight = weights.bathrooms;
+    totalWeightApplied += weight;
+    
+    const bathroomDiff = Math.abs(baseProperty.bathrooms - compareProperty.bathrooms);
+    
+    if (bathroomDiff === 0) {
+      totalScore += weight;
+    } else if (bathroomDiff <= 0.5) {
+      totalScore += weight * 0.8;
+    } else if (bathroomDiff <= 1) {
+      totalScore += weight * 0.6;
+    } else if (bathroomDiff <= 1.5) {
+      totalScore += weight * 0.3;
+    }
+  }
+
+  // Compare lot size (normalized difference)
+  if (baseProperty.lotSize && compareProperty.lotSize) {
+    const weight = weights.lotSize;
+    totalWeightApplied += weight;
+    
+    const percentDiff = Math.abs(baseProperty.lotSize - compareProperty.lotSize) / baseProperty.lotSize;
+    const similarityScore = Math.max(0, 1 - percentDiff); // 0 to 1 score
+    
+    totalScore += similarityScore * weight;
+  }
+
+  // If no weights were applied, return 0
+  if (totalWeightApplied === 0) return 0;
+
+  // Normalize by weights that were actually applied
+  return totalScore / totalWeightApplied;
 }
 
-/**
- * Calculate location similarity between properties
- * @returns Score from 0-100
- */
-function calculateLocationSimilarity(baseProperty: Property, compareProperty: Property): number {
-  // If either property is missing location data, return minimal score
-  if (!baseProperty.latitude || !baseProperty.longitude || 
-      !compareProperty.latitude || !compareProperty.longitude) {
-    
-    // If they're in the same neighborhood, that's at least something
-    if (baseProperty.neighborhood && compareProperty.neighborhood && 
-        baseProperty.neighborhood === compareProperty.neighborhood) {
-      return 50;
-    }
-    
-    return 25; // Minimal location similarity
-  }
-  
-  // Calculate distance between properties in kilometers
-  const distance = haversineDistance(
-    [baseProperty.latitude, baseProperty.longitude],
-    [compareProperty.latitude, compareProperty.longitude]
+// Finds similar properties to a given base property
+export function findSimilarProperties(
+  baseProperty: Property,
+  properties: Property[],
+  limit: number = 5
+): { properties: Property[], scores: Record<string | number, number> } {
+  // Calculate similarity scores for each property
+  const propertiesWithScores = properties.map(property => ({
+    property,
+    score: calculateSimilarity(baseProperty, property)
+  }));
+
+  // Sort by similarity score (descending)
+  propertiesWithScores.sort((a, b) => b.score - a.score);
+
+  // Ensure the base property is included (at the beginning)
+  const basePropertyInResults = propertiesWithScores.find(
+    p => p.property.id === baseProperty.id
   );
   
-  // Convert distance to similarity score (100 = same location, 0 = MAX_DISTANCE or further)
-  let distanceScore = 100 * Math.max(0, 1 - (distance / MAX_DISTANCE));
+  let results: typeof propertiesWithScores;
   
-  // Bonus for same neighborhood
-  if (baseProperty.neighborhood && compareProperty.neighborhood && 
-      baseProperty.neighborhood === compareProperty.neighborhood) {
-    distanceScore = Math.min(100, distanceScore + 10);
+  if (basePropertyInResults) {
+    // Remove base property from its current position
+    results = propertiesWithScores.filter(p => p.property.id !== baseProperty.id);
+    // Add it at the beginning
+    results.unshift(basePropertyInResults);
+  } else {
+    // Base property isn't in the results, add it manually
+    results = [
+      { property: baseProperty, score: 1 },
+      ...propertiesWithScores
+    ];
   }
-  
-  return distanceScore;
-}
 
-/**
- * Calculate feature similarity between properties
- * @returns Score from 0-100
- */
-function calculateFeatureSimilarity(baseProperty: Property, compareProperty: Property): number {
-  let scores: number[] = [];
+  // Limit results and create a scores record
+  const limitedResults = results.slice(0, limit);
+  const scores: Record<string | number, number> = {};
   
-  // Property type similarity (exact match)
-  if (baseProperty.propertyType && compareProperty.propertyType) {
-    scores.push(baseProperty.propertyType === compareProperty.propertyType ? 100 : 0);
-  }
-  
-  // Bedroom similarity
-  if (baseProperty.bedrooms && compareProperty.bedrooms) {
-    const bedroomDiff = Math.abs(baseProperty.bedrooms - compareProperty.bedrooms);
-    scores.push(100 * Math.max(0, 1 - (bedroomDiff / 3))); // 3+ bedroom difference = 0 similarity
-  }
-  
-  // Bathroom similarity
-  if (baseProperty.bathrooms && compareProperty.bathrooms) {
-    const bathroomDiff = Math.abs(baseProperty.bathrooms - compareProperty.bathrooms);
-    scores.push(100 * Math.max(0, 1 - (bathroomDiff / 2))); // 2+ bathroom difference = 0 similarity
-  }
-  
-  // Zoning similarity (exact match)
-  if (baseProperty.zoning && compareProperty.zoning) {
-    scores.push(baseProperty.zoning === compareProperty.zoning ? 100 : 0);
-  }
-  
-  // If we have no scores, return a default middle value
-  if (scores.length === 0) {
-    return 50;
-  }
-  
-  // Return average of all feature scores
-  return scores.reduce((sum, score) => sum + score, 0) / scores.length;
-}
+  limitedResults.forEach(({ property, score }) => {
+    scores[property.id] = score;
+  });
 
-/**
- * Calculate size similarity between properties
- * @returns Score from 0-100
- */
-function calculateSizeSimilarity(baseProperty: Property, compareProperty: Property): number {
-  let scores: number[] = [];
-  
-  // Square footage similarity
-  if (baseProperty.squareFeet && compareProperty.squareFeet) {
-    const sqftRatio = Math.min(baseProperty.squareFeet, compareProperty.squareFeet) / 
-                      Math.max(baseProperty.squareFeet, compareProperty.squareFeet);
-    scores.push(100 * sqftRatio);
-  }
-  
-  // Lot size similarity
-  if (baseProperty.lotSize && compareProperty.lotSize) {
-    const lotRatio = Math.min(baseProperty.lotSize, compareProperty.lotSize) / 
-                     Math.max(baseProperty.lotSize, compareProperty.lotSize);
-    scores.push(100 * lotRatio);
-  }
-  
-  // If we have no scores, return a default middle value
-  if (scores.length === 0) {
-    return 50;
-  }
-  
-  // Return average of all size scores
-  return scores.reduce((sum, score) => sum + score, 0) / scores.length;
-}
-
-/**
- * Calculate age and condition similarity between properties
- * @returns Score from 0-100
- */
-function calculateAgeSimilarity(baseProperty: Property, compareProperty: Property): number {
-  // If year built is missing, return middle value
-  if (!baseProperty.yearBuilt || !compareProperty.yearBuilt) {
-    return 50;
-  }
-  
-  // Calculate age difference
-  const ageDiff = Math.abs(baseProperty.yearBuilt - compareProperty.yearBuilt);
-  
-  // Convert to similarity score (0 difference = 100, 20+ years difference = 0)
-  return 100 * Math.max(0, 1 - (ageDiff / 20));
+  return {
+    properties: limitedResults.map(r => r.property),
+    scores
+  };
 }

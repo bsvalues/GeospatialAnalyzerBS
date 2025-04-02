@@ -1,191 +1,184 @@
 import React from 'react';
-import { Property } from '@shared/schema';
-import { PropertyValueAnalysis, ValuationStatus } from '../../services/comparison/valueAnalysisService';
-import { formatCurrency, formatPercentage } from '../../lib/utils';
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Separator } from '@/components/ui/separator';
-import { Badge } from '@/components/ui/badge';
+import { Property } from '@shared/schema';
+import { formatCurrency, formatPercentage } from '@/lib/utils';
 import { 
-  TrendingUp, 
-  TrendingDown, 
-  AlertCircle, 
-  CheckCircle,
-  DollarSign, 
-  Home,
-  ArrowUpDown,
-  Ruler
+  ArrowUpRight, 
+  ArrowDownRight, 
+  ArrowRight,
+  TrendingUp,
+  TrendingDown,
+  ChevronsUp,
+  ChevronsDown,
+  Minus
 } from 'lucide-react';
 
-interface PropertyValueAnalysisCardProps {
-  analysis: PropertyValueAnalysis;
-  className?: string;
+// Types for value analysis result
+export interface ValueAnalysisResult {
+  property: Property;
+  estimatedValue: number;
+  confidenceScore: number;
+  valueRange: [number, number];
+  marketPosition: {
+    percentile: number;
+    comparison: 'low' | 'average' | 'high';
+  };
+  metrics: {
+    pricePerSqFt: number;
+    propertyAge: number;
+    valueToLandRatio: number;
+  };
+  comparableProperties: {
+    property: Property;
+    similarityScore: number;
+    adjustedValue: number;
+  }[];
+  factors: {
+    name: string;
+    impact: 'high' | 'medium' | 'low';
+    weight: number;
+  }[];
 }
 
-/**
- * Card component to display property value analysis results
- */
-export const PropertyValueAnalysisCard: React.FC<PropertyValueAnalysisCardProps> = ({
-  analysis,
-  className = ''
-}) => {
-  // Get valuation status details
-  const getValuationDetails = (status: ValuationStatus) => {
-    switch (status) {
-      case 'undervalued':
-        return {
-          label: 'Undervalued',
-          icon: <TrendingDown className="h-5 w-5 text-green-500" />,
-          color: 'text-green-600',
-          description: 'This property appears to be undervalued compared to similar properties in the area.'
-        };
-      case 'overvalued':
-        return {
-          label: 'Overvalued',
-          icon: <TrendingUp className="h-5 w-5 text-red-500" />,
-          color: 'text-red-500',
-          description: 'This property appears to be overvalued compared to similar properties in the area.'
-        };
-      case 'fair-value':
-      default:
-        return {
-          label: 'Fair Value',
-          icon: <CheckCircle className="h-5 w-5 text-blue-500" />,
-          color: 'text-blue-500',
-          description: 'This property appears to be fairly valued compared to similar properties in the area.'
-        };
+interface PropertyValueAnalysisCardProps {
+  analysis: ValueAnalysisResult;
+}
+
+export function PropertyValueAnalysisCard({ analysis }: PropertyValueAnalysisCardProps) {
+  // Calculate the confidence level badge variant
+  const getConfidenceLevelVariant = (score: number) => {
+    if (score >= 90) return { variant: 'default', label: 'Very High' };
+    if (score >= 80) return { variant: 'default', label: 'High' };
+    if (score >= 70) return { variant: 'secondary', label: 'Good' };
+    if (score >= 60) return { variant: 'outline', label: 'Moderate' };
+    return { variant: 'destructive', label: 'Low' };
+  };
+
+  // Get estimated value position relative to the property value
+  const getValuePosition = () => {
+    const propertyValue = typeof analysis.property.value === 'string' 
+      ? parseFloat(analysis.property.value.replace(/[^0-9.-]+/g, ''))
+      : (analysis.property.value || 0);
+    
+    if (Math.abs(propertyValue - analysis.estimatedValue) < 0.01 * propertyValue) {
+      return { icon: <ArrowRight className="h-4 w-4 text-gray-500" />, text: 'On target', color: 'text-gray-500' };
     }
+    
+    if (analysis.estimatedValue > propertyValue) {
+      return { 
+        icon: <ArrowUpRight className="h-4 w-4 text-green-500" />, 
+        text: `${formatPercentage((analysis.estimatedValue - propertyValue) / propertyValue * 100)} above current value`, 
+        color: 'text-green-500' 
+      };
+    }
+    
+    return { 
+      icon: <ArrowDownRight className="h-4 w-4 text-red-500" />, 
+      text: `${formatPercentage((propertyValue - analysis.estimatedValue) / propertyValue * 100)} below current value`, 
+      color: 'text-red-500' 
+    };
   };
-  
-  const valuationDetails = getValuationDetails(analysis.valuationStatus);
-  
-  // Get percentage difference color
-  const getPercentColor = (percent: number) => {
-    if (Math.abs(percent) < 5) return 'text-blue-500';
-    return percent < 0 ? 'text-green-600' : 'text-red-500';
+
+  // Get market position icon
+  const getMarketPositionIcon = (percentile: number) => {
+    if (percentile >= 90) return <ChevronsUp className="h-5 w-5 text-green-500" />;
+    if (percentile >= 70) return <TrendingUp className="h-5 w-5 text-green-500" />;
+    if (percentile >= 30) return <Minus className="h-5 w-5 text-gray-500" />;
+    if (percentile >= 10) return <TrendingDown className="h-5 w-5 text-amber-500" />;
+    return <ChevronsDown className="h-5 w-5 text-red-500" />;
   };
-  
-  // Get progress bar color
-  const getProgressColor = (percent: number) => {
-    if (Math.abs(percent) < 5) return 'bg-blue-500';
-    return percent < 0 ? 'bg-green-600' : 'bg-red-500';
-  };
-  
-  // Convert percentage difference to a 0-100 scale for the progress bar
-  const getProgressValue = (percent: number) => {
-    // Center at 50, with range from 0 to 100
-    // -30% or lower -> 0
-    // +30% or higher -> 100
-    return Math.max(0, Math.min(100, (percent + 30) / 60 * 100));
-  };
+
+  const valuePosition = getValuePosition();
+  const confidenceLevel = getConfidenceLevelVariant(analysis.confidenceScore);
   
   return (
-    <Card className={className}>
-      <CardHeader className="pb-3">
-        <div className="flex items-center justify-between">
-          <CardTitle className="text-lg font-medium">Value Analysis</CardTitle>
-          <Badge 
-            variant="outline" 
-            className={`ml-2 ${valuationDetails.color}`}
-          >
-            <span className="flex items-center gap-1">
-              {valuationDetails.icon}
-              <span>{valuationDetails.label}</span>
-            </span>
-          </Badge>
-        </div>
+    <Card>
+      <CardHeader>
+        <CardTitle>Value Analysis</CardTitle>
+        <CardDescription>
+          Based on {analysis.comparableProperties.length} comparable properties
+        </CardDescription>
       </CardHeader>
-      
       <CardContent>
-        <p className="text-sm text-gray-500 mb-4">
-          {valuationDetails.description}
-        </p>
-        
-        {/* Value metrics */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-          <div className="bg-gray-50 p-3 rounded-md">
-            <div className="flex items-center text-sm text-gray-500 mb-1">
-              <DollarSign className="h-4 w-4 mr-1 text-gray-400" />
-              <span>Property Value</span>
-            </div>
-            <div className="text-lg font-medium">
-              {formatCurrency(parseFloat(analysis.property.value || '0'))}
-            </div>
-          </div>
-          
-          <div className="bg-gray-50 p-3 rounded-md">
-            <div className="flex items-center text-sm text-gray-500 mb-1">
-              <Ruler className="h-4 w-4 mr-1 text-gray-400" />
-              <span>Price per Sq.Ft.</span>
-            </div>
-            <div className="text-lg font-medium">
-              {formatCurrency(analysis.pricePerSquareFoot)}
-            </div>
-          </div>
-          
-          <div className="bg-gray-50 p-3 rounded-md">
-            <div className="flex items-center text-sm text-gray-500 mb-1">
-              <Home className="h-4 w-4 mr-1 text-gray-400" />
-              <span>Neighborhood Avg. (per Sq.Ft.)</span>
-            </div>
-            <div className="text-lg font-medium">
-              {formatCurrency(analysis.neighborhoodAveragePricePerSquareFoot)}
-            </div>
-          </div>
-          
-          <div className="bg-gray-50 p-3 rounded-md">
-            <div className="flex items-center text-sm text-gray-500 mb-1">
-              <ArrowUpDown className="h-4 w-4 mr-1 text-gray-400" />
-              <span>Difference</span>
-            </div>
-            <div className={`text-lg font-medium ${getPercentColor(analysis.percentageDifference)}`}>
-              {analysis.percentageDifference > 0 ? '+' : ''}{formatPercentage(analysis.percentageDifference)}
-            </div>
-          </div>
-        </div>
-        
-        {/* Relative Value Position */}
-        <div className="mb-4">
-          <div className="flex justify-between text-xs text-gray-500 mb-1">
-            <span>Undervalued</span>
-            <span>Market Value</span>
-            <span>Overvalued</span>
-          </div>
-          <Progress 
-            value={getProgressValue(analysis.percentageDifference)} 
-            className={`h-2 ${getProgressColor(analysis.percentageDifference)}`}
-          />
-        </div>
-        
-        <Separator className="my-4" />
-        
-        {/* Suggested Value Range */}
-        {analysis.suggestedValue && (
-          <div className="mt-4">
-            <h4 className="text-sm font-medium mb-2">Suggested Value Range</h4>
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-gray-500">
-                {formatCurrency(analysis.valueRangeMin || 0)}
-              </span>
-              <Badge variant="secondary" className="text-md">
-                {formatCurrency(analysis.suggestedValue)}
+        <div className="space-y-6">
+          {/* Estimated Value */}
+          <div>
+            <div className="flex justify-between items-center mb-2">
+              <div className="text-sm text-muted-foreground">Estimated Value</div>
+              <Badge variant="outline">
+                {confidenceLevel.label} Confidence
               </Badge>
-              <span className="text-sm text-gray-500">
-                {formatCurrency(analysis.valueRangeMax || 0)}
+            </div>
+            <div className="text-3xl font-bold mb-1">{formatCurrency(analysis.estimatedValue)}</div>
+            <div className="flex items-center text-sm">
+              {valuePosition.icon}
+              <span className={`ml-1 ${valuePosition.color}`}>
+                {valuePosition.text}
               </span>
             </div>
           </div>
-        )}
-        
-        {!analysis.suggestedValue && (
-          <div className="text-center text-gray-500 py-2">
-            <AlertCircle className="h-10 w-10 mx-auto text-amber-400 mb-2" />
-            <p className="text-sm">
-              Not enough comparable data to suggest a value range for this property.
-            </p>
+          
+          <Separator />
+          
+          {/* Value Range */}
+          <div>
+            <div className="text-sm text-muted-foreground mb-2">Value Range</div>
+            <div className="flex justify-between items-center">
+              <div className="font-medium">{formatCurrency(analysis.valueRange[0])}</div>
+              <div className="font-medium">{formatCurrency(analysis.valueRange[1])}</div>
+            </div>
+            <Progress value={analysis.confidenceScore} className="mt-2" />
+            <div className="flex justify-between text-xs text-muted-foreground mt-1">
+              <div>Min</div>
+              <div>Max</div>
+            </div>
           </div>
-        )}
+          
+          <Separator />
+          
+          {/* Market Position */}
+          <div>
+            <div className="text-sm text-muted-foreground mb-2">Market Position</div>
+            <div className="flex items-center">
+              {getMarketPositionIcon(analysis.marketPosition.percentile)}
+              <div className="ml-2">
+                <div className="font-medium">{analysis.marketPosition.percentile}th Percentile</div>
+                <div className="text-sm text-muted-foreground">
+                  {analysis.marketPosition.percentile < 30 
+                    ? 'Below average market value' 
+                    : analysis.marketPosition.percentile > 70 
+                      ? 'Above average market value'
+                      : 'Average market value'}
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          <Separator />
+          
+          {/* Key Metrics */}
+          <div>
+            <div className="text-sm text-muted-foreground mb-2">Key Metrics</div>
+            <div className="grid grid-cols-3 gap-4">
+              <div>
+                <div className="text-sm text-muted-foreground">Price/SqFt</div>
+                <div className="font-medium">{formatCurrency(analysis.metrics.pricePerSqFt)}</div>
+              </div>
+              <div>
+                <div className="text-sm text-muted-foreground">Age</div>
+                <div className="font-medium">{analysis.metrics.propertyAge} years</div>
+              </div>
+              <div>
+                <div className="text-sm text-muted-foreground">Value/Land</div>
+                <div className="font-medium">{analysis.metrics.valueToLandRatio.toFixed(2)}</div>
+              </div>
+            </div>
+          </div>
+        </div>
       </CardContent>
     </Card>
   );
-};
+}

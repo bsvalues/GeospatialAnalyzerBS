@@ -32,6 +32,27 @@ export function formatCurrency(value: number, options?: {
 }
 
 /**
+ * Format a number with thousand separators
+ */
+export function formatNumber(value: number, options?: {
+  notation?: Intl.NumberFormatOptions['notation'],
+  minimumFractionDigits?: number,
+  maximumFractionDigits?: number
+}): string {
+  const {
+    notation,
+    minimumFractionDigits = 0,
+    maximumFractionDigits = 0
+  } = options || {};
+  
+  return new Intl.NumberFormat('en-US', {
+    notation,
+    minimumFractionDigits,
+    maximumFractionDigits
+  }).format(value);
+}
+
+/**
  * Format a number as percentage
  */
 export function formatPercentage(value: number, options?: {

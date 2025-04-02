@@ -1,5 +1,4 @@
-import React, { useRef, useEffect, useState } from 'react';
-import { Property } from '@shared/schema';
+import React, { useRef } from 'react';
 import {
   Chart as ChartJS,
   LinearScale,
@@ -7,15 +6,16 @@ import {
   LineElement,
   Tooltip,
   Legend,
+  ScatterController,
   ChartData,
-  ChartOptions,
-  ScatterController
+  ChartOptions
 } from 'chart.js';
 import { Scatter } from 'react-chartjs-2';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { formatCurrency } from '../../lib/utils';
+import { Property } from '@shared/schema';
+import { Card, CardContent } from '@/components/ui/card';
+import { formatCurrency } from '@/lib/utils';
 
-// Register Chart.js components
+// Register ChartJS components
 ChartJS.register(
   LinearScale,
   PointElement,
@@ -29,228 +29,164 @@ interface MarketPositionScatterProps {
   baseProperty: Property;
   selectedProperties: Property[];
   allProperties: Property[];
-  className?: string;
-  xAxisProperty?: 'squareFeet' | 'yearBuilt' | 'lotSize';
+  xAxisProperty: 'squareFeet' | 'yearBuilt' | 'lotSize';
 }
 
-/**
- * Scatter plot component showing the market position of properties
- */
-export const MarketPositionScatter: React.FC<MarketPositionScatterProps> = ({
+export function MarketPositionScatter({
   baseProperty,
   selectedProperties,
   allProperties,
-  className = '',
-  xAxisProperty = 'squareFeet'
-}) => {
-  const chartRef = useRef<ChartJS>(null);
-  const [chartData, setChartData] = useState<ChartData<'scatter'>>({ datasets: [] });
-  const [chartOptions, setChartOptions] = useState<ChartOptions<'scatter'>>({});
-
-  useEffect(() => {
-    // Get all visible properties (selected + base)
-    const visibleProperties = [baseProperty, ...selectedProperties.filter(p => p.id !== baseProperty.id)];
+  xAxisProperty
+}: MarketPositionScatterProps) {
+  const chartRef = useRef(null);
+  
+  // Extract the appropriate property values
+  const getXValue = (property: Property): number => {
+    const value = property[xAxisProperty];
+    return typeof value === 'number' ? value : 0;
+  };
+  
+  const getYValue = (property: Property): number => {
+    if (!property.value) return 0;
     
-    // Filter properties with valid data points
-    const validMarketProperties = allProperties.filter(p => 
-      p.value !== undefined && 
-      parseFloat(p.value) > 0 &&
-      p[xAxisProperty] !== undefined
-    );
-    
-    // Map to data points
-    const marketData = validMarketProperties.map(p => ({
-      x: p[xAxisProperty] as number,
-      y: parseFloat(p.value || '0'),
-      property: p
-    }));
-    
-    // Create highlighted points for selected properties
-    const highlightedData = visibleProperties
-      .filter(p => p.value !== undefined && p[xAxisProperty] !== undefined)
-      .map(p => ({
-        x: p[xAxisProperty] as number,
-        y: parseFloat(p.value || '0'),
-        property: p
-      }));
-    
-    // Create datasets
-    const datasets = [
+    return typeof property.value === 'string'
+      ? parseFloat(property.value.replace(/[^0-9.-]+/g, ''))
+      : property.value;
+  };
+  
+  // Convert properties to scatter plot data points
+  const marketData = allProperties
+    .filter(p => p.id !== baseProperty.id && !selectedProperties.some(s => s.id === p.id))
+    .map(property => ({
+      x: getXValue(property),
+      y: getYValue(property)
+    }))
+    .filter(point => point.x > 0 && point.y > 0);
+  
+  const compareData = selectedProperties
+    .filter(p => p.id !== baseProperty.id)
+    .map(property => ({
+      x: getXValue(property),
+      y: getYValue(property)
+    }))
+    .filter(point => point.x > 0 && point.y > 0);
+  
+  const baseData = [{
+    x: getXValue(baseProperty),
+    y: getYValue(baseProperty)
+  }].filter(point => point.x > 0 && point.y > 0);
+  
+  // Define scatter plot data
+  const data: ChartData<'scatter'> = {
+    datasets: [
       {
-        label: 'Market Properties',
+        label: 'Market',
         data: marketData,
         backgroundColor: 'rgba(200, 200, 200, 0.5)',
         pointRadius: 4,
-        pointHoverRadius: 6,
       },
       {
-        label: 'Selected Properties',
-        data: highlightedData,
-        backgroundColor: 'rgba(59, 130, 246, 0.8)',
-        borderColor: 'rgb(59, 130, 246)',
-        borderWidth: 1,
+        label: 'Similar Properties',
+        data: compareData,
+        backgroundColor: 'rgba(99, 132, 255, 0.6)',
         pointRadius: 6,
-        pointHoverRadius: 8,
+      },
+      {
+        label: 'Base Property',
+        data: baseData,
+        backgroundColor: 'rgba(255, 99, 132, 0.8)',
+        pointRadius: 8,
+        pointStyle: 'circle',
       }
-    ];
-    
-    setChartData({ datasets });
-    
-    // Set chart options
-    const xAxisLabel = xAxisProperty === 'squareFeet' 
-      ? 'Square Footage' 
-      : xAxisProperty === 'yearBuilt' 
-        ? 'Year Built' 
-        : 'Lot Size';
-    
-    setChartOptions({
-      scales: {
-        x: {
-          title: {
-            display: true,
-            text: xAxisLabel
-          },
-          ticks: {
-            callback: function(value) {
-              if (xAxisProperty === 'yearBuilt') {
-                return value;
-              } else {
-                // Add commas for thousands
-                return value.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
-              }
-            }
-          }
+    ]
+  };
+  
+  // Configure chart options
+  const options: ChartOptions<'scatter'> = {
+    responsive: true,
+    maintainAspectRatio: false,
+    scales: {
+      x: {
+        title: {
+          display: true,
+          text: xAxisProperty === 'squareFeet' 
+            ? 'Square Feet'
+            : xAxisProperty === 'yearBuilt'
+              ? 'Year Built'
+              : 'Lot Size'
         },
-        y: {
-          title: {
-            display: true,
-            text: 'Property Value ($)'
-          },
-          ticks: {
-            callback: function(value) {
-              return formatCurrency(Number(value), false);
+        ticks: {
+          callback: function(value) {
+            if (xAxisProperty === 'yearBuilt') {
+              return value;
             }
+            
+            return new Intl.NumberFormat('en-US').format(value as number);
           }
         }
       },
-      plugins: {
-        tooltip: {
-          callbacks: {
-            label: function(context) {
-              const point = context.raw as { x: number; y: number; property: Property };
-              return [
-                `Address: ${point.property.address}`,
-                `Value: ${formatCurrency(point.y)}`,
-                xAxisProperty === 'squareFeet'
-                  ? `Square Feet: ${point.x.toLocaleString()}`
-                  : xAxisProperty === 'yearBuilt'
-                  ? `Year Built: ${point.x}`
-                  : `Lot Size: ${point.x.toLocaleString()}`
-              ];
-            }
-          }
+      y: {
+        title: {
+          display: true,
+          text: 'Property Value'
         },
-        legend: {
-          position: 'top',
-          labels: {
-            usePointStyle: true,
-            pointStyle: 'circle'
+        ticks: {
+          callback: function(value) {
+            return formatCurrency(value as number, { notation: 'compact' });
+          }
+        }
+      }
+    },
+    plugins: {
+      tooltip: {
+        callbacks: {
+          label: function(context) {
+            let xLabel = '';
+            
+            if (xAxisProperty === 'squareFeet') {
+              xLabel = `${new Intl.NumberFormat().format(context.parsed.x)} sq.ft.`;
+            } else if (xAxisProperty === 'yearBuilt') {
+              xLabel = `Built ${context.parsed.x}`;
+            } else {
+              xLabel = `Lot ${new Intl.NumberFormat().format(context.parsed.x)} sq.ft.`;
+            }
+            
+            return `${context.dataset.label}: ${xLabel}, ${formatCurrency(context.parsed.y)}`;
           }
         }
       },
-      maintainAspectRatio: false,
-      aspectRatio: 1.5
-    });
-  }, [baseProperty, selectedProperties, allProperties, xAxisProperty]);
-
-  // Calculate trendline
-  const calculateTrendline = () => {
-    if (!chartRef.current) return;
-    
-    // Get valid data points
-    const validPoints = allProperties
-      .filter(p => p.value !== undefined && p[xAxisProperty] !== undefined)
-      .map(p => ({ 
-        x: p[xAxisProperty] as number, 
-        y: parseFloat(p.value || '0')
-      }));
-    
-    if (validPoints.length < 2) return;
-    
-    // Calculate linear regression
-    let sumX = 0;
-    let sumY = 0;
-    let sumXY = 0;
-    let sumXX = 0;
-    
-    for (const point of validPoints) {
-      sumX += point.x;
-      sumY += point.y;
-      sumXY += point.x * point.y;
-      sumXX += point.x * point.x;
-    }
-    
-    const n = validPoints.length;
-    const slope = (n * sumXY - sumX * sumY) / (n * sumXX - sumX * sumX);
-    const intercept = (sumY - slope * sumX) / n;
-    
-    // Get chart instance and data
-    const chart = chartRef.current;
-    
-    // Add trendline dataset if it doesn't exist
-    if (!chart.data.datasets || chart.data.datasets.length < 3) {
-      const xValues = validPoints.map(p => p.x);
-      const minX = Math.min(...xValues);
-      const maxX = Math.max(...xValues);
-      
-      const trendlineData = [
-        { x: minX, y: minX * slope + intercept },
-        { x: maxX, y: maxX * slope + intercept }
-      ];
-      
-      if (chart.data.datasets) {
-        chart.data.datasets.push({
-          label: 'Market Trend',
-          data: trendlineData,
-          type: 'line' as const,
-          backgroundColor: 'rgba(255, 99, 132, 0.2)',
-          borderColor: 'rgba(255, 99, 132, 1)',
-          borderWidth: 2,
-          pointRadius: 0,
-          fill: false
-        });
-        
-        chart.update();
-      }
+      legend: {
+        position: 'top' as const,
+      },
+    },
+  };
+  
+  // Determine chart title based on x-axis property
+  const getChartTitle = () => {
+    switch (xAxisProperty) {
+      case 'squareFeet':
+        return 'Value vs. Square Footage';
+      case 'yearBuilt':
+        return 'Value vs. Year Built';
+      case 'lotSize':
+        return 'Value vs. Lot Size';
+      default:
+        return 'Market Position';
     }
   };
   
-  useEffect(() => {
-    // Add trendline after initial render
-    setTimeout(calculateTrendline, 500);
-  }, [chartData]);
-
   return (
-    <Card className={className}>
-      <CardHeader className="pb-2">
-        <CardTitle className="text-lg font-medium">Market Position</CardTitle>
-        <CardDescription>
-          Property values vs. {xAxisProperty === 'squareFeet' 
-            ? 'square footage' 
-            : xAxisProperty === 'yearBuilt' 
-              ? 'year built'
-              : 'lot size'}
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        <div className="h-64 md:h-80">
-          <Scatter 
+    <Card>
+      <CardContent className="p-4">
+        <h3 className="text-lg font-medium mb-2">{getChartTitle()}</h3>
+        <div style={{ height: '300px', position: 'relative' }}>
+          <Scatter
             ref={chartRef}
-            data={chartData as any} 
-            options={chartOptions as any} 
+            data={data}
+            options={options}
           />
         </div>
       </CardContent>
     </Card>
   );
-};
+}
