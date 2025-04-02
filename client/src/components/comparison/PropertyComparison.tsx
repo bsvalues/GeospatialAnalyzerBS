@@ -17,6 +17,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Badge } from '@/components/ui/badge';
 import { PropertySearchDialog } from './PropertySearchDialog';
 import { EnhancedPropertyComparison } from './EnhancedPropertyComparison';
+import { OneClickPropertyComparison } from './OneClickPropertyComparison';
 
 /**
  * Component to display a comparison of multiple properties
@@ -352,6 +353,18 @@ export function PropertyComparison() {
                     <TableCell>{property.neighborhood || 'N/A'}</TableCell>
                     <TableCell>
                       <div className="flex items-center gap-1">
+                        <Tooltip content="Quick compare with similar properties">
+                          <div>
+                            <OneClickPropertyComparison 
+                              property={property} 
+                              buttonVariant="ghost"
+                              buttonSize="icon"
+                              buttonText=""
+                              showIcon={true}
+                            />
+                          </div>
+                        </Tooltip>
+                        
                         <Tooltip content="Analyze this property">
                           <Button 
                             variant="ghost" 
