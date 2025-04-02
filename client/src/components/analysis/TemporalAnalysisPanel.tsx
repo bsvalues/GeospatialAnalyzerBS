@@ -134,7 +134,7 @@ export const TemporalAnalysisPanel: React.FC<TemporalAnalysisPanelProps> = ({
   
   // Growth rates
   const growthRates = useMemo(() => {
-    if (propertiesWithHistory.length === 0) return new Map();
+    if (propertiesWithHistory.length === 0) return new globalThis.Map();
     
     const analysis = new TimeSeriesAnalysis(propertiesWithHistory);
     return analysis.calculateAnnualGrowthRates();
