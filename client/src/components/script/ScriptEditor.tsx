@@ -53,13 +53,13 @@ const ScriptEditor: React.FC<ScriptEditorProps> = ({
   };
 
   return (
-    <div className="h-full flex flex-col border border-gray-700 rounded-md overflow-hidden">
-      <div className="bg-gray-800 px-4 py-3 border-b border-gray-700 flex justify-between items-center">
+    <div className="h-full flex flex-col border border-gray-300 rounded-md overflow-hidden shadow-sm">
+      <div className="bg-gray-100 px-4 py-3 border-b border-gray-200 flex justify-between items-center">
         <div className="flex items-center">
           <Code size={18} className="mr-2 text-blue-500" />
-          <h3 className="font-medium">{scriptName}</h3>
+          <h3 className="font-medium text-gray-800">{scriptName}</h3>
           {hasUnsavedChanges && (
-            <div className="ml-2 text-xs bg-yellow-800 text-yellow-100 px-2 py-0.5 rounded">
+            <div className="ml-2 text-xs bg-amber-100 text-amber-800 px-2 py-0.5 rounded border border-amber-200">
               Unsaved
             </div>
           )}
@@ -69,14 +69,14 @@ const ScriptEditor: React.FC<ScriptEditorProps> = ({
             aria-label="Toggle theme"
             pressed={isDarkTheme}
             onPressedChange={handleThemeToggle}
-            className="px-2 h-8"
+            className="px-2 h-8 bg-white border border-gray-200"
           >
             {isDarkTheme ? "Dark" : "Light"}
           </Toggle>
           <Button 
             variant="outline" 
             size="sm"
-            className="h-8"
+            className="h-8 bg-white"
             onClick={handleSave}
             disabled={readOnly || !hasUnsavedChanges}
           >
@@ -93,7 +93,7 @@ const ScriptEditor: React.FC<ScriptEditorProps> = ({
         </div>
       </div>
       
-      <div className="flex-1 overflow-hidden">
+      <div className="flex-1 overflow-hidden bg-white">
         <Editor
           height="100%"
           defaultLanguage="javascript"
@@ -121,13 +121,13 @@ const ScriptEditor: React.FC<ScriptEditorProps> = ({
         />
       </div>
       
-      <div className="bg-gray-800 border-t border-gray-700 px-4 py-3 flex items-center">
-        <Terminal size={14} className="text-gray-400 mr-2" />
-        <span className="text-xs text-gray-400">Script context includes: properties (array of Property objects), results (output object)</span>
+      <div className="bg-gray-100 border-t border-gray-200 px-4 py-3 flex items-center">
+        <Terminal size={14} className="text-gray-600 mr-2" />
+        <span className="text-xs text-gray-600">Script context includes: properties (array of Property objects), results (output object)</span>
         
         {/* Info note */}
-        <div className="ml-auto flex items-center text-xs text-gray-400">
-          <AlertTriangle size={14} className="text-yellow-400 mr-1" />
+        <div className="ml-auto flex items-center text-xs text-gray-600">
+          <AlertTriangle size={14} className="text-amber-500 mr-1" />
           <span>Scripts run in a controlled environment with access limited to property data</span>
         </div>
       </div>

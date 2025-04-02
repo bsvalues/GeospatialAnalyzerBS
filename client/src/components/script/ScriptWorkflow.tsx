@@ -95,16 +95,16 @@ const ScriptWorkflow: React.FC<ScriptWorkflowProps> = ({
   };
   
   return (
-    <div className="h-full flex flex-col bg-gray-800 border-r border-gray-700">
-      <div className="p-3 border-b border-gray-700 flex items-center justify-between">
-        <h2 className="text-sm font-medium flex items-center">
-          <Workflow size={16} className="mr-2 text-blue-400" />
+    <div className="h-full flex flex-col bg-gray-50 border-r border-gray-200">
+      <div className="p-3 border-b border-gray-200 flex items-center justify-between">
+        <h2 className="text-sm font-medium flex items-center text-gray-800">
+          <Workflow size={16} className="mr-2 text-blue-500" />
           Script Workflow
         </h2>
         <Button
           variant="ghost"
           size="icon"
-          className="h-7 w-7"
+          className="h-7 w-7 text-gray-600 hover:text-gray-900 hover:bg-gray-100"
           onClick={onAddGroup}
         >
           <PlusCircle size={14} />
@@ -116,22 +116,22 @@ const ScriptWorkflow: React.FC<ScriptWorkflowProps> = ({
         {scriptGroups.map(group => (
           <div key={group.id} className="mb-2">
             <div 
-              className={`flex items-center p-2 rounded cursor-pointer hover:bg-gray-700 ${
-                group.active ? 'bg-gray-700' : ''
+              className={`flex items-center p-2 rounded cursor-pointer hover:bg-gray-200 ${
+                group.active ? 'bg-gray-200' : ''
               }`}
               onClick={() => toggleGroup(group.id)}
             >
               {expandedGroups[group.id] ? 
-                <ChevronDown size={14} className="mr-1 text-gray-400" /> : 
-                <ChevronRight size={14} className="mr-1 text-gray-400" />
+                <ChevronDown size={14} className="mr-1 text-gray-600" /> : 
+                <ChevronRight size={14} className="mr-1 text-gray-600" />
               }
-              <Folder size={14} className="mr-2 text-yellow-400" />
-              <span className="text-sm truncate flex-1">{group.name}</span>
+              <Folder size={14} className="mr-2 text-yellow-500" />
+              <span className="text-sm truncate flex-1 text-gray-800">{group.name}</span>
               <div className="flex space-x-1">
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="h-5 w-5"
+                  className="h-5 w-5 text-gray-600 hover:text-gray-900 hover:bg-gray-200"
                   onClick={(e) => {
                     e.stopPropagation();
                     if (onAddStep) onAddStep(group.id);
@@ -142,7 +142,7 @@ const ScriptWorkflow: React.FC<ScriptWorkflowProps> = ({
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="h-5 w-5"
+                  className="h-5 w-5 text-gray-600 hover:text-gray-900 hover:bg-gray-200"
                   onClick={(e) => {
                     e.stopPropagation();
                     handleRunGroup(group.id);
@@ -160,23 +160,21 @@ const ScriptWorkflow: React.FC<ScriptWorkflowProps> = ({
                   <div 
                     key={step.id}
                     className={`flex items-center p-2 rounded text-sm cursor-pointer ${
-                      selectedStepId === step.id ? 'bg-blue-600' : 'hover:bg-gray-700'
+                      selectedStepId === step.id ? 'bg-blue-100 text-blue-900 border border-blue-200' : 'hover:bg-gray-100 text-gray-800'
                     }`}
                     onClick={() => onSelectStep && onSelectStep(step.id)}
                   >
                     <div className="w-4 mr-2 flex justify-center">
                       {getStepIcon(step)}
                     </div>
-                    <FileText size={12} className="mr-2 text-gray-400" />
+                    <FileText size={12} className="mr-2 text-gray-600" />
                     <span className="truncate flex-1">{step.name}</span>
                     
-                    <div className="flex opacity-0 group-hover:opacity-100 space-x-1">
+                    <div className="flex space-x-1">
                       <Button
                         variant="ghost"
                         size="icon"
-                        className={`h-5 w-5 opacity-0 ${
-                          selectedStepId === step.id ? 'opacity-100' : 'group-hover:opacity-100'
-                        }`}
+                        className="h-5 w-5 opacity-0 group-hover:opacity-100 hover:bg-gray-200 text-gray-600"
                         onClick={(e) => {
                           e.stopPropagation();
                           if (onRunStep) onRunStep(step.id);
@@ -187,9 +185,7 @@ const ScriptWorkflow: React.FC<ScriptWorkflowProps> = ({
                       <Button
                         variant="ghost"
                         size="icon"
-                        className={`h-5 w-5 opacity-0 ${
-                          selectedStepId === step.id ? 'opacity-100' : 'group-hover:opacity-100'
-                        }`}
+                        className="h-5 w-5 opacity-0 group-hover:opacity-100 hover:bg-gray-200 text-gray-600"
                         onClick={(e) => {
                           e.stopPropagation();
                           if (onDeleteStep) onDeleteStep(step.id);
@@ -209,29 +205,27 @@ const ScriptWorkflow: React.FC<ScriptWorkflowProps> = ({
         {getUngroupedSteps().length > 0 && (
           <div className="mb-2">
             <div className="mt-2">
-              <div className="p-2 text-xs text-gray-400 uppercase">Independent Steps</div>
+              <div className="p-2 text-xs text-gray-500 uppercase font-medium">Independent Steps</div>
               <div className="space-y-1">
                 {getUngroupedSteps().map(step => (
                   <div 
                     key={step.id}
                     className={`flex items-center p-2 rounded text-sm cursor-pointer ${
-                      selectedStepId === step.id ? 'bg-blue-600' : 'hover:bg-gray-700'
+                      selectedStepId === step.id ? 'bg-blue-100 text-blue-900 border border-blue-200' : 'hover:bg-gray-100 text-gray-800'
                     }`}
                     onClick={() => onSelectStep && onSelectStep(step.id)}
                   >
                     <div className="w-4 mr-2 flex justify-center">
                       {getStepIcon(step)}
                     </div>
-                    <Code size={12} className="mr-2 text-gray-400" />
+                    <Code size={12} className="mr-2 text-gray-600" />
                     <span className="truncate flex-1">{step.name}</span>
                     
                     <div className="flex space-x-1">
                       <Button
                         variant="ghost"
                         size="icon"
-                        className={`h-5 w-5 opacity-0 ${
-                          selectedStepId === step.id ? 'opacity-100' : 'group-hover:opacity-100'
-                        }`}
+                        className="h-5 w-5 opacity-0 group-hover:opacity-100 hover:bg-gray-200 text-gray-600"
                         onClick={(e) => {
                           e.stopPropagation();
                           if (onRunStep) onRunStep(step.id);
@@ -242,9 +236,7 @@ const ScriptWorkflow: React.FC<ScriptWorkflowProps> = ({
                       <Button
                         variant="ghost"
                         size="icon"
-                        className={`h-5 w-5 opacity-0 ${
-                          selectedStepId === step.id ? 'opacity-100' : 'group-hover:opacity-100'
-                        }`}
+                        className="h-5 w-5 opacity-0 group-hover:opacity-100 hover:bg-gray-200 text-gray-600"
                         onClick={(e) => {
                           e.stopPropagation();
                           if (onDeleteStep) onDeleteStep(step.id);
@@ -262,11 +254,11 @@ const ScriptWorkflow: React.FC<ScriptWorkflowProps> = ({
       </div>
       
       {/* New Step Button */}
-      <div className="p-3 border-t border-gray-700">
+      <div className="p-3 border-t border-gray-200">
         <Button
           variant="outline"
           size="sm"
-          className="w-full flex items-center justify-center"
+          className="w-full flex items-center justify-center bg-white hover:bg-gray-50"
           onClick={() => onAddStep && onAddStep()}
         >
           <Plus size={14} className="mr-1" />
