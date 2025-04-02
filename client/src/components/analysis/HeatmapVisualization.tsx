@@ -23,19 +23,19 @@ interface HeatmapVisualizationProps {
 export const HeatmapVisualization: React.FC<HeatmapVisualizationProps> = ({ properties }) => {
   // Get map instance from react-leaflet
   const map = useMap();
-  
+
   // State for heat map configuration
   const [intensity, setIntensity] = useState<number>(0.5);
   const [radius, setRadius] = useState<number>(20);
   const [variable, setVariable] = useState<HeatmapVariable>('value');
-  
+
   // Reference to heat layer
   const heatLayerRef = useRef<L.HeatLayer | null>(null);
-  
+
   // Convert string values to numbers
   const getPropertyValue = (property: Property, variable: HeatmapVariable): number => {
     if (!property) return 0;
-    
+
     switch (variable) {
       case 'value':
         return property.value ? parseFloat(property.value.replace(/[^0-9.-]+/g, '')) : 0;
@@ -49,44 +49,44 @@ export const HeatmapVisualization: React.FC<HeatmapVisualizationProps> = ({ prop
         return 0;
     }
   };
-  
+
   // Calculate max value for normalization
   const getMaxValue = (): number => {
     if (properties.length === 0) return 1;
-    
+
     return Math.max(
       ...properties.map(property => getPropertyValue(property, variable))
     );
   };
-  
+
   // Generate heat map points
   const generateHeatMapPoints = (): [number, number, number][] => {
     const validProperties = properties.filter(
       property => property.latitude && property.longitude
     );
-    
+
     if (validProperties.length === 0) return [];
-    
+
     const maxValue = getMaxValue();
-    
+
     return validProperties.map(property => {
       const lat = Number(property.latitude);
       const lng = Number(property.longitude);
       const value = getPropertyValue(property, variable);
       // Normalize value between 0 and 1, then scale by intensity
       const intensity = maxValue ? (value / maxValue) * intensity : 0;
-      
+
       return [lat, lng, intensity];
     });
   };
-  
+
   // Initialize or update heat map
   useEffect(() => {
     if (!map) return;
-    
+
     // Generate heat points
     const heatPoints = generateHeatMapPoints();
-    
+
     if (heatLayerRef.current) {
       // Update existing layer
       heatLayerRef.current.setLatLngs(heatPoints);
@@ -104,10 +104,10 @@ export const HeatmapVisualization: React.FC<HeatmapVisualizationProps> = ({ prop
         blur: 15,
         gradient: { 0.4: 'blue', 0.6: 'lime', 0.8: 'yellow', 1.0: 'red' }
       }).addTo(map);
-      
+
       heatLayerRef.current = heatLayer;
     }
-    
+
     // Cleanup on unmount
     return () => {
       if (heatLayerRef.current && map) {
@@ -116,22 +116,22 @@ export const HeatmapVisualization: React.FC<HeatmapVisualizationProps> = ({ prop
       }
     };
   }, [map, properties, variable, intensity, radius]);
-  
+
   // Handle variable change
   const handleVariableChange = (value: string) => {
     setVariable(value as HeatmapVariable);
   };
-  
+
   // Handle intensity change
   const handleIntensityChange = (value: number[]) => {
     setIntensity(value[0]);
   };
-  
+
   // Handle radius change
   const handleRadiusChange = (value: number[]) => {
     setRadius(value[0]);
   };
-  
+
   // Render component
   return (
     <Card className="w-80 shadow-md absolute top-4 right-4 z-[1000] bg-white bg-opacity-90">
@@ -161,7 +161,7 @@ export const HeatmapVisualization: React.FC<HeatmapVisualizationProps> = ({ prop
                   </SelectContent>
                 </Select>
               </div>
-              
+
               <div className="space-y-2">
                 <div className="flex justify-between">
                   <Label htmlFor="intensity-slider">Intensity</Label>
@@ -177,7 +177,7 @@ export const HeatmapVisualization: React.FC<HeatmapVisualizationProps> = ({ prop
                   onValueChange={handleIntensityChange}
                 />
               </div>
-              
+
               <div className="space-y-2">
                 <div className="flex justify-between">
                   <Label htmlFor="radius-slider">Radius</Label>
@@ -193,7 +193,7 @@ export const HeatmapVisualization: React.FC<HeatmapVisualizationProps> = ({ prop
                   onValueChange={handleRadiusChange}
                 />
               </div>
-              
+
               <div className="mt-4 text-xs text-gray-600">
                 <p>Showing heat map based on {variable === 'value' 
                   ? 'property values' 
