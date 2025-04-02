@@ -4,7 +4,7 @@ import {
   TimeSeriesDataPoint, 
   TrendAnalysisResult 
 } from '../../services/timeseries/timeSeriesAnalysisService';
-import { formatCurrency, formatPercent } from '../../lib/utils';
+import { formatCurrency, formatPercentage } from '../../lib/utils';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { 
   TrendingUp, 
@@ -137,7 +137,7 @@ export function PropertyValueTrend({
               <div className="flex justify-between items-center mb-1">
                 <p className="text-sm font-medium">{getTrendDescription()}</p>
                 <p className={`text-sm font-semibold ${getGrowthRateColor()}`}>
-                  {formatPercent(trendInfo.growthRate * 100)}
+                  {formatPercentage(trendInfo.growthRate * 100)}
                 </p>
               </div>
               <Progress 

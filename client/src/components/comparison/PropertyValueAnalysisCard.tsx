@@ -1,7 +1,7 @@
 import React from 'react';
 import { Property } from '@shared/schema';
 import { PropertyValueAnalysis, ValuationStatus } from '../../services/comparison/valueAnalysisService';
-import { formatCurrency, formatPercent } from '../../lib/utils';
+import { formatCurrency, formatPercentage } from '../../lib/utils';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Separator } from '@/components/ui/separator';
@@ -119,7 +119,7 @@ export const PropertyValueAnalysisCard: React.FC<PropertyValueAnalysisCardProps>
               <span>Price per Sq.Ft.</span>
             </div>
             <div className="text-lg font-medium">
-              {formatCurrency(analysis.pricePerSquareFoot, true, 'USD')}
+              {formatCurrency(analysis.pricePerSquareFoot)}
             </div>
           </div>
           
@@ -129,7 +129,7 @@ export const PropertyValueAnalysisCard: React.FC<PropertyValueAnalysisCardProps>
               <span>Neighborhood Avg. (per Sq.Ft.)</span>
             </div>
             <div className="text-lg font-medium">
-              {formatCurrency(analysis.neighborhoodAveragePricePerSquareFoot, true, 'USD')}
+              {formatCurrency(analysis.neighborhoodAveragePricePerSquareFoot)}
             </div>
           </div>
           
@@ -139,7 +139,7 @@ export const PropertyValueAnalysisCard: React.FC<PropertyValueAnalysisCardProps>
               <span>Difference</span>
             </div>
             <div className={`text-lg font-medium ${getPercentColor(analysis.percentageDifference)}`}>
-              {analysis.percentageDifference > 0 ? '+' : ''}{formatPercent(analysis.percentageDifference, 1)}
+              {analysis.percentageDifference > 0 ? '+' : ''}{formatPercentage(analysis.percentageDifference)}
             </div>
           </div>
         </div>

@@ -2,158 +2,153 @@ import { type ClassValue, clsx } from "clsx";
 import { twMerge } from "tailwind-merge";
 
 /**
- * Combines class names with Tailwind CSS classes
+ * Combine class names using clsx and tailwind-merge
  */
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
 /**
- * Formats a number as currency
- * @param value The value to format
- * @param showSymbol Whether to show the currency symbol (default: true)
- * @param currency The currency code (default: USD)
- * @returns Formatted currency string
+ * Format a number as currency
  */
-export function formatCurrency(value: number, showSymbol: boolean = true, currency = 'USD'): string {
+export function formatCurrency(value: number, options?: {
+  notation?: Intl.NumberFormatOptions['notation'],
+  minimumFractionDigits?: number,
+  maximumFractionDigits?: number
+}): string {
+  const {
+    notation,
+    minimumFractionDigits = 0,
+    maximumFractionDigits = 0
+  } = options || {};
+  
   return new Intl.NumberFormat('en-US', {
-    style: showSymbol ? 'currency' : 'decimal',
-    currency: showSymbol ? currency : undefined,
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0
+    style: 'currency',
+    currency: 'USD',
+    notation,
+    minimumFractionDigits,
+    maximumFractionDigits
   }).format(value);
 }
 
 /**
- * Formats a date as a string
- * @param date The date to format
- * @param options Intl.DateTimeFormatOptions
- * @returns Formatted date string
+ * Format a number as percentage
  */
-export function formatDate(
-  date: Date | string | number,
-  options: Intl.DateTimeFormatOptions = {
+export function formatPercentage(value: number, options?: {
+  minimumFractionDigits?: number,
+  maximumFractionDigits?: number
+}): string {
+  const {
+    minimumFractionDigits = 1,
+    maximumFractionDigits = 1
+  } = options || {};
+  
+  return new Intl.NumberFormat('en-US', {
+    style: 'percent',
+    minimumFractionDigits,
+    maximumFractionDigits
+  }).format(value / 100);
+}
+
+/**
+ * Format a date
+ */
+export function formatDate(date: Date, options?: Intl.DateTimeFormatOptions): string {
+  return new Intl.DateTimeFormat('en-US', {
     year: 'numeric',
     month: 'short',
-    day: 'numeric'
-  }
-): string {
-  if (!date) return 'N/A';
+    day: 'numeric',
+    ...options
+  }).format(date);
+}
+
+/**
+ * Return a human-readable file size
+ */
+export function formatFileSize(bytes: number): string {
+  if (bytes === 0) return '0 Bytes';
   
-  const dateObj = typeof date === 'string' || typeof date === 'number'
-    ? new Date(date)
-    : date;
-    
-  return new Intl.DateTimeFormat('en-US', options).format(dateObj);
-}
-
-/**
- * Truncates a string to a specified length
- * @param str The string to truncate
- * @param length Maximum length (default: 50)
- * @returns Truncated string with ellipsis if needed
- */
-export function truncateString(str: string, length = 50): string {
-  return str?.length > length ? `${str.substring(0, length)}...` : str;
-}
-
-/**
- * Formats a number with commas
- * @param value The number to format
- * @returns Formatted number string
- */
-export function formatNumber(value: number): string {
-  return new Intl.NumberFormat('en-US').format(value);
-}
-
-/**
- * Formats a percentage
- * @param value The value to format as percentage
- * @param decimals Number of decimal places (default: 1)
- * @returns Formatted percentage string
- */
-export function formatPercent(value: number, decimals = 1): string {
-  return `${value.toFixed(decimals)}%`;
-}
-
-/**
- * Creates an array with a range of numbers
- * @param start Starting number
- * @param end Ending number (inclusive)
- * @returns Array of numbers
- */
-export function range(start: number, end: number): number[] {
-  return Array.from({ length: end - start + 1 }, (_, i) => start + i);
-}
-
-/**
- * Debounces a function
- * @param fn The function to debounce
- * @param ms Debounce time in milliseconds
- * @returns Debounced function
- */
-export function debounce<T extends (...args: any[]) => any>(
-  fn: T,
-  ms = 300
-): (...args: Parameters<T>) => void {
-  let timeoutId: ReturnType<typeof setTimeout>;
+  const k = 1024;
+  const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
   
-  return function(this: any, ...args: Parameters<T>) {
-    clearTimeout(timeoutId);
-    timeoutId = setTimeout(() => fn.apply(this, args), ms);
-  };
+  return `${parseFloat((bytes / Math.pow(k, i)).toFixed(2))} ${sizes[i]}`;
 }
 
 /**
- * Generates a random color
- * @returns Hex color code
+ * Truncate a string to a specified length and add ellipsis if needed
  */
-export function randomColor(): string {
-  return `#${Math.floor(Math.random() * 16777215).toString(16).padStart(6, '0')}`;
+export function truncateString(str: string, maxLength: number): string {
+  if (str.length <= maxLength) return str;
+  return `${str.slice(0, maxLength)}...`;
 }
 
 /**
- * Capitalizes the first letter of each word in a string
- * @param str The string to capitalize
- * @returns Capitalized string
+ * Get initials from a name
  */
-export function titleCase(str: string): string {
+export function getInitials(name: string): string {
+  const parts = name.split(' ');
+  if (parts.length === 1) return parts[0].substring(0, 2).toUpperCase();
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+}
+
+/**
+ * Convert snake_case to Title Case
+ */
+export function snakeToTitleCase(str: string): string {
   return str
-    .toLowerCase()
-    .split(' ')
-    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+    .split('_')
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
     .join(' ');
 }
 
 /**
- * Calculate haversine distance between two points on Earth
- * @param point1 [latitude, longitude] of first point
- * @param point2 [latitude, longitude] of second point
- * @returns Distance in kilometers
+ * Parse a numeric value from a string, handling currency symbols and commas
  */
-export function haversineDistance(
-  point1: [number, number],
-  point2: [number, number]
-): number {
-  // Earth's radius in kilometers
-  const R = 6371;
-  
-  // Convert latitude and longitude from degrees to radians
-  const lat1 = (point1[0] * Math.PI) / 180;
-  const lon1 = (point1[1] * Math.PI) / 180;
-  const lat2 = (point2[0] * Math.PI) / 180;
-  const lon2 = (point2[1] * Math.PI) / 180;
-  
-  // Differences
-  const dLat = lat2 - lat1;
-  const dLon = lon2 - lon1;
-  
-  // Haversine formula
-  const a =
-    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-    Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  const distance = R * c;
-  
-  return distance;
+export function parseNumericValue(value: string | null | undefined): number {
+  if (!value) return 0;
+  return parseFloat(value.replace(/[^0-9.-]+/g, ''));
+}
+
+/**
+ * Check if a value is numeric
+ */
+export function isNumeric(value: any): boolean {
+  return !isNaN(parseFloat(value)) && isFinite(value);
+}
+
+/**
+ * Get color based on trend (up, down, stable)
+ */
+export function getTrendColor(trend: string): string {
+  switch (trend) {
+    case 'up':
+      return 'text-green-500';
+    case 'down':
+      return 'text-red-500';
+    default:
+      return 'text-amber-500';
+  }
+}
+
+/**
+ * Get icon based on trend (up, down, stable)
+ */
+export function getTrendIcon(trend: string): string {
+  switch (trend) {
+    case 'up':
+      return '↑';
+    case 'down':
+      return '↓';
+    default:
+      return '→';
+  }
+}
+
+/**
+ * Calculate percentage change between two values
+ */
+export function calculatePercentChange(oldValue: number, newValue: number): number {
+  if (oldValue === 0) return 0;
+  return ((newValue - oldValue) / Math.abs(oldValue)) * 100;
 }

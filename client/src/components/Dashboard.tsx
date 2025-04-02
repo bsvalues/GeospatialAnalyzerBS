@@ -29,6 +29,7 @@ import { PredictiveModelingPanel } from './panels/PredictiveModelingPanel';
 import { TimeSeriesAnalysisPanel } from './panels/TimeSeriesAnalysisPanel';
 import { SettingsPanel } from './panels/SettingsPanel';
 import { ReportGenerator } from './export/ReportGenerator';
+import { KPIDashboardPanel } from './KPIDashboardPanel';
 import { Property } from '@shared/schema';
 import { useQuery } from '@tanstack/react-query';
 import TabNavigation from './TabNavigation';
@@ -393,6 +394,8 @@ const Dashboard: React.FC<DashboardProps> = ({ className }) => {
         )}
         
         {activeTab === 'comparison' && <PropertyComparisonPanel />}
+        
+        {activeTab === 'kpi' && <KPIDashboardPanel />}
         
         {activeTab === 'reports' && (
           <div className="h-full p-6 overflow-auto">
