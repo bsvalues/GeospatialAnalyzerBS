@@ -1,17 +1,11 @@
 import React from 'react';
 import ETLManager from '../components/automation/ETLManager';
 
-const ETLPage: React.FC = () => {
+export default function ETLPage() {
   return (
-    <div className="container mx-auto py-6 space-y-8">
-      <h1 className="text-3xl font-bold tracking-tight">ETL Automation</h1>
-      <p className="text-muted-foreground">
-        Manage automated data extraction, transformation, and loading processes for GeospatialAnalyzerBS.
-      </p>
-      
+    <div className="container mx-auto py-6">
+      <h1 className="text-3xl font-bold mb-6">ETL Management</h1>
       <ETLManager />
     </div>
   );
-};
-
-export default ETLPage;
+}
