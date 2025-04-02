@@ -62,6 +62,7 @@ import { PropertyComparisonMap } from './PropertyComparisonMap';
 import { PropertyComparisonTable } from './PropertyComparisonTable';
 import { PropertyAttributesTable } from './PropertyAttributesTable';
 import { MarketPositionScatter } from './MarketPositionScatter';
+import { PropertyComparisonHeatmap } from './PropertyComparisonHeatmap';
 
 // Fix for Map constructor: Remove incorrect reference that's causing errors
 // Use {} for plain objects as key/value maps instead of Map constructor
@@ -264,6 +265,7 @@ export function EnhancedPropertyComparison({
               <TabsTrigger value="valuation">Valuation Analysis</TabsTrigger>
               <TabsTrigger value="spatial">Spatial Analysis</TabsTrigger>
               <TabsTrigger value="attributes">Property Attributes</TabsTrigger>
+              <TabsTrigger value="heatmap">Heatmap Visualization</TabsTrigger>
             </TabsList>
           </div>
           
@@ -970,6 +972,52 @@ export function EnhancedPropertyComparison({
                         </CardContent>
                       </Card>
                     </div>
+                  </div>
+                </div>
+              </ScrollArea>
+            </TabsContent>
+            
+            {/* Heatmap Visualization Tab */}
+            <TabsContent value="heatmap" className="m-0 p-0 h-full">
+              <ScrollArea className="h-full">
+                <div className="p-6">
+                  <Card className="mb-4">
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-lg">Property Comparison Heatmap</CardTitle>
+                      <CardDescription>
+                        Visual comparison of property attributes across similar properties
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="h-[450px]">
+                        <PropertyComparisonHeatmap 
+                          properties={[baseProperty, ...similarProperties.filter(p => p.id !== baseProperty.id)]} 
+                          selectedProperties={[baseProperty]}
+                        />
+                      </div>
+                    </CardContent>
+                  </Card>
+                  
+                  <div className="grid grid-cols-1 gap-4">
+                    <Card>
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-lg">Heatmap Analysis</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="space-y-4">
+                          <p>
+                            The heatmap visualization helps identify strengths and weaknesses of the subject property 
+                            compared to similar properties in the market. Darker colors indicate higher values, 
+                            allowing quick identification of patterns and outliers.
+                          </p>
+                          <p>
+                            Use this visualization to identify which attributes contribute most to the property's
+                            overall value and where there might be opportunities for improvement or justification
+                            for price adjustments.
+                          </p>
+                        </div>
+                      </CardContent>
+                    </Card>
                   </div>
                 </div>
               </ScrollArea>
