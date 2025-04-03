@@ -15,7 +15,8 @@ import {
   Globe,
   Menu,
   X,
-  ChevronDown
+  ChevronDown,
+  Brain
 } from 'lucide-react';
 import { Link, useLocation } from 'wouter';
 import { useMapAccessibility } from '@/contexts/MapAccessibilityContext';
@@ -211,6 +212,15 @@ export const Header: React.FC<HeaderProps> = ({ taxYear, onTaxYearChange }) => {
             )}>
               <Globe className="h-4 w-4 mr-1.5" />
               <span className="text-sm font-medium">Connectors</span>
+            </div>
+          </Link>
+          <Link href="/prediction">
+            <div className={cn(
+              "flex items-center px-3 py-1.5 rounded-md hover:bg-gray-200/50 transition-all duration-200 cursor-pointer",
+              currentLocation === "/prediction" ? "bg-primary/10 text-primary" : ""
+            )}>
+              <Brain className="h-4 w-4 mr-1.5" />
+              <span className="text-sm font-medium">AI Prediction</span>
             </div>
           </Link>
         </div>
@@ -462,6 +472,19 @@ export const Header: React.FC<HeaderProps> = ({ taxYear, onTaxYearChange }) => {
                 >
                   <Globe className="h-5 w-5 mr-3" />
                   <span className="font-medium">Connectors</span>
+                </div>
+              </Link>
+              
+              <Link href="/prediction">
+                <div 
+                  className={cn(
+                    "flex items-center rounded-md py-3 px-3 transition-colors",
+                    currentLocation === "/prediction" ? "bg-primary/10 text-primary" : "hover:bg-gray-100 text-gray-700"
+                  )}
+                  onClick={() => setIsMobileMenuOpen(false)}
+                >
+                  <Brain className="h-5 w-5 mr-3" />
+                  <span className="font-medium">AI Prediction</span>
                 </div>
               </Link>
             </nav>

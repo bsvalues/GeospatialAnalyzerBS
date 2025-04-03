@@ -6,7 +6,8 @@ import {
   isOpenAIConfigured, 
   generateCodeFromLanguage, 
   optimizeCode, 
-  debugCode 
+  debugCode,
+  generateContextualPropertyPrediction 
 } from "./services/openai";
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -1358,6 +1359,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('Error debugging code:', error);
       res.status(500).json({ error: 'Failed to debug code' });
+    }
+  });
+  
+  // ML-powered contextual property prediction
+  app.post('/api/ml/contextual-prediction', async (req, res) => {
+    try {
+      const { property, context, mlPrediction, comparableProperties, includeExplanation } = req.body;
+      
+      if (!property || !context || !mlPrediction) {
+        return res.status(400).json({ 
+          error: 'Missing required parameters: property, context, and mlPrediction are required' 
+        });
+      }
+      
+      if (!isOpenAIConfigured()) {
+        return res.status(500).json({ 
+          error: 'OpenAI API is not configured. Please set the OPENAI_API_KEY environment variable.' 
+        });
+      }
+      
+      const result = await generateContextualPropertyPrediction(
+        property, 
+        context, 
+        parseFloat(mlPrediction), 
+        comparableProperties || []
+      );
+      
+      res.json(result);
+    } catch (error) {
+      console.error('Error generating contextual property prediction:', error);
+      res.status(500).json({ error: 'Failed to generate contextual property prediction' });
     }
   });
 
