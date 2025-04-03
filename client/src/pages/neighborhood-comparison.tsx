@@ -7,29 +7,130 @@ import {
   TrendingUp, 
   Building, 
   Home, 
-  Info
+  Info,
+  Download,
+  FileText,
+  Filter
 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import NeighborhoodComparisonHeatmap from '../components/neighborhood/NeighborhoodComparisonHeatmap';
 import NeighborhoodTimeline from '../components/neighborhood/NeighborhoodTimeline';
 import { Property } from '@shared/schema';
 import { useQuery } from '@tanstack/react-query';
+import { TrendMetric, NeighborhoodTrendGraph } from '../components/neighborhood/NeighborhoodTrendGraph';
+import { NeighborhoodProfileComparison } from '../components/neighborhood/NeighborhoodProfileComparison';
+import { NeighborhoodPropertyTypeFilter } from '../components/neighborhood/NeighborhoodPropertyTypeFilter';
+import { neighborhoodComparisonReportService, ReportFormat } from '../services/neighborhoodComparisonReportService';
 
 const NeighborhoodComparisonPage: React.FC = () => {
   // State for active tab
   const [activeTab, setActiveTab] = useState('heatmap');
+  const [selectedNeighborhoods, setSelectedNeighborhoods] = useState<string[]>([]);
+  const [selectedYear, setSelectedYear] = useState('2022');
+  const [filteredProperties, setFilteredProperties] = useState<Property[]>([]);
+  const [isReportMenuOpen, setIsReportMenuOpen] = useState(false);
   
   // Fetch properties to use in visualization
   const { data: properties, isLoading, error } = useQuery<Property[]>({
     queryKey: ['/api/properties'],
   });
   
+  // Update filtered properties when source properties change
+  useEffect(() => {
+    if (properties) {
+      setFilteredProperties(properties);
+    }
+  }, [properties]);
+  
+  // Get neighborhoods data from the NeighborhoodTimeline component
+  const [neighborhoods, setNeighborhoods] = useState<any[]>([]);
+  
+  useEffect(() => {
+    // This would normally be fetched from a service
+    // For now, we'll use dummy data that will be replaced by the actual data
+    // from the NeighborhoodTimeline component
+    setNeighborhoods([]);
+  }, []);
+  
+  // Handle property type filter changes
+  const handleFilteredPropertiesChange = (props: Property[]) => {
+    setFilteredProperties(props);
+  };
+  
+  // Handle report generation
+  const generateReport = async (format: ReportFormat) => {
+    if (selectedNeighborhoods.length === 0) {
+      alert('Please select at least one neighborhood to generate a report');
+      return;
+    }
+    
+    try {
+      await neighborhoodComparisonReportService.generateAndDownloadReport({
+        neighborhoods,
+        selectedNeighborhoods,
+        properties: filteredProperties,
+        selectedYear,
+        metric: 'value',
+        format,
+        includeProperties: true
+      });
+      
+      setIsReportMenuOpen(false);
+    } catch (error) {
+      console.error('Error generating report:', error);
+      alert('Error generating report. Please try again.');
+    }
+  };
+  
   return (
     <div className="container mx-auto p-4 max-w-7xl">
-      <div className="mb-6">
-        <h1 className="text-3xl font-bold tracking-tight mb-1">Neighborhood Comparison</h1>
-        <p className="text-muted-foreground">
-          Compare neighborhoods using interactive visualizations to identify trends and patterns.
-        </p>
+      <div className="mb-6 flex justify-between items-center">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight mb-1">Neighborhood Comparison</h1>
+          <p className="text-muted-foreground">
+            Compare neighborhoods using interactive visualizations to identify trends and patterns.
+          </p>
+        </div>
+        
+        <div className="flex space-x-2">
+          <div className="relative">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setIsReportMenuOpen(!isReportMenuOpen)}
+              className="flex items-center gap-2"
+            >
+              <Download className="h-4 w-4" />
+              Export
+            </Button>
+            
+            {isReportMenuOpen && (
+              <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 z-10 border">
+                <button
+                  onClick={() => generateReport('csv')}
+                  className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 flex items-center"
+                >
+                  <FileText className="h-4 w-4 mr-2" />
+                  Download CSV
+                </button>
+                <button
+                  onClick={() => generateReport('excel')}
+                  className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 flex items-center"
+                >
+                  <FileText className="h-4 w-4 mr-2" />
+                  Download Excel
+                </button>
+                <button
+                  onClick={() => generateReport('pdf')}
+                  className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 flex items-center"
+                >
+                  <FileText className="h-4 w-4 mr-2" />
+                  Download PDF
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
       </div>
       
       <Tabs defaultValue="heatmap" value={activeTab} onValueChange={setActiveTab} className="w-full mb-8">
@@ -42,6 +143,14 @@ const NeighborhoodComparisonPage: React.FC = () => {
             <TrendingUp className="h-4 w-4" />
             <span>Timeline</span>
           </TabsTrigger>
+          <TabsTrigger value="profile" className="flex items-center gap-2">
+            <Building className="h-4 w-4" />
+            <span>Profile</span>
+          </TabsTrigger>
+          <TabsTrigger value="trends" className="flex items-center gap-2">
+            <BarChart3 className="h-4 w-4" />
+            <span>Trends</span>
+          </TabsTrigger>
           <TabsTrigger value="about" className="flex items-center gap-2">
             <Info className="h-4 w-4" />
             <span>About</span>
@@ -49,11 +158,150 @@ const NeighborhoodComparisonPage: React.FC = () => {
         </TabsList>
         
         <TabsContent value="heatmap" className="mt-0">
-          <NeighborhoodComparisonHeatmap properties={properties || []} />
+          <NeighborhoodComparisonHeatmap properties={filteredProperties || []} />
         </TabsContent>
         
         <TabsContent value="timeline" className="mt-0">
           <NeighborhoodTimeline />
+        </TabsContent>
+        
+        <TabsContent value="profile" className="mt-0">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <Card className="md:col-span-1">
+              <CardHeader>
+                <CardTitle className="text-lg">Filters</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <NeighborhoodPropertyTypeFilter 
+                  properties={properties || []}
+                  onFilterChange={handleFilteredPropertiesChange}
+                  className="mb-4"
+                />
+                
+                <div className="mt-6">
+                  <h3 className="text-base font-medium mb-2">Year</h3>
+                  <select
+                    className="w-full border rounded-md p-2"
+                    value={selectedYear}
+                    onChange={(e) => setSelectedYear(e.target.value)}
+                  >
+                    <option value="2020">2020</option>
+                    <option value="2021">2021</option>
+                    <option value="2022">2022</option>
+                  </select>
+                </div>
+              </CardContent>
+            </Card>
+            
+            <Card className="md:col-span-3">
+              <CardHeader>
+                <CardTitle className="text-lg">Neighborhood Profile Comparison</CardTitle>
+                <CardDescription>Detailed neighborhood-level statistics and trends</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {neighborhoods.length > 0 ? (
+                  <NeighborhoodProfileComparison 
+                    neighborhoods={neighborhoods}
+                    selectedNeighborhoods={selectedNeighborhoods}
+                    properties={filteredProperties || []}
+                    selectedYear={selectedYear}
+                  />
+                ) : (
+                  <div className="text-center p-8 text-gray-500">
+                    <p>Select neighborhoods to compare their profiles.</p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+        
+        <TabsContent value="trends" className="mt-0">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <Card className="md:col-span-3">
+              <CardHeader>
+                <CardTitle className="text-lg">Neighborhood Value Trends</CardTitle>
+                <CardDescription>Average property values over time</CardDescription>
+              </CardHeader>
+              <CardContent className="h-80">
+                {neighborhoods.length > 0 ? (
+                  <NeighborhoodTrendGraph 
+                    neighborhoods={neighborhoods}
+                    selectedNeighborhoods={selectedNeighborhoods}
+                    metric={TrendMetric.VALUE}
+                    height={300}
+                  />
+                ) : (
+                  <div className="h-full flex items-center justify-center text-gray-500">
+                    Select neighborhoods to view trends
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+            
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg">Growth Rates</CardTitle>
+                <CardDescription>Annual property value growth rates</CardDescription>
+              </CardHeader>
+              <CardContent className="h-64">
+                {neighborhoods.length > 0 ? (
+                  <NeighborhoodTrendGraph 
+                    neighborhoods={neighborhoods}
+                    selectedNeighborhoods={selectedNeighborhoods}
+                    metric={TrendMetric.PERCENT_CHANGE}
+                    height={230}
+                  />
+                ) : (
+                  <div className="h-full flex items-center justify-center text-gray-500">
+                    Select neighborhoods to view trends
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+            
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg">Transaction Volume</CardTitle>
+                <CardDescription>Number of property transactions by year</CardDescription>
+              </CardHeader>
+              <CardContent className="h-64">
+                {neighborhoods.length > 0 ? (
+                  <NeighborhoodTrendGraph 
+                    neighborhoods={neighborhoods}
+                    selectedNeighborhoods={selectedNeighborhoods}
+                    metric={TrendMetric.TRANSACTION_COUNT}
+                    height={230}
+                  />
+                ) : (
+                  <div className="h-full flex items-center justify-center text-gray-500">
+                    Select neighborhoods to view trends
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+            
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg">Price Per Square Foot</CardTitle>
+                <CardDescription>Average price per square foot trends</CardDescription>
+              </CardHeader>
+              <CardContent className="h-64">
+                {neighborhoods.length > 0 ? (
+                  <NeighborhoodTrendGraph 
+                    neighborhoods={neighborhoods}
+                    selectedNeighborhoods={selectedNeighborhoods}
+                    metric={TrendMetric.VALUE}
+                    height={230}
+                  />
+                ) : (
+                  <div className="h-full flex items-center justify-center text-gray-500">
+                    Select neighborhoods to view trends
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
         </TabsContent>
         
         <TabsContent value="about" className="mt-0">
