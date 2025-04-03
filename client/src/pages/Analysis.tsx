@@ -8,38 +8,40 @@ import { Badge } from "@/components/ui/badge";
 import MarketTrendsHeatMap from '@/components/map/MarketTrendsHeatMap';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
+import { MapContainer, TileLayer, useMap } from 'react-leaflet';
+
+// Helper component to get map instance
+const MapController = ({ setMap }: { setMap: (map: L.Map | null) => void }) => {
+  const map = useMap();
+  
+  useEffect(() => {
+    console.log("Map instance ready");
+    setMap(map);
+    
+    // Cleanup function to handle component unmount
+    return () => {
+      console.log("Cleaning up map instance");
+      // We don't need to call setMap(null) here as the
+      // component unmount already means the map is gone
+    };
+  }, [map, setMap]);
+  
+  return null;
+};
 
 const AnalysisPage = () => {
   const [map, setMap] = useState<L.Map | null>(null);
-  const mapContainerRef = useRef<HTMLDivElement | null>(null);
   
-  // Initialize map
+  // Clean up map when component unmounts
   useEffect(() => {
-    if (mapContainerRef.current && !map) {
-      // Create map instance
-      const mapInstance = L.map(mapContainerRef.current, {
-        center: [46.2085, -119.1372], // Benton County, WA coordinates
-        zoom: 12,
-        zoomControl: true,
-        attributionControl: true,
-      });
-      
-      // Add base tile layer
-      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-        maxZoom: 19
-      }).addTo(mapInstance);
-      
-      // Save map instance to state
-      setMap(mapInstance);
-      
-      // Clean up on unmount
-      return () => {
-        mapInstance.remove();
-        setMap(null);
-      };
-    }
-  }, []);
+    return () => {
+      // Ensure map is properly cleaned up on page navigation
+      if (map) {
+        console.log("Cleaning up map on page unmount");
+        // No need to call map.remove() here as React-Leaflet handles this
+      }
+    };
+  }, [map]);
   
   return (
     <div className="container mx-auto px-4 sm:px-6 py-4 sm:py-6 space-y-4 sm:space-y-6">
@@ -205,11 +207,20 @@ const AnalysisPage = () => {
                 </div>
               </CardHeader>
               <CardContent>
-                {/* Map container */}
-                <div 
-                  ref={mapContainerRef} 
-                  className="h-[400px] w-full rounded-md border mb-4"
-                ></div>
+                {/* Map container using react-leaflet */}
+                <div className="h-[400px] w-full rounded-md border mb-4">
+                  <MapContainer 
+                    center={[46.2085, -119.1372]} 
+                    zoom={12}
+                    style={{ height: '100%', width: '100%' }}
+                  >
+                    <TileLayer
+                      url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                      attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                    />
+                    <MapController setMap={setMap} />
+                  </MapContainer>
+                </div>
                 
                 {/* Heat Map Controls */}
                 <MarketTrendsHeatMap map={map} className="mt-4" />

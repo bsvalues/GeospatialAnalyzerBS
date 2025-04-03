@@ -97,7 +97,11 @@ export const HeatMapLayer: React.FC<HeatMapLayerProps> = ({
   useEffect(() => {
     if (!map || !visible) {
       if (heatLayerRef.current) {
-        map.removeLayer(heatLayerRef.current);
+        try {
+          map.removeLayer(heatLayerRef.current);
+        } catch (error) {
+          console.error("Error removing heat layer:", error);
+        }
         heatLayerRef.current = null;
       }
       return;
@@ -121,7 +125,11 @@ export const HeatMapLayer: React.FC<HeatMapLayerProps> = ({
     
     if (points.length === 0) {
       if (heatLayerRef.current) {
-        map.removeLayer(heatLayerRef.current);
+        try {
+          map.removeLayer(heatLayerRef.current);
+        } catch (error) {
+          console.error("Error removing heat layer:", error);
+        }
         heatLayerRef.current = null;
       }
       return;
@@ -133,31 +141,64 @@ export const HeatMapLayer: React.FC<HeatMapLayerProps> = ({
     // Create or update heat layer
     if (heatLayerRef.current) {
       // Update existing layer
-      heatLayerRef.current.setLatLngs(points);
-      heatLayerRef.current.setOptions({
-        radius: settings.radius,
-        blur: settings.blur,
-        gradient: settings.gradient,
-        max: maxIntensity
-      });
+      try {
+        heatLayerRef.current.setLatLngs(points);
+        heatLayerRef.current.setOptions({
+          radius: settings.radius,
+          blur: settings.blur,
+          gradient: settings.gradient,
+          max: maxIntensity
+        });
+      } catch (error) {
+        console.error("Error updating heat layer:", error);
+        // Try to recover by recreating the layer
+        try {
+          map.removeLayer(heatLayerRef.current);
+          heatLayerRef.current = null;
+          
+          const heatLayer = L.heatLayer(points, {
+            radius: settings.radius,
+            blur: settings.blur,
+            gradient: settings.gradient,
+            max: maxIntensity,
+            minOpacity: 0.4,
+            maxZoom: 18
+          });
+          
+          heatLayer.addTo(map);
+          heatLayerRef.current = heatLayer;
+        } catch (recreateError) {
+          console.error("Failed to recreate heat layer:", recreateError);
+        }
+      }
     } else {
       // Create new layer
-      const heatLayer = L.heatLayer(points, {
-        radius: settings.radius,
-        blur: settings.blur,
-        gradient: settings.gradient,
-        max: maxIntensity,
-        minOpacity: 0.4,
-        maxZoom: 18
-      });
-      
-      heatLayer.addTo(map);
-      heatLayerRef.current = heatLayer;
+      try {
+        const heatLayer = L.heatLayer(points, {
+          radius: settings.radius,
+          blur: settings.blur,
+          gradient: settings.gradient,
+          max: maxIntensity,
+          minOpacity: 0.4,
+          maxZoom: 18
+        });
+        
+        heatLayer.addTo(map);
+        heatLayerRef.current = heatLayer;
+      } catch (error) {
+        console.error("Error creating heat layer:", error);
+      }
     }
     
+    // Cleanup function for when component unmounts or dependencies change
     return () => {
-      if (heatLayerRef.current) {
-        map.removeLayer(heatLayerRef.current);
+      if (heatLayerRef.current && map) {
+        try {
+          console.log("Removing heat layer");
+          map.removeLayer(heatLayerRef.current);
+        } catch (error) {
+          console.error("Error removing heat layer during cleanup:", error);
+        }
         heatLayerRef.current = null;
       }
     };
