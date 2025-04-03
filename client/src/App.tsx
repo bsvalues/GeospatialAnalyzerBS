@@ -29,7 +29,7 @@ export const App = () => {
         <Header />
         <main className="flex-grow">
           <Switch>
-            <Route path="/" component={AnalysisPage} />
+            <Route path="/" component={IncomePage} />
             <Route path="/analysis" component={AnalysisPage} />
             <Route path="/income" component={IncomePage} />
             {/* Additional routes will be added as needed */}
