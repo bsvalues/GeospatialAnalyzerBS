@@ -80,7 +80,7 @@ export interface IStorage {
   
   // ETL Optimization Suggestion operations
   getEtlOptimizationSuggestions(): Promise<EtlOptimizationSuggestion[]>;
-  getEtlOptimizationSuggestionsByJobId(jobId: number): Promise<EtlOptimizationSuggestion[]>;
+  getEtlOptimizationSuggestionsByJobId(jobId: string): Promise<EtlOptimizationSuggestion[]>;
   getEtlOptimizationSuggestionById(id: number): Promise<EtlOptimizationSuggestion | undefined>;
   createEtlOptimizationSuggestion(suggestion: InsertEtlOptimizationSuggestion): Promise<EtlOptimizationSuggestion>;
   updateEtlOptimizationSuggestion(id: number, suggestion: Partial<InsertEtlOptimizationSuggestion>): Promise<EtlOptimizationSuggestion | undefined>;
@@ -95,7 +95,7 @@ export interface IStorage {
   
   // ETL Alert operations
   getEtlAlerts(): Promise<EtlAlert[]>;
-  getEtlAlertsByJobId(jobId: number): Promise<EtlAlert[]>;
+  getEtlAlertsByJobId(jobId: string): Promise<EtlAlert[]>;
   getEtlAlertById(id: number): Promise<EtlAlert | undefined>;
   createEtlAlert(alert: InsertEtlAlert): Promise<EtlAlert>;
   updateEtlAlert(id: number, alert: Partial<InsertEtlAlert>): Promise<EtlAlert | undefined>;
@@ -498,7 +498,7 @@ export class MemStorage implements IStorage {
     return Object.values(this.etlOptimizationSuggestionsMap);
   }
   
-  async getEtlOptimizationSuggestionsByJobId(jobId: number): Promise<EtlOptimizationSuggestion[]> {
+  async getEtlOptimizationSuggestionsByJobId(jobId: string): Promise<EtlOptimizationSuggestion[]> {
     return Object.values(this.etlOptimizationSuggestionsMap)
       .filter(suggestion => suggestion.jobId === jobId);
   }
@@ -611,7 +611,7 @@ export class MemStorage implements IStorage {
     return Object.values(this.etlAlertsMap);
   }
   
-  async getEtlAlertsByJobId(jobId: number): Promise<EtlAlert[]> {
+  async getEtlAlertsByJobId(jobId: string): Promise<EtlAlert[]> {
     return Object.values(this.etlAlertsMap)
       .filter(alert => alert.jobId === jobId);
   }
@@ -1130,7 +1130,7 @@ export class MemStorage implements IStorage {
         suggestedCode: null
       },
       {
-        jobId: 4, // GIS Boundary Update
+        jobId: "4", // GIS Boundary Update
         type: "code",
         severity: "high",
         title: "Implement retry logic for API failures",
@@ -1146,7 +1146,7 @@ export class MemStorage implements IStorage {
         suggestedCode: "async function fetchWithRetry(url, options, maxRetries = 3) {\n  let retries = 0;\n  while (retries < maxRetries) {\n    try {\n      return await fetch(url, options);\n    } catch (err) {\n      retries++;\n      if (retries >= maxRetries) throw err;\n      await new Promise(r => setTimeout(r, 1000 * Math.pow(2, retries)));\n    }\n  }\n}"
       },
       {
-        jobId: 2, // Weekly Census Data Integration
+        jobId: "2", // Weekly Census Data Integration
         type: "performance",
         severity: "medium",
         title: "Parallelize data processing tasks",
@@ -1168,7 +1168,7 @@ export class MemStorage implements IStorage {
       const id = this.etlOptimizationSuggestionCurrentId++;
       const optimizationSuggestion: EtlOptimizationSuggestion = {
         id,
-        jobId: suggestion.jobId || 1,
+        jobId: suggestion.jobId || "1",
         type: suggestion.type || 'performance',
         severity: suggestion.severity || 'medium',
         title: suggestion.title || '',
@@ -1237,35 +1237,35 @@ export class MemStorage implements IStorage {
     // Initialize ETL Alerts
     const alerts: InsertEtlAlert[] = [
       {
-        jobId: 4, // GIS Boundary Update
+        jobId: "4", // GIS Boundary Update
         type: "error",
         message: "Job failed: API request timeout",
         details: "Connection to Washington State GIS Portal timed out after 30 seconds",
         isRead: false
       },
       {
-        jobId: 1, // Daily Property Update
+        jobId: "1", // Daily Property Update
         type: "warning",
         message: "High memory usage detected",
         details: "Memory usage spiked to 85% during data transformation phase",
         isRead: true
       },
       {
-        jobId: 3, // Historical Sales Data Import
+        jobId: "3", // Historical Sales Data Import
         type: "info",
         message: "Job completed successfully",
         details: "Processed 25,000 records in 24 minutes and 16 seconds",
         isRead: true
       },
       {
-        jobId: 5, // Real-time Property Sales Feed
+        jobId: "5", // Real-time Property Sales Feed
         type: "warning",
         message: "Connection intermittently dropping",
         details: "Connection to data source has dropped 3 times in the past hour",
         isRead: false
       },
       {
-        jobId: 2, // Weekly Census Data Integration
+        jobId: "2", // Weekly Census Data Integration
         type: "info",
         message: "Job scheduled for next run",
         details: "Next execution scheduled for Sunday, April 07, 2025 at 03:00 AM",
