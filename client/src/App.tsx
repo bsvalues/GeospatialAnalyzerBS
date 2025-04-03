@@ -27,6 +27,7 @@ import AnalysisPage from '@/pages/Analysis';
 import PropertiesPage from '@/pages/Properties';
 import ReportsPage from '@/pages/Reports';
 import USPAPExportPage from '@/pages/uspap-export';
+import NeighborhoodComparisonPage from '@/pages/neighborhood-comparison';
 
 function Router() {
   const [location] = useLocation();
@@ -52,6 +53,7 @@ function Router() {
         <Route path="/properties" component={PropertiesPage} />
         <Route path="/reports" component={ReportsPage} />
         <Route path="/uspap-export" component={USPAPExportPage} />
+        <Route path="/neighborhood-comparison" component={NeighborhoodComparisonPage} />
         <Route component={NotFound} />
       </Switch>
     </>

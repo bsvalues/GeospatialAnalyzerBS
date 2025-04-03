@@ -171,6 +171,15 @@ export const Header: React.FC<HeaderProps> = ({ taxYear, onTaxYearChange }) => {
               <span className="text-sm font-medium">Neighborhoods</span>
             </div>
           </Link>
+          <Link href="/neighborhood-comparison">
+            <div className={cn(
+              "flex items-center px-3 py-1.5 rounded-md hover:bg-white/10 transition-all duration-200 cursor-pointer",
+              currentLocation === "/neighborhood-comparison" ? "bg-white/20" : ""
+            )}>
+              <Map className="h-4 w-4 mr-1.5" />
+              <span className="text-sm font-medium">Comparison</span>
+            </div>
+          </Link>
           <Link href="/scripting">
             <div className="flex items-center px-3 py-1.5 rounded-md hover:bg-white/10 transition-all duration-200 cursor-pointer">
               <Code className="h-4 w-4 mr-1.5" />
@@ -386,6 +395,19 @@ export const Header: React.FC<HeaderProps> = ({ taxYear, onTaxYearChange }) => {
                 >
                   <Home className="h-5 w-5 mr-3 text-white/90" />
                   <span className="text-white font-medium">Neighborhoods</span>
+                </div>
+              </Link>
+              
+              <Link href="/neighborhood-comparison">
+                <div 
+                  className={cn(
+                    "flex items-center rounded-md py-3 px-3 transition-colors",
+                    currentLocation === "/neighborhood-comparison" ? "bg-white/20" : "hover:bg-white/10"
+                  )}
+                  onClick={() => setIsMobileMenuOpen(false)}
+                >
+                  <Map className="h-5 w-5 mr-3 text-white/90" />
+                  <span className="text-white font-medium">Neighborhood Comparison</span>
                 </div>
               </Link>
               
