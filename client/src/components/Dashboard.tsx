@@ -57,18 +57,29 @@ const Dashboard: React.FC<DashboardProps> = ({ className }) => {
   });
 
   return (
-    <div className={`h-full flex flex-col ${className} bg-gradient-to-b from-gray-50 to-gray-100`} data-testid="dashboard-container">
+    <div className={`h-full flex flex-col ${className} bg-white`} data-testid="dashboard-container">
       {/* Tab navigation */}
       <TabNavigation activeTab={activeTab} onTabChange={setActiveTab} data-tour="app-navigation" />
 
-      {/* Subtle background elements */}
-      <div className="absolute top-1/4 right-1/3 w-[300px] h-[300px] bg-primary/20 rounded-full blur-[130px] opacity-20 z-0 pointer-events-none" />
-      <div className="absolute bottom-1/3 left-1/3 w-[250px] h-[250px] bg-primary/10 rounded-full blur-[100px] opacity-20 z-0 pointer-events-none" />
+      {/* Sophisticated background pattern */}
+      <div className="absolute inset-0 z-0 overflow-hidden pointer-events-none">
+        {/* Grid pattern */}
+        <div className="absolute inset-0 opacity-[0.02] bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxwYXRoIHN0cm9rZT0iIzIxMjEyMSIgc3Ryb2tlLXdpZHRoPSIwLjUiIGQ9Ik0wIDYwaDYwVjBoLTYweiIvPjwvZz48L3N2Zz4=')]"></div>
+        
+        {/* Gradient orbs */}
+        <div className="absolute top-20 right-1/4 w-[500px] h-[500px] bg-primary/10 rounded-full blur-[130px] opacity-20 z-0" />
+        <div className="absolute -bottom-20 left-1/4 w-[400px] h-[400px] bg-primary/5 rounded-full blur-[120px] opacity-30 z-0" />
+        <div className="absolute top-1/2 left-[5%] w-[300px] h-[300px] bg-blue-400/5 rounded-full blur-[100px] opacity-30 z-0" />
+        <div className="absolute -top-20 -right-20 w-[350px] h-[350px] bg-purple-400/5 rounded-full blur-[100px] opacity-20 z-0" />
+        
+        {/* Dotted grid */}
+        <div className="absolute inset-0 opacity-[0.015] bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAiIGhlaWdodD0iMjAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGNpcmNsZSBjeD0iMSIgY3k9IjEiIHI9IjEiIGZpbGw9IiMyMTIxMjEiLz48L3N2Zz4=')]"></div>
+      </div>
 
       {/* Panel content */}
       <div className="flex-grow overflow-hidden relative">
-        {/* Radial gradient overlay for depth */}
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(255,255,255,0)_0%,rgba(255,255,255,0.7)_70%,rgba(255,255,255,0.9)_100%)] z-[1] pointer-events-none" />
+        {/* Subtle radial gradient overlay for depth */}
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(255,255,255,0)_0%,rgba(255,255,255,0.7)_80%,rgba(255,255,255,0.95)_100%)] z-[1] pointer-events-none" />
 
         {activeTab === 'overview' && (
           <div className="h-full p-6 overflow-auto relative z-10" data-tour="overview-panel">
