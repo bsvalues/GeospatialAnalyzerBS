@@ -5,7 +5,7 @@ import { propertyReconciliationService } from '@/services/etl/property/PropertyR
 
 interface PropertyReconciliationPanelProps {
   conflict: PropertyConflict;
-  onResolve: (fieldName: string, value: any, sourceId: string) => void;
+  onResolve: (fieldName: string, value: unknown, sourceId: string) => void;
   onResolveAll: (sourceId: string) => void;
 }
 

@@ -14,13 +14,15 @@ import {
 import { Property } from '@shared/schema';
 import { 
   PropertyConflict,
+  FieldConflict,
   propertyReconciliationService,
-  ReconciliationOptions
+  PropertyReconciliationOptions
 } from '@/services/etl/property/PropertyReconciliationService';
 import { internalDatabaseConnector } from '@/services/etl/property/InternalDatabaseConnector';
 import { countyGISConnector } from '@/services/etl/property/CountyGISConnector';
 import { zillowAPIConnector } from '@/services/etl/property/ZillowAPIConnector';
-import PropertyReconciliationPanel from '@/components/property/PropertyReconciliationPanel';
+import { csvDataConnector } from '@/services/etl/property/CSVDataConnector';
+import { PropertyReconciliationPanel } from '@/components/property/PropertyReconciliationPanel';
 
 const PropertyDataSourcesPage: React.FC = () => {
   // State for data source properties
@@ -32,14 +34,13 @@ const PropertyDataSourcesPage: React.FC = () => {
   // State for loading status
   const [loading, setLoading] = useState<boolean>(false);
   // State for selected reconciliation options
-  const [reconciliationOptions, setReconciliationOptions] = useState<ReconciliationOptions>({
+  const [reconciliationOptions, setReconciliationOptions] = useState<PropertyReconciliationOptions>({
     defaultSourcePriority: ['county', 'internal', 'zillow'],
     fieldPriorities: {
       value: { sourcePriority: ['county'] },
       yearBuilt: { sourcePriority: ['internal', 'county'] },
       squareFeet: { highest: true }
-    },
-    forceMerge: false
+    }
   });
 
   // Register data connectors on component mount
@@ -48,6 +49,7 @@ const PropertyDataSourcesPage: React.FC = () => {
     propertyReconciliationService.registerDataConnector(internalDatabaseConnector);
     propertyReconciliationService.registerDataConnector(countyGISConnector);
     propertyReconciliationService.registerDataConnector(zillowAPIConnector);
+    propertyReconciliationService.registerDataConnector(csvDataConnector);
 
     // Since we don't have real data from the connectors yet, let's create some sample data
     const mockData: { [sourceId: string]: Property[] } = {
@@ -207,7 +209,7 @@ const PropertyDataSourcesPage: React.FC = () => {
   const handleResolveField = (
     conflictIndex: number,
     fieldName: string,
-    value: any,
+    value: unknown,
     sourceId: string
   ) => {
     // Update the conflict in state
@@ -235,8 +237,8 @@ const PropertyDataSourcesPage: React.FC = () => {
     const updatedConflict = { ...conflict };
     
     // Set all field conflicts to resolved with the chosen source
-    updatedConflict.conflicts = updatedConflict.conflicts.map(fc => {
-      const valueFromSource = fc.values.find(v => v.sourceId === sourceId);
+    updatedConflict.conflicts = updatedConflict.conflicts.map((fc: FieldConflict) => {
+      const valueFromSource = fc.values.find((v: { value: unknown; sourceId: string }) => v.sourceId === sourceId);
       if (valueFromSource) {
         return {
           ...fc,
@@ -368,7 +370,7 @@ const PropertyDataSourcesPage: React.FC = () => {
               </div>
             ) : (
               <div className="space-y-4">
-                {conflicts.map((conflict, index) => (
+                {conflicts.map((conflict: PropertyConflict, index: number) => (
                   <PropertyReconciliationPanel
                     key={`conflict-${index}`}
                     conflict={conflict}
@@ -466,7 +468,7 @@ const PropertyDataSourcesPage: React.FC = () => {
                   Default Source Priority
                 </label>
                 <div className="flex flex-col space-y-2">
-                  {reconciliationOptions.defaultSourcePriority?.map((sourceId, index) => (
+                  {reconciliationOptions.defaultSourcePriority?.map((sourceId: string, index: number) => (
                     <div key={`priority-${sourceId}`} className="flex items-center">
                       <div className="w-8 text-center text-gray-500">{index + 1}.</div>
                       <div className="flex-grow border rounded-md p-2 bg-gray-50">
@@ -495,7 +497,7 @@ const PropertyDataSourcesPage: React.FC = () => {
                           <div className="flex items-center">
                             <span className="text-gray-500 w-28">Source order:</span>
                             <span className="flex-grow">
-                              {priority.sourcePriority.map(s => 
+                              {priority.sourcePriority.map((s: string) => 
                                 propertyReconciliationService.getDataConnector(s)?.metadata.name || s
                               ).join(' > ')}
                             </span>
@@ -547,7 +549,7 @@ const PropertyDataSourcesPage: React.FC = () => {
                 <label className="flex items-center cursor-pointer">
                   <input
                     type="checkbox"
-                    checked={reconciliationOptions.forceMerge}
+                    checked={reconciliationOptions.forceMerge || false}
                     onChange={(e) => {
                       setReconciliationOptions({
                         ...reconciliationOptions,
@@ -576,7 +578,7 @@ const PropertyDataSourcesPage: React.FC = () => {
               </h2>
               
               <div className="space-y-2">
-                {mergedProperties.map((property, index) => (
+                {mergedProperties.map((property: Property, index: number) => (
                   <div key={`merged-${index}`} className="border rounded-md p-3">
                     <div className="flex justify-between items-center">
                       <h3 className="font-medium">{property.address}</h3>

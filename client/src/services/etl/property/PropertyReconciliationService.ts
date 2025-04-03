@@ -52,6 +52,9 @@ export interface PropertyReconciliationOptions {
       mostComplete?: boolean;
     };
   };
+  
+  // Whether to force merge properties even if conflicts are unresolved
+  forceMerge?: boolean;
 }
 
 /**
@@ -401,15 +404,15 @@ export class PropertyReconciliationService {
    * Merge properties based on resolved conflicts
    */
   mergeProperties(
-    resolvedConflicts: PropertyConflict[],
+    conflicts: PropertyConflict[],
     options: PropertyReconciliationOptions
   ): Property[] {
     const mergedProperties: Property[] = [];
     
-    // Process each resolved conflict
-    resolvedConflicts.forEach(conflict => {
-      // Skip conflicts that aren't fully resolved
-      if (!conflict.conflicts.every(fc => fc.resolved)) {
+    // Process each conflict
+    conflicts.forEach(conflict => {
+      // Skip conflicts that aren't fully resolved unless forceMerge is enabled
+      if (!conflict.conflicts.every(fc => fc.resolved) && !options.forceMerge) {
         return;
       }
       
