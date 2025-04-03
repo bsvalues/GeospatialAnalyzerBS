@@ -27,10 +27,4 @@ export default {
     'client/src/**/*.{ts,tsx}',
     '!client/src/**/*.d.ts',
   ],
-  // Set explicit timeouts to avoid test hanging
-  testTimeout: 15000,
-  // Force exit after tests complete to prevent hanging processes
-  forceExit: true,
-  // Detect open handles that may keep the Node process alive
-  detectOpenHandles: true,
 };

@@ -1,57 +1,114 @@
 /**
  * Google Maps Data Connector
  * 
- * This module handles data connections to the Google Maps API for geospatial
- * information. It implements the standard data connector interface
- * and provides specialized methods for retrieving geospatial data.
+ * This service provides functionality to connect to the Google Maps Extractor API
+ * via RapidAPI and retrieve location data for use in the ETL pipeline.
  */
 
-import { DataConnector } from './DataConnector';
+import { DataSource } from './ETLTypes';
+import { etlPipelineManager } from './ETLPipelineManager';
+import { dataConnector } from './DataConnector';
+
+// API configuration
+const RAPIDAPI_HOST = 'google-maps-extractor2.p.rapidapi.com';
+// The API key is retrieved from environment variables for security
 
 /**
- * GoogleMapsDataConnector class implements the DataConnector interface
- * for connecting to and retrieving data from the Google Maps API.
+ * Interface for Google Maps location query parameters
  */
-export class GoogleMapsDataConnector implements DataConnector {
-  private apiKey: string | null;
+interface GoogleMapsLocationQueryParams {
+  query: string;
+  country?: string;
+  language?: string;
+}
+
+/**
+ * Interface for Google Maps location data
+ */
+interface GoogleMapsLocationData {
+  id: string;
+  name: string;
+  address: string;
+  addressComponents?: {
+    streetNumber?: string;
+    route?: string;
+    neighborhood?: string;
+    locality?: string; // city
+    administrativeAreaLevel1?: string; // state
+    administrativeAreaLevel2?: string; // county
+    country?: string;
+    postalCode?: string;
+  };
+  phone?: string;
+  website?: string;
+  rating?: number;
+  reviewCount?: number;
+  latitude: number;
+  longitude: number;
+  placeTypes?: string[];
+  openingHours?: string[];
+  priceLevel?: number;
+}
+
+/**
+ * GoogleMapsDataConnector class for handling Google Maps API interactions
+ */
+class GoogleMapsDataConnector {
+  private dataSourceId: string | null = null;
   
-  /**
-   * Constructor for the GoogleMapsDataConnector
-   */
   constructor() {
-    // The API key will be fetched from environment or securely stored
-    this.apiKey = null;
+    // Register Google Maps as a data source when initialized
+    this.registerGoogleMapsDataSource();
   }
   
   /**
-   * Get the name of this data source
-   * @returns {string} The name of the data source
+   * Register Google Maps as a data source in the ETL system
    */
-  getSourceName(): string {
-    return 'Google Maps API';
-  }
-  
-  /**
-   * Check if the Google Maps API is available and ready to use
-   * @returns {Promise<boolean>} True if the API is available, false otherwise
-   */
-  async checkAvailability(): Promise<boolean> {
+  async registerGoogleMapsDataSource(): Promise<void> {
     try {
-      // Use a lightweight endpoint to check API status
-      const response = await fetch('/api/etl/check-google-maps-api', {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json'
+      // Check if API key is available
+      const isApiAvailable = await this.isGoogleMapsApiAvailable();
+      if (!isApiAvailable) {
+        console.error('Google Maps API key is not set on the server. Please configure the RAPIDAPI_KEY environment variable.');
+        return;
+      }
+      
+      // Register the data source with the ETL data connector
+      const dataSource = dataConnector.registerDataSource({
+        name: 'Google Maps Location Data',
+        description: 'Location data from Google Maps via RapidAPI',
+        type: 'api',
+        connectionDetails: {
+          baseUrl: '/api/maps', // Use our proxy endpoint
+          authType: 'none', // No auth needed for our proxy
+          headers: {
+            'Content-Type': 'application/json'
+          }
         }
       });
       
-      if (!response.ok) {
-        console.error('Google Maps API check failed:', response.status);
-        return false;
-      }
-      
-      const data = await response.json();
-      return data.success === true;
+      this.dataSourceId = dataSource.id;
+      console.log('Google Maps data source registered with ID:', this.dataSourceId);
+    } catch (error) {
+      console.error('Failed to register Google Maps data source:', error);
+    }
+  }
+  
+  /**
+   * Get the Google Maps data source ID
+   */
+  getDataSourceId(): string | null {
+    return this.dataSourceId;
+  }
+  
+  /**
+   * Check if the Google Maps API is available
+   */
+  async isGoogleMapsApiAvailable(): Promise<boolean> {
+    try {
+      const configResponse = await fetch('/api/config');
+      const config = await configResponse.json();
+      return !!config.hasRapidApiKey;
     } catch (error) {
       console.error('Error checking Google Maps API availability:', error);
       return false;
@@ -59,137 +116,173 @@ export class GoogleMapsDataConnector implements DataConnector {
   }
   
   /**
-   * Geocode an address to get its coordinates
-   * @param {string} address - The address to geocode
-   * @returns {Promise<any>} Geocoding results
+   * Query locations from Google Maps API
    */
-  async geocodeAddress(address: string): Promise<any> {
+  async queryLocations(params: GoogleMapsLocationQueryParams): Promise<GoogleMapsLocationData[]> {
     try {
-      // Ensure API is available before making a request
-      const isAvailable = await this.checkAvailability();
-      if (!isAvailable) {
-        throw new Error('Google Maps API is not available');
+      // First check if API is available
+      const isApiAvailable = await this.isGoogleMapsApiAvailable();
+      
+      if (!isApiAvailable) {
+        console.error('Google Maps API key is not configured on the server');
+        return [];
       }
       
-      const response = await fetch('/api/etl/google-maps/geocode', {
+      // Use our secure proxy endpoint
+      const response = await fetch('/api/maps/query-locate', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({ address })
+        body: JSON.stringify(params)
       });
       
       if (!response.ok) {
-        throw new Error(`Failed to geocode address: ${response.status}`);
+        throw new Error(`HTTP error! status: ${response.status}`);
       }
       
-      return await response.json();
+      const data = await response.json();
+      
+      if (!data.places || !Array.isArray(data.places)) {
+        return [];
+      }
+      
+      // Transform the response data
+      return data.places.map((place: any) => this.transformLocationData(place));
     } catch (error) {
-      console.error('Error geocoding address:', error);
-      throw error;
+      console.error('Error querying locations from Google Maps:', error);
+      return [];
     }
   }
   
   /**
-   * Get place details from Google Places API
-   * @param {string} placeId - The Google Place ID
-   * @returns {Promise<any>} Place details
+   * Find nearby points of interest
+   * This can be used to enrich property data with information about local amenities
    */
-  async getPlaceDetails(placeId: string): Promise<any> {
+  async findNearbyPOIs(latitude: number, longitude: number, type: string, radius: number = 2000): Promise<GoogleMapsLocationData[]> {
     try {
-      // Ensure API is available before making a request
-      const isAvailable = await this.checkAvailability();
-      if (!isAvailable) {
-        throw new Error('Google Maps API is not available');
+      // First check if API is available
+      const isApiAvailable = await this.isGoogleMapsApiAvailable();
+      
+      if (!isApiAvailable) {
+        console.error('Google Maps API key is not configured on the server');
+        return [];
       }
       
-      const response = await fetch(`/api/etl/google-maps/place/${placeId}`, {
-        method: 'GET',
+      // Build a location-based query string
+      const query = `${type} near ${latitude},${longitude}`;
+      
+      // Use the query-locate endpoint
+      const response = await fetch('/api/maps/query-locate', {
+        method: 'POST',
         headers: {
           'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          query,
+          country: 'us',
+          language: 'en'
+        })
+      });
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      
+      if (!data.places || !Array.isArray(data.places)) {
+        return [];
+      }
+      
+      // Transform the response data
+      return data.places.map((place: any) => this.transformLocationData(place));
+    } catch (error) {
+      console.error('Error finding nearby POIs from Google Maps:', error);
+      return [];
+    }
+  }
+  
+  /**
+   * Create an ETL job to import location data from Google Maps
+   */
+  async createLocationImportJob(searchQuery: string, targetDataSourceId: string, jobName?: string): Promise<string | null> {
+    try {
+      if (!this.dataSourceId) {
+        throw new Error('Google Maps data source not registered');
+      }
+      
+      // Create a job to import data from Google Maps to the target data source
+      const job = etlPipelineManager.createJob({
+        name: jobName || `Google Maps Import - ${searchQuery}`,
+        description: `Import location data for "${searchQuery}" from Google Maps API`,
+        sourceId: this.dataSourceId,
+        targetId: targetDataSourceId,
+        transformationRules: [], // Will be populated by default transformation rules
+      });
+      
+      console.log('Created Google Maps import job:', job.id);
+      return job.id;
+    } catch (error) {
+      console.error('Error creating Google Maps import job:', error);
+      return null;
+    }
+  }
+  
+  /**
+   * Transform raw Google Maps API data into a standardized format
+   */
+  private transformLocationData(rawData: any): GoogleMapsLocationData {
+    // Extract and normalize data from the API response
+    const locationData: GoogleMapsLocationData = {
+      id: rawData.place_id || rawData.id || `gm-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+      name: rawData.name || '',
+      address: rawData.formatted_address || rawData.address || '',
+      latitude: rawData.geometry?.location?.lat || rawData.lat || 0,
+      longitude: rawData.geometry?.location?.lng || rawData.lng || 0,
+      rating: rawData.rating || 0,
+      reviewCount: rawData.user_ratings_total || rawData.reviews_count || 0,
+      phone: rawData.international_phone_number || rawData.phone || '',
+      website: rawData.website || '',
+      priceLevel: rawData.price_level || 0,
+      placeTypes: rawData.types || []
+    };
+    
+    // Process address components if available
+    if (rawData.address_components && Array.isArray(rawData.address_components)) {
+      const addressComponents: any = {};
+      
+      rawData.address_components.forEach((component: any) => {
+        if (component.types && component.types.includes('street_number')) {
+          addressComponents.streetNumber = component.long_name;
+        } else if (component.types && component.types.includes('route')) {
+          addressComponents.route = component.long_name;
+        } else if (component.types && component.types.includes('neighborhood')) {
+          addressComponents.neighborhood = component.long_name;
+        } else if (component.types && component.types.includes('locality')) {
+          addressComponents.locality = component.long_name;
+        } else if (component.types && component.types.includes('administrative_area_level_1')) {
+          addressComponents.administrativeAreaLevel1 = component.long_name;
+        } else if (component.types && component.types.includes('administrative_area_level_2')) {
+          addressComponents.administrativeAreaLevel2 = component.long_name;
+        } else if (component.types && component.types.includes('country')) {
+          addressComponents.country = component.long_name;
+        } else if (component.types && component.types.includes('postal_code')) {
+          addressComponents.postalCode = component.long_name;
         }
       });
       
-      if (!response.ok) {
-        throw new Error(`Failed to get place details: ${response.status}`);
-      }
-      
-      return await response.json();
-    } catch (error) {
-      console.error('Error getting place details:', error);
-      throw error;
+      locationData.addressComponents = addressComponents;
     }
-  }
-  
-  /**
-   * Get directions between two points
-   * @param {object} params - Parameters for the directions request
-   * @returns {Promise<any>} Directions data
-   */
-  async getDirections(params: { origin: string, destination: string, mode?: string }): Promise<any> {
-    try {
-      // Ensure API is available before making a request
-      const isAvailable = await this.checkAvailability();
-      if (!isAvailable) {
-        throw new Error('Google Maps API is not available');
-      }
-      
-      const response = await fetch('/api/etl/google-maps/directions', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(params)
-      });
-      
-      if (!response.ok) {
-        throw new Error(`Failed to get directions: ${response.status}`);
-      }
-      
-      return await response.json();
-    } catch (error) {
-      console.error('Error getting directions:', error);
-      throw error;
+    
+    // Process opening hours if available
+    if (rawData.opening_hours && rawData.opening_hours.weekday_text) {
+      locationData.openingHours = rawData.opening_hours.weekday_text;
     }
-  }
-  
-  /**
-   * Search for nearby places
-   * @param {object} params - Parameters for the nearby search
-   * @returns {Promise<any>} Nearby places data
-   */
-  async searchNearbyPlaces(params: { 
-    location: { lat: number, lng: number }, 
-    radius: number, 
-    type?: string,
-    keyword?: string
-  }): Promise<any> {
-    try {
-      // Ensure API is available before making a request
-      const isAvailable = await this.checkAvailability();
-      if (!isAvailable) {
-        throw new Error('Google Maps API is not available');
-      }
-      
-      const response = await fetch('/api/etl/google-maps/nearby', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(params)
-      });
-      
-      if (!response.ok) {
-        throw new Error(`Failed to search nearby places: ${response.status}`);
-      }
-      
-      return await response.json();
-    } catch (error) {
-      console.error('Error searching nearby places:', error);
-      throw error;
-    }
+    
+    return locationData;
   }
 }
 
-// Export a singleton instance of the connector
+// Export singleton instance
 export const googleMapsDataConnector = new GoogleMapsDataConnector();
