@@ -156,37 +156,96 @@ jest.mock('lucide-react', () => {
 });
 
 // Mock Leaflet since it relies on browser APIs
-jest.mock('leaflet', () => ({
-  map: jest.fn().mockReturnValue({
-    setView: jest.fn().mockReturnThis(),
-    remove: jest.fn(),
-    on: jest.fn(),
-    off: jest.fn(),
-    addLayer: jest.fn(),
-    removeLayer: jest.fn(),
-  }),
-  tileLayer: jest.fn().mockReturnValue({
-    addTo: jest.fn().mockReturnThis(),
-    remove: jest.fn(),
-  }),
-  marker: jest.fn().mockReturnValue({
-    addTo: jest.fn().mockReturnThis(),
-    remove: jest.fn(),
-    setLatLng: jest.fn(),
-  }),
-  icon: jest.fn(),
-  CRS: {
-    EPSG3857: {}
-  },
-  latLng: jest.fn().mockImplementation((lat, lng) => ({ lat, lng })),
-  latLngBounds: jest.fn().mockImplementation((sw, ne) => ({ 
-    getSouthWest: () => sw,
-    getNorthEast: () => ne,
-    getCenter: () => ({ lat: (sw.lat + ne.lat) / 2, lng: (sw.lng + ne.lng) / 2 }),
-  })),
-  divIcon: jest.fn().mockReturnValue({}),
-  point: jest.fn().mockImplementation((x, y) => ({ x, y })),
-}));
+jest.mock('leaflet', () => {
+  // Create a proper prototype structure for L.Icon
+  function IconMock(options) {
+    this.options = options || {};
+  }
+  
+  // Add methods to the Icon prototype
+  IconMock.prototype = {
+    createIcon: jest.fn(),
+    createShadow: jest.fn()
+  };
+  
+  // Setup Default icon constructor
+  const DefaultIconConstructor = function() {
+    this.options = {
+      iconSize: [25, 41],
+      iconAnchor: [12, 41],
+      popupAnchor: [1, -34],
+      shadowSize: [41, 41],
+      shadowAnchor: [12, 41]
+    };
+  };
+  
+  // Setup Default icon prototype
+  DefaultIconConstructor.prototype = {
+    options: {
+      iconSize: [25, 41],
+      iconAnchor: [12, 41],
+      popupAnchor: [1, -34],
+      shadowSize: [41, 41],
+      shadowAnchor: [12, 41]
+    },
+    mergeOptions: jest.fn(),
+    createIcon: jest.fn(),
+    createShadow: jest.fn()
+  };
+  
+  // Assign the DefaultIcon constructor to Icon.Default
+  IconMock.Default = DefaultIconConstructor;
+  
+  const L = {
+    map: jest.fn().mockReturnValue({
+      setView: jest.fn().mockReturnThis(),
+      remove: jest.fn(),
+      on: jest.fn(),
+      off: jest.fn(),
+      addLayer: jest.fn(),
+      removeLayer: jest.fn(),
+      invalidateSize: jest.fn(),
+      getSize: jest.fn().mockReturnValue({ x: 500, y: 500 }),
+    }),
+    tileLayer: jest.fn().mockReturnValue({
+      addTo: jest.fn().mockReturnThis(),
+      remove: jest.fn(),
+    }),
+    marker: jest.fn().mockReturnValue({
+      addTo: jest.fn().mockReturnThis(),
+      remove: jest.fn(),
+      setLatLng: jest.fn(),
+    }),
+    Icon: IconMock,
+    icon: jest.fn(),
+    CRS: {
+      EPSG3857: {}
+    },
+    latLng: jest.fn().mockImplementation((lat, lng) => ({ lat, lng })),
+    latLngBounds: jest.fn().mockImplementation((sw, ne) => ({ 
+      getSouthWest: () => sw,
+      getNorthEast: () => ne,
+      getCenter: () => ({ lat: (sw.lat + ne.lat) / 2, lng: (sw.lng + ne.lng) / 2 }),
+    })),
+    divIcon: jest.fn().mockReturnValue({}),
+    point: jest.fn().mockImplementation((x, y) => ({ x, y })),
+    // Add heatLayer method for leaflet.heat
+    heatLayer: jest.fn().mockImplementation((points, options) => ({
+      addTo: jest.fn().mockReturnThis(),
+      setLatLngs: jest.fn(),
+      setOptions: jest.fn(),
+      redraw: jest.fn(),
+    })),
+    // Add MarkerClusterGroup for leaflet.markercluster
+    markerClusterGroup: jest.fn().mockImplementation(() => ({
+      addLayer: jest.fn(),
+      addTo: jest.fn().mockReturnThis(),
+      clearLayers: jest.fn(),
+    })),
+  };
+  
+  return L;
+});
 
 // Mock react-leaflet modules 
 jest.mock('react-leaflet', () => ({
@@ -221,6 +280,10 @@ jest.mock('react-leaflet', () => ({
       getNorthEast: jest.fn().mockReturnValue({ lat: 37.0, lng: -122.0 }),
       getSouthWest: jest.fn().mockReturnValue({ lat: 36.0, lng: -123.0 }),
     }),
+    invalidateSize: jest.fn(),
+    getSize: jest.fn().mockReturnValue({ x: 500, y: 500 }),
+    addLayer: jest.fn(),
+    removeLayer: jest.fn(),
   }),
 }));
 
@@ -236,6 +299,119 @@ jest.mock('@react-leaflet/core', () => ({
     return React.createElement('div');
   }),
 }));
+
+// Mock leaflet.heat
+jest.mock('leaflet.heat', () => {
+  // This is just an empty mock since leaflet.heat modifies L globally
+  // The actual functionality is mocked in the L.heatLayer method above
+});
+
+// Mock leaflet.markercluster
+jest.mock('leaflet.markercluster', () => {
+  // This is just an empty mock since leaflet.markercluster modifies L globally
+  // The actual functionality is mocked in the L.markerClusterGroup method above
+});
+
+// Mock chart.js
+jest.mock('chart.js', () => {
+  const Chart = jest.fn();
+  Chart.register = jest.fn();
+  
+  return {
+    Chart,
+    registerables: [],
+    LineElement: jest.fn(),
+    LinearScale: jest.fn(),
+    PointElement: jest.fn(),
+    TimeScale: jest.fn(),
+    Tooltip: jest.fn(),
+    CategoryScale: jest.fn(),
+  };
+});
+
+// Mock react-chartjs-2
+jest.mock('react-chartjs-2', () => {
+  return {
+    Line: jest.fn().mockImplementation(({ children, ...props }) => {
+      return React.createElement('div', { 'data-testid': 'chart-line', ...props }, children);
+    }),
+    Bar: jest.fn().mockImplementation(({ children, ...props }) => {
+      return React.createElement('div', { 'data-testid': 'chart-bar', ...props }, children);
+    }),
+    Doughnut: jest.fn().mockImplementation(({ children, ...props }) => {
+      return React.createElement('div', { 'data-testid': 'chart-doughnut', ...props }, children);
+    }),
+  };
+});
+
+// Mock chartjs-adapter-date-fns
+jest.mock('chartjs-adapter-date-fns', () => {
+  // Empty mock - the adapter just registers with Chart.js
+});
+
+// Mock recharts
+jest.mock('recharts', () => {
+  const createComponent = (name) => 
+    jest.fn().mockImplementation(({ children, ...props }) => 
+      React.createElement('div', { 'data-testid': `recharts-${name}`, ...props }, children)
+    );
+
+  return {
+    ResponsiveContainer: createComponent('responsive-container'),
+    LineChart: createComponent('line-chart'),
+    Line: createComponent('line'),
+    XAxis: createComponent('x-axis'),
+    YAxis: createComponent('y-axis'),
+    CartesianGrid: createComponent('cartesian-grid'),
+    Tooltip: createComponent('tooltip'),
+    Legend: createComponent('legend'),
+    BarChart: createComponent('bar-chart'),
+    Bar: createComponent('bar'),
+    PieChart: createComponent('pie-chart'),
+    Pie: createComponent('pie'),
+    Cell: createComponent('cell'),
+    Area: createComponent('area'),
+    AreaChart: createComponent('area-chart'),
+  };
+});
+
+// Mock GoogleMapsDataConnector
+jest.mock('@/services/GoogleMapsDataConnector', () => {
+  return {
+    GoogleMapsDataConnector: jest.fn().mockImplementation(() => {
+      return {
+        initialize: jest.fn().mockResolvedValue(true),
+        isInitialized: jest.fn().mockReturnValue(true),
+        fetchLocationData: jest.fn().mockResolvedValue({
+          results: [
+            {
+              formatted_address: '123 Test Street, Richland, WA 99352, USA',
+              geometry: {
+                location: { lat: 46.2, lng: -119.1 }
+              }
+            }
+          ]
+        }),
+        getNewUniqueId: jest.fn().mockReturnValue('mock-google-maps-id'),
+      };
+    }),
+  };
+});
+
+// Mock AutoHideContext
+jest.mock('@/contexts/AutoHideContext', () => {
+  return {
+    useAutoHide: jest.fn().mockReturnValue({
+      autoHideEnabled: true,
+      toggleAutoHide: jest.fn(),
+      hideNonEssentialElements: jest.fn(),
+      showAllElements: jest.fn(),
+    }),
+    AutoHideProvider: jest.fn().mockImplementation(({ children }) => {
+      return React.createElement('div', null, children);
+    }),
+  };
+});
 
 // Clean up mocks after each test
 afterEach(() => {

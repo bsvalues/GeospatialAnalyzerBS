@@ -9,6 +9,9 @@
 import React, { ReactElement } from 'react';
 import { render, RenderOptions } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { TourProvider } from '../../contexts/TourContext';
+import { MapAccessibilityProvider } from '../../contexts/MapAccessibilityContext';
+import { PropertyFilterProvider } from '../../contexts/PropertyFilterContext';
 
 // Create a test query client with optimized settings for tests
 export const createTestQueryClient = () => new QueryClient({
@@ -41,7 +44,13 @@ export function renderWithProviders(
   function Wrapper({ children }: { children: React.ReactNode }) {
     return (
       <QueryClientProvider client={queryClient}>
-        {children}
+        <MapAccessibilityProvider>
+          <PropertyFilterProvider>
+            <TourProvider>
+              {children}
+            </TourProvider>
+          </PropertyFilterProvider>
+        </MapAccessibilityProvider>
       </QueryClientProvider>
     );
   }

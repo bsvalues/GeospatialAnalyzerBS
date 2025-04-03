@@ -8,7 +8,10 @@ module.exports = {
     '^@components/(.*)$': '<rootDir>/client/src/components/$1',
     '^@lib/(.*)$': '<rootDir>/client/src/lib/$1',
     '^@shared/(.*)$': '<rootDir>/shared/$1',
-    '\\.(css|less|scss|sass)$': 'identity-obj-proxy'
+    '\\.(css|less|scss|sass)$': 'identity-obj-proxy',
+    '\\.(jpg|jpeg|png|gif|webp|svg)$': '<rootDir>/node_modules/jest-transform-stub',
+    // Mock leaflet image imports
+    'leaflet/dist/images/.*': '<rootDir>/node_modules/jest-transform-stub'
   },
   setupFilesAfterEnv: ['<rootDir>/jest.setup.cjs'],
   testMatch: ['**/__tests__/**/*.test.(ts|tsx|js)'],
@@ -28,6 +31,8 @@ module.exports = {
     // Add babel-jest for handling ES modules
     '^.+\\.js$': 'babel-jest',
     '^.+\\.css$': '<rootDir>/node_modules/jest-transform-stub',
+    // Handle image imports
+    '\\.(jpg|jpeg|png|gif|webp|svg)$': '<rootDir>/node_modules/jest-transform-stub',
   },
   transformIgnorePatterns: [
     // Include specific node_modules that use ESM
