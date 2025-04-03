@@ -5,11 +5,9 @@
  * for property data in Benton County.
  */
 import { useState } from 'react';
+import MapComponent from '../components/map/MapComponent';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-
-// Temporarily commenting out to avoid the Leaflet errors
-// import MapComponent from '../components/map/MapComponent';
 
 const AnalysisPage = () => {
   // State for controlling the map center and zoom
@@ -69,23 +67,11 @@ const AnalysisPage = () => {
         <div className="md:col-span-2">
           <Card className="h-full">
             <CardContent className="p-0 overflow-hidden rounded-lg">
-              {/* Temporarily disabled to avoid errors */}
-              {/* <MapComponent 
+              <MapComponent 
                 center={mapCenter} 
                 zoom={mapZoom} 
                 height="600px" 
-              /> */}
-              <div 
-                style={{ height: "600px", width: "100%" }}
-                className="flex items-center justify-center bg-gray-100 rounded-lg"
-              >
-                <div className="text-center p-4">
-                  <h3 className="font-semibold text-lg">Map Temporarily Unavailable</h3>
-                  <p className="text-muted-foreground">
-                    The map component is being updated. Please check back soon.
-                  </p>
-                </div>
-              </div>
+              />
             </CardContent>
           </Card>
         </div>
