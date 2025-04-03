@@ -4,7 +4,20 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
-import { PlayIcon, XCircleIcon, SaveIcon, FileIcon, BookIcon, DatabaseIcon, DownloadIcon, UploadIcon } from 'lucide-react';
+import { Textarea } from '@/components/ui/textarea';
+import { 
+  PlayIcon, 
+  XCircleIcon, 
+  SaveIcon, 
+  FileIcon, 
+  BookIcon, 
+  DatabaseIcon, 
+  DownloadIcon, 
+  UploadIcon, 
+  Sparkles,
+  BrainIcon,
+  MessageCircle
+} from 'lucide-react';
 import { Property } from '@shared/schema';
 import ScriptExecutionEngine, { ScriptResult } from './ScriptExecutionEngine';
 import ETLPipeline from '../../services/etl/ETLPipeline';
@@ -25,8 +38,8 @@ const getTransformedDataFromETL = (jobId: string = 'property-data-etl') => {
     new Date(b.startTime).getTime() - new Date(a.startTime).getTime()
   )[0];
   
-  if (latestRun?.result) {
-    return latestRun.result;
+  if (latestRun && 'result' in latestRun) {
+    return (latestRun as any).result;
   }
   
   return undefined;
@@ -235,11 +248,15 @@ const ScriptingPlayground: React.FC<ScriptingPlaygroundProps> = ({
   onScriptResult 
 }) => {
   const { toast } = useToast();
-  const [activeTab, setActiveTab] = useState('editor');
+  const [activeTab, setActiveTab] = useState('ai');
   const [script, setScript] = useState(SCRIPT_TEMPLATES['property-value-analysis']);
   const [scriptResult, setScriptResult] = useState<any>(null);
   const [isExecuting, setIsExecuting] = useState(false);
+  const [isGeneratingCode, setIsGeneratingCode] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [naturalLanguageInput, setNaturalLanguageInput] = useState('');
+  const [codeExplanation, setCodeExplanation] = useState<string | null>(null);
+  const [openAIConfigured, setOpenAIConfigured] = useState(false);
   const editorRef = useRef<any>(null);
 
   // Handle editor initialization
@@ -270,7 +287,83 @@ const ScriptingPlayground: React.FC<ScriptingPlaygroundProps> = ({
   useEffect(() => {
     const etlData = getTransformedDataFromETL();
     setTransformedData(etlData);
+    
+    // Check if OpenAI API is configured
+    fetch('/api/config')
+      .then(response => response.json())
+      .then(data => {
+        setOpenAIConfigured(!!data.hasOpenAIKey);
+      })
+      .catch(err => {
+        console.error('Error checking OpenAI configuration:', err);
+        setOpenAIConfigured(false);
+      });
   }, []);
+  
+  // Function to generate code from natural language
+  const generateCodeFromNaturalLanguage = useCallback(async () => {
+    if (!naturalLanguageInput.trim()) {
+      toast({
+        title: "Input Required",
+        description: "Please enter a natural language description of what you want to analyze.",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    setIsGeneratingCode(true);
+    setError(null);
+    setCodeExplanation(null);
+    
+    try {
+      const response = await fetch('/api/ai/generate-code', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          naturalLanguage: naturalLanguageInput,
+          context: {
+            properties: true,
+            transformedData: !!transformedData,
+            dataStructures: `Property fields: id, address, value, squareFeet, yearBuilt, landValue, coordinates, neighborhood, propertyType, etc.`
+          }
+        })
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to generate code from natural language');
+      }
+      
+      const result = await response.json();
+      
+      // Update the script with the generated code
+      setScript(result.code);
+      
+      // Store the explanation
+      setCodeExplanation(result.explanation);
+      
+      // Switch to editor tab to show the generated code
+      setActiveTab('editor');
+      
+      toast({
+        title: "Code Generated",
+        description: "Successfully generated code from your description. Review and run it."
+      });
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : String(err);
+      setError(errorMessage);
+      toast({
+        title: "Code Generation Error",
+        description: "Failed to generate code. Please check your input or try again later.",
+        variant: "destructive"
+      });
+      console.error('Error generating code:', err);
+    } finally {
+      setIsGeneratingCode(false);
+    }
+  }, [naturalLanguageInput, transformedData, toast]);
   
   // Execute the current script
   const executeScript = useCallback(() => {
@@ -347,17 +440,21 @@ const ScriptingPlayground: React.FC<ScriptingPlaygroundProps> = ({
     <Card className="shadow-lg">
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
-          <CodeIcon className="h-5 w-5 text-primary" />
-          Interactive Scripting Playground
+          <Sparkles className="h-5 w-5 text-primary" />
+          AI-Powered Scripting Playground
         </CardTitle>
         <CardDescription>
-          Write and execute custom scripts to analyze and visualize property data
+          Use natural language or JavaScript to analyze and visualize property data
         </CardDescription>
       </CardHeader>
       
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <div className="px-6 mb-2">
           <TabsList className="w-full">
+            <TabsTrigger value="ai" className="flex-1">
+              <BrainIcon className="h-4 w-4 mr-2" />
+              AI Assistant
+            </TabsTrigger>
             <TabsTrigger value="editor" className="flex-1">
               <CodeIcon className="h-4 w-4 mr-2" />
               Script Editor
@@ -378,6 +475,68 @@ const ScriptingPlayground: React.FC<ScriptingPlaygroundProps> = ({
         </div>
         
         <CardContent className="p-0">
+          <TabsContent value="ai" className="m-0 px-6 py-4">
+            <div className="space-y-4">
+              {!openAIConfigured && (
+                <div className="p-4 border border-yellow-200 bg-yellow-50 rounded-md text-yellow-800">
+                  <div className="flex items-start">
+                    <div className="mr-2 mt-0.5">⚠️</div>
+                    <div>
+                      <h4 className="font-medium">OpenAI API Key Required</h4>
+                      <p className="text-sm">
+                        The AI Assistant requires an OpenAI API key. Please add your API key to the environment variables.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+              
+              <div>
+                <h4 className="text-sm font-medium mb-2">Describe what you want to analyze in plain English</h4>
+                <Textarea
+                  value={naturalLanguageInput}
+                  onChange={(e) => setNaturalLanguageInput(e.target.value)}
+                  placeholder="Example: Find the average property value in each neighborhood and create a list of the top 3 most expensive neighborhoods"
+                  className="min-h-[120px]"
+                />
+              </div>
+              
+              <div className="flex items-center gap-2">
+                <Button
+                  onClick={generateCodeFromNaturalLanguage}
+                  disabled={isGeneratingCode || !openAIConfigured}
+                  className="gap-2"
+                >
+                  <Sparkles className="h-4 w-4" />
+                  {isGeneratingCode ? 'Generating Code...' : 'Generate Code'}
+                </Button>
+                <p className="text-xs text-muted-foreground">
+                  AI will convert your description into JavaScript code
+                </p>
+              </div>
+              
+              {codeExplanation && (
+                <div className="mt-4 p-4 border border-blue-100 bg-blue-50 rounded-md">
+                  <h4 className="text-sm font-medium mb-2 text-blue-800">Code Explanation:</h4>
+                  <div className="text-sm text-blue-700 space-y-2">
+                    <div dangerouslySetInnerHTML={{ __html: codeExplanation.replace(/\n/g, '<br />') }} />
+                  </div>
+                </div>
+              )}
+              
+              <div className="mt-4">
+                <h4 className="text-sm font-medium mb-2">Example queries you can try:</h4>
+                <ul className="text-sm text-muted-foreground space-y-1 list-disc pl-5">
+                  <li>Find all properties built after 2010 and calculate their average value</li>
+                  <li>Group properties by neighborhood and find the neighborhood with the highest average property value</li>
+                  <li>Calculate the price per square foot for each property and identify outliers</li>
+                  <li>Create a histogram of property values in $100,000 increments</li>
+                  <li>Find all properties with more than 3 bedrooms and 2 bathrooms, and sort them by value</li>
+                </ul>
+              </div>
+            </div>
+          </TabsContent>
+          
           <TabsContent value="editor" className="m-0">
             <div className="h-[500px] border rounded-md mx-6">
               <Editor
@@ -530,13 +689,20 @@ return {
       
       <CardFooter className="flex justify-between pt-6">
         <div className="flex gap-2">
-          <Button variant="outline" onClick={() => setActiveTab('templates')}>
+          <Button
+            variant="outline"
+            onClick={() => setActiveTab('ai')}
+            className="gap-2"
+          >
+            <BrainIcon className="h-4 w-4" />
+            AI Assistant
+          </Button>
+          <Button
+            variant="outline"
+            onClick={() => setActiveTab('templates')}
+          >
             <FileIcon className="h-4 w-4 mr-2" />
             Load Template
-          </Button>
-          <Button variant="outline" disabled>
-            <SaveIcon className="h-4 w-4 mr-2" />
-            Save Script
           </Button>
         </div>
         

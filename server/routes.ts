@@ -1,7 +1,13 @@
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { z } from "zod";
+import { 
+  isOpenAIConfigured, 
+  generateCodeFromLanguage, 
+  optimizeCode, 
+  debugCode 
+} from "./services/openai";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // API route for accessing whitelisted environment variables
@@ -9,7 +15,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     // Only expose whitelisted environment variables
     const clientConfig = {
       // API keys
-      hasRapidApiKey: !!process.env.RAPIDAPI_KEY
+      hasRapidApiKey: !!process.env.RAPIDAPI_KEY,
+      hasOpenAIKey: isOpenAIConfigured()
     };
     
     res.json(clientConfig);
@@ -1286,6 +1293,71 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error deleting income lease up:", error);
       res.status(500).json({ error: "Failed to delete income lease up" });
+    }
+  });
+
+  // OpenAI powered natural language scripting routes
+  
+  // Generate JavaScript code from natural language
+  app.post('/api/ai/generate-code', async (req, res) => {
+    try {
+      const { naturalLanguage, context } = req.body;
+      
+      if (!naturalLanguage) {
+        return res.status(400).json({ error: 'Missing required parameter: naturalLanguage' });
+      }
+      
+      if (!isOpenAIConfigured()) {
+        return res.status(500).json({ error: 'OpenAI API is not configured. Please set the OPENAI_API_KEY environment variable.' });
+      }
+      
+      const result = await generateCodeFromLanguage(naturalLanguage, context);
+      res.json(result);
+    } catch (error) {
+      console.error('Error generating code from natural language:', error);
+      res.status(500).json({ error: 'Failed to generate code from natural language' });
+    }
+  });
+  
+  // Optimize JavaScript code
+  app.post('/api/ai/optimize-code', async (req, res) => {
+    try {
+      const { code, instructions } = req.body;
+      
+      if (!code) {
+        return res.status(400).json({ error: 'Missing required parameter: code' });
+      }
+      
+      if (!isOpenAIConfigured()) {
+        return res.status(500).json({ error: 'OpenAI API is not configured. Please set the OPENAI_API_KEY environment variable.' });
+      }
+      
+      const result = await optimizeCode(code, instructions);
+      res.json(result);
+    } catch (error) {
+      console.error('Error optimizing code:', error);
+      res.status(500).json({ error: 'Failed to optimize code' });
+    }
+  });
+  
+  // Debug JavaScript code
+  app.post('/api/ai/debug-code', async (req, res) => {
+    try {
+      const { code, errorMessage } = req.body;
+      
+      if (!code) {
+        return res.status(400).json({ error: 'Missing required parameter: code' });
+      }
+      
+      if (!isOpenAIConfigured()) {
+        return res.status(500).json({ error: 'OpenAI API is not configured. Please set the OPENAI_API_KEY environment variable.' });
+      }
+      
+      const result = await debugCode(code, errorMessage);
+      res.json(result);
+    } catch (error) {
+      console.error('Error debugging code:', error);
+      res.status(500).json({ error: 'Failed to debug code' });
     }
   });
 
