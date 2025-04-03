@@ -29,9 +29,9 @@ const TabNavigation: React.FC<TabNavigationProps> = ({ activeTab, onTabChange })
         <div className="flex flex-col md:flex-row md:items-center md:justify-between">
           {/* Tabs bar with subtle glass effect */}
           <div className="relative overflow-hidden w-full">
-            {/* Blurred edge indicators for scroll */}
-            <div className="absolute left-0 top-0 bottom-0 w-8 bg-gradient-to-r from-white to-transparent z-10 pointer-events-none"></div>
-            <div className="absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-white to-transparent z-10 pointer-events-none"></div>
+            {/* Subtle indicators for scroll - no gradients for better readability */}
+            <div className="absolute left-0 top-0 bottom-0 w-8 bg-white z-10 pointer-events-none"></div>
+            <div className="absolute right-0 top-0 bottom-0 w-8 bg-white z-10 pointer-events-none"></div>
             
             <ul className="flex space-x-2 overflow-x-auto pb-2 md:pb-0 scrollbar-hide relative">
               {tabs.map(tab => (
@@ -106,7 +106,7 @@ const TabNavigation: React.FC<TabNavigationProps> = ({ activeTab, onTabChange })
           >
             <span className="font-medium text-gray-600">GIS_BS</span>
             <ChevronRight size={12} className="mx-1 text-gray-400" />
-            <span className="font-medium bg-clip-text text-transparent bg-gradient-to-r from-primary to-primary/80">
+            <span className="font-medium text-primary">
               {tabs.find(tab => tab.id === activeTab)?.name}
             </span>
           </motion.div>
