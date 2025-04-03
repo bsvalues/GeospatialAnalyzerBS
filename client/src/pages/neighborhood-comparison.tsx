@@ -10,7 +10,8 @@ import {
   Info,
   Download,
   FileText,
-  Filter
+  Filter,
+  Award
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import NeighborhoodComparisonHeatmap from '../components/neighborhood/NeighborhoodComparisonHeatmap';
@@ -20,6 +21,7 @@ import { useQuery } from '@tanstack/react-query';
 import { TrendMetric, NeighborhoodTrendGraph } from '../components/neighborhood/NeighborhoodTrendGraph';
 import { NeighborhoodProfileComparison } from '../components/neighborhood/NeighborhoodProfileComparison';
 import { NeighborhoodPropertyTypeFilter } from '../components/neighborhood/NeighborhoodPropertyTypeFilter';
+import { NeighborhoodScoreCard } from '../components/neighborhood/NeighborhoodScoreCard';
 import { neighborhoodComparisonReportService, ReportFormat } from '../services/neighborhoodComparisonReportService';
 
 const NeighborhoodComparisonPage: React.FC = () => {
@@ -42,14 +44,68 @@ const NeighborhoodComparisonPage: React.FC = () => {
     }
   }, [properties]);
   
-  // Get neighborhoods data from the NeighborhoodTimeline component
+  // Sample neighborhood data for demonstration
   const [neighborhoods, setNeighborhoods] = useState<any[]>([]);
   
   useEffect(() => {
     // This would normally be fetched from a service
-    // For now, we'll use dummy data that will be replaced by the actual data
-    // from the NeighborhoodTimeline component
-    setNeighborhoods([]);
+    // For demo purposes, we're creating sample data
+    const sampleNeighborhoods = [
+      {
+        id: 'n1',
+        name: 'Richland Heights',
+        growthRate: 5.2,
+        data: [
+          { year: '2020', value: 450000, percentChange: 4.2, transactionCount: 32 },
+          { year: '2021', value: 472500, percentChange: 5.0, transactionCount: 45 },
+          { year: '2022', value: 498000, percentChange: 5.4, transactionCount: 38 }
+        ]
+      },
+      {
+        id: 'n2',
+        name: 'West Pasco',
+        growthRate: 3.8,
+        data: [
+          { year: '2020', value: 320000, percentChange: 3.1, transactionCount: 27 },
+          { year: '2021', value: 335000, percentChange: 4.7, transactionCount: 31 },
+          { year: '2022', value: 347000, percentChange: 3.6, transactionCount: 24 }
+        ]
+      },
+      {
+        id: 'n3',
+        name: 'Kennewick Riverside',
+        growthRate: 6.1,
+        data: [
+          { year: '2020', value: 520000, percentChange: 5.8, transactionCount: 18 },
+          { year: '2021', value: 559000, percentChange: 7.5, transactionCount: 22 },
+          { year: '2022', value: 595000, percentChange: 6.4, transactionCount: 19 }
+        ]
+      },
+      {
+        id: 'n4',
+        name: 'Columbia Basin',
+        growthRate: 2.9,
+        data: [
+          { year: '2020', value: 275000, percentChange: 2.2, transactionCount: 42 },
+          { year: '2021', value: 284000, percentChange: 3.3, transactionCount: 39 },
+          { year: '2022', value: 291000, percentChange: 2.5, transactionCount: 44 }
+        ]
+      },
+      {
+        id: 'n5',
+        name: 'Finley District',
+        growthRate: 4.2,
+        data: [
+          { year: '2020', value: 310000, percentChange: 3.8, transactionCount: 25 },
+          { year: '2021', value: 325000, percentChange: 4.8, transactionCount: 29 },
+          { year: '2022', value: 339000, percentChange: 4.3, transactionCount: 31 }
+        ]
+      }
+    ];
+    
+    setNeighborhoods(sampleNeighborhoods);
+    // Select first two neighborhoods by default for demonstration
+    setSelectedNeighborhoods(['n1', 'n2']);
   }, []);
   
   // Handle property type filter changes
@@ -150,6 +206,10 @@ const NeighborhoodComparisonPage: React.FC = () => {
           <TabsTrigger value="trends" className="flex items-center gap-2">
             <BarChart3 className="h-4 w-4" />
             <span>Trends</span>
+          </TabsTrigger>
+          <TabsTrigger value="scorecard" className="flex items-center gap-2">
+            <Award className="h-4 w-4" />
+            <span>Score Card</span>
           </TabsTrigger>
           <TabsTrigger value="about" className="flex items-center gap-2">
             <Info className="h-4 w-4" />
@@ -302,6 +362,23 @@ const NeighborhoodComparisonPage: React.FC = () => {
               </CardContent>
             </Card>
           </div>
+        </TabsContent>
+        
+        <TabsContent value="scorecard" className="mt-0">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg">Neighborhood Score Card</CardTitle>
+              <CardDescription>
+                Customizable color-coded ratings for neighborhoods based on key metrics
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <NeighborhoodScoreCard 
+                neighborhoods={neighborhoods}
+                selectedNeighborhoods={selectedNeighborhoods}
+              />
+            </CardContent>
+          </Card>
         </TabsContent>
         
         <TabsContent value="about" className="mt-0">

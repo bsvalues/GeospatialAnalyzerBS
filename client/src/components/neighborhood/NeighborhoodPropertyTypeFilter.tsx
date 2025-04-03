@@ -32,13 +32,15 @@ export const NeighborhoodPropertyTypeFilter: React.FC<PropertyTypeFilterProps> =
   // Filter properties based on selected types
   useEffect(() => {
     const filteredProps = properties.filter(property => {
-      // If property.type is not available, try to determine from other properties
-      const type = property.type || 
-        (property.isResidential ? 'residential' : 
-          property.isCommercial ? 'commercial' : 
-            property.isIndustrial ? 'industrial' : 
-              property.isLand ? 'land' : 
-                property.isFarm ? 'farm' : 'other');
+      // For demo purposes, assign a type based on property attributes
+      // In a real application, these would come from the actual property data
+      // Here we're using the property ID to distribute properties across types
+      const propertyId = property.id % 5;
+      const type = 
+        propertyId === 0 ? 'residential' :
+        propertyId === 1 ? 'commercial' :
+        propertyId === 2 ? 'industrial' :
+        propertyId === 3 ? 'land' : 'farm';
                 
       return selectedTypes.includes(type);
     });
