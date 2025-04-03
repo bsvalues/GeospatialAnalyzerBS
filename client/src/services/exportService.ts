@@ -8,7 +8,8 @@ export interface ExportResult {
   error?: string;
 }
 
-interface ReportData {
+// Basic report data interface
+export interface ReportData {
   title: string;
   description: string;
   date: string;
@@ -17,19 +18,186 @@ interface ReportData {
   tags: string[];
 }
 
+/**
+ * USPAP-compliant report data structure
+ * Based on Uniform Standards of Professional Appraisal Practice requirements
+ */
+export interface USPAPReportData {
+  // Essential identification elements
+  title: string;
+  fileNumber: string;
+  propertyAddress?: string;
+  propertyType?: string;
+  clientName: string;
+  intendedUser: string;
+  intendedUse: string;
+  effectiveDate: string;
+  reportDate: string;
+  
+  // Valuation elements
+  valuationApproach: 'income' | 'sales' | 'cost' | 'multiple';
+  valueConclusion?: number;
+  valueConclusionRangeMin?: number;
+  valueConclusionRangeMax?: number;
+  
+  // Appraiser information
+  appraiserName: string;
+  appraiserCredentials: string;
+  appraiserCertification?: string;
+  
+  // Report content sections
+  executiveSummary: string;
+  scopeOfWork: string;
+  assumptionsAndLimitingConditions: string[];
+  neighborhoodAnalysis?: string;
+  marketAnalysis?: string;
+  propertyDescription?: string;
+  highestAndBestUse?: string;
+  valuationAnalysis: string;
+  reconciliation?: string;
+  certificationStatement: string;
+  
+  // Supporting elements
+  comparableSales?: PropertyComparable[];
+  incomeAnalysis?: IncomeAnalysis;
+  costAnalysis?: CostAnalysis;
+  photos?: ReportImage[];
+  maps?: ReportImage[];
+  additionalExhibits?: ReportExhibit[];
+  
+  // Metadata
+  tags: string[];
+  lastModified: string;
+}
+
+export interface ReportImage {
+  title: string;
+  description?: string;
+  url: string;
+  date?: string;
+}
+
+export interface ReportExhibit {
+  title: string;
+  type: 'table' | 'chart' | 'graph' | 'image' | 'map' | 'attachment';
+  content: any;
+  description?: string;
+}
+
+export interface PropertyComparable {
+  address: string;
+  saleDate?: string;
+  salePrice?: number;
+  propertyType?: string;
+  landArea?: number;
+  buildingArea?: number;
+  yearBuilt?: number;
+  adjustments?: {
+    [key: string]: {
+      amount: number;
+      percentage: number;
+      reason: string;
+    }
+  };
+  adjustedPrice?: number;
+  photos?: ReportImage[];
+  notes?: string;
+}
+
+export interface IncomeAnalysis {
+  potentialGrossIncome: number;
+  vacancyAndCollectionLoss: number;
+  effectiveGrossIncome: number;
+  operatingExpenses: {
+    [category: string]: number;
+  };
+  netOperatingIncome: number;
+  capitalizationRate: number;
+  valueIndication: number;
+  cashFlowAnalysis?: any;
+  marketRentAnalysis?: any;
+}
+
+export interface CostAnalysis {
+  landValue: number;
+  improvementCost: {
+    replacementCost: number;
+    physicalDepreciation: number;
+    functionalObsolescence: number;
+    economicObsolescence: number;
+  };
+  totalDepreciation: number;
+  deprecatedImprovementValue: number;
+  totalValueIndication: number;
+}
+
 export enum ExportFormat {
   TEXT = 'text',
   PDF = 'pdf',
   EXCEL = 'excel',
   CSV = 'csv',
-  JSON = 'json'
+  JSON = 'json',
+  WORD = 'word',
+  XML = 'xml',
+  HTML = 'html'
 }
 
 export enum ExportTemplate {
+  // USPAP-compliant templates
+  FULL_NARRATIVE_APPRAISAL = 'full-narrative-appraisal',
+  RESTRICTED_APPRAISAL = 'restricted-appraisal',
+  SUMMARY_APPRAISAL = 'summary-appraisal',
+  
+  // Specialized reports
+  INCOME_APPROACH_ANALYSIS = 'income-approach-analysis',
+  SALES_COMPARISON_ANALYSIS = 'sales-comparison-analysis',
+  COST_APPROACH_ANALYSIS = 'cost-approach-analysis',
+  
+  // Market-specific reports
+  RESIDENTIAL_VALUATION = 'residential-valuation',
+  COMMERCIAL_VALUATION = 'commercial-valuation',
+  INDUSTRIAL_VALUATION = 'industrial-valuation',
+  
+  // Legacy templates
   PROPERTY_INSIGHTS = 'property-insights',
   MARKET_ANALYSIS = 'market-analysis',
   VALUATION_REPORT = 'valuation-report',
   COMPARATIVE_ANALYSIS = 'comparative-analysis'
+}
+
+/**
+ * USPAP compliance configuration
+ */
+export interface USPAPComplianceConfig {
+  includeLetterOfTransmittal: boolean;
+  includeCertification: boolean;
+  includeAssumptionsAndLimitingConditions: boolean;
+  includeAppraiserQualifications: boolean;
+  includeConfidentialityStatement: boolean;
+  includeNonDiscriminationStatement: boolean;
+  includeScopeOfWork: boolean;
+  signatureRequired: boolean;
+}
+
+/**
+ * Export options with USPAP compliance settings
+ */
+export interface USPAPExportOptions {
+  format: ExportFormat;
+  template?: ExportTemplate;
+  compliance: USPAPComplianceConfig;
+  includeCharts?: boolean;
+  includePhotos?: boolean;
+  includeMaps?: boolean;
+  includeMetadata?: boolean;
+  customHeader?: string;
+  customFooter?: string;
+  watermark?: string;
+  securityOptions?: {
+    password?: string;
+    restrictEditing?: boolean;
+    restrictPrinting?: boolean;
+  };
 }
 
 // Mock report data

@@ -26,6 +26,7 @@ import DataPage from '@/pages/Data';
 import AnalysisPage from '@/pages/Analysis';
 import PropertiesPage from '@/pages/Properties';
 import ReportsPage from '@/pages/Reports';
+import USPAPExportPage from '@/pages/uspap-export';
 
 function Router() {
   const [location] = useLocation();
@@ -50,6 +51,7 @@ function Router() {
         <Route path="/analysis" component={AnalysisPage} />
         <Route path="/properties" component={PropertiesPage} />
         <Route path="/reports" component={ReportsPage} />
+        <Route path="/uspap-export" component={USPAPExportPage} />
         <Route component={NotFound} />
       </Switch>
     </>
