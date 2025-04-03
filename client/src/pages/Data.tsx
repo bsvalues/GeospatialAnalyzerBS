@@ -6,6 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { PropertyDataTable } from "../components/data/PropertyDataTable";
+import { CSVImportDialog } from "../components/import/CSVImportDialog";
 
 const DataPage = () => {
   return (
@@ -17,10 +19,14 @@ const DataPage = () => {
         </div>
         
         <div className="flex space-x-2 mt-4 sm:mt-0">
-          <Button size="sm" variant="outline" className="flex items-center">
-            <Upload className="h-4 w-4 mr-2" />
-            <span>Import</span>
-          </Button>
+          <CSVImportDialog 
+            trigger={
+              <Button size="sm" variant="outline" className="flex items-center">
+                <Upload className="h-4 w-4 mr-2" />
+                <span>Import</span>
+              </Button>
+            } 
+          />
           <Button size="sm" variant="outline" className="flex items-center">
             <FileDown className="h-4 w-4 mr-2" />
             <span>Export</span>
@@ -47,99 +53,7 @@ const DataPage = () => {
         </div>
         
         <TabsContent value="datasets" className="space-y-4">
-          <Card>
-            <CardHeader className="pb-2">
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-2 sm:space-y-0">
-                <div>
-                  <CardTitle>Property Datasets</CardTitle>
-                  <CardDescription>
-                    Available property data collections
-                  </CardDescription>
-                </div>
-                <div className="flex space-x-2">
-                  <div className="relative w-full sm:w-auto">
-                    <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                    <Input type="search" placeholder="Search datasets..." className="pl-8 h-9 w-full sm:w-[200px]" />
-                  </div>
-                  <Button size="sm" variant="ghost" className="h-9 w-9 p-0">
-                    <RefreshCw className="h-4 w-4" />
-                  </Button>
-                  <Button size="sm" variant="ghost" className="h-9 w-9 p-0">
-                    <Filter className="h-4 w-4" />
-                  </Button>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <ScrollArea className="h-[400px] sm:h-[500px] rounded-md">
-                <div className="space-y-4">
-                  {[
-                    {
-                      name: "Benton County Properties 2024",
-                      description: "Complete property database for 2024 tax year",
-                      date: "January 15, 2024",
-                      records: "42,387",
-                      status: "Active"
-                    },
-                    {
-                      name: "Benton County Properties 2023",
-                      description: "Complete property database for 2023 tax year",
-                      date: "January 12, 2023",
-                      records: "41,934",
-                      status: "Archived"
-                    },
-                    {
-                      name: "Commercial Properties",
-                      description: "Commercial property subset with valuation data",
-                      date: "March 3, 2024",
-                      records: "5,218",
-                      status: "Active"
-                    },
-                    {
-                      name: "Hotel/Motel Properties",
-                      description: "Hotel/motel specific dataset with income approach figures",
-                      date: "March 10, 2024",
-                      records: "142",
-                      status: "Active"
-                    },
-                    {
-                      name: "Residential Properties",
-                      description: "Residential properties with neighborhood classifications",
-                      date: "February 28, 2024",
-                      records: "36,419",
-                      status: "Active"
-                    }
-                  ].map((dataset, index) => (
-                    <div key={index} className="border rounded-md p-4 hover:border-primary/50 transition-colors">
-                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-                        <div>
-                          <div className="flex items-center">
-                            <h3 className="font-medium">{dataset.name}</h3>
-                            <Badge variant={dataset.status === "Active" ? "default" : "secondary"} className="ml-2">
-                              {dataset.status}
-                            </Badge>
-                          </div>
-                          <p className="text-sm text-muted-foreground mt-1">{dataset.description}</p>
-                        </div>
-                        <div className="flex items-center space-x-2 self-end sm:self-auto">
-                          <Button size="sm" variant="ghost">View</Button>
-                          <Button size="sm" variant="ghost">Export</Button>
-                        </div>
-                      </div>
-                      <div className="flex flex-col sm:flex-row mt-3 text-xs text-muted-foreground gap-2 sm:gap-4">
-                        <div>
-                          <span className="font-medium">Last Updated:</span> {dataset.date}
-                        </div>
-                        <div>
-                          <span className="font-medium">Records:</span> {dataset.records}
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </ScrollArea>
-            </CardContent>
-          </Card>
+          <PropertyDataTable className="w-full" />
         </TabsContent>
         
         <TabsContent value="imports" className="space-y-4">

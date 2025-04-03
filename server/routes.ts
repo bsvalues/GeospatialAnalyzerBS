@@ -564,6 +564,66 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ error: 'Failed to fetch properties in region' });
     }
   });
+  
+  // Import properties from CSV
+  app.post('/api/properties/import', async (req, res) => {
+    try {
+      const { properties } = req.body;
+      
+      if (!Array.isArray(properties) || properties.length === 0) {
+        return res.status(400).json({ 
+          success: false, 
+          imported: 0, 
+          errors: [{ message: 'No valid properties provided' }] 
+        });
+      }
+      
+      // Track successes and errors
+      const results = {
+        success: true,
+        imported: 0,
+        errors: [] as any[]
+      };
+      
+      // Process each property
+      for (const propertyData of properties) {
+        try {
+          // Validate required fields
+          if (!propertyData.parcelId || !propertyData.address) {
+            results.errors.push({
+              property: propertyData,
+              message: 'Missing required fields: parcelId and address'
+            });
+            continue;
+          }
+          
+          // Create the property
+          await storage.createProperty(propertyData);
+          results.imported++;
+        } catch (error: any) {
+          console.error('Error importing property:', error);
+          results.errors.push({
+            property: propertyData,
+            message: error.message || 'Failed to import property'
+          });
+        }
+      }
+      
+      // If we have any errors, mark the overall operation as partially successful
+      if (results.errors.length > 0) {
+        results.success = results.imported > 0;
+      }
+      
+      res.json(results);
+    } catch (error: any) {
+      console.error('Error importing properties:', error);
+      res.status(500).json({ 
+        success: false, 
+        imported: 0, 
+        errors: [{ message: error.message || 'Failed to import properties' }] 
+      });
+    }
+  });
 
   // API route for project overview data
   app.get('/api/project', (req, res) => {
