@@ -137,7 +137,7 @@ export const NeighborhoodTrendGraph: React.FC<NeighborhoodTrendGraphProps> = ({
       {filteredNeighborhoods.length > 0 ? (
         <Line data={chartData} options={options} />
       ) : (
-        <div className="h-full flex items-center justify-center text-gray-500">
+        <div className="h-full flex items-center justify-center text-gray-500" data-testid="trend-placeholder">
           Select neighborhoods to view trends
         </div>
       )}

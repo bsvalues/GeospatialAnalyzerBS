@@ -160,7 +160,7 @@ export const NeighborhoodScoreCard: React.FC<NeighborhoodScoreCardProps> = ({
           
           <Dialog open={isSettingsOpen} onOpenChange={setIsSettingsOpen}>
             <DialogTrigger asChild>
-              <Button variant="outline" size="icon">
+              <Button variant="outline" size="icon" data-testid="settings-button">
                 <Settings className="h-4 w-4" />
               </Button>
             </DialogTrigger>

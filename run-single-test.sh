@@ -11,4 +11,4 @@ if [ -z "$1" ]; then
 fi
 
 # Run the specified test file with Jest
-NODE_OPTIONS=--experimental-vm-modules npx jest "$1" --verbose
+NODE_OPTIONS=--experimental-vm-modules npx jest "$1" --verbose --config=jest.config.cjs

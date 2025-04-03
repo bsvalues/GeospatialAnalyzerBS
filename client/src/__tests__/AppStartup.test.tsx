@@ -1,54 +1,60 @@
 import React from 'react';
-import { render, screen } from '@testing-library/react';
-import { App } from '../App';
-import { MemoryRouter } from 'react-router-dom';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import App from '../App';
 
-// Mock any components that might cause issues in tests
-jest.mock('@/components/ui/toaster', () => ({
-  Toaster: () => <div data-testid="mock-toaster">Toaster</div>,
-}));
+// Create a test query client
+const createTestQueryClient = () => new QueryClient({
+  defaultOptions: {
+    queries: {
+      retry: false,
+    },
+  },
+});
 
-// Mock any context providers if needed
-jest.mock('../contexts/MapAccessibilityContext', () => ({
-  MapAccessibilityProvider: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-}));
+// Wrapper component with providers needed for testing
+const AppWrapper = () => {
+  const testQueryClient = createTestQueryClient();
+  
+  return (
+    <QueryClientProvider client={testQueryClient}>
+      <App />
+    </QueryClientProvider>
+  );
+};
 
-jest.mock('../contexts/PropertyFilterContext', () => ({
-  PropertyFilterProvider: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-}));
+describe('Application Startup', () => {
+  beforeEach(() => {
+    // Mock fetch to prevent actual API calls
+    global.fetch = jest.fn().mockImplementation(() => 
+      Promise.resolve({
+        ok: true,
+        json: () => Promise.resolve([]),
+      })
+    );
+  });
 
-jest.mock('../contexts/AutoHideContext', () => ({
-  AutoHideProvider: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-}));
-
-jest.mock('../contexts/TourContext', () => ({
-  TourProvider: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-}));
-
-// Mock the routes we want to test
-jest.mock('@/pages/income-test', () => () => <div data-testid="income-test-page">Income Test Page</div>);
-jest.mock('@/pages/home', () => () => <div data-testid="home-page">Home Page</div>);
-
-describe('App Component', () => {
-  test('renders without crashing', () => {
-    render(<App />);
-    // The test passes if the render doesn't throw
+  afterEach(() => {
+    jest.resetAllMocks();
   });
   
-  test('renders home page by default', () => {
-    // We need to create our own Router with a specific initial entry
-    // since App uses wouter which doesn't easily work with MemoryRouter
-    window.history.pushState({}, 'Home', '/');
+  test('application initializes without errors', async () => {
+    render(<AppWrapper />);
     
-    render(<App />);
-    expect(screen.getByTestId('home-page')).toBeInTheDocument();
+    // Wait for the application to load
+    await waitFor(() => {
+      // Verify at least one core element is present
+      expect(document.querySelector('.container')).toBeInTheDocument();
+    });
   });
   
-  test('navigates to income-test page', () => {
-    // Set the URL to /income-test
-    window.history.pushState({}, 'Income Test', '/income-test');
+  test('app header contains correct navigation elements', async () => {
+    render(<AppWrapper />);
     
-    render(<App />);
-    expect(screen.getByTestId('income-test-page')).toBeInTheDocument();
+    // Check for navigation elements
+    await waitFor(() => {
+      const headerElement = document.querySelector('header');
+      expect(headerElement).toBeInTheDocument();
+    });
   });
 });

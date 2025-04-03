@@ -1,14 +1,7 @@
 // Import Jest DOM extensions
-import '@testing-library/jest-dom';
-import { jest, describe, beforeEach, afterEach, test, expect } from '@jest/globals';
+require('@testing-library/jest-dom');
 
-// Make Jest globals available in all test files
-globalThis.jest = jest;
-globalThis.describe = describe;
-globalThis.beforeEach = beforeEach;
-globalThis.afterEach = afterEach;
-globalThis.test = test;
-globalThis.expect = expect;
+// Jest globals are already available in the test environment
 
 // Mock the global fetch API
 global.fetch = jest.fn();
