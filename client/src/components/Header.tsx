@@ -91,15 +91,15 @@ export const Header: React.FC<HeaderProps> = ({ taxYear, onTaxYearChange }) => {
   };
   
   return (
-    <header className="bg-gradient-to-r from-primary/90 to-primary/70 text-white shadow-md px-4 py-3 flex justify-between items-center">
+    <header className="bg-gradient-to-b from-gray-50 to-gray-100 text-gray-900 shadow-md px-4 py-3 flex justify-between items-center">
       <div className="flex items-center">
         <div className="flex items-center">
-          <div className="bg-white p-1.5 rounded-lg shadow-sm mr-2">
+          <div className="bg-primary/10 p-2 rounded-full shadow-sm mr-2">
             <Map className="h-6 w-6 text-primary" />
           </div>
-          <h1 className="text-xl font-bold tracking-tight">GIS_BS</h1>
+          <h1 className="text-xl font-bold tracking-tight text-gray-900">GIS_BS</h1>
         </div>
-        <span className="ml-3 text-sm text-white/80 font-light tracking-wide border-l border-white/20 pl-3">Property Valuation & Analysis Platform</span>
+        <span className="ml-3 text-sm text-gray-600 font-light tracking-wide border-l border-gray-200 pl-3">Benton County's Advanced Property Valuation Platform</span>
       </div>
       
       <div className="flex items-center space-x-4">
@@ -113,11 +113,11 @@ export const Header: React.FC<HeaderProps> = ({ taxYear, onTaxYearChange }) => {
         </button>
         
         {/* Desktop navigation */}
-        <div className="hidden md:flex items-center space-x-1 text-white/90">
+        <div className="hidden md:flex items-center space-x-1 text-gray-700">
           <Link href="/layers">
             <div className={cn(
-              "flex items-center px-3 py-1.5 rounded-md hover:bg-white/10 transition-all duration-200 cursor-pointer",
-              currentLocation === "/layers" ? "bg-white/20" : ""
+              "flex items-center px-3 py-1.5 rounded-md hover:bg-gray-200/50 transition-all duration-200 cursor-pointer",
+              currentLocation === "/layers" ? "bg-primary/10 text-primary" : ""
             )}>
               <Map className="h-4 w-4 mr-1.5" />
               <span className="text-sm font-medium">Layers</span>
@@ -125,8 +125,8 @@ export const Header: React.FC<HeaderProps> = ({ taxYear, onTaxYearChange }) => {
           </Link>
           <Link href="/data">
             <div className={cn(
-              "flex items-center px-3 py-1.5 rounded-md hover:bg-white/10 transition-all duration-200 cursor-pointer",
-              currentLocation === "/data" ? "bg-white/20" : ""
+              "flex items-center px-3 py-1.5 rounded-md hover:bg-gray-200/50 transition-all duration-200 cursor-pointer",
+              currentLocation === "/data" ? "bg-primary/10 text-primary" : ""
             )}>
               <Database className="h-4 w-4 mr-1.5" />
               <span className="text-sm font-medium">Data</span>
@@ -134,8 +134,8 @@ export const Header: React.FC<HeaderProps> = ({ taxYear, onTaxYearChange }) => {
           </Link>
           <Link href="/analysis">
             <div className={cn(
-              "flex items-center px-3 py-1.5 rounded-md hover:bg-white/10 transition-all duration-200 cursor-pointer",
-              currentLocation === "/analysis" ? "bg-white/20" : ""
+              "flex items-center px-3 py-1.5 rounded-md hover:bg-gray-200/50 transition-all duration-200 cursor-pointer",
+              currentLocation === "/analysis" ? "bg-primary/10 text-primary" : ""
             )}>
               <Calculator className="h-4 w-4 mr-1.5" />
               <span className="text-sm font-medium">Analysis</span>
@@ -143,8 +143,8 @@ export const Header: React.FC<HeaderProps> = ({ taxYear, onTaxYearChange }) => {
           </Link>
           <Link href="/properties">
             <div className={cn(
-              "flex items-center px-3 py-1.5 rounded-md hover:bg-white/10 transition-all duration-200 cursor-pointer",
-              currentLocation === "/properties" ? "bg-white/20" : ""
+              "flex items-center px-3 py-1.5 rounded-md hover:bg-gray-200/50 transition-all duration-200 cursor-pointer",
+              currentLocation === "/properties" ? "bg-primary/10 text-primary" : ""
             )}>
               <Building className="h-4 w-4 mr-1.5" />
               <span className="text-sm font-medium">Properties</span>
@@ -152,61 +152,76 @@ export const Header: React.FC<HeaderProps> = ({ taxYear, onTaxYearChange }) => {
           </Link>
           <Link href="/reports">
             <div className={cn(
-              "flex items-center px-3 py-1.5 rounded-md hover:bg-white/10 transition-all duration-200 cursor-pointer",
-              currentLocation === "/reports" ? "bg-white/20" : ""
+              "flex items-center px-3 py-1.5 rounded-md hover:bg-gray-200/50 transition-all duration-200 cursor-pointer",
+              currentLocation === "/reports" ? "bg-primary/10 text-primary" : ""
             )}>
               <FileText className="h-4 w-4 mr-1.5" />
               <span className="text-sm font-medium">Reports</span>
             </div>
           </Link>
           <Link href="/trends">
-            <div className="flex items-center px-3 py-1.5 rounded-md hover:bg-white/10 transition-all duration-200 cursor-pointer">
+            <div className={cn(
+              "flex items-center px-3 py-1.5 rounded-md hover:bg-gray-200/50 transition-all duration-200 cursor-pointer",
+              currentLocation === "/trends" ? "bg-primary/10 text-primary" : ""
+            )}>
               <TrendingUp className="h-4 w-4 mr-1.5" />
               <span className="text-sm font-medium">Trends</span>
             </div>
           </Link>
           <Link href="/neighborhoods">
-            <div className="flex items-center px-3 py-1.5 rounded-md hover:bg-white/10 transition-all duration-200 cursor-pointer">
+            <div className={cn(
+              "flex items-center px-3 py-1.5 rounded-md hover:bg-gray-200/50 transition-all duration-200 cursor-pointer",
+              currentLocation === "/neighborhoods" ? "bg-primary/10 text-primary" : ""
+            )}>
               <Home className="h-4 w-4 mr-1.5" />
               <span className="text-sm font-medium">Neighborhoods</span>
             </div>
           </Link>
           <Link href="/neighborhood-comparison">
             <div className={cn(
-              "flex items-center px-3 py-1.5 rounded-md hover:bg-white/10 transition-all duration-200 cursor-pointer",
-              currentLocation === "/neighborhood-comparison" ? "bg-white/20" : ""
+              "flex items-center px-3 py-1.5 rounded-md hover:bg-gray-200/50 transition-all duration-200 cursor-pointer",
+              currentLocation === "/neighborhood-comparison" ? "bg-primary/10 text-primary" : ""
             )}>
               <Map className="h-4 w-4 mr-1.5" />
               <span className="text-sm font-medium">Comparison</span>
             </div>
           </Link>
           <Link href="/scripting">
-            <div className="flex items-center px-3 py-1.5 rounded-md hover:bg-white/10 transition-all duration-200 cursor-pointer">
+            <div className={cn(
+              "flex items-center px-3 py-1.5 rounded-md hover:bg-gray-200/50 transition-all duration-200 cursor-pointer",
+              currentLocation === "/scripting" ? "bg-primary/10 text-primary" : ""
+            )}>
               <Code className="h-4 w-4 mr-1.5" />
               <span className="text-sm font-medium">Scripting</span>
             </div>
           </Link>
           <Link href="/etl">
-            <div className="flex items-center px-3 py-1.5 rounded-md hover:bg-white/10 transition-all duration-200 cursor-pointer">
+            <div className={cn(
+              "flex items-center px-3 py-1.5 rounded-md hover:bg-gray-200/50 transition-all duration-200 cursor-pointer",
+              currentLocation === "/etl" ? "bg-primary/10 text-primary" : ""
+            )}>
               <Settings className="h-4 w-4 mr-1.5" />
               <span className="text-sm font-medium">ETL</span>
             </div>
           </Link>
           <Link href="/data-connectors">
-            <div className="flex items-center px-3 py-1.5 rounded-md hover:bg-white/10 transition-all duration-200 cursor-pointer">
+            <div className={cn(
+              "flex items-center px-3 py-1.5 rounded-md hover:bg-gray-200/50 transition-all duration-200 cursor-pointer",
+              currentLocation === "/data-connectors" ? "bg-primary/10 text-primary" : ""
+            )}>
               <Globe className="h-4 w-4 mr-1.5" />
               <span className="text-sm font-medium">Connectors</span>
             </div>
           </Link>
         </div>
         
-        <div className="mr-4 border-r border-white/20 pr-4 hidden sm:block">
-          <label htmlFor="taxYear" className="block text-xs text-white/80 mb-1">
+        <div className="mr-4 border-r border-gray-200 pr-4 hidden sm:block">
+          <label htmlFor="taxYear" className="block text-xs text-gray-600 mb-1">
             Tax Year
           </label>
           <select
             id="taxYear"
-            className="bg-white/10 border border-white/20 rounded-md px-3 py-1 text-sm text-white focus:ring-2 focus:ring-white/30 focus:outline-none"
+            className="bg-white border border-gray-200 rounded-md px-3 py-1 text-sm text-gray-800 focus:ring-2 focus:ring-primary/30 focus:outline-none shadow-sm"
             value={taxYear}
             onChange={(e) => onTaxYearChange(e.target.value)}
           >
@@ -221,9 +236,9 @@ export const Header: React.FC<HeaderProps> = ({ taxYear, onTaxYearChange }) => {
         <div className="flex items-center space-x-3">
           {/* Accessibility button */}
           <button
-            className={`text-white hover:text-white p-1.5 rounded-full hover:bg-white/10 transition-all duration-200 ${
+            className={`text-gray-700 hover:text-primary p-1.5 rounded-full hover:bg-gray-200/50 transition-all duration-200 ${
               highContrastMode || keyboardNavigation || screenReaderAnnouncements || reducedMotion 
-                ? 'bg-white/20 ring-2 ring-white/30' 
+                ? 'bg-primary/10 ring-2 ring-primary/30' 
                 : ''
             }`}
             aria-label="Accessibility settings"
@@ -237,13 +252,13 @@ export const Header: React.FC<HeaderProps> = ({ taxYear, onTaxYearChange }) => {
           <TourButton 
             variant="ghost"
             size="icon"
-            className="text-white hover:text-white hover:bg-white/10 transition-colors"
+            className="text-gray-700 hover:text-primary hover:bg-gray-200/50 transition-colors"
             showTooltip={true}
             tooltipContent={hasSeenTour ? 'Restart guided tour' : 'Start guided tour'}
           />
           
           <button
-            className="text-white hover:text-white p-1.5 rounded-full hover:bg-white/10 transition-all duration-200 relative"
+            className="text-gray-700 hover:text-primary p-1.5 rounded-full hover:bg-gray-200/50 transition-all duration-200 relative"
             aria-label="Notifications"
           >
             <Bell className="h-5 w-5" />
@@ -255,10 +270,10 @@ export const Header: React.FC<HeaderProps> = ({ taxYear, onTaxYearChange }) => {
               className="flex items-center group"
               aria-label="User menu"
             >
-              <div className="w-9 h-9 rounded-full bg-white/20 flex items-center justify-center text-white font-medium border-2 border-white/30 shadow-sm group-hover:border-white transition-all duration-200">
+              <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center text-primary font-medium border-2 border-primary/20 shadow-sm group-hover:border-primary transition-all duration-200">
                 AS
               </div>
-              <span className="ml-2 text-sm font-medium hidden md:inline">Admin</span>
+              <span className="ml-2 text-sm font-medium text-gray-700 hidden md:inline">Admin</span>
             </button>
           </div>
         </div>
@@ -268,17 +283,17 @@ export const Header: React.FC<HeaderProps> = ({ taxYear, onTaxYearChange }) => {
       {isMobileMenuOpen && (
         <div className="fixed inset-0 z-50 md:hidden">
           <div className="fixed inset-0 bg-black/50" onClick={() => setIsMobileMenuOpen(false)} />
-          <div className="fixed inset-y-0 left-0 w-3/4 max-w-sm bg-primary shadow-lg p-5 overflow-y-auto transform transition-transform duration-300">
+          <div className="fixed inset-y-0 left-0 w-3/4 max-w-sm bg-white shadow-lg p-5 overflow-y-auto transform transition-transform duration-300">
             <div className="flex justify-between items-center mb-6">
               <div className="flex items-center">
-                <div className="bg-white p-1.5 rounded-lg shadow-sm mr-2">
+                <div className="bg-primary/10 p-2 rounded-full shadow-sm mr-2">
                   <Map className="h-5 w-5 text-primary" />
                 </div>
-                <h2 className="text-lg font-bold tracking-tight text-white">GIS_BS Menu</h2>
+                <h2 className="text-lg font-bold tracking-tight text-gray-900">GIS_BS Menu</h2>
               </div>
               <button 
                 onClick={() => setIsMobileMenuOpen(false)}
-                className="text-white hover:text-white p-1.5 rounded-full hover:bg-white/10"
+                className="text-gray-500 hover:text-gray-700 p-1.5 rounded-full hover:bg-gray-100"
                 aria-label="Close menu"
               >
                 <X className="h-5 w-5" />
@@ -286,12 +301,12 @@ export const Header: React.FC<HeaderProps> = ({ taxYear, onTaxYearChange }) => {
             </div>
             
             <div className="mt-2 mb-6">
-              <label htmlFor="mobileTaxYear" className="block text-xs text-white/80 mb-1">
+              <label htmlFor="mobileTaxYear" className="block text-xs text-gray-600 mb-1">
                 Tax Year
               </label>
               <select
                 id="mobileTaxYear"
-                className="w-full bg-white/10 border border-white/20 rounded-md px-3 py-2.5 text-sm text-white focus:ring-2 focus:ring-white/30 focus:outline-none"
+                className="w-full bg-white border border-gray-200 rounded-md px-3 py-2.5 text-sm text-gray-800 focus:ring-2 focus:ring-primary/30 focus:outline-none shadow-sm"
                 value={taxYear}
                 onChange={(e) => {
                   onTaxYearChange(e.target.value);
@@ -311,12 +326,12 @@ export const Header: React.FC<HeaderProps> = ({ taxYear, onTaxYearChange }) => {
                 <div 
                   className={cn(
                     "flex items-center rounded-md py-3 px-3 transition-colors",
-                    currentLocation === "/layers" ? "bg-white/20" : "hover:bg-white/10"
+                    currentLocation === "/layers" ? "bg-primary/10 text-primary" : "hover:bg-gray-100 text-gray-700"
                   )}
                   onClick={() => setIsMobileMenuOpen(false)}
                 >
-                  <Map className="h-5 w-5 mr-3 text-white/90" />
-                  <span className="text-white font-medium">Layers</span>
+                  <Map className="h-5 w-5 mr-3" />
+                  <span className="font-medium">Layers</span>
                 </div>
               </Link>
               
@@ -324,12 +339,12 @@ export const Header: React.FC<HeaderProps> = ({ taxYear, onTaxYearChange }) => {
                 <div 
                   className={cn(
                     "flex items-center rounded-md py-3 px-3 transition-colors",
-                    currentLocation === "/data" ? "bg-white/20" : "hover:bg-white/10"
+                    currentLocation === "/data" ? "bg-primary/10 text-primary" : "hover:bg-gray-100 text-gray-700"
                   )}
                   onClick={() => setIsMobileMenuOpen(false)}
                 >
-                  <Database className="h-5 w-5 mr-3 text-white/90" />
-                  <span className="text-white font-medium">Data</span>
+                  <Database className="h-5 w-5 mr-3" />
+                  <span className="font-medium">Data</span>
                 </div>
               </Link>
               
@@ -337,12 +352,12 @@ export const Header: React.FC<HeaderProps> = ({ taxYear, onTaxYearChange }) => {
                 <div 
                   className={cn(
                     "flex items-center rounded-md py-3 px-3 transition-colors",
-                    currentLocation === "/analysis" ? "bg-white/20" : "hover:bg-white/10"
+                    currentLocation === "/analysis" ? "bg-primary/10 text-primary" : "hover:bg-gray-100 text-gray-700"
                   )}
                   onClick={() => setIsMobileMenuOpen(false)}
                 >
-                  <Calculator className="h-5 w-5 mr-3 text-white/90" />
-                  <span className="text-white font-medium">Analysis</span>
+                  <Calculator className="h-5 w-5 mr-3" />
+                  <span className="font-medium">Analysis</span>
                 </div>
               </Link>
               
@@ -350,12 +365,12 @@ export const Header: React.FC<HeaderProps> = ({ taxYear, onTaxYearChange }) => {
                 <div 
                   className={cn(
                     "flex items-center rounded-md py-3 px-3 transition-colors",
-                    currentLocation === "/properties" ? "bg-white/20" : "hover:bg-white/10"
+                    currentLocation === "/properties" ? "bg-primary/10 text-primary" : "hover:bg-gray-100 text-gray-700"
                   )}
                   onClick={() => setIsMobileMenuOpen(false)}
                 >
-                  <Building className="h-5 w-5 mr-3 text-white/90" />
-                  <span className="text-white font-medium">Properties</span>
+                  <Building className="h-5 w-5 mr-3" />
+                  <span className="font-medium">Properties</span>
                 </div>
               </Link>
               
@@ -363,12 +378,12 @@ export const Header: React.FC<HeaderProps> = ({ taxYear, onTaxYearChange }) => {
                 <div 
                   className={cn(
                     "flex items-center rounded-md py-3 px-3 transition-colors",
-                    currentLocation === "/reports" ? "bg-white/20" : "hover:bg-white/10"
+                    currentLocation === "/reports" ? "bg-primary/10 text-primary" : "hover:bg-gray-100 text-gray-700"
                   )}
                   onClick={() => setIsMobileMenuOpen(false)}
                 >
-                  <FileText className="h-5 w-5 mr-3 text-white/90" />
-                  <span className="text-white font-medium">Reports</span>
+                  <FileText className="h-5 w-5 mr-3" />
+                  <span className="font-medium">Reports</span>
                 </div>
               </Link>
               
@@ -376,12 +391,12 @@ export const Header: React.FC<HeaderProps> = ({ taxYear, onTaxYearChange }) => {
                 <div 
                   className={cn(
                     "flex items-center rounded-md py-3 px-3 transition-colors",
-                    currentLocation === "/trends" ? "bg-white/20" : "hover:bg-white/10"
+                    currentLocation === "/trends" ? "bg-primary/10 text-primary" : "hover:bg-gray-100 text-gray-700"
                   )}
                   onClick={() => setIsMobileMenuOpen(false)}
                 >
-                  <TrendingUp className="h-5 w-5 mr-3 text-white/90" />
-                  <span className="text-white font-medium">Trends</span>
+                  <TrendingUp className="h-5 w-5 mr-3" />
+                  <span className="font-medium">Trends</span>
                 </div>
               </Link>
               
@@ -389,12 +404,12 @@ export const Header: React.FC<HeaderProps> = ({ taxYear, onTaxYearChange }) => {
                 <div 
                   className={cn(
                     "flex items-center rounded-md py-3 px-3 transition-colors",
-                    currentLocation === "/neighborhoods" ? "bg-white/20" : "hover:bg-white/10"
+                    currentLocation === "/neighborhoods" ? "bg-primary/10 text-primary" : "hover:bg-gray-100 text-gray-700"
                   )}
                   onClick={() => setIsMobileMenuOpen(false)}
                 >
-                  <Home className="h-5 w-5 mr-3 text-white/90" />
-                  <span className="text-white font-medium">Neighborhoods</span>
+                  <Home className="h-5 w-5 mr-3" />
+                  <span className="font-medium">Neighborhoods</span>
                 </div>
               </Link>
               
@@ -402,12 +417,12 @@ export const Header: React.FC<HeaderProps> = ({ taxYear, onTaxYearChange }) => {
                 <div 
                   className={cn(
                     "flex items-center rounded-md py-3 px-3 transition-colors",
-                    currentLocation === "/neighborhood-comparison" ? "bg-white/20" : "hover:bg-white/10"
+                    currentLocation === "/neighborhood-comparison" ? "bg-primary/10 text-primary" : "hover:bg-gray-100 text-gray-700"
                   )}
                   onClick={() => setIsMobileMenuOpen(false)}
                 >
-                  <Map className="h-5 w-5 mr-3 text-white/90" />
-                  <span className="text-white font-medium">Neighborhood Comparison</span>
+                  <Map className="h-5 w-5 mr-3" />
+                  <span className="font-medium">Neighborhood Comparison</span>
                 </div>
               </Link>
               
@@ -415,12 +430,12 @@ export const Header: React.FC<HeaderProps> = ({ taxYear, onTaxYearChange }) => {
                 <div 
                   className={cn(
                     "flex items-center rounded-md py-3 px-3 transition-colors",
-                    currentLocation === "/scripting" ? "bg-white/20" : "hover:bg-white/10"
+                    currentLocation === "/scripting" ? "bg-primary/10 text-primary" : "hover:bg-gray-100 text-gray-700"
                   )}
                   onClick={() => setIsMobileMenuOpen(false)}
                 >
-                  <Code className="h-5 w-5 mr-3 text-white/90" />
-                  <span className="text-white font-medium">Scripting</span>
+                  <Code className="h-5 w-5 mr-3" />
+                  <span className="font-medium">Scripting</span>
                 </div>
               </Link>
               
@@ -428,12 +443,12 @@ export const Header: React.FC<HeaderProps> = ({ taxYear, onTaxYearChange }) => {
                 <div 
                   className={cn(
                     "flex items-center rounded-md py-3 px-3 transition-colors",
-                    currentLocation === "/etl" ? "bg-white/20" : "hover:bg-white/10"
+                    currentLocation === "/etl" ? "bg-primary/10 text-primary" : "hover:bg-gray-100 text-gray-700"
                   )}
                   onClick={() => setIsMobileMenuOpen(false)}
                 >
-                  <Settings className="h-5 w-5 mr-3 text-white/90" />
-                  <span className="text-white font-medium">ETL</span>
+                  <Settings className="h-5 w-5 mr-3" />
+                  <span className="font-medium">ETL</span>
                 </div>
               </Link>
               
@@ -441,19 +456,19 @@ export const Header: React.FC<HeaderProps> = ({ taxYear, onTaxYearChange }) => {
                 <div 
                   className={cn(
                     "flex items-center rounded-md py-3 px-3 transition-colors",
-                    currentLocation === "/data-connectors" ? "bg-white/20" : "hover:bg-white/10"
+                    currentLocation === "/data-connectors" ? "bg-primary/10 text-primary" : "hover:bg-gray-100 text-gray-700"
                   )}
                   onClick={() => setIsMobileMenuOpen(false)}
                 >
-                  <Globe className="h-5 w-5 mr-3 text-white/90" />
-                  <span className="text-white font-medium">Connectors</span>
+                  <Globe className="h-5 w-5 mr-3" />
+                  <span className="font-medium">Connectors</span>
                 </div>
               </Link>
             </nav>
             
-            <div className="mt-8 border-t border-white/10 pt-6">
+            <div className="mt-8 border-t border-gray-200 pt-6">
               <button 
-                className="w-full flex items-center justify-center px-4 py-3 bg-white/10 hover:bg-white/20 rounded-md text-white font-medium transition-colors duration-200"
+                className="w-full flex items-center justify-center px-4 py-3 bg-primary/10 hover:bg-primary/20 rounded-md text-primary font-medium transition-colors duration-200"
                 onClick={() => {
                   setIsMobileMenuOpen(false);
                   setIsAccessibilityDialogOpen(true);
@@ -464,7 +479,7 @@ export const Header: React.FC<HeaderProps> = ({ taxYear, onTaxYearChange }) => {
               </button>
               
               <button 
-                className="mt-3 w-full flex items-center justify-center px-4 py-3 bg-white/10 hover:bg-white/20 rounded-md text-white font-medium transition-colors duration-200"
+                className="mt-3 w-full flex items-center justify-center px-4 py-3 bg-gray-100 hover:bg-gray-200 rounded-md text-gray-700 font-medium transition-colors duration-200"
                 onClick={() => {
                   setIsMobileMenuOpen(false);
                   startTour();

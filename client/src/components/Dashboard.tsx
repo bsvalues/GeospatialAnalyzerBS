@@ -57,13 +57,13 @@ const Dashboard: React.FC<DashboardProps> = ({ className }) => {
   });
 
   return (
-    <div className={`h-full flex flex-col ${className} bg-gradient-to-b from-[#f8faff] to-[#e6f2ff]`} data-testid="dashboard-container">
+    <div className={`h-full flex flex-col ${className} bg-gradient-to-b from-gray-50 to-gray-100`} data-testid="dashboard-container">
       {/* Tab navigation */}
       <TabNavigation activeTab={activeTab} onTabChange={setActiveTab} data-tour="app-navigation" />
 
       {/* Subtle background elements */}
-      <div className="absolute top-1/4 right-1/3 w-[300px] h-[300px] bg-blue-300 rounded-full blur-[130px] opacity-10 z-0 pointer-events-none" />
-      <div className="absolute bottom-1/3 left-1/3 w-[250px] h-[250px] bg-purple-300 rounded-full blur-[100px] opacity-10 z-0 pointer-events-none" />
+      <div className="absolute top-1/4 right-1/3 w-[300px] h-[300px] bg-primary/20 rounded-full blur-[130px] opacity-20 z-0 pointer-events-none" />
+      <div className="absolute bottom-1/3 left-1/3 w-[250px] h-[250px] bg-primary/10 rounded-full blur-[100px] opacity-20 z-0 pointer-events-none" />
 
       {/* Panel content */}
       <div className="flex-grow overflow-hidden relative">
@@ -79,7 +79,7 @@ const Dashboard: React.FC<DashboardProps> = ({ className }) => {
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.5 }}
-                    className="text-3xl font-bold mb-2 bg-clip-text text-transparent bg-gradient-to-r from-blue-700 to-indigo-800"
+                    className="text-3xl font-bold mb-2 bg-clip-text text-transparent bg-gradient-to-r from-primary to-primary/70"
                   >
                     Benton County Property Valuation
                   </motion.h1>
@@ -204,8 +204,8 @@ const Dashboard: React.FC<DashboardProps> = ({ className }) => {
                   className="bg-white/80 backdrop-blur-md p-6 rounded-xl border border-blue-50 shadow-[0_8px_16px_rgba(112,144,176,0.08)]"
                 >
                   <div className="flex justify-between items-center mb-6">
-                    <h2 className="text-lg font-semibold bg-clip-text text-transparent bg-gradient-to-r from-blue-700 to-blue-500 flex items-center">
-                      <BarChart className="h-5 w-5 text-blue-600 mr-2" />
+                    <h2 className="text-lg font-semibold bg-clip-text text-transparent bg-gradient-to-r from-primary to-primary/70 flex items-center">
+                      <BarChart className="h-5 w-5 text-primary mr-2" />
                       Property Statistics
                     </h2>
                     <button className="text-gray-400 hover:text-blue-500 p-1 rounded-full transition-colors duration-200">
@@ -252,8 +252,8 @@ const Dashboard: React.FC<DashboardProps> = ({ className }) => {
                   className="bg-white/80 backdrop-blur-md p-6 rounded-xl border border-purple-50 shadow-[0_8px_16px_rgba(112,144,176,0.08)]"
                 >
                   <div className="flex justify-between items-center mb-6">
-                    <h2 className="text-lg font-semibold bg-clip-text text-transparent bg-gradient-to-r from-purple-700 to-purple-500 flex items-center">
-                      <TrendingUp className="h-5 w-5 text-purple-600 mr-2" />
+                    <h2 className="text-lg font-semibold bg-clip-text text-transparent bg-gradient-to-r from-primary to-primary/70 flex items-center">
+                      <TrendingUp className="h-5 w-5 text-primary mr-2" />
                       Value Distribution
                     </h2>
                     <button className="text-gray-400 hover:text-purple-500 p-1 rounded-full transition-colors duration-200">
@@ -294,8 +294,8 @@ const Dashboard: React.FC<DashboardProps> = ({ className }) => {
                   className="bg-white/80 backdrop-blur-md p-6 rounded-xl border border-green-50 shadow-[0_8px_16px_rgba(112,144,176,0.08)]"
                 >
                   <div className="flex justify-between items-center mb-6">
-                    <h2 className="text-lg font-semibold bg-clip-text text-transparent bg-gradient-to-r from-green-700 to-green-500 flex items-center">
-                      <Calendar className="h-5 w-5 text-green-600 mr-2" />
+                    <h2 className="text-lg font-semibold bg-clip-text text-transparent bg-gradient-to-r from-primary to-primary/70 flex items-center">
+                      <Calendar className="h-5 w-5 text-primary mr-2" />
                       Recent Activity
                     </h2>
                     <button className="text-gray-400 hover:text-green-500 p-1 rounded-full transition-colors duration-200">
@@ -389,7 +389,7 @@ const Dashboard: React.FC<DashboardProps> = ({ className }) => {
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.5, delay: 0.4 }}
-                className="text-xl font-bold mb-4 bg-clip-text text-transparent bg-gradient-to-r from-gray-800 to-gray-700"
+                className="text-xl font-bold mb-4 bg-clip-text text-transparent bg-gradient-to-r from-primary to-primary/70"
               >
                 Quick Access
               </motion.h2>
