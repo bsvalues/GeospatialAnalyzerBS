@@ -375,43 +375,10 @@ jest.mock('recharts', () => {
   };
 });
 
-// Mock GoogleMapsDataConnector
-jest.mock('@/services/GoogleMapsDataConnector', () => {
-  return {
-    GoogleMapsDataConnector: jest.fn().mockImplementation(() => {
-      return {
-        initialize: jest.fn().mockResolvedValue(true),
-        isInitialized: jest.fn().mockReturnValue(true),
-        fetchLocationData: jest.fn().mockResolvedValue({
-          results: [
-            {
-              formatted_address: '123 Test Street, Richland, WA 99352, USA',
-              geometry: {
-                location: { lat: 46.2, lng: -119.1 }
-              }
-            }
-          ]
-        }),
-        getNewUniqueId: jest.fn().mockReturnValue('mock-google-maps-id'),
-      };
-    }),
-  };
-});
+// We have created mock implementations directly in the file system
+// No need to mock GoogleMapsDataConnector here anymore
 
-// Mock AutoHideContext
-jest.mock('@/contexts/AutoHideContext', () => {
-  return {
-    useAutoHide: jest.fn().mockReturnValue({
-      autoHideEnabled: true,
-      toggleAutoHide: jest.fn(),
-      hideNonEssentialElements: jest.fn(),
-      showAllElements: jest.fn(),
-    }),
-    AutoHideProvider: jest.fn().mockImplementation(({ children }) => {
-      return React.createElement('div', null, children);
-    }),
-  };
-});
+// We will use the real AutoHideContext implementation
 
 // Clean up mocks after each test
 afterEach(() => {
