@@ -35,7 +35,9 @@ export const properties = pgTable("properties", {
   lastSaleDate: text("last_sale_date"),
   taxAssessment: text("tax_assessment"),
   pricePerSqFt: text("price_per_sqft"),
-  attributes: jsonb("attributes")
+  attributes: jsonb("attributes"),
+  sourceId: text("source_id"),
+  zillowId: text("zillow_id")
 });
 
 // Project table for storing project metadata
@@ -305,8 +307,13 @@ export const insertPropertySchema = createInsertSchema(properties).pick({
   lastSaleDate: true,
   taxAssessment: true,
   pricePerSqFt: true,
-  attributes: true
+  attributes: true,
+  sourceId: true,
+  zillowId: true
 });
+
+// Type definitions
+// These are properly defined as a group at the end of the file
 
 export const insertProjectSchema = createInsertSchema(projects).pick({
   name: true,
