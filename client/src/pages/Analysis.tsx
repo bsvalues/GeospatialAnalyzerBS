@@ -4,7 +4,7 @@
  * This page provides spatial analysis tools and visualization
  * for property data in Benton County.
  */
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import MapComponent from '../components/map/MapComponent';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -16,11 +16,18 @@ const AnalysisPage = () => {
   
   // State for analysis options
   const [showAnalysisOptions, setShowAnalysisOptions] = useState<boolean>(false);
+  // State to control map rendering
+  const [mapReady, setMapReady] = useState<boolean>(false);
   
   // Function to handle creating a new analysis
   const handleNewAnalysis = () => {
     setShowAnalysisOptions(true);
   };
+  
+  // Ensure the DOM is fully loaded before attempting to render the map
+  useEffect(() => {
+    setMapReady(true);
+  }, []);
   
   return (
     <div className="container mx-auto py-4">
@@ -66,12 +73,18 @@ const AnalysisPage = () => {
         {/* Map container */}
         <div className="md:col-span-2">
           <Card className="h-full">
-            <CardContent className="p-0 overflow-hidden rounded-lg">
-              <MapComponent 
-                center={mapCenter} 
-                zoom={mapZoom} 
-                height="600px" 
-              />
+            <CardContent className="p-0 overflow-hidden rounded-lg" style={{ position: 'relative', height: '620px' }}>
+              {/* Only render map component when the component is mounted and ready */}
+              {mapReady && (
+                <MapComponent 
+                  key="analysis-map" // Add a key to ensure proper remounting
+                  center={mapCenter} 
+                  zoom={mapZoom} 
+                  height="600px" 
+                  width="100%" 
+                  className="analysis-map-container"
+                />
+              )}
             </CardContent>
           </Card>
         </div>

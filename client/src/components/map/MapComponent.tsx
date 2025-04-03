@@ -28,6 +28,12 @@ interface MapComponentProps {
   className?: string;
 }
 
+// Create a unique ID for each map instance
+const createMapId = (() => {
+  let counter = 0;
+  return () => `map-${counter++}`;
+})();
+
 export const MapComponent = ({
   center = [46.2087, -119.1372], // Default to Kennewick, WA (Benton County)
   zoom = 12,
@@ -35,46 +41,77 @@ export const MapComponent = ({
   width = '100%',
   className = ''
 }: MapComponentProps) => {
+  // Create a unique ID for this instance
+  const mapId = useRef(createMapId());
   // Create a ref to hold the map div element
   const mapRef = useRef<HTMLDivElement>(null);
+  // Map instance
+  const [mapInstance, setMapInstance] = useState<L.Map | null>(null);
   
-  // Track the Leaflet map instance
-  const [map, setMap] = useState<L.Map | null>(null);
-  
-  // Initialize the map when the component mounts
+  // Initialize the map on component mount
   useEffect(() => {
-    if (mapRef.current && !map) {
-      // Create a new Leaflet map instance
-      const mapInstance = L.map(mapRef.current).setView(center, zoom);
+    // Guard against missing DOM element
+    if (!mapRef.current) return;
+    
+    let map: L.Map | null = null;
+    
+    // Initialize the map after a small delay to ensure the DOM is ready
+    const initTimeout = setTimeout(() => {
+      try {
+        // Make sure the element exists and isn't being used
+        if (!mapRef.current) return;
+        
+        // Create a new Leaflet map
+        map = L.map(mapRef.current, {
+          center: center,
+          zoom: zoom,
+        });
+        
+        // Add the base tile layer
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+          attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+          maxZoom: 19
+        }).addTo(map);
+        
+        // Set the state after map is initialized
+        setMapInstance(map);
+        
+        // Fix any size issues
+        setTimeout(() => {
+          if (map) map.invalidateSize();
+        }, 250);
+      } catch (error) {
+        console.error('Error initializing map:', error);
+      }
+    }, 100);
+    
+    // Cleanup function
+    return () => {
+      clearTimeout(initTimeout);
       
-      // Add OpenStreetMap tile layer
-      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-        maxZoom: 19
-      }).addTo(mapInstance);
-      
-      // Store the map instance in state
-      setMap(mapInstance);
-      
-      // Clean up the map when the component unmounts
-      return () => {
-        mapInstance.remove();
-      };
-    }
-  }, [mapRef, map, center, zoom]);
+      // Remove the map instance if it exists
+      if (map) {
+        console.log('Cleaning up map instance');
+        map.remove();
+        setMapInstance(null);
+      }
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Empty deps array - we only want to initialize once and handle cleanup
   
-  // Update the map view when center or zoom props change
+  // Update view when props change
   useEffect(() => {
-    if (map) {
-      map.setView(center, zoom);
+    if (mapInstance) {
+      mapInstance.setView(center, zoom);
     }
-  }, [map, center, zoom]);
+  }, [mapInstance, center, zoom]);
   
   return (
     <div 
+      id={mapId.current}
       ref={mapRef} 
       style={{ height, width }} 
-      className={`map-container ${className}`} 
+      className={`leaflet-map-container ${className}`}
       data-testid="map-container"
     />
   );
