@@ -92,7 +92,7 @@ export const Header: React.FC<HeaderProps> = ({ taxYear, onTaxYearChange }) => {
   };
   
   return (
-    <header className="relative bg-gradient-to-b from-primary/5 via-white to-white text-gray-900 shadow-md px-4 py-3 flex justify-between items-center border-b border-primary/10">
+    <header className="relative bg-white text-gray-900 shadow-sm px-4 py-3 flex justify-between items-center border-b border-gray-200">
       <div className="flex items-center">
         <div className="flex items-center">
           <div className="bg-primary/10 p-2 rounded-full shadow-sm mr-2">
