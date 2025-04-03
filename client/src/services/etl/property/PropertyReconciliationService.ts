@@ -61,21 +61,21 @@ export interface PropertyReconciliationOptions {
  * Service for reconciling property data from different sources
  */
 export class PropertyReconciliationService {
-  // Map of registered data connectors by source ID
-  private dataConnectors: Map<string, PropertyDataConnector> = new Map();
+  // Object map of registered data connectors by source ID
+  private dataConnectors: Record<string, PropertyDataConnector> = {};
   
   /**
    * Register a data connector with the service
    */
   registerDataConnector(connector: PropertyDataConnector): void {
-    this.dataConnectors.set(connector.metadata.id, connector);
+    this.dataConnectors[connector.metadata.id] = connector;
   }
   
   /**
    * Get a data connector by source ID
    */
   getDataConnector(sourceId: string): PropertyDataConnector | undefined {
-    return this.dataConnectors.get(sourceId);
+    return this.dataConnectors[sourceId];
   }
   
   /**

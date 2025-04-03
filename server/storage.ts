@@ -129,17 +129,17 @@ export interface IStorage {
 
 // MemStorage class implementation
 export class MemStorage implements IStorage {
-  private users: Map<number, User>;
-  private properties: Map<number, Property>;
-  private incomeHotelMotelMap: Map<string, IncomeHotelMotel>;
-  private incomeHotelMotelDetailMap: Map<string, IncomeHotelMotelDetail>;
-  private incomeLeaseUpMap: Map<number, IncomeLeaseUp>;
-  private etlDataSourcesMap: Map<number, EtlDataSource>;
-  private etlTransformationRulesMap: Map<number, EtlTransformationRule>;
-  private etlJobsMap: Map<number, EtlJob>;
-  private etlOptimizationSuggestionsMap: Map<number, EtlOptimizationSuggestion>;
-  private etlBatchJobsMap: Map<number, EtlBatchJob>;
-  private etlAlertsMap: Map<number, EtlAlert>;
+  private users: Record<number, User>;
+  private properties: Record<number, Property>;
+  private incomeHotelMotelMap: Record<string, IncomeHotelMotel>;
+  private incomeHotelMotelDetailMap: Record<string, IncomeHotelMotelDetail>;
+  private incomeLeaseUpMap: Record<number, IncomeLeaseUp>;
+  private etlDataSourcesMap: Record<number, EtlDataSource>;
+  private etlTransformationRulesMap: Record<number, EtlTransformationRule>;
+  private etlJobsMap: Record<number, EtlJob>;
+  private etlOptimizationSuggestionsMap: Record<number, EtlOptimizationSuggestion>;
+  private etlBatchJobsMap: Record<number, EtlBatchJob>;
+  private etlAlertsMap: Record<number, EtlAlert>;
   private userCurrentId: number;
   private propertyCurrentId: number;
   private incomeLeaseUpCurrentId: number;
@@ -151,17 +151,17 @@ export class MemStorage implements IStorage {
   private etlAlertCurrentId: number;
 
   constructor() {
-    this.users = new Map();
-    this.properties = new Map();
-    this.incomeHotelMotelMap = new Map();
-    this.incomeHotelMotelDetailMap = new Map();
-    this.incomeLeaseUpMap = new Map();
-    this.etlDataSourcesMap = new Map();
-    this.etlTransformationRulesMap = new Map();
-    this.etlJobsMap = new Map();
-    this.etlOptimizationSuggestionsMap = new Map();
-    this.etlBatchJobsMap = new Map();
-    this.etlAlertsMap = new Map();
+    this.users = {};
+    this.properties = {};
+    this.incomeHotelMotelMap = {};
+    this.incomeHotelMotelDetailMap = {};
+    this.incomeLeaseUpMap = {};
+    this.etlDataSourcesMap = {};
+    this.etlTransformationRulesMap = {};
+    this.etlJobsMap = {};
+    this.etlOptimizationSuggestionsMap = {};
+    this.etlBatchJobsMap = {};
+    this.etlAlertsMap = {};
     this.userCurrentId = 1;
     this.propertyCurrentId = 1;
     this.incomeLeaseUpCurrentId = 1;
@@ -177,11 +177,11 @@ export class MemStorage implements IStorage {
 
   // User operations
   async getUser(id: number): Promise<User | undefined> {
-    return this.users.get(id);
+    return this.users[id];
   }
 
   async getUserByUsername(username: string): Promise<User | undefined> {
-    return Array.from(this.users.values()).find(
+    return Object.values(this.users).find(
       (user) => user.username === username,
     );
   }
@@ -196,17 +196,17 @@ export class MemStorage implements IStorage {
       email: insertUser.email || null,
       isActive: insertUser.isActive !== undefined ? insertUser.isActive : true
     };
-    this.users.set(id, user);
+    this.users[id] = user;
     return user;
   }
 
   // Property operations
   async getProperties(): Promise<Property[]> {
-    return Array.from(this.properties.values());
+    return Object.values(this.properties);
   }
 
   async getPropertyById(id: number): Promise<Property | undefined> {
-    return this.properties.get(id);
+    return this.properties[id];
   }
 
   async getPropertiesByFilter(filters: {
@@ -223,7 +223,7 @@ export class MemStorage implements IStorage {
     limit?: number;
     offset?: number;
   }): Promise<Property[]> {
-    let properties = Array.from(this.properties.values());
+    let properties = Object.values(this.properties);
 
     // Apply filters
     if (filters.neighborhood) {
@@ -301,7 +301,7 @@ export class MemStorage implements IStorage {
   async getPropertiesInRegion(bounds: [number, number, number, number]): Promise<Property[]> {
     const [south, west, north, east] = bounds;
     
-    return Array.from(this.properties.values()).filter(property => {
+    return Object.values(this.properties).filter(property => {
       if (!property.coordinates) return false;
       
       // Check if coordinates is an array or use latitude/longitude fields
@@ -340,9 +340,11 @@ export class MemStorage implements IStorage {
       lastSaleDate: insertProperty.lastSaleDate || null,
       taxAssessment: insertProperty.taxAssessment || null,
       pricePerSqFt: insertProperty.pricePerSqFt || null,
-      attributes: insertProperty.attributes || {}
+      attributes: insertProperty.attributes || {},
+      sourceId: insertProperty.sourceId || null,
+      zillowId: insertProperty.zillowId || null
     };
-    this.properties.set(id, property);
+    this.properties[id] = property;
     return property;
   }
 
@@ -353,7 +355,7 @@ export class MemStorage implements IStorage {
     
     const searchLower = searchText.toLowerCase();
     
-    return Array.from(this.properties.values()).filter(property => {
+    return Object.values(this.properties).filter(property => {
       const address = property.address.toLowerCase();
       const owner = property.owner?.toLowerCase() || '';
       const parcelId = property.parcelId.toLowerCase();
@@ -371,7 +373,7 @@ export class MemStorage implements IStorage {
   // Income Hotel/Motel operations
   async getIncomeHotelMotel(incomeYear: number, supNum: number, incomeId: number): Promise<IncomeHotelMotel | undefined> {
     const key = `${incomeYear}-${supNum}-${incomeId}`;
-    return this.incomeHotelMotelMap.get(key);
+    return this.incomeHotelMotelMap[key];
   }
 
   async createIncomeHotelMotel(incomeHotelMotel: InsertIncomeHotelMotel): Promise<IncomeHotelMotel> {
@@ -392,20 +394,20 @@ export class MemStorage implements IStorage {
       assessmentValuePerSqft: incomeHotelMotel.assessmentValuePerSqft || "0"
     };
     
-    this.incomeHotelMotelMap.set(key, newItem);
+    this.incomeHotelMotelMap[key] = newItem;
     return newItem;
   }
 
   async updateIncomeHotelMotel(incomeYear: number, supNum: number, incomeId: number, incomeHotelMotel: Partial<InsertIncomeHotelMotel>): Promise<IncomeHotelMotel | undefined> {
     const key = `${incomeYear}-${supNum}-${incomeId}`;
-    const existingItem = this.incomeHotelMotelMap.get(key);
+    const existingItem = this.incomeHotelMotelMap[key];
     
     if (!existingItem) {
       return undefined;
     }
     
     const updatedItem: IncomeHotelMotel = { ...existingItem, ...incomeHotelMotel };
-    this.incomeHotelMotelMap.set(key, updatedItem);
+    this.incomeHotelMotelMap[key] = updatedItem;
     
     return updatedItem;
   }
@@ -413,15 +415,15 @@ export class MemStorage implements IStorage {
   // Income Hotel/Motel Detail operations
   async getIncomeHotelMotelDetail(incomeYear: number, supNum: number, incomeId: number, valueType: string): Promise<IncomeHotelMotelDetail | undefined> {
     const key = `${incomeYear}-${supNum}-${incomeId}-${valueType}`;
-    return this.incomeHotelMotelDetailMap.get(key);
+    return this.incomeHotelMotelDetailMap[key];
   }
 
   async getIncomeHotelMotelDetails(incomeYear: number, supNum: number, incomeId: number): Promise<IncomeHotelMotelDetail[]> {
     const prefix = `${incomeYear}-${supNum}-${incomeId}-`;
     
-    return Array.from(this.incomeHotelMotelDetailMap.entries())
+    return Object.entries(this.incomeHotelMotelDetailMap)
       .filter(([key]) => key.startsWith(prefix))
-      .map(([_, value]) => value);
+      .map(([_, value]) => value as IncomeHotelMotelDetail);
   }
 
   async createIncomeHotelMotelDetail(incomeHotelMotelDetail: InsertIncomeHotelMotelDetail): Promise<IncomeHotelMotelDetail> {
@@ -497,31 +499,31 @@ export class MemStorage implements IStorage {
       indicatedIncomeValue: incomeHotelMotelDetail.indicatedIncomeValue || "0"
     };
     
-    this.incomeHotelMotelDetailMap.set(key, newItem);
+    this.incomeHotelMotelDetailMap[key] = newItem;
     return newItem;
   }
 
   async updateIncomeHotelMotelDetail(incomeYear: number, supNum: number, incomeId: number, valueType: string, incomeHotelMotelDetail: Partial<InsertIncomeHotelMotelDetail>): Promise<IncomeHotelMotelDetail | undefined> {
     const key = `${incomeYear}-${supNum}-${incomeId}-${valueType}`;
-    const existingItem = this.incomeHotelMotelDetailMap.get(key);
+    const existingItem = this.incomeHotelMotelDetailMap[key];
     
     if (!existingItem) {
       return undefined;
     }
     
     const updatedItem: IncomeHotelMotelDetail = { ...existingItem, ...incomeHotelMotelDetail };
-    this.incomeHotelMotelDetailMap.set(key, updatedItem);
+    this.incomeHotelMotelDetailMap[key] = updatedItem;
     
     return updatedItem;
   }
 
   // Income Lease Up operations
   async getIncomeLeaseUp(incomeLeaseUpId: number): Promise<IncomeLeaseUp | undefined> {
-    return this.incomeLeaseUpMap.get(incomeLeaseUpId);
+    return this.incomeLeaseUpMap[incomeLeaseUpId];
   }
 
   async getIncomeLeaseUpsByIncomeId(incomeYear: number, supNum: number, incomeId: number): Promise<IncomeLeaseUp[]> {
-    return Array.from(this.incomeLeaseUpMap.values())
+    return Object.values(this.incomeLeaseUpMap)
       .filter(leaseUp => 
         Number(leaseUp.incomeYear) === incomeYear && 
         leaseUp.supNum === supNum && 
@@ -548,34 +550,38 @@ export class MemStorage implements IStorage {
       leaseTotal: incomeLeaseUp.leaseTotal || null
     };
     
-    this.incomeLeaseUpMap.set(incomeLeaseUpId, newItem);
+    this.incomeLeaseUpMap[incomeLeaseUpId] = newItem;
     return newItem;
   }
 
   async updateIncomeLeaseUp(incomeLeaseUpId: number, incomeLeaseUp: Partial<InsertIncomeLeaseUp>): Promise<IncomeLeaseUp | undefined> {
-    const existingItem = this.incomeLeaseUpMap.get(incomeLeaseUpId);
+    const existingItem = this.incomeLeaseUpMap[incomeLeaseUpId];
     
     if (!existingItem) {
       return undefined;
     }
     
     const updatedItem: IncomeLeaseUp = { ...existingItem, ...incomeLeaseUp };
-    this.incomeLeaseUpMap.set(incomeLeaseUpId, updatedItem);
+    this.incomeLeaseUpMap[incomeLeaseUpId] = updatedItem;
     
     return updatedItem;
   }
 
   async deleteIncomeLeaseUp(incomeLeaseUpId: number): Promise<boolean> {
-    return this.incomeLeaseUpMap.delete(incomeLeaseUpId);
+    if (this.incomeLeaseUpMap[incomeLeaseUpId]) {
+      delete this.incomeLeaseUpMap[incomeLeaseUpId];
+      return true;
+    }
+    return false;
   }
   
   // ETL Data Source operations
   async getEtlDataSources(): Promise<EtlDataSource[]> {
-    return Array.from(this.etlDataSourcesMap.values());
+    return Object.values(this.etlDataSourcesMap);
   }
   
   async getEtlDataSourceById(id: number): Promise<EtlDataSource | undefined> {
-    return this.etlDataSourcesMap.get(id);
+    return this.etlDataSourcesMap[id];
   }
   
   async createEtlDataSource(dataSource: InsertEtlDataSource): Promise<EtlDataSource> {
@@ -591,12 +597,12 @@ export class MemStorage implements IStorage {
       createdAt: new Date(),
       updatedAt: new Date()
     };
-    this.etlDataSourcesMap.set(id, newDataSource);
+    this.etlDataSourcesMap[id] = newDataSource;
     return newDataSource;
   }
   
   async updateEtlDataSource(id: number, dataSource: Partial<InsertEtlDataSource>): Promise<EtlDataSource | undefined> {
-    const existingDataSource = this.etlDataSourcesMap.get(id);
+    const existingDataSource = this.etlDataSourcesMap[id];
     if (!existingDataSource) {
       return undefined;
     }
@@ -608,21 +614,25 @@ export class MemStorage implements IStorage {
       updatedAt: new Date()
     };
     
-    this.etlDataSourcesMap.set(id, updatedDataSource);
+    this.etlDataSourcesMap[id] = updatedDataSource;
     return updatedDataSource;
   }
   
   async deleteEtlDataSource(id: number): Promise<boolean> {
-    return this.etlDataSourcesMap.delete(id);
+    if (this.etlDataSourcesMap[id]) {
+      delete this.etlDataSourcesMap[id];
+      return true;
+    }
+    return false;
   }
   
   // ETL Transformation Rule operations
   async getEtlTransformationRules(): Promise<EtlTransformationRule[]> {
-    return Array.from(this.etlTransformationRulesMap.values());
+    return Object.values(this.etlTransformationRulesMap);
   }
   
   async getEtlTransformationRuleById(id: number): Promise<EtlTransformationRule | undefined> {
-    return this.etlTransformationRulesMap.get(id);
+    return this.etlTransformationRulesMap[id];
   }
   
   async createEtlTransformationRule(rule: InsertEtlTransformationRule): Promise<EtlTransformationRule> {
@@ -637,12 +647,12 @@ export class MemStorage implements IStorage {
       createdAt: new Date(),
       updatedAt: new Date()
     };
-    this.etlTransformationRulesMap.set(id, newRule);
+    this.etlTransformationRulesMap[id] = newRule;
     return newRule;
   }
   
   async updateEtlTransformationRule(id: number, rule: Partial<InsertEtlTransformationRule>): Promise<EtlTransformationRule | undefined> {
-    const existingRule = this.etlTransformationRulesMap.get(id);
+    const existingRule = this.etlTransformationRulesMap[id];
     if (!existingRule) {
       return undefined;
     }
@@ -653,21 +663,25 @@ export class MemStorage implements IStorage {
       updatedAt: new Date()
     };
     
-    this.etlTransformationRulesMap.set(id, updatedRule);
+    this.etlTransformationRulesMap[id] = updatedRule;
     return updatedRule;
   }
   
   async deleteEtlTransformationRule(id: number): Promise<boolean> {
-    return this.etlTransformationRulesMap.delete(id);
+    if (this.etlTransformationRulesMap[id]) {
+      delete this.etlTransformationRulesMap[id];
+      return true;
+    }
+    return false;
   }
   
   // ETL Job operations
   async getEtlJobs(): Promise<EtlJob[]> {
-    return Array.from(this.etlJobsMap.values());
+    return Object.values(this.etlJobsMap);
   }
   
   async getEtlJobById(id: number): Promise<EtlJob | undefined> {
-    return this.etlJobsMap.get(id);
+    return this.etlJobsMap[id];
   }
   
   async createEtlJob(job: InsertEtlJob): Promise<EtlJob> {
@@ -686,12 +700,12 @@ export class MemStorage implements IStorage {
       updatedAt: new Date(),
       lastRunAt: job.lastRunAt ? new Date(job.lastRunAt) : null
     };
-    this.etlJobsMap.set(id, newJob);
+    this.etlJobsMap[id] = newJob;
     return newJob;
   }
   
   async updateEtlJob(id: number, job: Partial<InsertEtlJob>): Promise<EtlJob | undefined> {
-    const existingJob = this.etlJobsMap.get(id);
+    const existingJob = this.etlJobsMap[id];
     if (!existingJob) {
       return undefined;
     }
@@ -703,26 +717,30 @@ export class MemStorage implements IStorage {
       updatedAt: new Date()
     };
     
-    this.etlJobsMap.set(id, updatedJob);
+    this.etlJobsMap[id] = updatedJob;
     return updatedJob;
   }
   
   async deleteEtlJob(id: number): Promise<boolean> {
-    return this.etlJobsMap.delete(id);
+    if (this.etlJobsMap[id]) {
+      delete this.etlJobsMap[id];
+      return true;
+    }
+    return false;
   }
   
   // ETL Optimization Suggestion operations
   async getEtlOptimizationSuggestions(): Promise<EtlOptimizationSuggestion[]> {
-    return Array.from(this.etlOptimizationSuggestionsMap.values());
+    return Object.values(this.etlOptimizationSuggestionsMap);
   }
   
   async getEtlOptimizationSuggestionsByJobId(jobId: number): Promise<EtlOptimizationSuggestion[]> {
-    return Array.from(this.etlOptimizationSuggestionsMap.values())
+    return Object.values(this.etlOptimizationSuggestionsMap)
       .filter(suggestion => suggestion.jobId === jobId);
   }
   
   async getEtlOptimizationSuggestionById(id: number): Promise<EtlOptimizationSuggestion | undefined> {
-    return this.etlOptimizationSuggestionsMap.get(id);
+    return this.etlOptimizationSuggestionsMap[id];
   }
   
   async createEtlOptimizationSuggestion(suggestion: InsertEtlOptimizationSuggestion): Promise<EtlOptimizationSuggestion> {
@@ -743,12 +761,12 @@ export class MemStorage implements IStorage {
       createdAt: new Date(),
       updatedAt: new Date()
     };
-    this.etlOptimizationSuggestionsMap.set(id, newSuggestion);
+    this.etlOptimizationSuggestionsMap[id] = newSuggestion;
     return newSuggestion;
   }
   
   async updateEtlOptimizationSuggestion(id: number, suggestion: Partial<InsertEtlOptimizationSuggestion>): Promise<EtlOptimizationSuggestion | undefined> {
-    const existingSuggestion = this.etlOptimizationSuggestionsMap.get(id);
+    const existingSuggestion = this.etlOptimizationSuggestionsMap[id];
     if (!existingSuggestion) {
       return undefined;
     }
@@ -759,21 +777,25 @@ export class MemStorage implements IStorage {
       updatedAt: new Date()
     };
     
-    this.etlOptimizationSuggestionsMap.set(id, updatedSuggestion);
+    this.etlOptimizationSuggestionsMap[id] = updatedSuggestion;
     return updatedSuggestion;
   }
   
   async deleteEtlOptimizationSuggestion(id: number): Promise<boolean> {
-    return this.etlOptimizationSuggestionsMap.delete(id);
+    if (this.etlOptimizationSuggestionsMap[id]) {
+      delete this.etlOptimizationSuggestionsMap[id];
+      return true;
+    }
+    return false;
   }
   
   // ETL Batch Job operations
   async getEtlBatchJobs(): Promise<EtlBatchJob[]> {
-    return Array.from(this.etlBatchJobsMap.values());
+    return Object.values(this.etlBatchJobsMap);
   }
   
   async getEtlBatchJobById(id: number): Promise<EtlBatchJob | undefined> {
-    return this.etlBatchJobsMap.get(id);
+    return this.etlBatchJobsMap[id];
   }
   
   async createEtlBatchJob(batchJob: InsertEtlBatchJob): Promise<EtlBatchJob> {
@@ -790,12 +812,12 @@ export class MemStorage implements IStorage {
       startedAt: batchJob.startedAt ? new Date(batchJob.startedAt) : null,
       completedAt: batchJob.completedAt ? new Date(batchJob.completedAt) : null
     };
-    this.etlBatchJobsMap.set(id, newBatchJob);
+    this.etlBatchJobsMap[id] = newBatchJob;
     return newBatchJob;
   }
   
   async updateEtlBatchJob(id: number, batchJob: Partial<InsertEtlBatchJob>): Promise<EtlBatchJob | undefined> {
-    const existingBatchJob = this.etlBatchJobsMap.get(id);
+    const existingBatchJob = this.etlBatchJobsMap[id];
     if (!existingBatchJob) {
       return undefined;
     }
@@ -808,26 +830,30 @@ export class MemStorage implements IStorage {
       updatedAt: new Date()
     };
     
-    this.etlBatchJobsMap.set(id, updatedBatchJob);
+    this.etlBatchJobsMap[id] = updatedBatchJob;
     return updatedBatchJob;
   }
   
   async deleteEtlBatchJob(id: number): Promise<boolean> {
-    return this.etlBatchJobsMap.delete(id);
+    if (this.etlBatchJobsMap[id]) {
+      delete this.etlBatchJobsMap[id];
+      return true;
+    }
+    return false;
   }
   
   // ETL Alert operations
   async getEtlAlerts(): Promise<EtlAlert[]> {
-    return Array.from(this.etlAlertsMap.values());
+    return Object.values(this.etlAlertsMap);
   }
   
   async getEtlAlertsByJobId(jobId: number): Promise<EtlAlert[]> {
-    return Array.from(this.etlAlertsMap.values())
+    return Object.values(this.etlAlertsMap)
       .filter(alert => alert.jobId === jobId);
   }
   
   async getEtlAlertById(id: number): Promise<EtlAlert | undefined> {
-    return this.etlAlertsMap.get(id);
+    return this.etlAlertsMap[id];
   }
   
   async createEtlAlert(alert: InsertEtlAlert): Promise<EtlAlert> {
@@ -841,12 +867,12 @@ export class MemStorage implements IStorage {
       timestamp: new Date(),
       isRead: alert.isRead || false
     };
-    this.etlAlertsMap.set(id, newAlert);
+    this.etlAlertsMap[id] = newAlert;
     return newAlert;
   }
   
   async updateEtlAlert(id: number, alert: Partial<InsertEtlAlert>): Promise<EtlAlert | undefined> {
-    const existingAlert = this.etlAlertsMap.get(id);
+    const existingAlert = this.etlAlertsMap[id];
     if (!existingAlert) {
       return undefined;
     }
@@ -856,12 +882,16 @@ export class MemStorage implements IStorage {
       ...alert
     };
     
-    this.etlAlertsMap.set(id, updatedAlert);
+    this.etlAlertsMap[id] = updatedAlert;
     return updatedAlert;
   }
   
   async deleteEtlAlert(id: number): Promise<boolean> {
-    return this.etlAlertsMap.delete(id);
+    if (this.etlAlertsMap[id]) {
+      delete this.etlAlertsMap[id];
+      return true;
+    }
+    return false;
   }
 
   private initializeSampleProperties() {
@@ -942,7 +972,7 @@ export class MemStorage implements IStorage {
     
     // Store properties in the map
     sampleProperties.forEach(property => {
-      this.properties.set(property.id, property);
+      this.properties[property.id] = property;
     });
   }
   
@@ -1030,7 +1060,7 @@ export class MemStorage implements IStorage {
         createdAt: new Date(),
         updatedAt: new Date()
       };
-      this.etlDataSourcesMap.set(id, dataSource);
+      this.etlDataSourcesMap[id] = dataSource;
     });
     
     // Initialize ETL Transformation Rules
@@ -1154,7 +1184,7 @@ export class MemStorage implements IStorage {
         createdAt: new Date(),
         updatedAt: new Date()
       };
-      this.etlTransformationRulesMap.set(id, transformationRule);
+      this.etlTransformationRulesMap[id] = transformationRule;
     });
     
     // Initialize ETL Jobs
@@ -1280,7 +1310,7 @@ export class MemStorage implements IStorage {
         updatedAt: new Date(),
         lastRunAt: job.lastRunAt ? new Date(job.lastRunAt) : null
       };
-      this.etlJobsMap.set(id, etlJob);
+      this.etlJobsMap[id] = etlJob;
     });
     
     // Initialize ETL Optimization Suggestions
@@ -1386,7 +1416,7 @@ export class MemStorage implements IStorage {
         createdAt: new Date(),
         updatedAt: new Date()
       };
-      this.etlOptimizationSuggestionsMap.set(id, optimizationSuggestion);
+      this.etlOptimizationSuggestionsMap[id] = optimizationSuggestion;
     });
     
     // Initialize ETL Batch Jobs
@@ -1435,7 +1465,7 @@ export class MemStorage implements IStorage {
         startedAt: batchJob.startedAt ? new Date(batchJob.startedAt) : null,
         completedAt: batchJob.completedAt ? new Date(batchJob.completedAt) : null
       };
-      this.etlBatchJobsMap.set(id, etlBatchJob);
+      this.etlBatchJobsMap[id] = etlBatchJob;
     });
     
     // Initialize ETL Alerts
@@ -1489,7 +1519,7 @@ export class MemStorage implements IStorage {
         timestamp: new Date(),
         isRead: alert.isRead !== undefined ? alert.isRead : false
       };
-      this.etlAlertsMap.set(id, etlAlert);
+      this.etlAlertsMap[id] = etlAlert;
     });
   }
 }
