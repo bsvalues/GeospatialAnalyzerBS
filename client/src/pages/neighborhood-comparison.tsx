@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { 
@@ -23,8 +23,12 @@ import { NeighborhoodProfileComparison } from '../components/neighborhood/Neighb
 import { NeighborhoodPropertyTypeFilter } from '../components/neighborhood/NeighborhoodPropertyTypeFilter';
 import { NeighborhoodScoreCard } from '../components/neighborhood/NeighborhoodScoreCard';
 import { neighborhoodComparisonReportService, ReportFormat } from '../services/neighborhoodComparisonReportService';
+import { NeighborhoodSnapshotButton } from '../components/neighborhood/NeighborhoodSnapshotButton';
 
 const NeighborhoodComparisonPage: React.FC = () => {
+  // References for the container element to capture snapshots
+  const comparisonContainerRef = useRef<HTMLDivElement>(null);
+  
   // State for active tab
   const [activeTab, setActiveTab] = useState('heatmap');
   const [selectedNeighborhoods, setSelectedNeighborhoods] = useState<string[]>([]);
@@ -139,7 +143,7 @@ const NeighborhoodComparisonPage: React.FC = () => {
   };
   
   return (
-    <div className="container mx-auto p-4 max-w-7xl">
+    <div className="container mx-auto p-4 max-w-7xl" ref={comparisonContainerRef}>
       <div className="mb-6 flex justify-between items-center">
         <div>
           <h1 className="text-3xl font-bold tracking-tight mb-1">Neighborhood Comparison</h1>
@@ -149,6 +153,14 @@ const NeighborhoodComparisonPage: React.FC = () => {
         </div>
         
         <div className="flex space-x-2">
+          <NeighborhoodSnapshotButton
+            neighborhoods={neighborhoods}
+            selectedNeighborhoods={selectedNeighborhoods}
+            properties={filteredProperties}
+            selectedYear={selectedYear}
+            containerRef={comparisonContainerRef}
+          />
+          
           <div className="relative">
             <Button
               variant="outline"
