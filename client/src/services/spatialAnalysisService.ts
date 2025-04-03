@@ -42,7 +42,7 @@ export interface ClusteringOptions {
  */
 export interface ClusteringResult {
   clusters: Cluster[];
-  propertyClusterMap: Map<number, number>; // Map of propertyId -> clusterId
+  propertyClusterMap: Record<number, number>; // Map of propertyId -> clusterId
   metadata: {
     totalProperties: number;
     includedProperties: number;
@@ -200,7 +200,7 @@ export function performSpatialClustering(
   if (validProperties.length === 0) {
     return {
       clusters: [],
-      propertyClusterMap: new Map(),
+      propertyClusterMap: {},
       metadata: {
         totalProperties: properties.length,
         includedProperties: 0,
@@ -390,7 +390,7 @@ export function performSpatialClustering(
   
   // Prepare result object
   const clusterData: Cluster[] = [];
-  const propertyClusterMap = new Map<number, number>();
+  const propertyClusterMap: Record<number, number> = {};
   
   // Calculate cluster statistics
   for (let i = 0; i < k; i++) {
@@ -469,7 +469,7 @@ export function performSpatialClustering(
     
     // Map properties to their clusters
     clusterMembers.forEach(p => {
-      propertyClusterMap.set(p.id as number, i + 1);
+      propertyClusterMap[p.id as number] = i + 1;
     });
   }
   
