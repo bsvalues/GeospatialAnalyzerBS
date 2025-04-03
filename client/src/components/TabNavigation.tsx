@@ -24,52 +24,93 @@ const TabNavigation: React.FC<TabNavigationProps> = ({ activeTab, onTabChange })
   ];
   
   return (
-    <nav className="bg-gradient-to-b from-gray-50 to-gray-100 border-b border-[rgba(209,213,219,0.3)] sticky top-0 z-20 px-6 py-3 shadow-sm">
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between">
-        <ul className="flex space-x-2 overflow-x-auto pb-2 md:pb-0 scrollbar-hide">
-          {tabs.map(tab => (
-            <motion.li 
-              key={tab.id}
-              whileHover={{ y: -2 }}
-              whileTap={{ scale: 0.98 }}
-              className={`
-                px-4 py-2 rounded-xl cursor-pointer font-medium transition-all duration-200 flex items-center whitespace-nowrap
-                ${activeTab === tab.id 
-                  ? 'bg-gradient-to-r from-primary/10 to-primary/5 text-primary border-primary/20 border shadow-sm' 
-                  : 'hover:bg-gray-200/50 text-gray-600 hover:text-gray-800 border border-transparent'
-                }
-              `}
-              onClick={() => onTabChange(tab.id)}
-            >
-              <div className={`
-                ${activeTab === tab.id 
-                  ? 'text-primary' 
-                  : 'text-gray-500'
-                } mr-2
-              `}>
-                {tab.icon}
-              </div>
-              <span className="text-sm">{tab.name}</span>
-              {activeTab === tab.id && (
-                <ChevronRight size={14} className="ml-2 text-primary" />
-              )}
-            </motion.li>
-          ))}
-        </ul>
-        
-        {/* Breadcrumb path */}
-        <motion.div 
-          initial={{ opacity: 0, y: 5 }} 
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.3 }}
-          className="flex items-center mt-2 md:mt-0 text-xs text-gray-500"
-        >
-          <span className="font-medium">GIS_BS</span>
-          <ChevronRight size={12} className="mx-1" />
-          <span className="text-primary font-medium">
-            {tabs.find(tab => tab.id === activeTab)?.name}
-          </span>
-        </motion.div>
+    <nav className="bg-white backdrop-blur-md z-20 px-6 py-3 shadow-[0_1px_3px_rgba(0,0,0,0.05)] border-b border-gray-100 sticky top-0">
+      <div className="max-w-[1600px] mx-auto">
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between">
+          {/* Tabs bar with subtle glass effect */}
+          <div className="relative overflow-hidden w-full">
+            {/* Blurred edge indicators for scroll */}
+            <div className="absolute left-0 top-0 bottom-0 w-8 bg-gradient-to-r from-white to-transparent z-10 pointer-events-none"></div>
+            <div className="absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-white to-transparent z-10 pointer-events-none"></div>
+            
+            <ul className="flex space-x-2 overflow-x-auto pb-2 md:pb-0 scrollbar-hide relative">
+              {tabs.map(tab => (
+                <motion.li 
+                  key={tab.id}
+                  whileHover={{ y: -2 }}
+                  whileTap={{ scale: 0.98 }}
+                  className={`
+                    cursor-pointer font-medium transition-all duration-200 flex items-center whitespace-nowrap
+                    ${activeTab === tab.id 
+                      ? 'text-primary' 
+                      : 'text-gray-500 hover:text-gray-800'
+                    }
+                  `}
+                  onClick={() => onTabChange(tab.id)}
+                >
+                  {/* Tab inner wrapper */}
+                  <div className={`
+                    px-4 py-2 rounded-xl flex items-center transition-all duration-300
+                    ${activeTab === tab.id 
+                      ? 'bg-gradient-to-br from-primary/10 to-primary/5 shadow-[0_2px_10px_rgba(0,0,0,0.03)] border border-primary/10' 
+                      : 'hover:bg-gray-50 border border-transparent'
+                    }
+                  `}>
+                    {/* Icon with subtle animation */}
+                    <motion.div 
+                      animate={activeTab === tab.id ? { rotate: [0, 5, 0] } : {}}
+                      transition={{ duration: 0.3 }}
+                      className={`
+                        ${activeTab === tab.id 
+                          ? 'text-primary' 
+                          : 'text-gray-400'
+                        } mr-2 transition-colors duration-200
+                      `}
+                    >
+                      {tab.icon}
+                    </motion.div>
+                    
+                    {/* Label */}
+                    <span className="text-sm">{tab.name}</span>
+                    
+                    {/* Active indicator */}
+                    {activeTab === tab.id && (
+                      <motion.div 
+                        initial={{ scale: 0 }}
+                        animate={{ scale: 1 }}
+                        className="ml-2 flex items-center"
+                      >
+                        <ChevronRight size={14} className="text-primary" />
+                      </motion.div>
+                    )}
+                    
+                    {/* Subtle underline for active tab */}
+                    {activeTab === tab.id && (
+                      <motion.div 
+                        className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary/30 rounded-full"
+                        layoutId="activeTabIndicator"
+                      />
+                    )}
+                  </div>
+                </motion.li>
+              ))}
+            </ul>
+          </div>
+          
+          {/* Breadcrumb path with enhanced styling */}
+          <motion.div 
+            initial={{ opacity: 0, y: 5 }} 
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.3 }}
+            className="flex items-center mt-2 md:mt-0 text-xs text-gray-500 bg-gray-50/70 px-3 py-1.5 rounded-lg"
+          >
+            <span className="font-medium text-gray-600">GIS_BS</span>
+            <ChevronRight size={12} className="mx-1 text-gray-400" />
+            <span className="font-medium bg-clip-text text-transparent bg-gradient-to-r from-primary to-primary/80">
+              {tabs.find(tab => tab.id === activeTab)?.name}
+            </span>
+          </motion.div>
+        </div>
       </div>
     </nav>
   );
