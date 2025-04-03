@@ -92,7 +92,7 @@ export const Header: React.FC<HeaderProps> = ({ taxYear, onTaxYearChange }) => {
   };
   
   return (
-    <header className="bg-gradient-to-b from-gray-50 to-gray-100 text-gray-900 shadow-md px-4 py-3 flex justify-between items-center">
+    <header className="bg-white/95 backdrop-blur-sm text-gray-900 shadow-md px-4 py-3 flex justify-between items-center border-b border-gray-200">
       <div className="flex items-center">
         <div className="flex items-center">
           <div className="bg-primary/10 p-2 rounded-full shadow-sm mr-2">
@@ -106,7 +106,7 @@ export const Header: React.FC<HeaderProps> = ({ taxYear, onTaxYearChange }) => {
       <div className="flex items-center space-x-4">
         {/* Mobile menu toggle button */}
         <button
-          className="md:hidden text-white hover:text-white p-1.5 rounded-full hover:bg-white/10 transition-all duration-200"
+          className="md:hidden text-gray-700 hover:text-primary p-1.5 rounded-full hover:bg-gray-200/50 transition-all duration-200"
           onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
           aria-label={isMobileMenuOpen ? "Close menu" : "Open menu"}
         >
