@@ -1,11 +1,12 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Calculator, BarChart, TrendingUp, Landmark, PieChart, LineChart, ArrowRight, Map } from "lucide-react";
+import { Calculator, BarChart, TrendingUp, Landmark, PieChart, LineChart, ArrowRight, Map, FileDown as FileDownIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import MarketTrendsHeatMap from '@/components/map/MarketTrendsHeatMap';
+import { OneClickExport } from '@/components/export/OneClickExport';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { MapContainer, TileLayer, useMap } from 'react-leaflet';
@@ -315,10 +316,20 @@ const AnalysisPage = () => {
         <TabsContent value="reports" className="space-y-4">
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle>Analysis Reports</CardTitle>
-              <CardDescription>
-                Generated property analysis reports
-              </CardDescription>
+              <div className="flex justify-between items-start">
+                <div>
+                  <CardTitle>Analysis Reports</CardTitle>
+                  <CardDescription>
+                    Generated property analysis reports
+                  </CardDescription>
+                </div>
+                <OneClickExport 
+                  text="One-Click Export"
+                  variant="default"
+                  size="sm"
+                  icon={<FileDownIcon className="h-4 w-4 mr-1" />}
+                />
+              </div>
             </CardHeader>
             <CardContent>
               <ScrollArea className="h-[500px] rounded-md">
