@@ -1,9 +1,6 @@
 import { 
   users, 
   properties, 
-  incomeHotelMotel,
-  incomeHotelMotelDetail,
-  incomeLeaseUp,
   etlDataSources,
   etlTransformationRules,
   etlJobs,
@@ -14,12 +11,6 @@ import {
   type InsertUser, 
   type Property, 
   type InsertProperty,
-  type IncomeHotelMotel,
-  type InsertIncomeHotelMotel,
-  type IncomeHotelMotelDetail,
-  type InsertIncomeHotelMotelDetail,
-  type IncomeLeaseUp,
-  type InsertIncomeLeaseUp,
   type EtlDataSource,
   type InsertEtlDataSource,
   type EtlTransformationRule,
@@ -64,23 +55,7 @@ export interface IStorage {
   createProperty(property: InsertProperty): Promise<Property>;
   searchProperties(searchText: string): Promise<Property[]>;
   
-  // Income Hotel/Motel operations
-  getIncomeHotelMotel(incomeYear: number, supNum: number, incomeId: number): Promise<IncomeHotelMotel | undefined>;
-  createIncomeHotelMotel(incomeHotelMotel: InsertIncomeHotelMotel): Promise<IncomeHotelMotel>;
-  updateIncomeHotelMotel(incomeYear: number, supNum: number, incomeId: number, incomeHotelMotel: Partial<InsertIncomeHotelMotel>): Promise<IncomeHotelMotel | undefined>;
-  
-  // Income Hotel/Motel Detail operations
-  getIncomeHotelMotelDetail(incomeYear: number, supNum: number, incomeId: number, valueType: string): Promise<IncomeHotelMotelDetail | undefined>;
-  getIncomeHotelMotelDetails(incomeYear: number, supNum: number, incomeId: number): Promise<IncomeHotelMotelDetail[]>;
-  createIncomeHotelMotelDetail(incomeHotelMotelDetail: InsertIncomeHotelMotelDetail): Promise<IncomeHotelMotelDetail>;
-  updateIncomeHotelMotelDetail(incomeYear: number, supNum: number, incomeId: number, valueType: string, incomeHotelMotelDetail: Partial<InsertIncomeHotelMotelDetail>): Promise<IncomeHotelMotelDetail | undefined>;
-  
-  // Income Lease Up operations
-  getIncomeLeaseUp(incomeLeaseUpId: number): Promise<IncomeLeaseUp | undefined>;
-  getIncomeLeaseUpsByIncomeId(incomeYear: number, supNum: number, incomeId: number): Promise<IncomeLeaseUp[]>;
-  createIncomeLeaseUp(incomeLeaseUp: InsertIncomeLeaseUp): Promise<IncomeLeaseUp>;
-  updateIncomeLeaseUp(incomeLeaseUpId: number, incomeLeaseUp: Partial<InsertIncomeLeaseUp>): Promise<IncomeLeaseUp | undefined>;
-  deleteIncomeLeaseUp(incomeLeaseUpId: number): Promise<boolean>;
+  // Income approach functionality was removed
 
   // ETL Data Source operations
   getEtlDataSources(): Promise<EtlDataSource[]>;
@@ -131,9 +106,6 @@ export interface IStorage {
 export class MemStorage implements IStorage {
   private users: Record<number, User>;
   private properties: Record<number, Property>;
-  private incomeHotelMotelMap: Record<string, IncomeHotelMotel>;
-  private incomeHotelMotelDetailMap: Record<string, IncomeHotelMotelDetail>;
-  private incomeLeaseUpMap: Record<number, IncomeLeaseUp>;
   private etlDataSourcesMap: Record<number, EtlDataSource>;
   private etlTransformationRulesMap: Record<number, EtlTransformationRule>;
   private etlJobsMap: Record<number, EtlJob>;
@@ -142,7 +114,6 @@ export class MemStorage implements IStorage {
   private etlAlertsMap: Record<number, EtlAlert>;
   private userCurrentId: number;
   private propertyCurrentId: number;
-  private incomeLeaseUpCurrentId: number;
   private etlDataSourceCurrentId: number;
   private etlTransformationRuleCurrentId: number;
   private etlJobCurrentId: number;
@@ -153,9 +124,6 @@ export class MemStorage implements IStorage {
   constructor() {
     this.users = {};
     this.properties = {};
-    this.incomeHotelMotelMap = {};
-    this.incomeHotelMotelDetailMap = {};
-    this.incomeLeaseUpMap = {};
     this.etlDataSourcesMap = {};
     this.etlTransformationRulesMap = {};
     this.etlJobsMap = {};
@@ -164,7 +132,6 @@ export class MemStorage implements IStorage {
     this.etlAlertsMap = {};
     this.userCurrentId = 1;
     this.propertyCurrentId = 1;
-    this.incomeLeaseUpCurrentId = 1;
     this.etlDataSourceCurrentId = 1;
     this.etlTransformationRuleCurrentId = 1;
     this.etlJobCurrentId = 1;
@@ -370,210 +337,7 @@ export class MemStorage implements IStorage {
     });
   }
 
-  // Income Hotel/Motel operations
-  async getIncomeHotelMotel(incomeYear: number, supNum: number, incomeId: number): Promise<IncomeHotelMotel | undefined> {
-    const key = `${incomeYear}-${supNum}-${incomeId}`;
-    return this.incomeHotelMotelMap[key];
-  }
-
-  async createIncomeHotelMotel(incomeHotelMotel: InsertIncomeHotelMotel): Promise<IncomeHotelMotel> {
-    const key = `${incomeHotelMotel.incomeYear}-${incomeHotelMotel.supNum}-${incomeHotelMotel.incomeId}`;
-    
-    const newItem: IncomeHotelMotel = {
-      incomeYear: incomeHotelMotel.incomeYear,
-      supNum: incomeHotelMotel.supNum,
-      incomeId: incomeHotelMotel.incomeId,
-      sizeInSqft: incomeHotelMotel.sizeInSqft || "0",
-      averageDailyRoomRate: incomeHotelMotel.averageDailyRoomRate || "0",
-      numberOfRooms: incomeHotelMotel.numberOfRooms || "0",
-      numberOfRoomNights: incomeHotelMotel.numberOfRoomNights || "0",
-      incomeValueReconciled: incomeHotelMotel.incomeValueReconciled || "0",
-      incomeValuePerRoom: incomeHotelMotel.incomeValuePerRoom || "0",
-      assessmentValuePerRoom: incomeHotelMotel.assessmentValuePerRoom || "0",
-      incomeValuePerSqft: incomeHotelMotel.incomeValuePerSqft || "0",
-      assessmentValuePerSqft: incomeHotelMotel.assessmentValuePerSqft || "0"
-    };
-    
-    this.incomeHotelMotelMap[key] = newItem;
-    return newItem;
-  }
-
-  async updateIncomeHotelMotel(incomeYear: number, supNum: number, incomeId: number, incomeHotelMotel: Partial<InsertIncomeHotelMotel>): Promise<IncomeHotelMotel | undefined> {
-    const key = `${incomeYear}-${supNum}-${incomeId}`;
-    const existingItem = this.incomeHotelMotelMap[key];
-    
-    if (!existingItem) {
-      return undefined;
-    }
-    
-    const updatedItem: IncomeHotelMotel = { ...existingItem, ...incomeHotelMotel };
-    this.incomeHotelMotelMap[key] = updatedItem;
-    
-    return updatedItem;
-  }
-
-  // Income Hotel/Motel Detail operations
-  async getIncomeHotelMotelDetail(incomeYear: number, supNum: number, incomeId: number, valueType: string): Promise<IncomeHotelMotelDetail | undefined> {
-    const key = `${incomeYear}-${supNum}-${incomeId}-${valueType}`;
-    return this.incomeHotelMotelDetailMap[key];
-  }
-
-  async getIncomeHotelMotelDetails(incomeYear: number, supNum: number, incomeId: number): Promise<IncomeHotelMotelDetail[]> {
-    const prefix = `${incomeYear}-${supNum}-${incomeId}-`;
-    
-    return Object.entries(this.incomeHotelMotelDetailMap)
-      .filter(([key]) => key.startsWith(prefix))
-      .map(([_, value]) => value as IncomeHotelMotelDetail);
-  }
-
-  async createIncomeHotelMotelDetail(incomeHotelMotelDetail: InsertIncomeHotelMotelDetail): Promise<IncomeHotelMotelDetail> {
-    const key = `${incomeHotelMotelDetail.incomeYear}-${incomeHotelMotelDetail.supNum}-${incomeHotelMotelDetail.incomeId}-${incomeHotelMotelDetail.valueType}`;
-    
-    const newItem: IncomeHotelMotelDetail = {
-      incomeYear: incomeHotelMotelDetail.incomeYear,
-      supNum: incomeHotelMotelDetail.supNum,
-      incomeId: incomeHotelMotelDetail.incomeId,
-      valueType: incomeHotelMotelDetail.valueType,
-      roomRevenue: incomeHotelMotelDetail.roomRevenue || "0",
-      roomRevenuePct: incomeHotelMotelDetail.roomRevenuePct || "0",
-      roomRevenueUpdate: incomeHotelMotelDetail.roomRevenueUpdate || "",
-      vacancyCollectionLoss: incomeHotelMotelDetail.vacancyCollectionLoss || "0",
-      vacancyCollectionLossPct: incomeHotelMotelDetail.vacancyCollectionLossPct || "0",
-      vacancyCollectionLossUpdate: incomeHotelMotelDetail.vacancyCollectionLossUpdate || "",
-      foodBeverageIncome: incomeHotelMotelDetail.foodBeverageIncome || "0",
-      foodBeverageIncomePct: incomeHotelMotelDetail.foodBeverageIncomePct || "0",
-      foodBeverageIncomeUpdate: incomeHotelMotelDetail.foodBeverageIncomeUpdate || "",
-      miscIncome: incomeHotelMotelDetail.miscIncome || "0",
-      miscIncomePct: incomeHotelMotelDetail.miscIncomePct || "0",
-      miscIncomeUpdate: incomeHotelMotelDetail.miscIncomeUpdate || "",
-      effectiveGrossIncome: incomeHotelMotelDetail.effectiveGrossIncome || "0",
-      effectiveGrossIncomePct: incomeHotelMotelDetail.effectiveGrossIncomePct || "0",
-      utilities: incomeHotelMotelDetail.utilities || "0",
-      utilitiesPct: incomeHotelMotelDetail.utilitiesPct || "0",
-      utilitiesUpdate: incomeHotelMotelDetail.utilitiesUpdate || "",
-      maintenanceRepair: incomeHotelMotelDetail.maintenanceRepair || "0",
-      maintenanceRepairPct: incomeHotelMotelDetail.maintenanceRepairPct || "0",
-      maintenanceRepairUpdate: incomeHotelMotelDetail.maintenanceRepairUpdate || "",
-      departmentExpenses: incomeHotelMotelDetail.departmentExpenses || "0",
-      departmentExpensesPct: incomeHotelMotelDetail.departmentExpensesPct || "0",
-      departmentExpensesUpdate: incomeHotelMotelDetail.departmentExpensesUpdate || "",
-      management: incomeHotelMotelDetail.management || "0",
-      managementPct: incomeHotelMotelDetail.managementPct || "0",
-      managementUpdate: incomeHotelMotelDetail.managementUpdate || "",
-      administrative: incomeHotelMotelDetail.administrative || "0",
-      administrativePct: incomeHotelMotelDetail.administrativePct || "0",
-      administrativeUpdate: incomeHotelMotelDetail.administrativeUpdate || "",
-      payroll: incomeHotelMotelDetail.payroll || "0",
-      payrollPct: incomeHotelMotelDetail.payrollPct || "0",
-      payrollUpdate: incomeHotelMotelDetail.payrollUpdate || "",
-      insurance: incomeHotelMotelDetail.insurance || "0",
-      insurancePct: incomeHotelMotelDetail.insurancePct || "0",
-      insuranceUpdate: incomeHotelMotelDetail.insuranceUpdate || "",
-      marketing: incomeHotelMotelDetail.marketing || "0",
-      marketingPct: incomeHotelMotelDetail.marketingPct || "0",
-      marketingUpdate: incomeHotelMotelDetail.marketingUpdate || "",
-      realEstateTax: incomeHotelMotelDetail.realEstateTax || "0",
-      realEstateTaxPct: incomeHotelMotelDetail.realEstateTaxPct || "0",
-      realEstateTaxUpdate: incomeHotelMotelDetail.realEstateTaxUpdate || "",
-      franchiseFee: incomeHotelMotelDetail.franchiseFee || "0",
-      franchiseFeePct: incomeHotelMotelDetail.franchiseFeePct || "0",
-      franchiseFeeUpdate: incomeHotelMotelDetail.franchiseFeeUpdate || "",
-      other: incomeHotelMotelDetail.other || "0",
-      otherPct: incomeHotelMotelDetail.otherPct || "0",
-      otherUpdate: incomeHotelMotelDetail.otherUpdate || "",
-      totalExpenses: incomeHotelMotelDetail.totalExpenses || "0",
-      totalExpensesPct: incomeHotelMotelDetail.totalExpensesPct || "0",
-      totalExpensesUpdate: incomeHotelMotelDetail.totalExpensesUpdate || "",
-      netOperatingIncome: incomeHotelMotelDetail.netOperatingIncome || "0",
-      netOperatingIncomePct: incomeHotelMotelDetail.netOperatingIncomePct || "0",
-      capRate: incomeHotelMotelDetail.capRate || "0",
-      capRateUpdate: incomeHotelMotelDetail.capRateUpdate || "",
-      taxRate: incomeHotelMotelDetail.taxRate || "0",
-      taxRateUpdate: incomeHotelMotelDetail.taxRateUpdate || "",
-      overallCapRate: incomeHotelMotelDetail.overallCapRate || "0",
-      incomeValue: incomeHotelMotelDetail.incomeValue || "0",
-      personalPropertyValue: incomeHotelMotelDetail.personalPropertyValue || "0",
-      personalPropertyValueUpdate: incomeHotelMotelDetail.personalPropertyValueUpdate || "",
-      otherValue: incomeHotelMotelDetail.otherValue || "0",
-      otherValueUpdate: incomeHotelMotelDetail.otherValueUpdate || "",
-      indicatedIncomeValue: incomeHotelMotelDetail.indicatedIncomeValue || "0"
-    };
-    
-    this.incomeHotelMotelDetailMap[key] = newItem;
-    return newItem;
-  }
-
-  async updateIncomeHotelMotelDetail(incomeYear: number, supNum: number, incomeId: number, valueType: string, incomeHotelMotelDetail: Partial<InsertIncomeHotelMotelDetail>): Promise<IncomeHotelMotelDetail | undefined> {
-    const key = `${incomeYear}-${supNum}-${incomeId}-${valueType}`;
-    const existingItem = this.incomeHotelMotelDetailMap[key];
-    
-    if (!existingItem) {
-      return undefined;
-    }
-    
-    const updatedItem: IncomeHotelMotelDetail = { ...existingItem, ...incomeHotelMotelDetail };
-    this.incomeHotelMotelDetailMap[key] = updatedItem;
-    
-    return updatedItem;
-  }
-
-  // Income Lease Up operations
-  async getIncomeLeaseUp(incomeLeaseUpId: number): Promise<IncomeLeaseUp | undefined> {
-    return this.incomeLeaseUpMap[incomeLeaseUpId];
-  }
-
-  async getIncomeLeaseUpsByIncomeId(incomeYear: number, supNum: number, incomeId: number): Promise<IncomeLeaseUp[]> {
-    return Object.values(this.incomeLeaseUpMap)
-      .filter(leaseUp => 
-        Number(leaseUp.incomeYear) === incomeYear && 
-        leaseUp.supNum === supNum && 
-        leaseUp.incomeId === incomeId
-      );
-  }
-
-  async createIncomeLeaseUp(incomeLeaseUp: InsertIncomeLeaseUp): Promise<IncomeLeaseUp> {
-    const incomeLeaseUpId = this.incomeLeaseUpCurrentId++;
-    
-    const newItem: IncomeLeaseUp = {
-      incomeYear: incomeLeaseUp.incomeYear,
-      supNum: incomeLeaseUp.supNum,
-      incomeId: incomeLeaseUp.incomeId,
-      incomeLeaseUpId: incomeLeaseUpId,
-      frequency: incomeLeaseUp.frequency || "A",
-      leaseType: incomeLeaseUp.leaseType || null,
-      unitOfMeasure: incomeLeaseUp.unitOfMeasure || null,
-      rentLossAreaSqft: incomeLeaseUp.rentLossAreaSqft || null,
-      rentSqft: incomeLeaseUp.rentSqft || null,
-      rentNumberOfYears: incomeLeaseUp.rentNumberOfYears || null,
-      rentTotal: incomeLeaseUp.rentTotal || null,
-      leasePct: incomeLeaseUp.leasePct || null,
-      leaseTotal: incomeLeaseUp.leaseTotal || null
-    };
-    
-    this.incomeLeaseUpMap[incomeLeaseUpId] = newItem;
-    return newItem;
-  }
-
-  async updateIncomeLeaseUp(incomeLeaseUpId: number, incomeLeaseUp: Partial<InsertIncomeLeaseUp>): Promise<IncomeLeaseUp | undefined> {
-    const existingItem = this.incomeLeaseUpMap[incomeLeaseUpId];
-    
-    if (!existingItem) {
-      return undefined;
-    }
-    
-    const updatedItem: IncomeLeaseUp = { ...existingItem, ...incomeLeaseUp };
-    this.incomeLeaseUpMap[incomeLeaseUpId] = updatedItem;
-    
-    return updatedItem;
-  }
-
-  async deleteIncomeLeaseUp(incomeLeaseUpId: number): Promise<boolean> {
-    if (this.incomeLeaseUpMap[incomeLeaseUpId]) {
-      delete this.incomeLeaseUpMap[incomeLeaseUpId];
-      return true;
-    }
-    return false;
-  }
+  // Income approach functionality was removed
   
   // ETL Data Source operations
   async getEtlDataSources(): Promise<EtlDataSource[]> {
@@ -965,7 +729,7 @@ export class MemStorage implements IStorage {
         taxAssessment,
         pricePerSqFt,
         attributes: {},
-        sourceId: 1, // Default to internal database source
+        sourceId: "1", // Default to internal database source
         zillowId: null // No Zillow ID for sample data
       };
       
@@ -1194,8 +958,8 @@ export class MemStorage implements IStorage {
       {
         name: "Daily Property Update",
         description: "Imports new and updated properties from county database",
-        sourceId: 1, // Reference to Benton County Property Database
-        targetId: 5, // Reference to Local PostGIS Database
+        sourceId: "1", // Reference to Benton County Property Database
+        targetId: "5", // Reference to Local PostGIS Database
         transformationIds: [1, 2, 3, 4, 5], // Reference to transformation rules
         status: "success",
         schedule: {
@@ -1215,8 +979,8 @@ export class MemStorage implements IStorage {
       {
         name: "Weekly Census Data Integration",
         description: "Imports demographic data for property analysis",
-        sourceId: 3, // Reference to Census Bureau API
-        targetId: 5, // Reference to Local PostGIS Database
+        sourceId: "3", // Reference to Census Bureau API
+        targetId: "5", // Reference to Local PostGIS Database
         transformationIds: [3, 4], // Reference to transformation rules
         status: "idle",
         schedule: {
@@ -1237,8 +1001,8 @@ export class MemStorage implements IStorage {
       {
         name: "Historical Sales Data Import",
         description: "One-time import of historical sales data",
-        sourceId: 4, // Reference to Historical Property Sales CSV
-        targetId: 5, // Reference to Local PostGIS Database
+        sourceId: "4", // Reference to Historical Property Sales CSV
+        targetId: "5", // Reference to Local PostGIS Database
         transformationIds: [2, 4], // Reference to transformation rules
         status: "success",
         schedule: null, // One-time job, no schedule
@@ -1254,8 +1018,8 @@ export class MemStorage implements IStorage {
       {
         name: "GIS Boundary Update",
         description: "Updates property boundaries from state GIS data",
-        sourceId: 2, // Reference to Washington State GIS Portal
-        targetId: 5, // Reference to Local PostGIS Database
+        sourceId: "2", // Reference to Washington State GIS Portal
+        targetId: "5", // Reference to Local PostGIS Database
         transformationIds: [3], // Reference to transformation rules
         status: "failed",
         schedule: {
@@ -1276,8 +1040,8 @@ export class MemStorage implements IStorage {
       {
         name: "Real-time Property Sales Feed",
         description: "Streams real-time property sales data",
-        sourceId: 1, // Reference to Benton County Property Database
-        targetId: 5, // Reference to Local PostGIS Database
+        sourceId: "1", // Reference to Benton County Property Database
+        targetId: "5", // Reference to Local PostGIS Database
         transformationIds: [1, 2, 4], // Reference to transformation rules
         status: "running",
         schedule: {
@@ -1318,7 +1082,7 @@ export class MemStorage implements IStorage {
     // Initialize ETL Optimization Suggestions
     const optimizationSuggestions: InsertEtlOptimizationSuggestion[] = [
       {
-        jobId: 1, // Daily Property Update
+        jobId: "1", // Daily Property Update
         type: "performance",
         severity: "medium",
         title: "Implement database indexing for faster queries",
@@ -1334,7 +1098,7 @@ export class MemStorage implements IStorage {
         suggestedCode: "CREATE INDEX idx_property_last_updated ON property_records(last_updated_date);"
       },
       {
-        jobId: 5, // Real-time Property Sales Feed
+        jobId: "5", // Real-time Property Sales Feed
         type: "resource",
         severity: "high",
         title: "Reduce memory usage by optimizing JSON parsing",
@@ -1350,7 +1114,7 @@ export class MemStorage implements IStorage {
         suggestedCode: "const JSONStream = require('JSONStream');\nconst parser = JSONStream.parse('*.properties');\nrequest.pipe(parser);"
       },
       {
-        jobId: 3, // Historical Sales Data Import
+        jobId: "3", // Historical Sales Data Import
         type: "scheduling",
         severity: "low",
         title: "Run job during off-peak hours",

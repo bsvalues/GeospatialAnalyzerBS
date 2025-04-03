@@ -67,7 +67,7 @@ const ReportsPage = () => {
                       <SelectItem value="valuation">Valuation</SelectItem>
                       <SelectItem value="market">Market Analysis</SelectItem>
                       <SelectItem value="tax">Tax Assessment</SelectItem>
-                      <SelectItem value="income">Income Analysis</SelectItem>
+
                     </SelectContent>
                   </Select>
                   <Button size="sm" variant="ghost" className="h-9 w-9 p-0">
@@ -116,15 +116,7 @@ const ReportsPage = () => {
                       author: "John Admin",
                       format: "PDF/Excel"
                     },
-                    {
-                      id: 5,
-                      title: "Hotel/Motel Income Analysis",
-                      description: "Income approach analysis for hotel and motel properties",
-                      type: "Income Analysis",
-                      date: "March 5, 2024",
-                      author: "Sarah Manager",
-                      format: "PDF/Excel"
-                    },
+
                     {
                       id: 6,
                       title: "Residential Market Trends",
@@ -207,11 +199,7 @@ const ReportsPage = () => {
               <ScrollArea className="h-[500px] rounded-md">
                 <div className="space-y-4">
                   {[
-                    {
-                      title: "Hotel/Motel Income Analysis",
-                      accessedDate: "April 1, 2024, 10:23 AM",
-                      action: "Downloaded"
-                    },
+
                     {
                       title: "Quarterly Market Analysis Q1 2024",
                       accessedDate: "March 31, 2024, 2:45 PM",
@@ -272,7 +260,7 @@ const ReportsPage = () => {
                   </CardHeader>
                   <CardContent className="pb-2">
                     <p className="text-sm text-muted-foreground">
-                      Comprehensive property valuation report with all three approaches to value: income, cost, and sales comparison.
+                      Comprehensive property valuation report with cost and sales comparison approaches.
                     </p>
                   </CardContent>
                   <CardFooter className="pt-0">
@@ -293,26 +281,6 @@ const ReportsPage = () => {
                   <CardContent className="pb-2">
                     <p className="text-sm text-muted-foreground">
                       Detailed market analysis with trends, comparable properties, and market condition adjustments.
-                    </p>
-                  </CardContent>
-                  <CardFooter className="pt-0">
-                    <Button size="sm" className="w-full">Use Template</Button>
-                  </CardFooter>
-                </Card>
-                
-                <Card className="overflow-hidden hover:shadow-md transition-shadow">
-                  <CardHeader className="pb-2">
-                    <div className="flex items-center justify-between">
-                      <CardTitle className="text-base">Income Approach</CardTitle>
-                      <FileSpreadsheet className="h-5 w-5 text-primary" />
-                    </div>
-                    <CardDescription>
-                      Income-based property valuation
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent className="pb-2">
-                    <p className="text-sm text-muted-foreground">
-                      Detailed income approach analysis for income-producing properties including capitalization rate analysis.
                     </p>
                   </CardContent>
                   <CardFooter className="pt-0">
