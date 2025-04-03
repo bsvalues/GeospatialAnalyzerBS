@@ -20,11 +20,20 @@ import { InsertProperty } from '@shared/schema';
 interface CSVImportDialogProps {
   trigger?: React.ReactNode;
   onImportComplete?: (result: { imported: number }) => void;
+  isOpen?: boolean;
+  onClose?: () => void;
 }
 
-export function CSVImportDialog({ trigger, onImportComplete }: CSVImportDialogProps) {
-  const [open, setOpen] = useState(false);
+export function CSVImportDialog({ trigger, onImportComplete, isOpen, onClose }: CSVImportDialogProps) {
+  const [open, setOpen] = useState(isOpen || false);
   const [file, setFile] = useState<File | null>(null);
+  
+  // Handle prop-driven open state
+  React.useEffect(() => {
+    if (isOpen !== undefined) {
+      setOpen(isOpen);
+    }
+  }, [isOpen]);
   const [csvContent, setCsvContent] = useState<string>('');
   const [hasHeaderRow, setHasHeaderRow] = useState(true);
   const [parsedData, setParsedData] = useState<Record<string, string>[]>([]);
@@ -113,8 +122,15 @@ export function CSVImportDialog({ trigger, onImportComplete }: CSVImportDialogPr
     }
   };
 
+  const handleOpenChange = (newOpen: boolean) => {
+    setOpen(newOpen);
+    if (!newOpen && onClose) {
+      onClose();
+    }
+  };
+
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogTrigger asChild>
         {trigger || <Button className="flex items-center gap-2"><FileText className="w-4 h-4" /> Import Properties</Button>}
       </DialogTrigger>
@@ -292,7 +308,7 @@ export function CSVImportDialog({ trigger, onImportComplete }: CSVImportDialogPr
                   
                   <Button 
                     onClick={() => {
-                      setOpen(false);
+                      handleOpenChange(false);
                       resetDialog();
                     }}
                     className="w-full"
@@ -328,7 +344,7 @@ export function CSVImportDialog({ trigger, onImportComplete }: CSVImportDialogPr
           <Button
             variant="outline"
             onClick={() => {
-              setOpen(false);
+              handleOpenChange(false);
               resetDialog();
             }}
           >

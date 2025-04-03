@@ -24,7 +24,11 @@ import {
   CandlestickChart,
   LineChart,
   GitCompare,
-  ArrowRight
+  ArrowRight,
+  Check,
+  Download,
+  RefreshCw,
+  Upload
 } from 'lucide-react';
 import { PropertyInsightsReport } from '@/components/export/PropertyInsightsReport';
 import { MapPanel } from './panels/MapPanel';
@@ -42,6 +46,10 @@ import { Property } from '@shared/schema';
 import { useQuery } from '@tanstack/react-query';
 import TabNavigation from './TabNavigation';
 import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Progress } from '@/components/ui/progress';
+import { useToast } from '@/hooks/use-toast';
+import { CSVImportDialog } from '../components/import/CSVImportDialog';
 
 export interface DashboardProps {
   className?: string;
@@ -49,9 +57,11 @@ export interface DashboardProps {
 
 const Dashboard: React.FC<DashboardProps> = ({ className }) => {
   const [activeTab, setActiveTab] = useState('overview');
+  const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
+  const [isDetailsDialogOpen, setIsDetailsDialogOpen] = useState(false);
 
   // Fetch properties data
-  const { data: properties = [] } = useQuery<Property[]>({
+  const { data: properties = [], refetch: refetchProperties } = useQuery<Property[]>({
     queryKey: ['/api/properties'],
     staleTime: 1000 * 60 * 5, // 5 minutes
   });
@@ -381,12 +391,14 @@ const Dashboard: React.FC<DashboardProps> = ({ className }) => {
                     <div className="flex space-x-4">
                       <Button 
                         className="bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 shadow-sm hover:shadow-md"
+                        onClick={() => setIsImportDialogOpen(true)}
                       >
                         Import Data Now
                       </Button>
                       <Button 
                         variant="outline"
                         className="bg-transparent hover:bg-amber-200 text-amber-800 border-amber-300 px-4 py-2 rounded-lg text-sm font-medium transition-colors duration-200"
+                        onClick={() => setIsDetailsDialogOpen(true)}
                       >
                         View Details
                       </Button>
@@ -541,6 +553,114 @@ const Dashboard: React.FC<DashboardProps> = ({ className }) => {
         {activeTab === 'analytics' && <AdvancedAnalyticsPanel allProperties={properties} />}
         {activeTab === 'settings' && <SettingsPanel />}
       </div>
+
+      {/* Import Data Dialog */}
+      <CSVImportDialog isOpen={isImportDialogOpen} onClose={() => setIsImportDialogOpen(false)} />
+
+      {/* Details Dialog */}
+      <Dialog open={isDetailsDialogOpen} onOpenChange={setIsDetailsDialogOpen}>
+        <DialogContent className="sm:max-w-[600px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-xl">
+              <Database className="h-5 w-5 text-amber-500" />
+              Valuation Data Update Details
+            </DialogTitle>
+            <DialogDescription>
+              Details of the latest property valuation data available for import.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4 my-2">
+            <div className="p-4 rounded-lg bg-amber-50 border border-amber-100">
+              <h3 className="text-lg font-medium text-amber-800 mb-2 flex items-center">
+                <AlertCircle className="h-5 w-5 mr-2 text-amber-500" />
+                Update Summary
+              </h3>
+              <div className="space-y-3 text-sm">
+                <div className="grid grid-cols-2 gap-2">
+                  <span className="text-amber-700">New Properties:</span>
+                  <span className="font-medium text-amber-900">156</span>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <span className="text-amber-700">Revised Valuations:</span>
+                  <span className="font-medium text-amber-900">78</span>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <span className="text-amber-700">Data Source:</span>
+                  <span className="font-medium text-amber-900">Benton County Assessor</span>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <span className="text-amber-700">Date Generated:</span>
+                  <span className="font-medium text-amber-900">April 01, 2025</span>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <span className="text-amber-700">Format:</span>
+                  <span className="font-medium text-amber-900">CSV (27.3MB)</span>
+                </div>
+              </div>
+            </div>
+            
+            <div className="p-4 rounded-lg border border-gray-200">
+              <h3 className="text-lg font-medium text-gray-700 mb-2">Property Types Included</h3>
+              <div className="grid grid-cols-2 gap-y-2 text-sm">
+                <div className="flex items-center gap-2">
+                  <Check className="h-4 w-4 text-green-500" />
+                  <span>Residential (114)</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Check className="h-4 w-4 text-green-500" />
+                  <span>Commercial (23)</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Check className="h-4 w-4 text-green-500" />
+                  <span>Agricultural (12)</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Check className="h-4 w-4 text-green-500" />
+                  <span>Industrial (7)</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="p-4 rounded-lg border border-gray-200">
+              <h3 className="text-lg font-medium text-gray-700 mb-2">Neighborhoods</h3>
+              <p className="text-sm text-gray-600 mb-2">
+                Properties span 14 different neighborhoods across Benton County.
+              </p>
+              <div className="flex flex-wrap gap-2">
+                <span className="px-2 py-1 text-xs bg-blue-50 text-blue-700 rounded-full">Richland Heights</span>
+                <span className="px-2 py-1 text-xs bg-blue-50 text-blue-700 rounded-full">West Kennewick</span>
+                <span className="px-2 py-1 text-xs bg-blue-50 text-blue-700 rounded-full">Prosser Valley</span>
+                <span className="px-2 py-1 text-xs bg-blue-50 text-blue-700 rounded-full">Badger Mountain</span>
+                <span className="px-2 py-1 text-xs bg-blue-50 text-blue-700 rounded-full">Horn Rapids</span>
+                <span className="px-2 py-1 text-xs bg-blue-50 text-blue-700 rounded-full">+9 more</span>
+              </div>
+            </div>
+          </div>
+          
+          <DialogFooter className="flex-col sm:flex-row gap-2">
+            <Button
+              variant="outline"
+              className="gap-1"
+              onClick={() => {
+                setIsDetailsDialogOpen(false);
+                setIsImportDialogOpen(true);
+              }}
+            >
+              <Upload className="h-4 w-4" />
+              Import Data
+            </Button>
+            <Button
+              variant="outline"
+              className="gap-1"
+              onClick={() => setIsDetailsDialogOpen(false)}
+            >
+              <Download className="h-4 w-4" />
+              Download CSV
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
