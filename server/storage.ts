@@ -964,7 +964,9 @@ export class MemStorage implements IStorage {
         lastSaleDate,
         taxAssessment,
         pricePerSqFt,
-        attributes: {}
+        attributes: {},
+        sourceId: 1, // Default to internal database source
+        zillowId: null // No Zillow ID for sample data
       };
       
       return property;
