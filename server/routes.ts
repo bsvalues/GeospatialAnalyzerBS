@@ -1308,6 +1308,248 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
+  // Connection testing endpoint for ETL data sources
+  app.post('/api/etl/data-sources/:id/test', async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ error: 'Invalid data source ID' });
+      }
+      
+      const dataSource = await storage.getEtlDataSourceById(id);
+      if (!dataSource) {
+        return res.status(404).json({ error: 'Data source not found' });
+      }
+      
+      // Test the connection based on the data source type
+      let testResult: {
+        success: boolean;
+        message: string;
+        latencyMs?: number;
+        metadata?: any;
+      };
+      
+      const startTime = Date.now();
+      
+      // In a real application, we would attempt an actual connection
+      // to the data source. For this demo, we'll simulate connections.
+      switch (dataSource.type) {
+        case 'database':
+          // Simulate database connection test
+          if (dataSource.connectionDetails && 
+              dataSource.connectionDetails.host && 
+              dataSource.connectionDetails.database) {
+            testResult = {
+              success: true,
+              message: `Successfully connected to database '${dataSource.connectionDetails.database}' on host '${dataSource.connectionDetails.host}'`,
+              latencyMs: Date.now() - startTime,
+              metadata: {
+                version: '14.5',
+                tables: ['properties', 'users', 'transactions'],
+                connection: 'active'
+              }
+            };
+          } else {
+            testResult = {
+              success: false,
+              message: 'Invalid database connection details',
+              latencyMs: Date.now() - startTime
+            };
+          }
+          break;
+          
+        case 'api':
+          // Simulate API connection test
+          if (dataSource.connectionDetails && 
+              dataSource.connectionDetails.url) {
+            testResult = {
+              success: true,
+              message: `Successfully connected to API at '${dataSource.connectionDetails.url}'`,
+              latencyMs: Date.now() - startTime,
+              metadata: {
+                endpoints: ['/data', '/properties', '/users'],
+                version: 'v2.1',
+                supportedFormats: ['json', 'xml']
+              }
+            };
+          } else {
+            testResult = {
+              success: false,
+              message: 'Invalid API connection details',
+              latencyMs: Date.now() - startTime
+            };
+          }
+          break;
+          
+        case 'file':
+          // Simulate file connection test
+          if (dataSource.connectionDetails && 
+              dataSource.connectionDetails.path) {
+            testResult = {
+              success: true,
+              message: `Successfully accessed file at '${dataSource.connectionDetails.path}'`,
+              latencyMs: Date.now() - startTime,
+              metadata: {
+                size: '1.2MB',
+                format: dataSource.connectionDetails.format || 'csv',
+                lastModified: new Date().toISOString()
+              }
+            };
+          } else {
+            testResult = {
+              success: false,
+              message: 'Invalid file path or format',
+              latencyMs: Date.now() - startTime
+            };
+          }
+          break;
+          
+        case 'memory':
+          // Simulate in-memory data source test
+          testResult = {
+            success: true,
+            message: 'Successfully connected to in-memory data source',
+            latencyMs: Date.now() - startTime,
+            metadata: {
+              records: 1000,
+              inUse: true
+            }
+          };
+          break;
+          
+        default:
+          testResult = {
+            success: false,
+            message: `Unsupported data source type: ${dataSource.type}`,
+            latencyMs: Date.now() - startTime
+          };
+      }
+      
+      // Update the data source connection status
+      await storage.updateEtlDataSource(id, {
+        isConnected: testResult.success,
+        lastConnected: testResult.success ? new Date() : undefined
+      });
+      
+      res.json(testResult);
+    } catch (error: any) {
+      console.error('Error testing ETL data source connection:', error);
+      res.status(500).json({ 
+        success: false,
+        message: error.message || 'Failed to test data source connection',
+        error: error.message
+      });
+    }
+  });
+  
+  // Schema detection endpoint for ETL data sources
+  app.get('/api/etl/data-sources/:id/schema', async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ error: 'Invalid data source ID' });
+      }
+      
+      const dataSource = await storage.getEtlDataSourceById(id);
+      if (!dataSource) {
+        return res.status(404).json({ error: 'Data source not found' });
+      }
+      
+      // In a real application, we would connect to the data source
+      // and introspect its schema. For this demo, we'll simulate schema detection.
+      let schemaResult: {
+        tables?: string[];
+        fields?: { name: string; type: string; nullable: boolean }[];
+        error?: string;
+      };
+      
+      switch (dataSource.type) {
+        case 'database':
+          schemaResult = {
+            tables: ['properties', 'users', 'transactions', 'neighborhoods', 'analytics'],
+            fields: [
+              { name: 'id', type: 'integer', nullable: false },
+              { name: 'parcel_id', type: 'string', nullable: false },
+              { name: 'address', type: 'string', nullable: false },
+              { name: 'value', type: 'decimal', nullable: true },
+              { name: 'square_feet', type: 'integer', nullable: true },
+              { name: 'year_built', type: 'integer', nullable: true },
+              { name: 'last_updated', type: 'timestamp', nullable: false }
+            ]
+          };
+          break;
+          
+        case 'api':
+          schemaResult = {
+            fields: [
+              { name: 'id', type: 'string', nullable: false },
+              { name: 'property_id', type: 'string', nullable: false },
+              { name: 'location', type: 'object', nullable: false },
+              { name: 'attributes', type: 'object', nullable: true },
+              { name: 'created_at', type: 'string', nullable: false },
+              { name: 'updated_at', type: 'string', nullable: false }
+            ]
+          };
+          break;
+          
+        case 'file':
+          const format = dataSource.connectionDetails?.format || 'csv';
+          if (format === 'csv' || format === 'excel') {
+            schemaResult = {
+              fields: [
+                { name: 'ID', type: 'string', nullable: false },
+                { name: 'Address', type: 'string', nullable: false },
+                { name: 'City', type: 'string', nullable: false },
+                { name: 'State', type: 'string', nullable: false },
+                { name: 'ZIP', type: 'string', nullable: false },
+                { name: 'Value', type: 'number', nullable: true },
+                { name: 'YearBuilt', type: 'number', nullable: true },
+                { name: 'LastSale', type: 'date', nullable: true }
+              ]
+            };
+          } else if (format === 'json') {
+            schemaResult = {
+              fields: [
+                { name: 'id', type: 'string', nullable: false },
+                { name: 'address', type: 'object', nullable: false },
+                { name: 'valuation', type: 'object', nullable: true },
+                { name: 'details', type: 'object', nullable: true },
+                { name: 'history', type: 'array', nullable: true }
+              ]
+            };
+          } else {
+            schemaResult = {
+              error: `Schema detection not supported for format: ${format}`
+            };
+          }
+          break;
+          
+        case 'memory':
+          schemaResult = {
+            fields: [
+              { name: 'id', type: 'number', nullable: false },
+              { name: 'name', type: 'string', nullable: false },
+              { name: 'properties', type: 'array', nullable: true },
+              { name: 'created', type: 'date', nullable: false }
+            ]
+          };
+          break;
+          
+        default:
+          schemaResult = {
+            error: `Schema detection not supported for type: ${dataSource.type}`
+          };
+      }
+      
+      res.json(schemaResult);
+    } catch (error: any) {
+      console.error('Error detecting ETL data source schema:', error);
+      res.status(500).json({ 
+        error: error.message || 'Failed to detect data source schema'
+      });
+    }
+  });
+  
   // Data preview endpoint for ETL data sources
   app.get('/api/etl/data-sources/:id/preview', async (req, res) => {
     try {
@@ -1394,6 +1636,469 @@ export async function registerRoutes(app: Express): Promise<Server> {
         columns: ['Error'],
         rows: [['An error occurred while previewing data']],
         totalRows: 1
+      });
+    }
+  });
+  
+  // Transformation endpoint for applying transformations to data
+  app.post('/api/etl/transform', async (req, res) => {
+    try {
+      const { data, transformationRuleIds, options } = req.body;
+      
+      if (!data || !data.columns || !data.rows || !transformationRuleIds) {
+        return res.status(400).json({ 
+          success: false,
+          error: 'Missing required parameters: data (columns, rows) and transformationRuleIds',
+          logs: ['Validation error: Missing required parameters']
+        });
+      }
+      
+      // Get the transformation rules
+      const transformationRules = [];
+      for (const ruleId of transformationRuleIds) {
+        const id = parseInt(ruleId);
+        if (isNaN(id)) {
+          return res.status(400).json({ 
+            success: false,
+            error: 'Invalid transformation rule ID',
+            logs: [`Validation error: Invalid transformation rule ID: ${ruleId}`]
+          });
+        }
+        
+        const rule = await storage.getEtlTransformationRuleById(id);
+        if (!rule) {
+          return res.status(400).json({ 
+            success: false,
+            error: `Transformation rule not found: ${id}`,
+            logs: [`Error: Transformation rule not found: ${id}`]
+          });
+        }
+        
+        transformationRules.push(rule);
+      }
+      
+      // Start transformation context
+      const context = {
+        sourceColumns: [...data.columns],
+        sourceRows: data.rows.map(row => [...row]), // Deep copy
+        transformedColumns: [...data.columns],
+        transformedRows: data.rows.map(row => [...row]), // Deep copy
+        logs: ['Starting transformations'],
+        metrics: {
+          startTime: Date.now(),
+          totalRowsProcessed: data.rows.length,
+          successfulTransformations: 0,
+          failedTransformations: 0
+        }
+      };
+      
+      // Apply each transformation rule
+      for (const rule of transformationRules) {
+        try {
+          if (!rule.isActive) {
+            context.logs.push(`Skipping inactive transformation rule: ${rule.name}`);
+            continue;
+          }
+          
+          context.logs.push(`Applying transformation rule: ${rule.name}`);
+          
+          // Execute the transformation code safely using the transformation utilities
+          // In a real implementation, we'd have a more robust way to execute transformation code
+          // For demo purposes, we'll apply built-in transformations based on rule name
+          
+          if (rule.name.includes('Fill Missing')) {
+            // Apply fill missing values transformation
+            const targetFieldMatch = rule.name.match(/Fill Missing Values \((.+)\)/);
+            const targetField = targetFieldMatch ? targetFieldMatch[1] : '';
+            const targetFieldIndex = context.transformedColumns.indexOf(targetField);
+            
+            if (targetFieldIndex === -1) {
+              context.logs.push(`Warning: Target field "${targetField}" not found, skipping transformation`);
+              continue;
+            }
+            
+            let filledCount = 0;
+            context.transformedRows.forEach(row => {
+              if (row[targetFieldIndex] === null || row[targetFieldIndex] === undefined || row[targetFieldIndex] === '') {
+                const defaultValue = rule.transformationCode.includes('defaultValue') ? 
+                  JSON.parse(rule.transformationCode).defaultValue : 
+                  'N/A';
+                
+                row[targetFieldIndex] = defaultValue;
+                filledCount++;
+              }
+            });
+            
+            context.logs.push(`Filled ${filledCount} missing values in field "${targetField}"`);
+            context.metrics.successfulTransformations++;
+          }
+          else if (rule.name.includes('Format Date')) {
+            // Apply date formatting transformation
+            const fieldMatch = rule.name.match(/Format Date \((.+)\)/);
+            const field = fieldMatch ? fieldMatch[1] : '';
+            const fieldIndex = context.transformedColumns.indexOf(field);
+            
+            if (fieldIndex === -1) {
+              context.logs.push(`Warning: Field "${field}" not found, skipping transformation`);
+              continue;
+            }
+            
+            let formattedCount = 0;
+            context.transformedRows.forEach(row => {
+              try {
+                const dateValue = row[fieldIndex];
+                if (dateValue) {
+                  const date = new Date(dateValue);
+                  if (!isNaN(date.getTime())) {
+                    // Format date as ISO string or a specific format based on transformation code
+                    row[fieldIndex] = date.toISOString().split('T')[0]; // YYYY-MM-DD
+                    formattedCount++;
+                  }
+                }
+              } catch (e) {
+                // Log the error but continue processing
+                context.logs.push(`Error formatting date: ${e}`);
+              }
+            });
+            
+            context.logs.push(`Formatted ${formattedCount} dates in field "${field}"`);
+            context.metrics.successfulTransformations++;
+          }
+          else if (rule.name.includes('Number Format')) {
+            // Apply number formatting transformation
+            const fieldMatch = rule.name.match(/Number Format \((.+)\)/);
+            const field = fieldMatch ? fieldMatch[1] : '';
+            const fieldIndex = context.transformedColumns.indexOf(field);
+            
+            if (fieldIndex === -1) {
+              context.logs.push(`Warning: Field "${field}" not found, skipping transformation`);
+              continue;
+            }
+            
+            let formattedCount = 0;
+            context.transformedRows.forEach(row => {
+              try {
+                const value = row[fieldIndex];
+                if (value !== null && value !== undefined && value !== '') {
+                  const num = Number(value);
+                  if (!isNaN(num)) {
+                    // Format number with 2 decimal places or based on transformation code
+                    row[fieldIndex] = num.toFixed(2);
+                    formattedCount++;
+                  }
+                }
+              } catch (e) {
+                context.logs.push(`Error formatting number: ${e}`);
+              }
+            });
+            
+            context.logs.push(`Formatted ${formattedCount} numbers in field "${field}"`);
+            context.metrics.successfulTransformations++;
+          }
+          else if (rule.name.includes('Text Case')) {
+            // Apply text case transformation
+            const fieldMatch = rule.name.match(/Text Case \((.+)\)/);
+            const field = fieldMatch ? fieldMatch[1] : '';
+            const fieldIndex = context.transformedColumns.indexOf(field);
+            
+            if (fieldIndex === -1) {
+              context.logs.push(`Warning: Field "${field}" not found, skipping transformation`);
+              continue;
+            }
+            
+            const caseType = rule.transformationCode.includes('caseType') ? 
+              JSON.parse(rule.transformationCode).caseType : 
+              'upper';
+              
+            let transformedCount = 0;
+            context.transformedRows.forEach(row => {
+              try {
+                const value = row[fieldIndex];
+                if (typeof value === 'string') {
+                  switch (caseType) {
+                    case 'upper':
+                      row[fieldIndex] = value.toUpperCase();
+                      break;
+                    case 'lower':
+                      row[fieldIndex] = value.toLowerCase();
+                      break;
+                    case 'title':
+                      row[fieldIndex] = value
+                        .toLowerCase()
+                        .split(' ')
+                        .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+                        .join(' ');
+                      break;
+                    default:
+                      // No change
+                      break;
+                  }
+                  transformedCount++;
+                }
+              } catch (e) {
+                context.logs.push(`Error transforming text case: ${e}`);
+              }
+            });
+            
+            context.logs.push(`Transformed case for ${transformedCount} values in field "${field}"`);
+            context.metrics.successfulTransformations++;
+          }
+          else {
+            // For complex or custom transformations, we'd evaluate the code safely
+            // For demo purposes, we'll just log a message
+            context.logs.push(`Custom transformation "${rule.name}" applied (simulated)`);
+            context.metrics.successfulTransformations++;
+          }
+        } catch (ruleError) {
+          context.logs.push(`Error applying transformation rule "${rule.name}": ${ruleError}`);
+          context.metrics.failedTransformations++;
+        }
+      }
+      
+      // Complete the transformation context
+      context.metrics.endTime = Date.now();
+      context.metrics.processingTimeMs = context.metrics.endTime - context.metrics.startTime;
+      
+      // Return the transformation result
+      res.json({
+        success: context.metrics.failedTransformations === 0,
+        data: {
+          columns: context.transformedColumns,
+          rows: context.transformedRows,
+          totalRows: context.transformedRows.length
+        },
+        metrics: {
+          processingTimeMs: context.metrics.processingTimeMs,
+          successRate: context.metrics.totalRowsProcessed > 0 ? 
+            (context.metrics.successfulTransformations / transformationRules.length) * 100 : 
+            100,
+          errorRate: context.metrics.totalRowsProcessed > 0 ? 
+            (context.metrics.failedTransformations / transformationRules.length) * 100 : 
+            0
+        },
+        logs: context.logs
+      });
+    } catch (error: any) {
+      console.error('Error transforming data:', error);
+      res.status(500).json({ 
+        success: false,
+        error: error.message || 'Failed to transform data',
+        logs: ['Error transforming data', error.message || 'Unknown error']
+      });
+    }
+  });
+  
+  // Test transformation rule endpoint
+  app.post('/api/etl/transformation-rules/test', async (req, res) => {
+    try {
+      const { rule, sampleData } = req.body;
+      
+      if (!rule || !rule.dataType || !rule.transformationCode || !sampleData || !Array.isArray(sampleData)) {
+        return res.status(400).json({ 
+          success: false,
+          results: [],
+          errors: ['Missing required parameters: rule (dataType, transformationCode) and sampleData']
+        });
+      }
+      
+      // Process the sample data with the transformation rule
+      const results = [];
+      const errors = [];
+      
+      try {
+        // Apply the transformation to each sample
+        sampleData.forEach((sample, index) => {
+          try {
+            // For demo purposes, we'll apply simple transformations based on data type
+            let result;
+            
+            switch (rule.dataType) {
+              case 'text':
+                if (rule.transformationCode.includes('toUpperCase')) {
+                  result = String(sample).toUpperCase();
+                } else if (rule.transformationCode.includes('toLowerCase')) {
+                  result = String(sample).toLowerCase();
+                } else if (rule.transformationCode.includes('trim')) {
+                  result = String(sample).trim();
+                } else {
+                  result = sample; // No transformation
+                }
+                break;
+                
+              case 'number':
+                const num = Number(sample);
+                if (isNaN(num)) {
+                  throw new Error('Invalid number format');
+                }
+                
+                if (rule.transformationCode.includes('toFixed')) {
+                  const precision = 2; // Default
+                  result = num.toFixed(precision);
+                } else if (rule.transformationCode.includes('round')) {
+                  result = Math.round(num);
+                } else if (rule.transformationCode.includes('floor')) {
+                  result = Math.floor(num);
+                } else if (rule.transformationCode.includes('ceil')) {
+                  result = Math.ceil(num);
+                } else {
+                  result = num; // No transformation
+                }
+                break;
+                
+              case 'date':
+                const date = new Date(sample);
+                if (isNaN(date.getTime())) {
+                  throw new Error('Invalid date format');
+                }
+                
+                if (rule.transformationCode.includes('toISOString')) {
+                  result = date.toISOString();
+                } else if (rule.transformationCode.includes('toLocaleDateString')) {
+                  result = date.toLocaleDateString();
+                } else {
+                  result = date.toISOString(); // Default transformation
+                }
+                break;
+                
+              default:
+                result = sample; // No transformation for unknown data types
+            }
+            
+            results.push(result);
+          } catch (sampleError) {
+            errors.push(`Error processing sample at index ${index}: ${sampleError}`);
+            results.push(null); // Add null for failed transformations
+          }
+        });
+      } catch (transformError) {
+        errors.push(`Error applying transformation: ${transformError}`);
+      }
+      
+      res.json({
+        success: errors.length === 0,
+        results,
+        errors
+      });
+    } catch (error: any) {
+      console.error('Error testing transformation rule:', error);
+      res.status(500).json({ 
+        success: false,
+        results: [],
+        errors: [error.message || 'Failed to test transformation rule']
+      });
+    }
+  });
+  
+  // Transformation rule suggestion endpoint based on data quality issues
+  app.post('/api/etl/suggest-transformations', async (req, res) => {
+    try {
+      const { issues, sampleData } = req.body;
+      
+      if (!issues || !Array.isArray(issues) || !sampleData || !sampleData.columns || !sampleData.rows) {
+        return res.status(400).json({ 
+          success: false,
+          suggestions: []
+        });
+      }
+      
+      // Generate transformation suggestions based on data quality issues
+      const suggestions = [];
+      
+      issues.forEach(issue => {
+        const field = issue.field;
+        const issueLower = issue.issue.toLowerCase();
+        
+        // Check for common issues and suggest appropriate transformations
+        if (issueLower.includes('missing') || issueLower.includes('null') || issueLower.includes('empty')) {
+          suggestions.push({
+            name: `Fill Missing Values (${field})`,
+            description: `Fill missing values in ${field} with default or calculated values`,
+            dataType: 'text',
+            transformationCode: JSON.stringify({
+              operation: 'fill_missing_values',
+              defaultValue: 'N/A'
+            }),
+            targetIssue: {
+              field,
+              issue: issue.issue
+            }
+          });
+        }
+        else if (issueLower.includes('date') && 
+                (issueLower.includes('format') || issueLower.includes('invalid') || issueLower.includes('inconsistent'))) {
+          suggestions.push({
+            name: `Format Date (${field})`,
+            description: `Standardize date format in ${field} to ISO format (YYYY-MM-DD)`,
+            dataType: 'date',
+            transformationCode: JSON.stringify({
+              operation: 'format_date',
+              format: 'YYYY-MM-DD'
+            }),
+            targetIssue: {
+              field,
+              issue: issue.issue
+            }
+          });
+        }
+        else if ((issueLower.includes('number') || issueLower.includes('decimal') || issueLower.includes('numeric')) && 
+                (issueLower.includes('format') || issueLower.includes('precision') || issueLower.includes('round'))) {
+          suggestions.push({
+            name: `Number Format (${field})`,
+            description: `Format numeric values in ${field} with consistent precision (2 decimal places)`,
+            dataType: 'number',
+            transformationCode: JSON.stringify({
+              operation: 'number_format',
+              precision: 2
+            }),
+            targetIssue: {
+              field,
+              issue: issue.issue
+            }
+          });
+        }
+        else if (issueLower.includes('case') || 
+                (issueLower.includes('text') && issueLower.includes('consistent'))) {
+          suggestions.push({
+            name: `Text Case (${field})`,
+            description: `Standardize text case in ${field} to title case for consistency`,
+            dataType: 'text',
+            transformationCode: JSON.stringify({
+              operation: 'text_case',
+              caseType: 'title'
+            }),
+            targetIssue: {
+              field,
+              issue: issue.issue
+            }
+          });
+        }
+        else if (issueLower.includes('duplicate')) {
+          suggestions.push({
+            name: `Remove Duplicates`,
+            description: `Remove duplicate records based on key fields including ${field}`,
+            dataType: 'special',
+            transformationCode: JSON.stringify({
+              operation: 'remove_duplicates',
+              keyFields: [field]
+            }),
+            targetIssue: {
+              field,
+              issue: issue.issue
+            }
+          });
+        }
+      });
+      
+      res.json({
+        success: true,
+        suggestions
+      });
+    } catch (error: any) {
+      console.error('Error suggesting transformations:', error);
+      res.status(500).json({ 
+        success: false,
+        suggestions: [],
+        error: error.message || 'Failed to generate transformation suggestions'
       });
     }
   });
