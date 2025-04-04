@@ -19,6 +19,7 @@ import AboutPage from '@/pages/about';
 import GetSmarterPage from '@/pages/get-smarter';
 import ScriptingPage from '@/pages/scripting';
 import ETLPage from '@/pages/etl';
+import ETLManagementPage from '@/pages/ETLManagement';
 import DataConnectorsPage from '@/pages/DataConnectors';
 import LayersPage from '@/pages/Layers';
 import DataPage from '@/pages/Data';
@@ -46,6 +47,7 @@ function Router() {
         <Route path="/neighborhoods" component={NeighborhoodTimelineDemo} />
         <Route path="/scripting" component={ScriptingPage} />
         <Route path="/etl" component={ETLPage} />
+        <Route path="/etl-management" component={ETLManagementPage} />
         <Route path="/data-connectors" component={DataConnectorsPage} />
         <Route path="/layers" component={LayersPage} />
         <Route path="/data" component={DataPage} />
