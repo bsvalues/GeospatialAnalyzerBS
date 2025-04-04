@@ -442,8 +442,10 @@ class DataQualityService {
         : sorted[middle];
       
       // Calculate standard deviation
-      const variance = numericValues.reduce((sum, val) => sum + Math.pow(val - avg, 2), 0) / numericValues.length;
-      stdDev = Math.sqrt(variance);
+      if (avg !== undefined) {
+        const variance = numericValues.reduce((sum, val) => sum + Math.pow(val - avg, 2), 0) / numericValues.length;
+        stdDev = Math.sqrt(variance);
+      }
     }
     
     // Calculate string statistics if appropriate

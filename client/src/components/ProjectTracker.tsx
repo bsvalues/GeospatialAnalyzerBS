@@ -767,15 +767,17 @@ export function ProjectTracker() {
     let oldTask: TaskItem | null = null;
     let milestoneTitle = '';
     
+    // First, find the task to get its original details for logging
     milestones.forEach(milestone => {
       const task = milestone.tasks.find(t => t.id === taskId);
       if (task) {
         taskTitle = task.title;
-        oldTask = task;
+        oldTask = { ...task }; // Make a copy to ensure we have the original values
         milestoneTitle = milestone.title;
       }
     });
     
+    // Update the milestones state with the updated task
     setMilestones(currentMilestones => 
       currentMilestones.map(milestone => ({
         ...milestone,
@@ -797,20 +799,28 @@ export function ProjectTracker() {
       }))
     );
     
-    // Log the task edit
+    // Log the task edit if we found the original task
     if (oldTask) {
       // Check what changed
       const changes: string[] = [];
-      if (updatedTask.title && updatedTask.title !== oldTask.title) 
-        changes.push(`title from "${oldTask.title}" to "${updatedTask.title}"`);
-      if (updatedTask.description && updatedTask.description !== oldTask.description) 
+      
+      // Use type assertion to ensure TypeScript knows oldTask is not null
+      const originalTask = oldTask as TaskItem;
+      
+      if (updatedTask.title && updatedTask.title !== originalTask.title) 
+        changes.push(`title from "${originalTask.title}" to "${updatedTask.title}"`);
+      
+      if (updatedTask.description && updatedTask.description !== originalTask.description) 
         changes.push(`description`);
-      if (updatedTask.status && updatedTask.status !== oldTask.status) 
-        changes.push(`status from "${oldTask.status}" to "${updatedTask.status}"`);
-      if (updatedTask.priority && updatedTask.priority !== oldTask.priority) 
-        changes.push(`priority from "${oldTask.priority}" to "${updatedTask.priority}"`);
-      if (updatedTask.category && updatedTask.category !== oldTask.category) {
-        const oldCategoryName = projectCategories.find(c => c.id === oldTask.category)?.name || 'Unknown';
+      
+      if (updatedTask.status && updatedTask.status !== originalTask.status) 
+        changes.push(`status from "${originalTask.status}" to "${updatedTask.status}"`);
+      
+      if (updatedTask.priority && updatedTask.priority !== originalTask.priority) 
+        changes.push(`priority from "${originalTask.priority}" to "${updatedTask.priority}"`);
+      
+      if (updatedTask.category && updatedTask.category !== originalTask.category) {
+        const oldCategoryName = projectCategories.find(c => c.id === originalTask.category)?.name || 'Unknown';
         const newCategoryName = projectCategories.find(c => c.id === updatedTask.category)?.name || 'Unknown';
         changes.push(`category from "${oldCategoryName}" to "${newCategoryName}"`);
       }
@@ -821,8 +831,8 @@ export function ProjectTracker() {
           `Updated task "${taskTitle}" in milestone "${milestoneTitle}": changed ${changes.join(', ')}`,
           taskId,
           'task',
-          JSON.stringify(oldTask),
-          JSON.stringify({...oldTask, ...updatedTask as Partial<TaskItem>}),
+          JSON.stringify(originalTask),
+          JSON.stringify({ ...originalTask, ...updatedTask }),
           'Pencil'
         );
       }
