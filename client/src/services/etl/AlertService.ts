@@ -1,5 +1,12 @@
 /**
- * Alert type enum
+ * Alert service
+ * 
+ * This service handles the creation, management, and notification of alerts
+ * throughout the ETL pipeline.
+ */
+
+/**
+ * Alert type
  */
 export enum AlertType {
   INFO = 'INFO',
@@ -9,7 +16,7 @@ export enum AlertType {
 }
 
 /**
- * Alert severity enum
+ * Alert severity
  */
 export enum AlertSeverity {
   LOW = 'LOW',
@@ -19,7 +26,7 @@ export enum AlertSeverity {
 }
 
 /**
- * Alert category enum
+ * Alert category
  */
 export enum AlertCategory {
   SYSTEM = 'SYSTEM',
@@ -32,9 +39,9 @@ export enum AlertCategory {
 }
 
 /**
- * Alert state enum
+ * Alert status
  */
-export enum AlertState {
+export enum AlertStatus {
   NEW = 'NEW',
   ACKNOWLEDGED = 'ACKNOWLEDGED',
   RESOLVED = 'RESOLVED',
@@ -47,139 +54,93 @@ export enum AlertState {
 export interface Alert {
   id: string;
   type: AlertType;
-  severity: AlertSeverity;
-  category: AlertCategory;
   title: string;
   message: string;
-  details?: string;
-  timestamp: Date;
-  state: AlertState;
-  jobId?: number;
-  userId?: string;
+  severity: AlertSeverity;
+  category: AlertCategory;
+  status: AlertStatus;
+  metadata?: Record<string, any>;
+  createdAt: Date;
+  updatedAt: Date;
   acknowledgedAt?: Date;
-  acknowledgedBy?: string;
   resolvedAt?: Date;
-  resolvedBy?: string;
+  closedAt?: Date;
 }
 
 /**
- * Alert create options interface
+ * Create alert options
  */
-export interface AlertCreateOptions {
+export interface CreateAlertOptions {
   type: AlertType;
-  severity: AlertSeverity;
-  category: AlertCategory;
   title: string;
   message: string;
-  details?: string;
-  jobId?: number;
-  userId?: string;
-  state?: AlertState;
+  severity: AlertSeverity;
+  category: AlertCategory;
+  metadata?: Record<string, any>;
 }
 
 /**
- * Alert update options interface
+ * Update alert options
  */
-export interface AlertUpdateOptions {
-  state?: AlertState;
-  acknowledgedBy?: string;
-  resolvedBy?: string;
+export interface UpdateAlertOptions {
+  status?: AlertStatus;
+  metadata?: Record<string, any>;
 }
 
 /**
- * Alert filter options interface
+ * Alert filter options
  */
 export interface AlertFilterOptions {
-  type?: AlertType;
-  severity?: AlertSeverity;
-  category?: AlertCategory;
-  state?: AlertState;
+  types?: AlertType[];
+  severities?: AlertSeverity[];
+  categories?: AlertCategory[];
+  statuses?: AlertStatus[];
   startDate?: Date;
   endDate?: Date;
-  jobId?: number;
-  userId?: string;
   search?: string;
 }
 
 /**
- * Alert listener callback type
+ * Alert listener callback
  */
 export type AlertListenerCallback = (alert: Alert) => void;
 
 /**
- * AlertService class
+ * Alert service class
  */
 class AlertService {
   private alerts: Map<string, Alert> = new Map();
   private listeners: Map<string, AlertListenerCallback[]> = new Map();
   private nextId = 1;
   
-  constructor() {
-    this.createDefaultRules();
-    console.log('AlertService initialized');
-  }
-  
   /**
-   * Create an alert
+   * Create a new alert
    */
-  createAlert(options: AlertCreateOptions): Alert {
-    const id = this.generateAlertId();
+  createAlert(options: CreateAlertOptions): Alert {
+    const id = `alert-${this.nextId++}`;
+    const now = new Date();
     
     const alert: Alert = {
       id,
-      type: options.type,
-      severity: options.severity,
-      category: options.category,
-      title: options.title,
-      message: options.message,
-      details: options.details,
-      timestamp: new Date(),
-      state: options.state || AlertState.NEW,
-      jobId: options.jobId,
-      userId: options.userId
+      status: AlertStatus.NEW,
+      createdAt: now,
+      updatedAt: now,
+      ...options
     };
     
     this.alerts.set(id, alert);
-    this.notifyListeners(alert);
     
-    console.log(`Alert created: ${id} - ${options.title}`);
+    // Notify listeners
+    this.notifyListeners('create', alert);
     
     return alert;
   }
   
   /**
-   * Update an alert
+   * Get an alert by ID
    */
-  updateAlert(id: string, options: AlertUpdateOptions): Alert | null {
-    const alert = this.alerts.get(id);
-    
-    if (!alert) {
-      console.warn(`Alert not found: ${id}`);
-      return null;
-    }
-    
-    const updatedAlert = { ...alert };
-    
-    if (options.state !== undefined) {
-      updatedAlert.state = options.state;
-      
-      // Set timestamps based on state change
-      if (options.state === AlertState.ACKNOWLEDGED && !updatedAlert.acknowledgedAt) {
-        updatedAlert.acknowledgedAt = new Date();
-        updatedAlert.acknowledgedBy = options.acknowledgedBy;
-      } else if (options.state === AlertState.RESOLVED && !updatedAlert.resolvedAt) {
-        updatedAlert.resolvedAt = new Date();
-        updatedAlert.resolvedBy = options.resolvedBy;
-      }
-    }
-    
-    // Update the alert
-    this.alerts.set(id, updatedAlert);
-    this.notifyListeners(updatedAlert);
-    
-    console.log(`Alert updated: ${id} - ${updatedAlert.title}`);
-    
-    return updatedAlert;
+  getAlert(id: string): Alert | undefined {
+    return this.alerts.get(id);
   }
   
   /**
@@ -190,89 +151,192 @@ class AlertService {
   }
   
   /**
-   * Get an alert by ID
+   * Get filtered alerts
    */
-  getAlert(id: string): Alert | null {
-    return this.alerts.get(id) || null;
-  }
-  
-  /**
-   * Get alerts with filtering
-   */
-  getAlerts(filter: AlertFilterOptions = {}): Alert[] {
-    // Get all alerts
+  getFilteredAlerts(options: AlertFilterOptions): Alert[] {
     let alerts = this.getAllAlerts();
     
-    // Filter by type
-    if (filter.type !== undefined) {
-      alerts = alerts.filter(alert => alert.type === filter.type);
+    // Apply filters
+    if (options.types && options.types.length > 0) {
+      alerts = alerts.filter(alert => options.types!.includes(alert.type));
     }
     
-    // Filter by severity
-    if (filter.severity !== undefined) {
-      alerts = alerts.filter(alert => alert.severity === filter.severity);
+    if (options.severities && options.severities.length > 0) {
+      alerts = alerts.filter(alert => options.severities!.includes(alert.severity));
     }
     
-    // Filter by category
-    if (filter.category !== undefined) {
-      alerts = alerts.filter(alert => alert.category === filter.category);
+    if (options.categories && options.categories.length > 0) {
+      alerts = alerts.filter(alert => options.categories!.includes(alert.category));
     }
     
-    // Filter by state
-    if (filter.state !== undefined) {
-      alerts = alerts.filter(alert => alert.state === filter.state);
+    if (options.statuses && options.statuses.length > 0) {
+      alerts = alerts.filter(alert => options.statuses!.includes(alert.status));
     }
     
-    // Filter by job ID
-    if (filter.jobId !== undefined) {
-      alerts = alerts.filter(alert => alert.jobId === filter.jobId);
+    if (options.startDate) {
+      alerts = alerts.filter(alert => alert.createdAt >= options.startDate!);
     }
     
-    // Filter by user ID
-    if (filter.userId !== undefined) {
-      alerts = alerts.filter(alert => alert.userId === filter.userId);
+    if (options.endDate) {
+      alerts = alerts.filter(alert => alert.createdAt <= options.endDate!);
     }
     
-    // Filter by date range
-    if (filter.startDate !== undefined) {
-      alerts = alerts.filter(alert => alert.timestamp >= filter.startDate!);
-    }
-    
-    if (filter.endDate !== undefined) {
-      alerts = alerts.filter(alert => alert.timestamp <= filter.endDate!);
-    }
-    
-    // Filter by search term (in title or message)
-    if (filter.search !== undefined && filter.search.trim() !== '') {
-      const searchLower = filter.search.toLowerCase();
+    if (options.search) {
+      const search = options.search.toLowerCase();
       alerts = alerts.filter(
-        alert => alert.title.toLowerCase().includes(searchLower) || 
-                 alert.message.toLowerCase().includes(searchLower) ||
-                 (alert.details && alert.details.toLowerCase().includes(searchLower))
+        alert =>
+          alert.title.toLowerCase().includes(search) ||
+          alert.message.toLowerCase().includes(search)
       );
     }
     
-    // Sort by timestamp (newest first)
-    return alerts.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
+    return alerts;
   }
   
   /**
-   * Get alert counts by status
+   * Update an alert
    */
-  getAlertCounts(): {
+  updateAlert(id: string, options: UpdateAlertOptions): Alert | undefined {
+    const alert = this.alerts.get(id);
+    
+    if (!alert) {
+      return undefined;
+    }
+    
+    const now = new Date();
+    const updatedAlert: Alert = {
+      ...alert,
+      ...options,
+      updatedAt: now
+    };
+    
+    // Set additional timestamps based on status
+    if (options.status) {
+      switch (options.status) {
+        case AlertStatus.ACKNOWLEDGED:
+          updatedAlert.acknowledgedAt = now;
+          break;
+          
+        case AlertStatus.RESOLVED:
+          updatedAlert.resolvedAt = now;
+          break;
+          
+        case AlertStatus.CLOSED:
+          updatedAlert.closedAt = now;
+          break;
+      }
+    }
+    
+    this.alerts.set(id, updatedAlert);
+    
+    // Notify listeners
+    this.notifyListeners('update', updatedAlert);
+    
+    return updatedAlert;
+  }
+  
+  /**
+   * Delete an alert
+   */
+  deleteAlert(id: string): boolean {
+    const alert = this.alerts.get(id);
+    
+    if (!alert) {
+      return false;
+    }
+    
+    this.alerts.delete(id);
+    
+    // Notify listeners
+    this.notifyListeners('delete', alert);
+    
+    return true;
+  }
+  
+  /**
+   * Acknowledge an alert
+   */
+  acknowledgeAlert(id: string): Alert | undefined {
+    return this.updateAlert(id, { status: AlertStatus.ACKNOWLEDGED });
+  }
+  
+  /**
+   * Resolve an alert
+   */
+  resolveAlert(id: string): Alert | undefined {
+    return this.updateAlert(id, { status: AlertStatus.RESOLVED });
+  }
+  
+  /**
+   * Close an alert
+   */
+  closeAlert(id: string): Alert | undefined {
+    return this.updateAlert(id, { status: AlertStatus.CLOSED });
+  }
+  
+  /**
+   * Add an alert listener
+   */
+  addListener(event: 'create' | 'update' | 'delete', callback: AlertListenerCallback): void {
+    if (!this.listeners.has(event)) {
+      this.listeners.set(event, []);
+    }
+    
+    this.listeners.get(event)!.push(callback);
+  }
+  
+  /**
+   * Remove an alert listener
+   */
+  removeListener(event: 'create' | 'update' | 'delete', callback: AlertListenerCallback): void {
+    if (!this.listeners.has(event)) {
+      return;
+    }
+    
+    const callbacks = this.listeners.get(event)!;
+    const index = callbacks.indexOf(callback);
+    
+    if (index !== -1) {
+      callbacks.splice(index, 1);
+    }
+  }
+  
+  /**
+   * Notify listeners of an event
+   */
+  private notifyListeners(event: 'create' | 'update' | 'delete', alert: Alert): void {
+    if (!this.listeners.has(event)) {
+      return;
+    }
+    
+    for (const callback of this.listeners.get(event)!) {
+      try {
+        callback(alert);
+      } catch (error) {
+        console.error(`Error in alert listener for event '${event}':`, error);
+      }
+    }
+  }
+  
+  /**
+   * Get alert statistics
+   */
+  getAlertStatistics(): {
     total: number;
-    byState: Record<AlertState, number>;
+    byStatus: Record<AlertStatus, number>;
     byType: Record<AlertType, number>;
     bySeverity: Record<AlertSeverity, number>;
     byCategory: Record<AlertCategory, number>;
   } {
-    const counts = {
-      total: this.alerts.size,
-      byState: {
-        [AlertState.NEW]: 0,
-        [AlertState.ACKNOWLEDGED]: 0,
-        [AlertState.RESOLVED]: 0,
-        [AlertState.CLOSED]: 0
+    const alerts = this.getAllAlerts();
+    
+    const stats = {
+      total: alerts.length,
+      byStatus: {
+        [AlertStatus.NEW]: 0,
+        [AlertStatus.ACKNOWLEDGED]: 0,
+        [AlertStatus.RESOLVED]: 0,
+        [AlertStatus.CLOSED]: 0
       },
       byType: {
         [AlertType.INFO]: 0,
@@ -297,116 +361,15 @@ class AlertService {
       }
     };
     
-    for (const alert of this.alerts.values()) {
-      counts.byState[alert.state]++;
-      counts.byType[alert.type]++;
-      counts.bySeverity[alert.severity]++;
-      counts.byCategory[alert.category]++;
+    // Count alerts by status, type, severity, and category
+    for (const alert of alerts) {
+      stats.byStatus[alert.status]++;
+      stats.byType[alert.type]++;
+      stats.bySeverity[alert.severity]++;
+      stats.byCategory[alert.category]++;
     }
     
-    return counts;
-  }
-  
-  /**
-   * Register a listener for alerts
-   */
-  addListener(listenerId: string, callback: AlertListenerCallback): void {
-    if (!this.listeners.has(listenerId)) {
-      this.listeners.set(listenerId, []);
-    }
-    
-    this.listeners.get(listenerId)!.push(callback);
-  }
-  
-  /**
-   * Remove all listeners with the given ID
-   */
-  removeListener(listenerId: string): void {
-    this.listeners.delete(listenerId);
-  }
-  
-  /**
-   * Notify all listeners of a new or updated alert
-   */
-  private notifyListeners(alert: Alert): void {
-    for (const callbacks of this.listeners.values()) {
-      for (const callback of callbacks) {
-        try {
-          callback(alert);
-        } catch (error) {
-          console.error('Error in alert listener callback:', error);
-        }
-      }
-    }
-  }
-  
-  /**
-   * Generate a unique alert ID
-   */
-  private generateAlertId(): string {
-    return `alert-${Date.now()}-${this.nextId++}`;
-  }
-  
-  /**
-   * Create default alert rules for the system
-   */
-  private createDefaultRules(): void {
-    // Create a system startup alert
-    this.createAlert({
-      type: AlertType.INFO,
-      severity: AlertSeverity.LOW,
-      category: AlertCategory.SYSTEM,
-      title: 'System Initialized',
-      message: 'ETL system has been initialized',
-      details: `Initialized at ${new Date().toISOString()}`
-    });
-  }
-  
-  /**
-   * Clear all alerts
-   */
-  clearAlerts(): void {
-    this.alerts.clear();
-    console.log('All alerts cleared');
-  }
-  
-  /**
-   * Acknowledge all alerts
-   */
-  acknowledgeAllAlerts(userId?: string): void {
-    for (const [id, alert] of this.alerts) {
-      if (alert.state === AlertState.NEW) {
-        this.updateAlert(id, {
-          state: AlertState.ACKNOWLEDGED,
-          acknowledgedBy: userId
-        });
-      }
-    }
-    
-    console.log('All alerts acknowledged');
-  }
-  
-  /**
-   * Close alerts that are older than the specified number of days
-   */
-  closeOldAlerts(days: number = 30): number {
-    const now = new Date();
-    const cutoffDate = new Date(now);
-    cutoffDate.setDate(cutoffDate.getDate() - days);
-    
-    let closedCount = 0;
-    
-    for (const [id, alert] of this.alerts) {
-      if (alert.timestamp < cutoffDate && alert.state !== AlertState.CLOSED) {
-        this.updateAlert(id, {
-          state: AlertState.CLOSED
-        });
-        closedCount++;
-      }
-    }
-    
-    console.log(`Closed ${closedCount} old alerts`);
-    return closedCount;
+    return stats;
   }
 }
 

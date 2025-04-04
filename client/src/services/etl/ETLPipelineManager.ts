@@ -1,657 +1,705 @@
-import { ETLJob, JobStatus, TransformationRule } from './ETLTypes';
-import { etlPipeline, ETLPipelineOptions, ETLPipelineResult } from './ETLPipeline';
-import { scheduler } from './Scheduler';
-import { dataConnector, ConnectionTestResult } from './DataConnector';
-import { dataQualityService } from './DataQualityService';
-import { optimizationService } from './OptimizationService';
-import { alertService, AlertType, AlertSeverity, AlertCategory } from './AlertService';
+import { ETLJob, JobStatus } from './ETLTypes';
+import { etlPipeline, ETLPipelineStatus } from './ETLPipeline';
+import { dataConnector } from './DataConnector';
+import { alertService, AlertType, AlertCategory, AlertSeverity } from './AlertService';
+import { scheduler, ScheduledJob, ScheduleConfig, JobExecutionResult } from './Scheduler';
 
 /**
- * Interface for job run history
+ * Job run interface
  */
 export interface JobRun {
-  id: number;
+  /** Run ID */
+  id: string;
+  
+  /** Job ID */
   jobId: number;
-  startTime: Date;
-  endTime?: Date;
+  
+  /** Run status */
   status: JobStatus;
-  records: {
+  
+  /** Start time */
+  startTime: Date;
+  
+  /** End time */
+  endTime?: Date;
+  
+  /** Error message */
+  error?: string;
+  
+  /** Record counts */
+  recordCounts: {
     extracted: number;
     transformed: number;
     loaded: number;
     failed: number;
   };
-  errors: any[];
-  executionTime?: number;
-  createdAt: Date;
-  logs?: string[]; // Optional logs from the execution
+  
+  /** Execution time in milliseconds */
+  executionTime: number;
 }
 
 /**
- * ETL Pipeline Manager class
- * 
- * This class coordinates between the ETL pipeline, scheduler, and other services.
+ * ETL pipeline manager
  */
 class ETLPipelineManager {
   private jobs: Map<number, ETLJob> = new Map();
-  private jobRuns: Map<number, JobRun[]> = new Map();
-  private dataSources: Map<number, any> = new Map();
-  private rules: Map<number, TransformationRule> = new Map();
+  private jobRuns: Map<string, JobRun> = new Map();
   private nextJobId = 1;
   private nextRunId = 1;
   
   constructor() {
-    console.log('ETL Pipeline Manager initialized');
-    this.initializeManager();
+    // Initialize with some mock jobs for demonstration
+    this.initializeMockJobs();
   }
   
   /**
-   * Initialize the manager and set up job handlers
+   * Initialize mock jobs for demonstration
    */
-  private initializeManager(): void {
-    // Set up a run handler for the scheduler
-    scheduler.scheduleJob(
-      0, // Special system job ID
-      'Clean Up Expired Alerts',
+  private initializeMockJobs(): void {
+    const mockJobs: ETLJob[] = [
       {
-        frequency: 'daily',
-        hour: 0,
-        minute: 0
+        id: this.nextJobId++,
+        name: 'Property Data Import',
+        description: 'Import property data from API to database',
+        sources: [1],
+        destinations: [2],
+        rules: [1, 2],
+        status: JobStatus.CREATED,
+        enabled: true,
+        createdAt: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000), // 7 days ago
+        updatedAt: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
       },
-      async () => {
-        // Clean up expired alerts
-        const expiredAlerts = alertService.clearExpiredAlerts();
-        console.log(`Cleaned up ${expiredAlerts.length} expired alerts`);
+      {
+        id: this.nextJobId++,
+        name: 'User Data Sync',
+        description: 'Synchronize user data between systems',
+        sources: [3],
+        destinations: [4],
+        rules: [3],
+        status: JobStatus.CREATED,
+        enabled: true,
+        createdAt: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000), // 5 days ago
+        updatedAt: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000)
+      },
+      {
+        id: this.nextJobId++,
+        name: 'Analytics Data Processing',
+        description: 'Process and aggregate analytics data',
+        sources: [5],
+        destinations: [6],
+        rules: [1, 3],
+        status: JobStatus.CREATED,
+        enabled: false,
+        createdAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000), // 3 days ago
+        updatedAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000)
       }
-    );
+    ];
     
-    console.log('ETL Pipeline Manager initialized');
+    for (const job of mockJobs) {
+      this.jobs.set(job.id, job);
+    }
+    
+    // Register mock data sources
+    this.registerMockDataSources();
+  }
+  
+  /**
+   * Register mock data sources for demonstration
+   */
+  private registerMockDataSources(): void {
+    const mockDataSources = [
+      {
+        id: 1,
+        name: 'Property API',
+        type: 'REST_API',
+        config: {
+          url: 'https://api.example.com/properties',
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer mock-token'
+          },
+          data: [
+            { id: 1, addr: '123 Main St', price: 350000, sqft: 2000, yearBuilt: 1995, type: 'single-family', latitude: 37.7749, longitude: -122.4194 },
+            { id: 2, addr: '456 Oak Ave', price: 275000, sqft: 1800, yearBuilt: 1985, type: 'single-family', latitude: 37.7750, longitude: -122.4180 },
+            { id: 3, addr: '789 Elm Blvd', price: 425000, sqft: 2200, yearBuilt: 2005, type: 'single-family', latitude: 37.7760, longitude: -122.4170 },
+            { id: 4, addr: '101 Pine St', price: 180000, sqft: 1200, yearBuilt: 1975, type: 'condo', latitude: 37.7770, longitude: -122.4160 },
+            { id: 5, addr: '202 Cedar Ln', price: 550000, sqft: 2800, yearBuilt: 2015, type: 'single-family', latitude: 37.7780, longitude: -122.4150 }
+          ]
+        },
+        enabled: true,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      },
+      {
+        id: 2,
+        name: 'Property Database',
+        type: 'POSTGRESQL',
+        config: {
+          host: 'localhost',
+          port: 5432,
+          database: 'properties',
+          user: 'user',
+          password: 'password',
+          data: []
+        },
+        enabled: true,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      },
+      {
+        id: 3,
+        name: 'User API',
+        type: 'REST_API',
+        config: {
+          url: 'https://api.example.com/users',
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer mock-token'
+          },
+          data: [
+            { id: 1, name: 'John Doe', email: 'john@example.com', role: 'user' },
+            { id: 2, name: 'Jane Smith', email: 'jane@example.com', role: 'admin' },
+            { id: 3, name: 'Bob Johnson', email: 'bob@example.com', role: 'user' }
+          ]
+        },
+        enabled: true,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      },
+      {
+        id: 4,
+        name: 'User Database',
+        type: 'MYSQL',
+        config: {
+          host: 'localhost',
+          port: 3306,
+          database: 'users',
+          user: 'user',
+          password: 'password',
+          data: []
+        },
+        enabled: true,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      },
+      {
+        id: 5,
+        name: 'Analytics API',
+        type: 'REST_API',
+        config: {
+          url: 'https://api.example.com/analytics',
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer mock-token'
+          },
+          data: [
+            { id: 1, page: 'home', views: 1200, bounce_rate: 0.35 },
+            { id: 2, page: 'properties', views: 850, bounce_rate: 0.25 },
+            { id: 3, page: 'contact', views: 450, bounce_rate: 0.40 },
+            { id: 4, page: 'about', views: 320, bounce_rate: 0.30 }
+          ]
+        },
+        enabled: true,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      },
+      {
+        id: 6,
+        name: 'Analytics Database',
+        type: 'POSTGRESQL',
+        config: {
+          host: 'localhost',
+          port: 5432,
+          database: 'analytics',
+          user: 'user',
+          password: 'password',
+          data: []
+        },
+        enabled: true,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      }
+    ];
+    
+    for (const dataSource of mockDataSources) {
+      dataConnector.registerDataSource(dataSource);
+    }
   }
   
   /**
    * Create a new ETL job
    */
-  createJob(
-    name: string,
-    description: string,
-    sources: number[],
-    destinations: number[],
-    rules: number[],
-    enabled: boolean = true
-  ): ETLJob {
+  createJob(jobData: Omit<ETLJob, 'id' | 'status' | 'createdAt' | 'updatedAt'>): ETLJob {
     const now = new Date();
-    const jobId = this.nextJobId++;
+    const id = this.nextJobId++;
     
     const job: ETLJob = {
-      id: jobId,
-      name,
-      description,
-      sources,
-      destinations,
-      rules,
-      enabled,
-      status: JobStatus.IDLE,
+      id,
+      ...jobData,
+      status: JobStatus.CREATED,
       createdAt: now,
       updatedAt: now
     };
     
-    this.jobs.set(jobId, job);
-    this.jobRuns.set(jobId, []);
+    this.jobs.set(id, job);
     
-    console.log(`Created ETL job: ${name} (ID: ${jobId})`);
+    alertService.createAlert({
+      type: AlertType.INFO,
+      severity: AlertSeverity.LOW,
+      category: AlertCategory.TRANSFORMATION,
+      title: `ETL Job Created: ${job.name}`,
+      message: `A new ETL job "${job.name}" (ID: ${id}) has been created`
+    });
     
     return job;
   }
   
   /**
-   * Get all ETL jobs
-   */
-  getJobs(): ETLJob[] {
-    return Array.from(this.jobs.values());
-  }
-  
-  /**
-   * Get a specific ETL job by ID
-   */
-  getJob(id: number): ETLJob | undefined {
-    return this.jobs.get(id);
-  }
-  
-  /**
    * Update an existing ETL job
    */
-  updateJob(id: number, updates: Partial<ETLJob>): boolean {
-    const job = this.getJob(id);
+  updateJob(id: number, jobData: Partial<Omit<ETLJob, 'id' | 'createdAt' | 'updatedAt'>>): ETLJob | undefined {
+    const job = this.jobs.get(id);
     
     if (!job) {
-      return false;
+      return undefined;
     }
     
-    const now = new Date();
+    const updatedJob: ETLJob = {
+      ...job,
+      ...jobData,
+      updatedAt: new Date()
+    };
     
-    // Update job properties
-    Object.assign(job, {
-      ...updates,
-      updatedAt: now
+    this.jobs.set(id, updatedJob);
+    
+    alertService.createAlert({
+      type: AlertType.INFO,
+      severity: AlertSeverity.LOW,
+      category: AlertCategory.TRANSFORMATION,
+      title: `ETL Job Updated: ${updatedJob.name}`,
+      message: `ETL job "${updatedJob.name}" (ID: ${id}) has been updated`
     });
     
-    this.jobs.set(id, job);
-    
-    console.log(`Updated ETL job: ${job.name} (ID: ${id})`);
-    
-    return true;
+    return updatedJob;
   }
   
   /**
    * Delete an ETL job
    */
   deleteJob(id: number): boolean {
-    if (!this.jobs.has(id)) {
+    const job = this.jobs.get(id);
+    
+    if (!job) {
       return false;
     }
     
-    // Get the job and runs for logging
-    const job = this.jobs.get(id)!;
-    const runs = this.jobRuns.get(id) || [];
+    // Delete job runs
+    for (const [runId, run] of this.jobRuns.entries()) {
+      if (run.jobId === id) {
+        this.jobRuns.delete(runId);
+      }
+    }
     
-    // Remove job and runs
+    // Delete job
     this.jobs.delete(id);
-    this.jobRuns.delete(id);
     
-    console.log(`Deleted ETL job: ${job.name} (ID: ${id}) with ${runs.length} run records`);
+    alertService.createAlert({
+      type: AlertType.INFO,
+      severity: AlertSeverity.LOW,
+      category: AlertCategory.TRANSFORMATION,
+      title: `ETL Job Deleted: ${job.name}`,
+      message: `ETL job "${job.name}" (ID: ${id}) has been deleted`
+    });
     
     return true;
   }
   
   /**
-   * Execute an ETL job immediately
+   * Get an ETL job by ID
    */
-  async executeJob(id: number, options?: ETLPipelineOptions): Promise<JobRun> {
-    const job = this.getJob(id);
+  getJob(id: number): ETLJob | undefined {
+    return this.jobs.get(id);
+  }
+  
+  /**
+   * Get all ETL jobs
+   */
+  getAllJobs(): ETLJob[] {
+    return Array.from(this.jobs.values());
+  }
+  
+  /**
+   * Execute an ETL job
+   */
+  async executeJob(id: number, runManually = false): Promise<JobRun | undefined> {
+    const job = this.jobs.get(id);
     
     if (!job) {
-      throw new Error(`Job not found: ${id}`);
+      return undefined;
     }
     
-    const now = new Date();
-    const runId = this.nextRunId++;
+    if (!job.enabled && !runManually) {
+      alertService.createAlert({
+        type: AlertType.WARNING,
+        severity: AlertSeverity.MEDIUM,
+        category: AlertCategory.TRANSFORMATION,
+        title: `Job Execution Skipped: ${job.name}`,
+        message: `ETL job "${job.name}" (ID: ${id}) was not executed because it is disabled`
+      });
+      
+      return undefined;
+    }
     
-    // Create a job run record
-    const jobRun: JobRun = {
+    // Update job status
+    job.status = JobStatus.RUNNING;
+    job.updatedAt = new Date();
+    
+    // Create run
+    const runId = `run-${this.nextRunId++}`;
+    const run: JobRun = {
       id: runId,
       jobId: id,
-      startTime: now,
       status: JobStatus.RUNNING,
-      records: {
+      startTime: new Date(),
+      recordCounts: {
         extracted: 0,
         transformed: 0,
         loaded: 0,
         failed: 0
       },
-      errors: [],
-      createdAt: now,
-      logs: ['Job execution started']
+      executionTime: 0
     };
     
-    // Add to job runs
-    const jobRuns = this.jobRuns.get(id) || [];
-    jobRuns.push(jobRun);
-    this.jobRuns.set(id, jobRuns);
-    
-    // Update job status
-    job.status = JobStatus.RUNNING;
-    job.lastRun = now;
-    this.jobs.set(id, job);
-    
-    // Create an alert for job start
-    alertService.createAlert({
-      type: AlertType.INFO,
-      severity: AlertSeverity.LOW,
-      category: AlertCategory.TRANSFORMATION,
-      title: 'ETL Job Started',
-      message: `ETL job "${job.name}" execution started`,
-      jobId: id
-    });
+    this.jobRuns.set(runId, run);
     
     try {
-      // Get the sources, destinations, and rules for this job
-      const sources = job.sources.map(sourceId => this.dataSources.get(sourceId)).filter(Boolean);
-      const destinations = job.destinations.map(destId => this.dataSources.get(destId)).filter(Boolean);
-      const transformRules = job.rules.map(ruleId => this.rules.get(ruleId)).filter(Boolean);
-      
-      // Validate that we have all the required data
-      if (sources.length === 0) {
-        throw new Error('No valid sources found for job');
-      }
-      
-      if (destinations.length === 0) {
-        throw new Error('No valid destinations found for job');
-      }
-      
-      // Sort rules by order
-      const sortedRules = [...transformRules].sort((a, b) => {
-        if (a.order !== undefined && b.order !== undefined) {
-          return a.order - b.order;
-        }
-        return 0;
-      });
-      
-      // Log source, destination, and rule counts
-      jobRun.logs?.push(`Job has ${sources.length} sources, ${destinations.length} destinations, and ${sortedRules.length} transformation rules`);
-      
-      // Execute the ETL pipeline for each source/destination pair
-      for (let i = 0; i < sources.length; i++) {
-        const source = sources[i];
+      // Execute pipeline
+      const result = await etlPipeline.executeJob(job, (status: ETLPipelineStatus) => {
+        // Update run status
+        run.status = status.status;
+        run.recordCounts = {
+          extracted: status.recordsExtracted,
+          transformed: status.recordsTransformed,
+          loaded: status.recordsLoaded,
+          failed: status.recordsFailed
+        };
         
-        for (let j = 0; j < destinations.length; j++) {
-          const destination = destinations[j];
-          
-          jobRun.logs?.push(`Executing pipeline for source "${source.name}" to destination "${destination.name}"`);
-          
-          const pipelineResult = await etlPipeline.execute(
-            source,
-            destination,
-            sortedRules,
-            options
-          );
-          
-          // Add logs from the pipeline execution
-          if (jobRun.logs && pipelineResult.logs) {
-            jobRun.logs.push(...pipelineResult.logs);
-          }
-          
-          // Update record counts
-          jobRun.records.extracted += pipelineResult.recordCounts.extracted;
-          jobRun.records.transformed += pipelineResult.recordCounts.transformed;
-          jobRun.records.loaded += pipelineResult.recordCounts.loaded;
-          jobRun.records.failed += pipelineResult.recordCounts.failed;
-          
-          // Add any errors to the job run
-          if (pipelineResult.errors.length > 0) {
-            jobRun.errors.push(...pipelineResult.errors);
-          }
-          
-          // Data quality analysis
-          if (pipelineResult.dataQualityResult) {
-            jobRun.logs?.push(`Data quality analysis identified ${pipelineResult.dataQualityResult.issues.length} issues`);
-            
-            // Create alerts for data quality issues
-            if (pipelineResult.dataQualityResult.issues.length > 0) {
-              alertService.createAlert({
-                type: AlertType.WARNING,
-                severity: AlertSeverity.MEDIUM,
-                category: AlertCategory.DATA_QUALITY,
-                title: 'Data Quality Issues',
-                message: `${pipelineResult.dataQualityResult.issues.length} data quality issues detected during job "${job.name}" execution`,
-                jobId: id
-              });
-            }
-          }
-          
-          // Generate optimization suggestions
-          const suggestions = await optimizationService.analyzePipelineResult(job, pipelineResult);
-          if (suggestions.length > 0) {
-            jobRun.logs?.push(`Optimization analysis generated ${suggestions.length} suggestions`);
-          }
+        if (status.endTime) {
+          run.endTime = status.endTime;
+          run.executionTime = status.executionTime;
         }
-      }
-      
-      // Update job run status to success
-      const endTime = new Date();
-      const executionTime = endTime.getTime() - now.getTime();
-      
-      jobRun.status = JobStatus.SUCCEEDED;
-      jobRun.endTime = endTime;
-      jobRun.executionTime = executionTime;
-      
-      // Add success log
-      jobRun.logs?.push(`Job execution completed successfully in ${executionTime}ms`);
+        
+        if (status.error) {
+          run.error = status.error;
+        }
+        
+        // Update job runs map
+        this.jobRuns.set(runId, { ...run });
+      });
       
       // Update job status
-      job.status = JobStatus.IDLE;
-      this.jobs.set(id, job);
+      job.status = result.status;
+      job.updatedAt = new Date();
       
-      // Create an alert for job completion
-      alertService.createAlert({
-        type: AlertType.SUCCESS,
-        severity: AlertSeverity.LOW,
-        category: AlertCategory.TRANSFORMATION,
-        title: 'ETL Job Completed',
-        message: `ETL job "${job.name}" completed successfully in ${executionTime}ms`,
-        jobId: id
-      });
+      return run;
     } catch (error) {
-      // Handle error and update job run status
-      const endTime = new Date();
-      const executionTime = endTime.getTime() - now.getTime();
-      
-      jobRun.status = JobStatus.FAILED;
-      jobRun.endTime = endTime;
-      jobRun.executionTime = executionTime;
-      
+      // Handle error
       const errorMessage = error instanceof Error ? error.message : String(error);
-      jobRun.errors.push({
-        type: 'job_execution_error',
-        message: errorMessage
-      });
       
-      // Add error log
-      jobRun.logs?.push(`Job execution failed after ${executionTime}ms: ${errorMessage}`);
+      // Update run
+      run.status = JobStatus.FAILED;
+      run.error = errorMessage;
+      run.endTime = new Date();
+      run.executionTime = run.endTime.getTime() - run.startTime.getTime();
+      this.jobRuns.set(runId, run);
       
-      // Update job status
-      job.status = JobStatus.IDLE;
-      this.jobs.set(id, job);
+      // Update job
+      job.status = JobStatus.FAILED;
+      job.updatedAt = new Date();
       
-      // Create an alert for job failure
       alertService.createAlert({
         type: AlertType.ERROR,
         severity: AlertSeverity.HIGH,
         category: AlertCategory.TRANSFORMATION,
-        title: 'ETL Job Failed',
-        message: `ETL job "${job.name}" failed: ${errorMessage}`,
-        jobId: id
+        title: `Job Execution Error: ${job.name}`,
+        message: `ETL job "${job.name}" (ID: ${id}) execution failed: ${errorMessage}`
       });
       
-      console.error(`Job ${job.name} (ID: ${id}) execution failed:`, error);
+      return run;
     }
-    
-    // Update job runs list
-    this.jobRuns.set(id, jobRuns);
-    
-    return jobRun;
   }
   
   /**
-   * Get job run history for a specific job
+   * Schedule an ETL job
    */
-  getJobRuns(jobId: number): JobRun[] {
-    return this.jobRuns.get(jobId) || [];
-  }
-  
-  /**
-   * Get a specific job run by ID
-   */
-  getJobRun(jobId: number, runId: number): JobRun | undefined {
-    const runs = this.getJobRuns(jobId);
-    return runs.find(run => run.id === runId);
-  }
-  
-  /**
-   * Schedule a job for recurring execution
-   */
-  scheduleJob(jobId: number, scheduleOptions: any): number {
-    const job = this.getJob(jobId);
+  scheduleJob(jobId: number, schedule: ScheduleConfig): string | undefined {
+    const job = this.jobs.get(jobId);
     
     if (!job) {
-      throw new Error(`Job not found: ${jobId}`);
+      return undefined;
     }
     
-    // Create a run handler that will execute this job
-    const runHandler = async (): Promise<void> => {
-      await this.executeJob(jobId);
-    };
-    
-    // Schedule the job with the scheduler
-    const scheduleId = scheduler.scheduleJob(
-      jobId,
-      job.name,
-      scheduleOptions,
-      runHandler
+    // Schedule job
+    const scheduledJobId = scheduler.scheduleJob(
+      `ETL Job: ${job.name} (${jobId})`,
+      schedule,
+      async () => {
+        // Execute job
+        return await this.executeJob(jobId);
+      }
     );
     
-    // Update the job with the schedule
-    this.updateJob(jobId, {
-      schedule: scheduleOptions
-    });
-    
-    console.log(`Scheduled job ${job.name} (ID: ${jobId}) with schedule ID: ${scheduleId}`);
-    
-    return scheduleId;
-  }
-  
-  /**
-   * Update a job schedule
-   */
-  updateJobSchedule(jobId: number, scheduleId: number, scheduleOptions: any): boolean {
-    const job = this.getJob(jobId);
-    
-    if (!job) {
-      return false;
-    }
-    
-    // Update the schedule in the scheduler
-    const result = scheduler.updateJobSchedule(scheduleId, {
-      name: job.name,
-      schedule: scheduleOptions
-    });
-    
-    if (result) {
-      // Update the job with the new schedule
-      this.updateJob(jobId, {
-        schedule: scheduleOptions
-      });
-      
-      console.log(`Updated schedule for job ${job.name} (ID: ${jobId})`);
-    }
-    
-    return result;
-  }
-  
-  /**
-   * Unschedule a job
-   */
-  unscheduleJob(scheduleId: number): boolean {
-    return scheduler.deleteScheduledJob(scheduleId);
-  }
-  
-  /**
-   * Add a data source to the manager
-   */
-  addDataSource(dataSource: any): number {
-    const id = dataSource.id;
-    this.dataSources.set(id, dataSource);
-    console.log(`Added data source: ${dataSource.name} (ID: ${id})`);
-    return id;
-  }
-  
-  /**
-   * Get a data source by ID
-   */
-  getDataSource(id: number): any {
-    return this.dataSources.get(id);
-  }
-  
-  /**
-   * Get all data sources
-   */
-  getDataSources(): any[] {
-    return Array.from(this.dataSources.values());
-  }
-  
-  /**
-   * Add a transformation rule to the manager
-   */
-  addRule(rule: TransformationRule): number {
-    const id = rule.id;
-    this.rules.set(id, rule);
-    console.log(`Added transformation rule: ${rule.name} (ID: ${id})`);
-    return id;
-  }
-  
-  /**
-   * Get a transformation rule by ID
-   */
-  getRule(id: number): TransformationRule | undefined {
-    return this.rules.get(id);
-  }
-  
-  /**
-   * Get all transformation rules
-   */
-  getRules(): TransformationRule[] {
-    return Array.from(this.rules.values());
-  }
-  
-  /**
-   * Pause a job (disable it temporarily)
-   */
-  pauseJob(id: number): boolean {
-    const job = this.getJob(id);
-    
-    if (!job) {
-      return false;
-    }
-    
-    // Update the job to disable it
-    this.updateJob(id, {
-      enabled: false
-    });
-    
-    // Create an alert
     alertService.createAlert({
       type: AlertType.INFO,
       severity: AlertSeverity.LOW,
-      category: AlertCategory.TRANSFORMATION,
-      title: 'ETL Job Paused',
-      message: `ETL job "${job.name}" has been paused`,
-      jobId: id
+      category: AlertCategory.SCHEDULING,
+      title: `Job Scheduled: ${job.name}`,
+      message: `ETL job "${job.name}" (ID: ${jobId}) has been scheduled with frequency: ${schedule.frequency}`
     });
     
-    console.log(`Paused job: ${job.name} (ID: ${id})`);
+    return scheduledJobId;
+  }
+  
+  /**
+   * Unschedule an ETL job
+   */
+  unscheduleJob(jobId: number, scheduledJobId: string): boolean {
+    const job = this.jobs.get(jobId);
+    
+    if (!job) {
+      return false;
+    }
+    
+    // Delete scheduled job
+    if (!scheduler.deleteJob(scheduledJobId)) {
+      return false;
+    }
+    
+    alertService.createAlert({
+      type: AlertType.INFO,
+      severity: AlertSeverity.LOW,
+      category: AlertCategory.SCHEDULING,
+      title: `Job Unscheduled: ${job.name}`,
+      message: `ETL job "${job.name}" (ID: ${jobId}) has been unscheduled`
+    });
     
     return true;
   }
   
   /**
-   * Resume a paused job
+   * Enable an ETL job
    */
-  resumeJob(id: number): boolean {
-    const job = this.getJob(id);
+  enableJob(id: number): boolean {
+    const job = this.jobs.get(id);
     
     if (!job) {
       return false;
     }
     
-    // Update the job to enable it
-    this.updateJob(id, {
-      enabled: true
-    });
+    job.enabled = true;
+    job.updatedAt = new Date();
     
-    // Create an alert
     alertService.createAlert({
       type: AlertType.INFO,
       severity: AlertSeverity.LOW,
       category: AlertCategory.TRANSFORMATION,
-      title: 'ETL Job Resumed',
-      message: `ETL job "${job.name}" has been resumed`,
-      jobId: id
+      title: `Job Enabled: ${job.name}`,
+      message: `ETL job "${job.name}" (ID: ${id}) has been enabled`
     });
-    
-    console.log(`Resumed job: ${job.name} (ID: ${id})`);
     
     return true;
   }
   
   /**
-   * Test a data source connection
+   * Disable an ETL job
+   */
+  disableJob(id: number): boolean {
+    const job = this.jobs.get(id);
+    
+    if (!job) {
+      return false;
+    }
+    
+    job.enabled = false;
+    job.updatedAt = new Date();
+    
+    alertService.createAlert({
+      type: AlertType.INFO,
+      severity: AlertSeverity.LOW,
+      category: AlertCategory.TRANSFORMATION,
+      title: `Job Disabled: ${job.name}`,
+      message: `ETL job "${job.name}" (ID: ${id}) has been disabled`
+    });
+    
+    return true;
+  }
+  
+  /**
+   * Get job runs for a job
+   */
+  getJobRuns(jobId?: number): JobRun[] {
+    if (jobId) {
+      return Array.from(this.jobRuns.values()).filter(run => run.jobId === jobId);
+    }
+    
+    return Array.from(this.jobRuns.values());
+  }
+  
+  /**
+   * Get a job run by ID
+   */
+  getJobRun(runId: string): JobRun | undefined {
+    return this.jobRuns.get(runId);
+  }
+  
+  /**
+   * Get the last run for a job
+   */
+  getLastJobRun(jobId: number): JobRun | undefined {
+    const runs = this.getJobRuns(jobId);
+    
+    if (runs.length === 0) {
+      return undefined;
+    }
+    
+    // Sort by start time (descending)
+    runs.sort((a, b) => b.startTime.getTime() - a.startTime.getTime());
+    
+    return runs[0];
+  }
+  
+  /**
+   * Test connection to a data source
    */
   async testConnection(dataSourceId: number): Promise<boolean> {
-    const dataSource = this.getDataSource(dataSourceId);
-    
-    if (!dataSource) {
-      throw new Error(`Data source not found: ${dataSourceId}`);
-    }
-    
-    console.log(`Testing connection for data source: ${dataSource.name} (ID: ${dataSourceId})`);
-    
     try {
-      const result = await dataConnector.testConnection(dataSource);
+      const dataSource = dataConnector.getDataSource(dataSourceId);
       
-      if (result.success) {
-        console.log(`Connection test successful for data source: ${dataSource.name}`);
-        return true;
-      } else {
-        console.error(`Connection test failed for data source: ${dataSource.name} - ${result.message}`);
-        
-        // Create an alert
+      if (!dataSource) {
         alertService.createAlert({
           type: AlertType.ERROR,
           severity: AlertSeverity.HIGH,
-          category: AlertCategory.CONNECTIVITY,
+          category: AlertCategory.DATA_SOURCE,
           title: 'Connection Test Failed',
-          message: `Connection test failed for data source "${dataSource.name}": ${result.message}`
+          message: `Data source with ID ${dataSourceId} not found`
+        });
+        
+        return false;
+      }
+      
+      const result = await dataConnector.testConnection(dataSource);
+      
+      if (result.success) {
+        alertService.createAlert({
+          type: AlertType.SUCCESS,
+          severity: AlertSeverity.LOW,
+          category: AlertCategory.DATA_SOURCE,
+          title: `Connection Test Successful: ${dataSource.name}`,
+          message: `Successfully connected to ${dataSource.name} (${dataSource.type})`
+        });
+        
+        return true;
+      } else {
+        alertService.createAlert({
+          type: AlertType.ERROR,
+          severity: AlertSeverity.HIGH,
+          category: AlertCategory.DATA_SOURCE,
+          title: `Connection Test Failed: ${dataSource.name}`,
+          message: `Failed to connect to ${dataSource.name} (${dataSource.type}): ${result.error || 'Unknown error'}`
         });
         
         return false;
       }
     } catch (error) {
-      console.error(`Error testing connection for data source: ${dataSource.name}`, error);
+      alertService.createAlert({
+        type: AlertType.ERROR,
+        severity: AlertSeverity.HIGH,
+        category: AlertCategory.DATA_SOURCE,
+        title: 'Connection Test Error',
+        message: `Error testing connection: ${error instanceof Error ? error.message : String(error)}`
+      });
       
       return false;
     }
   }
   
   /**
-   * Get job statistics
+   * Get ETL system statistics
    */
-  getJobStatistics(): {
-    total: number;
-    enabled: number;
-    scheduled: number;
-    byStatus: Record<JobStatus, number>;
+  getStatistics(): {
+    jobs: {
+      total: number;
+      active: number;
+      inactive: number;
+      byStatus: Record<JobStatus, number>;
+    };
+    runs: {
+      total: number;
+      successful: number;
+      failed: number;
+      inProgress: number;
+    };
+    dataSources: {
+      total: number;
+      byType: Record<string, number>;
+    };
   } {
-    const byStatus: Record<JobStatus, number> = {
-      [JobStatus.IDLE]: 0,
-      [JobStatus.RUNNING]: 0,
-      [JobStatus.SUCCEEDED]: 0,
-      [JobStatus.FAILED]: 0,
-      [JobStatus.CANCELLED]: 0
+    // Job statistics
+    const jobs = this.getAllJobs();
+    const jobStats = {
+      total: jobs.length,
+      active: jobs.filter(job => job.enabled).length,
+      inactive: jobs.filter(job => !job.enabled).length,
+      byStatus: {
+        [JobStatus.CREATED]: 0,
+        [JobStatus.SCHEDULED]: 0,
+        [JobStatus.QUEUED]: 0,
+        [JobStatus.RUNNING]: 0,
+        [JobStatus.SUCCEEDED]: 0,
+        [JobStatus.FAILED]: 0,
+        [JobStatus.CANCELED]: 0,
+        [JobStatus.PAUSED]: 0
+      }
     };
     
-    let enabledCount = 0;
-    let scheduledCount = 0;
+    for (const job of jobs) {
+      jobStats.byStatus[job.status]++;
+    }
     
-    for (const job of this.jobs.values()) {
-      byStatus[job.status]++;
+    // Run statistics
+    const runs = this.getJobRuns();
+    const runStats = {
+      total: runs.length,
+      successful: runs.filter(run => run.status === JobStatus.SUCCEEDED).length,
+      failed: runs.filter(run => run.status === JobStatus.FAILED).length,
+      inProgress: runs.filter(run => run.status === JobStatus.RUNNING).length
+    };
+    
+    // Data source statistics
+    const dataSources = dataConnector.getAllDataSources();
+    const dataSourceStats = {
+      total: dataSources.length,
+      byType: {} as Record<string, number>
+    };
+    
+    for (const dataSource of dataSources) {
+      const type = dataSource.type;
       
-      if (job.enabled) {
-        enabledCount++;
+      if (!(type in dataSourceStats.byType)) {
+        dataSourceStats.byType[type] = 0;
       }
       
-      if (job.schedule) {
-        scheduledCount++;
-      }
+      dataSourceStats.byType[type]++;
     }
     
     return {
-      total: this.jobs.size,
-      enabled: enabledCount,
-      scheduled: scheduledCount,
-      byStatus
+      jobs: jobStats,
+      runs: runStats,
+      dataSources: dataSourceStats
     };
-  }
-  
-  /**
-   * Get the latest job run for each job
-   */
-  getLatestRuns(): Record<number, JobRun | undefined> {
-    const result: Record<number, JobRun | undefined> = {};
-    
-    for (const job of this.jobs.values()) {
-      const runs = this.getJobRuns(job.id);
-      
-      if (runs.length > 0) {
-        // Sort by start time descending to get the latest run
-        const sortedRuns = [...runs].sort(
-          (a, b) => b.startTime.getTime() - a.startTime.getTime()
-        );
-        result[job.id] = sortedRuns[0];
-      } else {
-        result[job.id] = undefined;
-      }
-    }
-    
-    return result;
   }
 }
 
