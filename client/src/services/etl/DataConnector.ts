@@ -545,6 +545,7 @@ class DataConnector {
     
     switch (type) {
       case 'database':
+        // Required fields for all database types
         if (!details.host) {
           errors.push({
             field: 'host',
@@ -561,6 +562,7 @@ class DataConnector {
           });
         }
         
+        // Port validation
         if (details.port) {
           const port = Number(details.port);
           if (isNaN(port) || port <= 0 || port > 65535) {
@@ -578,6 +580,7 @@ class DataConnector {
           });
         }
         
+        // Authentication validation
         if (!details.username) {
           errors.push({
             field: 'username',
@@ -586,9 +589,65 @@ class DataConnector {
           });
         }
         
+        // Database type specific validations
+        if (details.databaseType) {
+          switch (details.databaseType) {
+            case 'postgresql':
+              // PostgreSQL-specific validations
+              if (details.extensions && !Array.isArray(details.extensions)) {
+                errors.push({
+                  field: 'extensions',
+                  message: 'Extensions must be an array',
+                  severity: 'error'
+                });
+              }
+              break;
+              
+            case 'mssql':
+              // MSSQL-specific validations
+              if (!details.schema) {
+                errors.push({
+                  field: 'schema',
+                  message: 'Schema is required for MSSQL databases',
+                  severity: 'warning'
+                });
+              }
+              break;
+              
+            case 'mysql':
+              // MySQL-specific validations
+              break;
+              
+            case 'oracle':
+              // Oracle-specific validations
+              if (!details.serviceName && !details.sid) {
+                errors.push({
+                  field: 'serviceName',
+                  message: 'Either serviceName or SID is required for Oracle connections',
+                  severity: 'warning'
+                });
+              }
+              break;
+              
+            default:
+              errors.push({
+                field: 'databaseType',
+                message: `Unknown database type: ${details.databaseType}`,
+                severity: 'warning'
+              });
+          }
+        } else {
+          errors.push({
+            field: 'databaseType',
+            message: 'Database type is recommended for better connection handling',
+            severity: 'warning'
+          });
+        }
+        
         break;
         
       case 'api':
+        // Required fields
         if (!details.baseUrl) {
           errors.push({
             field: 'baseUrl',
@@ -607,6 +666,7 @@ class DataConnector {
           }
         }
         
+        // Timeout validation
         if (details.timeout) {
           const timeout = Number(details.timeout);
           if (isNaN(timeout) || timeout <= 0) {
@@ -618,17 +678,90 @@ class DataConnector {
           }
         }
         
-        if (details.authType === 'api_key' && !details.apiKey) {
+        // Rate limit validation
+        if (details.rateLimitPerMinute) {
+          const rateLimit = Number(details.rateLimitPerMinute);
+          if (isNaN(rateLimit) || rateLimit <= 0) {
+            errors.push({
+              field: 'rateLimitPerMinute',
+              message: 'Rate limit must be a positive number',
+              severity: 'error'
+            });
+          }
+        }
+        
+        // Authentication validation
+        if (details.authType) {
+          switch (details.authType) {
+            case 'api_key':
+              if (!details.apiKey) {
+                errors.push({
+                  field: 'apiKey',
+                  message: 'API key is required when auth type is api_key',
+                  severity: 'error'
+                });
+              }
+              break;
+              
+            case 'oauth2':
+              if (!details.clientId) {
+                errors.push({
+                  field: 'clientId',
+                  message: 'Client ID is required when auth type is oauth2',
+                  severity: 'error'
+                });
+              }
+              
+              if (!details.clientSecret) {
+                errors.push({
+                  field: 'clientSecret',
+                  message: 'Client secret is required when auth type is oauth2',
+                  severity: 'error'
+                });
+              }
+              break;
+              
+            case 'basic':
+              if (!details.username) {
+                errors.push({
+                  field: 'username',
+                  message: 'Username is required when auth type is basic',
+                  severity: 'error'
+                });
+              }
+              
+              if (!details.password) {
+                errors.push({
+                  field: 'password',
+                  message: 'Password is required when auth type is basic',
+                  severity: 'error'
+                });
+              }
+              break;
+              
+            case 'none':
+              // No auth required
+              break;
+              
+            default:
+              errors.push({
+                field: 'authType',
+                message: `Unknown auth type: ${details.authType}`,
+                severity: 'warning'
+              });
+          }
+        } else {
           errors.push({
-            field: 'apiKey',
-            message: 'API key is required when auth type is api_key',
-            severity: 'error'
+            field: 'authType',
+            message: 'Authentication type is recommended for API connections',
+            severity: 'warning'
           });
         }
         
         break;
         
       case 'file':
+        // Required fields
         if (!details.path) {
           errors.push({
             field: 'path',
@@ -637,10 +770,86 @@ class DataConnector {
           });
         }
         
-        if (!details.filePattern) {
+        // File type specific validations
+        if (details.fileType) {
+          switch (details.fileType) {
+            case 'csv':
+              // CSV-specific validations
+              if (!details.hasOwnProperty('hasHeader')) {
+                errors.push({
+                  field: 'hasHeader',
+                  message: 'hasHeader property is recommended for CSV files',
+                  severity: 'warning'
+                });
+              }
+              
+              if (!details.delimiter) {
+                errors.push({
+                  field: 'delimiter',
+                  message: 'Delimiter is recommended for CSV files',
+                  severity: 'warning'
+                });
+              }
+              break;
+              
+            case 'shapefile':
+              // Shapefile-specific validations
+              if (!details.projection) {
+                errors.push({
+                  field: 'projection',
+                  message: 'Projection information is recommended for shapefiles',
+                  severity: 'warning'
+                });
+              }
+              break;
+              
+            case 'json':
+              // JSON-specific validations
+              break;
+              
+            case 'xml':
+              // XML-specific validations
+              break;
+              
+            case 'multi':
+              // Multi-file format validations
+              if (!details.supportedFormats || !Array.isArray(details.supportedFormats)) {
+                errors.push({
+                  field: 'supportedFormats',
+                  message: 'Supported formats should be specified as an array',
+                  severity: 'warning'
+                });
+              }
+              break;
+              
+            default:
+              errors.push({
+                field: 'fileType',
+                message: `Unknown file type: ${details.fileType}`,
+                severity: 'warning'
+              });
+          }
+        } else {
+          errors.push({
+            field: 'fileType',
+            message: 'File type is recommended for better file handling',
+            severity: 'warning'
+          });
+        }
+        
+        // Common file options
+        if (!details.filePattern && details.fileType !== 'multi') {
           errors.push({
             field: 'filePattern',
             message: 'File pattern is recommended for file data sources',
+            severity: 'warning'
+          });
+        }
+        
+        if (!details.encoding) {
+          errors.push({
+            field: 'encoding',
+            message: 'File encoding is recommended',
             severity: 'warning'
           });
         }
@@ -649,6 +858,11 @@ class DataConnector {
         
       default:
         // No validation for other types
+        errors.push({
+          field: 'type',
+          message: `Unknown data source type: ${type}`,
+          severity: 'warning'
+        });
         break;
     }
     
@@ -732,69 +946,154 @@ class DataConnector {
    * Initialize with sample data sources
    */
   private initializeSampleDataSources() {
-    // Sample database source
-    const dbSource: DataSource = this.registerDataSource({
-      name: 'County Property Database',
-      description: 'Main county property records database',
+    // 1. Benton County Property Database
+    this.registerDataSource({
+      name: 'Benton County Property Database',
+      description: 'Main county property data source containing assessment records',
       type: 'database',
       connectionDetails: {
-        host: 'property-db.example.com',
+        databaseType: 'postgresql',
+        host: 'county-db.bentoncounty.gov',
         port: 5432,
         database: 'property_records',
-        username: 'etl_user',
+        username: 'etl_service_account',
+        password: 'DEMO_PASSWORD_123', // For demo purposes only
+        schema: 'public',
         ssl: true
       }
     });
     
-    // Sample API source
-    const apiSource: DataSource = this.registerDataSource({
-      name: 'Census API',
-      description: 'US Census Bureau API for demographic data (DEMO)',
+    // 2. Washington State GIS Portal
+    this.registerDataSource({
+      name: 'Washington State GIS Portal',
+      description: 'State-level GIS data for geospatial analysis',
       type: 'api',
       connectionDetails: {
-        baseUrl: 'https://api.census.gov/data',
+        baseUrl: 'https://gis-api.wa.gov/property',
         authType: 'api_key',
-        apiKey: 'SAMPLE_DEMO_KEY_123',  // DEMO key for UI testing only
-        timeout: 30000
+        apiKey: 'DEMO_WA_GIS_KEY_456', // For demo purposes only
+        timeout: 60000,
+        rateLimitPerMinute: 100
       }
     });
     
-    // Sample file source
-    const fileSource: DataSource = this.registerDataSource({
-      name: 'GIS Data Files',
-      description: 'GIS shapefiles and property boundary data',
+    // 3. Census Bureau API
+    this.registerDataSource({
+      name: 'Census Bureau API',
+      description: 'Demographic data from US Census Bureau',
+      type: 'api',
+      connectionDetails: {
+        baseUrl: 'https://api.census.gov/data/latest',
+        authType: 'api_key',
+        apiKey: 'DEMO_CENSUS_KEY_789', // For demo purposes only
+        timeout: 45000,
+        rateLimitPerMinute: 500
+      }
+    });
+    
+    // 4. Historical Property Sales CSV
+    this.registerDataSource({
+      name: 'Historical Property Sales CSV',
+      description: 'Historical property sales data in CSV format',
       type: 'file',
       connectionDetails: {
-        path: '/data/gis',
-        filePattern: '*.shp',
+        fileType: 'csv',
+        path: '/data/historical_sales.csv',
+        hasHeader: true,
+        delimiter: ',',
         encoding: 'utf-8'
       }
     });
     
-    // Sample target database
-    const targetDb: DataSource = this.registerDataSource({
-      name: 'Analytics Database',
-      description: 'Target database for processed property analytics',
+    // 5. Local PostGIS Database
+    this.registerDataSource({
+      name: 'Local PostGIS Database',
+      description: 'Local geospatial database for analysis',
       type: 'database',
       connectionDetails: {
-        host: 'analytics-db.example.com',
+        databaseType: 'postgresql',
+        host: 'localhost',
+        port: 5432,
+        database: 'postgis_data',
+        username: 'spatial_analyst',
+        password: 'DEMO_PASSWORD_456', // For demo purposes only
+        schema: 'public',
+        extensions: ['postgis']
+      }
+    });
+    
+    // 6. Zillow Property API
+    this.registerDataSource({
+      name: 'Zillow Property API',
+      description: 'Real estate market data for comparative analysis',
+      type: 'api',
+      connectionDetails: {
+        baseUrl: 'https://api.zillow.com/v2',
+        authType: 'oauth2',
+        clientId: 'DEMO_ZILLOW_CLIENT_ID', // For demo purposes only
+        clientSecret: 'DEMO_ZILLOW_CLIENT_SECRET', // For demo purposes only
+        timeout: 30000,
+        rateLimitPerMinute: 50
+      }
+    });
+    
+    // 7. County Tax Assessor Database
+    this.registerDataSource({
+      name: 'County Tax Assessor Database',
+      description: 'Tax assessment records and property valuations',
+      type: 'database',
+      connectionDetails: {
+        databaseType: 'mssql',
+        host: 'tax-db.bentoncounty.gov',
+        port: 1433,
+        database: 'tax_assessments',
+        username: 'readonly_user',
+        password: 'DEMO_PASSWORD_789', // For demo purposes only
+        schema: 'dbo'
+      }
+    });
+    
+    // 8. Property Boundary Shapefiles
+    this.registerDataSource({
+      name: 'Property Boundary Shapefiles',
+      description: 'GIS shapefiles defining property boundaries',
+      type: 'file',
+      connectionDetails: {
+        fileType: 'shapefile',
+        path: '/data/boundaries',
+        filePattern: '*.shp',
+        encoding: 'utf-8',
+        projection: 'EPSG:4326'
+      }
+    });
+    
+    // 9. Analytics Export Database
+    this.registerDataSource({
+      name: 'Analytics Export Database',
+      description: 'Target database for processed analytics data',
+      type: 'database',
+      connectionDetails: {
+        databaseType: 'postgresql',
+        host: 'analytics-db.internal',
         port: 5432,
         database: 'property_analytics',
-        username: 'analytics_user',
+        username: 'etl_writer',
+        password: 'DEMO_PASSWORD_ABC', // For demo purposes only
+        schema: 'public',
         ssl: true
       }
     });
     
-    // Sample target file system
-    const targetFile: DataSource = this.registerDataSource({
-      name: 'Analytics Export Files',
-      description: 'Target file system for analytics exports',
+    // 10. Reports Export Directory
+    this.registerDataSource({
+      name: 'Reports Export Directory',
+      description: 'Target file system for report exports',
       type: 'file',
       connectionDetails: {
-        path: '/data/exports',
-        filePattern: '*.csv',
-        encoding: 'utf-8',
-        delimiter: ','
+        fileType: 'multi',
+        path: '/data/reports',
+        supportedFormats: ['csv', 'json', 'xlsx', 'pdf'],
+        permissions: 'write'
       }
     });
   }
