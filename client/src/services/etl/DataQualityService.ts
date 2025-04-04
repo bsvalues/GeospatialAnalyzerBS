@@ -428,7 +428,7 @@ class DataQualityService {
     let median: number | undefined;
     let stdDev: number | undefined;
     
-    if (dataType === 'number') {
+    if (dataType === 'number' && nonNullValues.length > 0) {
       const numericValues = nonNullValues.map(Number);
       min = Math.min(...numericValues);
       max = Math.max(...numericValues);
@@ -442,7 +442,8 @@ class DataQualityService {
         : sorted[middle];
       
       // Calculate standard deviation
-      if (avg !== undefined) {
+      // Now we need to handle the case where avg might be undefined (though it shouldn't be in this context)
+      if (typeof avg === 'number') {
         const variance = numericValues.reduce((sum, val) => sum + Math.pow(val - avg, 2), 0) / numericValues.length;
         stdDev = Math.sqrt(variance);
       }
