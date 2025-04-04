@@ -133,14 +133,58 @@ export interface ConnectionTestResult {
  * Transformation Types
  */
 export enum TransformationType {
+  // Column operations
+  RENAME_COLUMN = 'RENAME_COLUMN',
+  DROP_COLUMN = 'DROP_COLUMN',
+  REORDER_COLUMNS = 'REORDER_COLUMNS',
+  
+  // Type conversions
+  CAST_TYPE = 'CAST_TYPE',
+  PARSE_DATE = 'PARSE_DATE',
+  PARSE_NUMBER = 'PARSE_NUMBER',
+  
+  // Value operations
+  REPLACE_VALUE = 'REPLACE_VALUE',
+  FILL_NULL = 'FILL_NULL',
+  MAP_VALUES = 'MAP_VALUES',
+  
+  // String operations
+  TO_UPPERCASE = 'TO_UPPERCASE',
+  TO_LOWERCASE = 'TO_LOWERCASE',
+  TRIM = 'TRIM',
+  SUBSTRING = 'SUBSTRING',
+  CONCAT = 'CONCAT',
+  SPLIT = 'SPLIT',
+  
+  // Numeric operations
+  ROUND = 'ROUND',
+  ADD = 'ADD',
+  SUBTRACT = 'SUBTRACT',
+  MULTIPLY = 'MULTIPLY',
+  DIVIDE = 'DIVIDE',
+  
+  // Data operations
   FILTER = 'FILTER',
-  MAP = 'MAP',
+  SORT = 'SORT',
+  GROUP_BY = 'GROUP_BY',
   AGGREGATE = 'AGGREGATE',
   JOIN = 'JOIN',
-  SORT = 'SORT',
-  GROUP = 'GROUP',
+  UNION = 'UNION',
+  
+  // Quality operations
+  REMOVE_DUPLICATES = 'REMOVE_DUPLICATES',
   VALIDATE = 'VALIDATE',
   DEDUPLICATE = 'DEDUPLICATE',
+  
+  // Advanced operations
+  CUSTOM_FUNCTION = 'CUSTOM_FUNCTION',
+  JAVASCRIPT = 'JAVASCRIPT',
+  SQL = 'SQL',
+  FORMULA = 'FORMULA',
+  
+  // Basic operations
+  MAP = 'MAP',
+  GROUP = 'GROUP',
   CUSTOM = 'CUSTOM'
 }
 
