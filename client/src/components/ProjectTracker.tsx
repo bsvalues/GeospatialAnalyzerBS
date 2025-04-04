@@ -23,6 +23,16 @@ import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
 import { 
   Milestone, 
   CheckCircle2, 
@@ -30,7 +40,8 @@ import {
   GitMerge, 
   Clock, 
   AlertCircle, 
-  BarChart 
+  BarChart,
+  Plus
 } from 'lucide-react';
 
 // Define our project task types
@@ -412,6 +423,21 @@ export function ProjectTracker() {
   const [filterStatus, setFilterStatus] = useState<TaskItem['status'] | 'all'>('all');
   const [filterCategory, setFilterCategory] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
+  const [isAddTaskModalOpen, setIsAddTaskModalOpen] = useState(false);
+  const [isAddMilestoneModalOpen, setIsAddMilestoneModalOpen] = useState(false);
+  const [editingTask, setEditingTask] = useState<TaskItem | null>(null);
+  const [selectedMilestoneId, setSelectedMilestoneId] = useState<string>('');
+  const [newTaskData, setNewTaskData] = useState<Partial<TaskItem>>({
+    title: '',
+    description: '',
+    status: 'planned',
+    priority: 'medium',
+    category: '1',
+  });
+  const [newMilestoneData, setNewMilestoneData] = useState<Partial<Milestone>>({
+    title: '',
+    description: '',
+  });
   
   // Calculate overall project progress
   const overallProgress = Math.round(
@@ -457,6 +483,100 @@ export function ProjectTracker() {
     const priorityOrder = { 'high': 0, 'medium': 1, 'low': 2 };
     return priorityOrder[a.priority] - priorityOrder[b.priority];
   });
+  
+  // Handle updating a task's status
+  const updateTaskStatus = (taskId: string, newStatus: TaskItem['status']) => {
+    setMilestones(currentMilestones => 
+      currentMilestones.map(milestone => ({
+        ...milestone,
+        tasks: milestone.tasks.map(task => 
+          task.id === taskId 
+            ? { ...task, status: newStatus, updated: new Date() }
+            : task
+        ),
+        // Recalculate milestone progress
+        progress: Math.round(
+          (milestone.tasks.map(task => 
+            task.id === taskId 
+              ? (newStatus === 'completed' ? 1 : 0) 
+              : (task.status === 'completed' ? 1 : 0)
+          ).reduce((sum: number, val: number) => sum + val, 0) / milestone.tasks.length) * 100
+        )
+      }))
+    );
+  };
+  
+  // Handle adding a new task
+  const addNewTask = (milestoneId: string, task: Omit<TaskItem, 'id' | 'created' | 'updated'>) => {
+    const newTask: TaskItem = {
+      ...task,
+      id: `task-${Date.now()}`,
+      created: new Date(),
+      updated: new Date()
+    };
+    
+    setMilestones(currentMilestones => 
+      currentMilestones.map(milestone => 
+        milestone.id === milestoneId 
+          ? {
+              ...milestone,
+              tasks: [...milestone.tasks, newTask],
+              // Recalculate milestone progress
+              progress: Math.round(
+                ((milestone.tasks.filter(t => t.status === 'completed').length + 
+                  (newTask.status === 'completed' ? 1 : 0)) / 
+                  (milestone.tasks.length + 1)) * 100
+              )
+            }
+          : milestone
+      )
+    );
+    
+    // Close the add task modal
+    setIsAddTaskModalOpen(false);
+  };
+  
+  // Handle adding a new milestone
+  const addNewMilestone = (milestone: Omit<Milestone, 'id' | 'tasks' | 'progress'>) => {
+    const newMilestone: Milestone = {
+      ...milestone,
+      id: `milestone-${Date.now()}`,
+      tasks: [],
+      progress: 0
+    };
+    
+    setMilestones(currentMilestones => [...currentMilestones, newMilestone]);
+    
+    // Close the add milestone modal
+    setIsAddMilestoneModalOpen(false);
+  };
+  
+  // Handle editing a task
+  const editTask = (taskId: string, updatedTask: Partial<TaskItem>) => {
+    setMilestones(currentMilestones => 
+      currentMilestones.map(milestone => ({
+        ...milestone,
+        tasks: milestone.tasks.map(task => 
+          task.id === taskId 
+            ? { ...task, ...updatedTask, updated: new Date() }
+            : task
+        ),
+        // Recalculate milestone progress if status changed
+        progress: updatedTask.status 
+          ? Math.round(
+              (milestone.tasks.map(task => 
+                task.id === taskId 
+                  ? (updatedTask.status === 'completed' ? 1 : 0) 
+                  : (task.status === 'completed' ? 1 : 0)
+              ).reduce((sum: number, val: number) => sum + val, 0) / milestone.tasks.length) * 100
+            )
+          : milestone.progress
+      }))
+    );
+    
+    // Clear the editing task
+    setEditingTask(null);
+  };
   
   return (
     <Card className="shadow-lg">
@@ -686,6 +806,78 @@ export function ProjectTracker() {
                           </div>
                           <CategoryBadge categoryId={task.category} />
                         </div>
+                        
+                        {/* Task Actions */}
+                        <div className="flex justify-end gap-2 mt-3 pt-3 border-t border-gray-100">
+                          {task.status !== 'completed' && (
+                            <Button 
+                              size="sm" 
+                              variant="outline" 
+                              className="h-8" 
+                              onClick={() => updateTaskStatus(task.id, 'completed')}
+                            >
+                              <CheckCircle2 className="h-3.5 w-3.5 mr-1" />
+                              Mark Complete
+                            </Button>
+                          )}
+                          
+                          {task.status === 'completed' && (
+                            <Button 
+                              size="sm" 
+                              variant="outline" 
+                              className="h-8" 
+                              onClick={() => updateTaskStatus(task.id, 'in-progress')}
+                            >
+                              <GitPullRequestDraft className="h-3.5 w-3.5 mr-1" />
+                              Reopen
+                            </Button>
+                          )}
+                          
+                          {task.status === 'planned' && (
+                            <Button 
+                              size="sm" 
+                              variant="outline" 
+                              className="h-8" 
+                              onClick={() => updateTaskStatus(task.id, 'in-progress')}
+                            >
+                              <GitPullRequestDraft className="h-3.5 w-3.5 mr-1" />
+                              Start Task
+                            </Button>
+                          )}
+                          
+                          {task.status === 'blocked' && (
+                            <Button 
+                              size="sm" 
+                              variant="outline" 
+                              className="h-8" 
+                              onClick={() => updateTaskStatus(task.id, 'in-progress')}
+                            >
+                              <GitMerge className="h-3.5 w-3.5 mr-1" />
+                              Unblock
+                            </Button>
+                          )}
+                          
+                          {task.status === 'in-progress' && (
+                            <Button 
+                              size="sm" 
+                              variant="outline" 
+                              className="h-8" 
+                              onClick={() => updateTaskStatus(task.id, 'blocked')}
+                            >
+                              <AlertCircle className="h-3.5 w-3.5 mr-1" />
+                              Block
+                            </Button>
+                          )}
+                          
+                          <Button 
+                            size="sm" 
+                            variant="ghost" 
+                            className="h-8" 
+                            onClick={() => setEditingTask(task)}
+                          >
+                            Edit
+                          </Button>
+                        </div>
                       </div>
                     </Card>
                   ))
@@ -784,11 +976,335 @@ export function ProjectTracker() {
           <span className="text-sm text-muted-foreground">
             Last updated: {formatDate(new Date())}
           </span>
-          <Button variant="outline" size="sm" onClick={() => window.print()}>
-            Export Report
-          </Button>
+          <div className="flex gap-2">
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={() => setIsAddTaskModalOpen(true)}
+            >
+              <Plus className="h-4 w-4 mr-1" />
+              Add Task
+            </Button>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={() => setIsAddMilestoneModalOpen(true)}
+            >
+              <Plus className="h-4 w-4 mr-1" />
+              Add Milestone
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => window.print()}>
+              Export Report
+            </Button>
+          </div>
         </div>
       </CardFooter>
+      
+      {/* Add Task Modal */}
+      <Dialog open={isAddTaskModalOpen} onOpenChange={setIsAddTaskModalOpen}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>Add New Task</DialogTitle>
+            <DialogDescription>
+              Create a new task for the selected milestone.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <Label htmlFor="milestone">Milestone</Label>
+              <Select
+                value={selectedMilestoneId}
+                onValueChange={setSelectedMilestoneId}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select a milestone" />
+                </SelectTrigger>
+                <SelectContent>
+                  {milestones.map((milestone) => (
+                    <SelectItem key={milestone.id} value={milestone.id}>
+                      {milestone.title}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            
+            <div className="grid gap-2">
+              <Label htmlFor="title">Title</Label>
+              <Input
+                id="title"
+                value={newTaskData.title}
+                onChange={(e) => setNewTaskData({ ...newTaskData, title: e.target.value })}
+                className="col-span-3"
+              />
+            </div>
+            
+            <div className="grid gap-2">
+              <Label htmlFor="description">Description</Label>
+              <Textarea
+                id="description"
+                value={newTaskData.description}
+                onChange={(e) => setNewTaskData({ ...newTaskData, description: e.target.value })}
+                className="col-span-3"
+              />
+            </div>
+            
+            <div className="grid grid-cols-2 gap-4">
+              <div className="grid gap-2">
+                <Label htmlFor="status">Status</Label>
+                <Select 
+                  value={newTaskData.status} 
+                  onValueChange={(value: TaskItem['status']) => 
+                    setNewTaskData({ ...newTaskData, status: value })
+                  }
+                >
+                  <SelectTrigger id="status">
+                    <SelectValue placeholder="Select status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="planned">Planned</SelectItem>
+                    <SelectItem value="in-progress">In Progress</SelectItem>
+                    <SelectItem value="completed">Completed</SelectItem>
+                    <SelectItem value="blocked">Blocked</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              <div className="grid gap-2">
+                <Label htmlFor="priority">Priority</Label>
+                <Select 
+                  value={newTaskData.priority} 
+                  onValueChange={(value: TaskItem['priority']) => 
+                    setNewTaskData({ ...newTaskData, priority: value })
+                  }
+                >
+                  <SelectTrigger id="priority">
+                    <SelectValue placeholder="Select priority" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="high">High</SelectItem>
+                    <SelectItem value="medium">Medium</SelectItem>
+                    <SelectItem value="low">Low</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            
+            <div className="grid gap-2">
+              <Label htmlFor="category">Category</Label>
+              <Select 
+                value={newTaskData.category} 
+                onValueChange={(value) => 
+                  setNewTaskData({ ...newTaskData, category: value })
+                }
+              >
+                <SelectTrigger id="category">
+                  <SelectValue placeholder="Select category" />
+                </SelectTrigger>
+                <SelectContent>
+                  {projectCategories.map((category) => (
+                    <SelectItem key={category.id} value={category.id}>
+                      {category.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setIsAddTaskModalOpen(false)}>
+              Cancel
+            </Button>
+            <Button 
+              type="submit" 
+              onClick={() => {
+                if (selectedMilestoneId && newTaskData.title) {
+                  addNewTask(selectedMilestoneId, newTaskData as Omit<TaskItem, 'id' | 'created' | 'updated'>);
+                  // Reset form data
+                  setNewTaskData({
+                    title: '',
+                    description: '',
+                    status: 'planned',
+                    priority: 'medium',
+                    category: '1',
+                  });
+                  setSelectedMilestoneId('');
+                }
+              }}
+              disabled={!selectedMilestoneId || !newTaskData.title}
+            >
+              Add Task
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      
+      {/* Add Milestone Modal */}
+      <Dialog open={isAddMilestoneModalOpen} onOpenChange={setIsAddMilestoneModalOpen}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>Add New Milestone</DialogTitle>
+            <DialogDescription>
+              Create a new milestone to group related tasks.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <Label htmlFor="milestone-title">Title</Label>
+              <Input
+                id="milestone-title"
+                value={newMilestoneData.title}
+                onChange={(e) => setNewMilestoneData({ ...newMilestoneData, title: e.target.value })}
+                className="col-span-3"
+              />
+            </div>
+            
+            <div className="grid gap-2">
+              <Label htmlFor="milestone-description">Description</Label>
+              <Textarea
+                id="milestone-description"
+                value={newMilestoneData.description}
+                onChange={(e) => setNewMilestoneData({ ...newMilestoneData, description: e.target.value })}
+                className="col-span-3"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setIsAddMilestoneModalOpen(false)}>
+              Cancel
+            </Button>
+            <Button 
+              type="submit" 
+              onClick={() => {
+                if (newMilestoneData.title) {
+                  addNewMilestone(newMilestoneData as Omit<Milestone, 'id' | 'tasks' | 'progress'>);
+                  // Reset form data
+                  setNewMilestoneData({
+                    title: '',
+                    description: '',
+                  });
+                }
+              }}
+              disabled={!newMilestoneData.title}
+            >
+              Add Milestone
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      
+      {/* Edit Task Modal */}
+      <Dialog open={!!editingTask} onOpenChange={(open) => !open && setEditingTask(null)}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>Edit Task</DialogTitle>
+            <DialogDescription>
+              Update task details and save changes.
+            </DialogDescription>
+          </DialogHeader>
+          {editingTask && (
+            <div className="grid gap-4 py-4">
+              <div className="grid gap-2">
+                <Label htmlFor="edit-title">Title</Label>
+                <Input
+                  id="edit-title"
+                  value={editingTask.title}
+                  onChange={(e) => setEditingTask({ ...editingTask, title: e.target.value })}
+                  className="col-span-3"
+                />
+              </div>
+              
+              <div className="grid gap-2">
+                <Label htmlFor="edit-description">Description</Label>
+                <Textarea
+                  id="edit-description"
+                  value={editingTask.description}
+                  onChange={(e) => setEditingTask({ ...editingTask, description: e.target.value })}
+                  className="col-span-3"
+                />
+              </div>
+              
+              <div className="grid grid-cols-2 gap-4">
+                <div className="grid gap-2">
+                  <Label htmlFor="edit-status">Status</Label>
+                  <Select 
+                    value={editingTask.status} 
+                    onValueChange={(value: TaskItem['status']) => 
+                      setEditingTask({ ...editingTask, status: value })
+                    }
+                  >
+                    <SelectTrigger id="edit-status">
+                      <SelectValue placeholder="Select status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="planned">Planned</SelectItem>
+                      <SelectItem value="in-progress">In Progress</SelectItem>
+                      <SelectItem value="completed">Completed</SelectItem>
+                      <SelectItem value="blocked">Blocked</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                
+                <div className="grid gap-2">
+                  <Label htmlFor="edit-priority">Priority</Label>
+                  <Select 
+                    value={editingTask.priority} 
+                    onValueChange={(value: TaskItem['priority']) => 
+                      setEditingTask({ ...editingTask, priority: value })
+                    }
+                  >
+                    <SelectTrigger id="edit-priority">
+                      <SelectValue placeholder="Select priority" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="high">High</SelectItem>
+                      <SelectItem value="medium">Medium</SelectItem>
+                      <SelectItem value="low">Low</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              
+              <div className="grid gap-2">
+                <Label htmlFor="edit-category">Category</Label>
+                <Select 
+                  value={editingTask.category} 
+                  onValueChange={(value) => 
+                    setEditingTask({ ...editingTask, category: value })
+                  }
+                >
+                  <SelectTrigger id="edit-category">
+                    <SelectValue placeholder="Select category" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {projectCategories.map((category) => (
+                      <SelectItem key={category.id} value={category.id}>
+                        {category.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setEditingTask(null)}>
+              Cancel
+            </Button>
+            <Button 
+              type="submit" 
+              onClick={() => {
+                if (editingTask && editingTask.id) {
+                  editTask(editingTask.id, editingTask);
+                }
+              }}
+              disabled={!editingTask?.title}
+            >
+              Save Changes
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 }
