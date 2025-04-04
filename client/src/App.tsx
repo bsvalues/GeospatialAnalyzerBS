@@ -31,6 +31,7 @@ import NeighborhoodComparisonPage from '@/pages/neighborhood-comparison';
 import PropertyPredictionDemo from '@/pages/PropertyPredictionDemo';
 import PropertyDataSourcesPage from '@/pages/PropertyDataSources';
 import DataQualityDemo from '@/pages/DataQualityDemo';
+import PropertyBulkImportPage from '@/pages/PropertyBulkImportPage';
 import { ProjectTrackerPage } from '@/pages/ProjectTrackerPage';
 
 function Router() {
@@ -62,6 +63,7 @@ function Router() {
         <Route path="/property-data-sources" component={PropertyDataSourcesPage} />
         <Route path="/data-quality" component={DataQualityDemo} />
         <Route path="/project-tracker" component={ProjectTrackerPage} />
+        <Route path="/property-bulk-import" component={PropertyBulkImportPage} />
         <Route component={NotFound} />
       </Switch>
     </>

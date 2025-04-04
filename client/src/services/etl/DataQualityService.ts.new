@@ -302,13 +302,12 @@ class DataQualityService {
     // Send alerts for critical issues
     issues.forEach(issue => {
       if (issue.severity === DataQualityIssueSeverity.CRITICAL) {
-        alertService.createAlert({
-          type: AlertType.ERROR,
-          category: AlertCategory.VALIDATION,
+        alertService.addAlert({
+          type: AlertType.DATA_QUALITY,
+          category: AlertCategory.ERROR,
           severity: AlertSeverity.HIGH,
-          title: `Data Quality Issue: ${issue.field}`,
           message: `Critical data quality issue: ${issue.description}`,
-          data: {
+          details: {
             field: issue.field,
             type: issue.type,
             recordCount: issue.recordCount,
@@ -391,8 +390,7 @@ class DataQualityService {
         : sorted[middle];
       
       // Calculate standard deviation - with TypeScript safety
-      // We know avg is defined here since we've checked numericValues.length > 0
-      const avgValue = avg!; // Non-null assertion is safe here
+      const avgValue = avg; // This is safe as we've verified numericValues.length > 0
       const variance = numericValues.reduce((sum, val) => sum + Math.pow(val - avgValue, 2), 0) / numericValues.length;
       stdDev = Math.sqrt(variance);
     }

@@ -211,163 +211,214 @@ class DataQualityService {
     data: any[],
     options: DataQualityAnalysisOptions = {}
   ): DataQualityAnalysisResult {
-    const timestamp = new Date();
-    const recordCount = data.length;
-    const defaultOptions: DataQualityAnalysisOptions = {
-      checkNull: true,
-      checkMissing: true,
-      checkDuplicates: true,
-      checkOutliers: true,
-      checkFormats: true,
-      checkDistributions: true,
-      maxExamples: 5,
-      nullThreshold: 0.1, // 10%
-      duplicateThreshold: 0.05, // 5%
-      outlierStdDevs: 3
-    };
-    
-    // Merge options with defaults
-    const mergedOptions = { ...defaultOptions, ...options };
-    
-    // Get all fields in the dataset
-    const allFields = new Set<string>();
-    data.forEach(record => {
-      Object.keys(record).forEach(field => allFields.add(field));
-    });
-    
-    // Filter fields if needed
-    let fields = Array.from(allFields);
-    
-    if (mergedOptions.includeFields && mergedOptions.includeFields.length > 0) {
-      fields = fields.filter(field => mergedOptions.includeFields!.includes(field));
-    }
-    
-    if (mergedOptions.excludeFields && mergedOptions.excludeFields.length > 0) {
-      fields = fields.filter(field => !mergedOptions.excludeFields!.includes(field));
-    }
-    
-    const fieldCount = fields.length;
-    const fieldStats: Record<string, FieldStatistics> = {};
-    const issues: DataQualityIssue[] = [];
-    
-    // Calculate field statistics
-    for (const field of fields) {
-      fieldStats[field] = this.calculateFieldStatistics(data, field);
-    }
-    
-    // Check for issues
-    if (mergedOptions.checkNull) {
-      this.checkNullValues(data, fields, fieldStats, issues, mergedOptions);
-    }
-    
-    if (mergedOptions.checkMissing) {
-      this.checkMissingValues(data, fields, fieldStats, issues, mergedOptions);
-    }
-    
-    if (mergedOptions.checkDuplicates) {
-      this.checkDuplicateValues(data, fields, fieldStats, issues, mergedOptions);
-    }
-    
-    if (mergedOptions.checkOutliers) {
-      this.checkOutliers(data, fields, fieldStats, issues, mergedOptions);
-    }
-    
-    if (mergedOptions.checkFormats) {
-      this.checkFormats(data, fields, fieldStats, issues, mergedOptions);
-    }
-    
-    if (mergedOptions.expectedTypes) {
-      this.checkExpectedTypes(data, fields, fieldStats, issues, mergedOptions);
-    }
-    
-    if (mergedOptions.expectedRanges) {
-      this.checkExpectedRanges(data, fields, fieldStats, issues, mergedOptions);
-    }
-    
-    // Calculate scores
-    const completenessScore = this.calculateCompletenessScore(fieldStats);
-    const accuracyScore = this.calculateAccuracyScore(issues);
-    const consistencyScore = this.calculateConsistencyScore(issues);
-    const uniquenessScore = this.calculateUniquenessScore(fieldStats, issues);
-    
-    // Calculate overall quality score
-    const qualityScore = Math.round(
-      (completenessScore + accuracyScore + consistencyScore + uniquenessScore) / 4
-    );
-    
-    // Generate summary and recommendations
-    const summary = this.generateSummary(recordCount, fieldCount, issues, qualityScore);
-    const recommendations = this.generateRecommendations(issues, fieldStats);
-    
-    // Send alerts for critical issues
-    issues.forEach(issue => {
-      if (issue.severity === DataQualityIssueSeverity.CRITICAL) {
+    try {
+      // Set default options
+      const defaultOptions: DataQualityAnalysisOptions = {
+        checkNull: true,
+        checkMissing: true,
+        checkDuplicates: true,
+        checkOutliers: true,
+        checkFormats: true,
+        checkDistributions: true,
+        maxExamples: 5,
+        nullThreshold: 0.1, // 10%
+        duplicateThreshold: 0.05, // 5%
+        outlierStdDevs: 3,
+        excludeFields: []
+      };
+      
+      const resolvedOptions = { ...defaultOptions, ...options };
+      const recordCount = data.length;
+      const issues: DataQualityIssue[] = [];
+      
+      // If no data, return empty result
+      if (recordCount === 0) {
+        return {
+          timestamp: new Date(),
+          recordCount: 0,
+          fieldCount: 0,
+          fieldStats: {},
+          issues: [],
+          qualityScore: 100,
+          completenessScore: 100,
+          accuracyScore: 100,
+          consistencyScore: 100,
+          uniquenessScore: 100,
+          options: resolvedOptions,
+          summary: 'No data to analyze',
+          recommendations: ['Provide data for analysis']
+        };
+      }
+      
+      // Get all field names
+      const allFields = new Set<string>();
+      
+      for (const record of data) {
+        for (const field in record) {
+          allFields.add(field);
+        }
+      }
+      
+      // Filter fields based on include/exclude options
+      let fields: string[] = Array.from(allFields);
+      
+      if (resolvedOptions.includeFields && resolvedOptions.includeFields.length > 0) {
+        fields = fields.filter(field => resolvedOptions.includeFields!.includes(field));
+      }
+      
+      if (resolvedOptions.excludeFields && resolvedOptions.excludeFields.length > 0) {
+        fields = fields.filter(field => !resolvedOptions.excludeFields!.includes(field));
+      }
+      
+      // Calculate field statistics
+      const fieldStats: Record<string, FieldStatistics> = {};
+      
+      for (const field of fields) {
+        fieldStats[field] = this.calculateFieldStatistics(data, field);
+      }
+      
+      // Check for null values
+      if (resolvedOptions.checkNull) {
+        this.checkNullValues(data, fields, fieldStats, issues, resolvedOptions);
+      }
+      
+      // Check for missing values
+      if (resolvedOptions.checkMissing) {
+        this.checkMissingValues(data, fields, fieldStats, issues, resolvedOptions);
+      }
+      
+      // Check for duplicate values
+      if (resolvedOptions.checkDuplicates) {
+        this.checkDuplicateValues(data, fields, fieldStats, issues, resolvedOptions);
+      }
+      
+      // Check for outliers
+      if (resolvedOptions.checkOutliers) {
+        this.checkOutliers(data, fields, fieldStats, issues, resolvedOptions);
+      }
+      
+      // Check for inconsistent formats
+      if (resolvedOptions.checkFormats) {
+        this.checkFormats(data, fields, fieldStats, issues, resolvedOptions);
+      }
+      
+      // Check for expected data types
+      if (resolvedOptions.expectedTypes) {
+        this.checkExpectedTypes(data, fields, fieldStats, issues, resolvedOptions);
+      }
+      
+      // Check for expected value ranges
+      if (resolvedOptions.expectedRanges) {
+        this.checkExpectedRanges(data, fields, fieldStats, issues, resolvedOptions);
+      }
+      
+      // Calculate quality scores
+      const completenessScore = this.calculateCompletenessScore(fieldStats);
+      const accuracyScore = this.calculateAccuracyScore(issues);
+      const consistencyScore = this.calculateConsistencyScore(issues);
+      const uniquenessScore = this.calculateUniquenessScore(fieldStats, issues);
+      
+      // Calculate overall quality score
+      const qualityScore = (completenessScore + accuracyScore + consistencyScore + uniquenessScore) / 4;
+      
+      // Generate summary and recommendations
+      const summary = this.generateSummary(recordCount, fields.length, issues, qualityScore);
+      const recommendations = this.generateRecommendations(issues, fieldStats);
+      
+      // Log results
+      if (issues.length > 0) {
+        const criticalIssues = issues.filter(issue => issue.severity === DataQualityIssueSeverity.CRITICAL).length;
+        const highIssues = issues.filter(issue => issue.severity === DataQualityIssueSeverity.HIGH).length;
+        
         alertService.createAlert({
-          type: AlertType.ERROR,
+          type: criticalIssues > 0 ? AlertType.ERROR : highIssues > 0 ? AlertType.WARNING : AlertType.INFO,
+          severity: criticalIssues > 0 ? AlertSeverity.HIGH : highIssues > 0 ? AlertSeverity.MEDIUM : AlertSeverity.LOW,
           category: AlertCategory.VALIDATION,
-          severity: AlertSeverity.HIGH,
-          title: `Data Quality Issue: ${issue.field}`,
-          message: `Critical data quality issue: ${issue.description}`,
-          data: {
-            field: issue.field,
-            type: issue.type,
-            recordCount: issue.recordCount,
-            percentage: issue.percentage
-          }
+          title: 'Data Quality Analysis',
+          message: `Found ${issues.length} quality issues (${criticalIssues} critical, ${highIssues} high)`
         });
       }
-    });
-    
-    return {
-      timestamp,
-      recordCount,
-      fieldCount,
-      fieldStats,
-      issues,
-      qualityScore,
-      completenessScore,
-      accuracyScore,
-      consistencyScore,
-      uniquenessScore,
-      options: mergedOptions,
-      summary,
-      recommendations
-    };
+      
+      return {
+        timestamp: new Date(),
+        recordCount,
+        fieldCount: fields.length,
+        fieldStats,
+        issues,
+        qualityScore,
+        completenessScore,
+        accuracyScore,
+        consistencyScore,
+        uniquenessScore,
+        options: resolvedOptions,
+        summary,
+        recommendations
+      };
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      
+      alertService.createAlert({
+        type: AlertType.ERROR,
+        severity: AlertSeverity.MEDIUM,
+        category: AlertCategory.VALIDATION,
+        title: 'Data Quality Analysis Error',
+        message: `Error analyzing data quality: ${errorMessage}`
+      });
+      
+      // Return a minimal result
+      return {
+        timestamp: new Date(),
+        recordCount: data.length,
+        fieldCount: 0,
+        fieldStats: {},
+        issues: [
+          {
+            field: 'all',
+            type: 'error',
+            description: `Analysis error: ${errorMessage}`,
+            severity: DataQualityIssueSeverity.HIGH,
+            recordCount: data.length,
+            percentage: 100
+          }
+        ],
+        qualityScore: 0,
+        completenessScore: 0,
+        accuracyScore: 0,
+        consistencyScore: 0,
+        uniquenessScore: 0,
+        options: options,
+        summary: `Error analyzing data quality: ${errorMessage}`,
+        recommendations: ['Fix analysis error and try again']
+      };
+    }
   }
   
   /**
    * Calculate statistics for a field
    */
   private calculateFieldStatistics(data: any[], field: string): FieldStatistics {
+    const count = data.length;
     const values = data.map(record => record[field]);
-    const count = values.length;
     
     // Count null values
-    const nullValues = values.filter(value => value === null || value === undefined);
-    const nullCount = nullValues.length;
+    const nullCount = values.filter(value => value === null || value === undefined).length;
     const nullPercentage = (nullCount / count) * 100;
     
-    // Count missing values (empty strings, empty arrays, empty objects)
-    const missingValues = values.filter(
-      value => 
-        value === '' || 
-        (Array.isArray(value) && value.length === 0) ||
-        (typeof value === 'object' && value !== null && Object.keys(value).length === 0)
-    );
-    const missingCount = missingValues.length;
+    // Count missing values (empty strings, etc.)
+    const missingCount = values.filter(value => 
+      value === '' || 
+      (Array.isArray(value) && value.length === 0) ||
+      (typeof value === 'object' && value !== null && Object.keys(value).length === 0)
+    ).length;
     const missingPercentage = (missingCount / count) * 100;
     
     // Count unique values
-    const nonNullValues = values.filter(value => value !== null && value !== undefined);
-    const uniqueValues = new Set(nonNullValues.map(value => 
-      typeof value === 'object' ? JSON.stringify(value) : value
-    ));
+    const uniqueValues = new Set(values.filter(value => value !== null && value !== undefined));
     const uniqueCount = uniqueValues.size;
-    const uniquePercentage = nonNullValues.length > 0 
-      ? (uniqueCount / nonNullValues.length) * 100 
-      : 0;
+    const uniquePercentage = (uniqueCount / (count - nullCount)) * 100;
     
     // Determine data type
+    const nonNullValues = values.filter(value => value !== null && value !== undefined);
     const dataType = this.determineDataType(nonNullValues);
     
     // Calculate numeric statistics if appropriate
@@ -390,11 +441,17 @@ class DataQualityService {
         ? (sorted[middle - 1] + sorted[middle]) / 2
         : sorted[middle];
       
-      // Calculate standard deviation - with TypeScript safety
-      // We know avg is defined here since we've checked numericValues.length > 0
-      const avgValue = avg!; // Non-null assertion is safe here
+      // Calculate standard deviation - TypeScript safety with null checks
+      const avgValue: number = avg; // This is safe as we've already verified numericValues.length > 0
       const variance = numericValues.reduce((sum, val) => sum + Math.pow(val - avgValue, 2), 0) / numericValues.length;
       stdDev = Math.sqrt(variance);
+    } else {
+      // Set default values for numeric statistics when not applicable
+      min = undefined;
+      max = undefined;
+      avg = undefined;
+      median = undefined;
+      stdDev = undefined;
     }
     
     // Calculate string statistics if appropriate
@@ -885,12 +942,12 @@ class DataQualityService {
           issues.push({
             field,
             type: 'wrong_type',
-            description: `Field has wrong type: expected ${expectedType}, found ${stats.dataType}`,
+            description: `Field has type ${stats.dataType} but expected ${expectedType}`,
             severity,
             recordCount: wrongTypeCount,
             percentage: wrongTypePercentage,
             examples: wrongTypeValues.slice(0, options.maxExamples || 5),
-            suggestion: `Convert values to ${expectedType} or correct data entry`
+            suggestion: `Convert values to ${expectedType} type`
           });
         }
       }
@@ -928,15 +985,17 @@ class DataQualityService {
         .filter(record => {
           const value = record[field];
           
-          if (value === null || value === undefined) {
+          if (value === null || value === undefined || isNaN(Number(value))) {
             return false;
           }
           
-          if (typeof range.min === 'number' && value < range.min) {
+          const numValue = Number(value);
+          
+          if (range.min !== undefined && numValue < range.min) {
             return true;
           }
           
-          if (typeof range.max === 'number' && value > range.max) {
+          if (range.max !== undefined && numValue > range.max) {
             return true;
           }
           
@@ -951,31 +1010,36 @@ class DataQualityService {
         // Determine severity based on out-of-range percentage
         let severity: DataQualityIssueSeverity;
         
-        if (outOfRangePercentage >= 50) {
+        if (outOfRangePercentage >= 25) {
           severity = DataQualityIssueSeverity.CRITICAL;
-        } else if (outOfRangePercentage >= 25) {
-          severity = DataQualityIssueSeverity.HIGH;
         } else if (outOfRangePercentage >= 10) {
+          severity = DataQualityIssueSeverity.HIGH;
+        } else if (outOfRangePercentage >= 5) {
           severity = DataQualityIssueSeverity.MEDIUM;
         } else {
           severity = DataQualityIssueSeverity.LOW;
         }
         
+        // Create description
+        let description = `Field contains values outside expected range`;
+        
+        if (range.min !== undefined && range.max !== undefined) {
+          description = `Field contains values outside expected range [${range.min}, ${range.max}]`;
+        } else if (range.min !== undefined) {
+          description = `Field contains values below expected minimum ${range.min}`;
+        } else if (range.max !== undefined) {
+          description = `Field contains values above expected maximum ${range.max}`;
+        }
+        
         issues.push({
           field,
           type: 'out_of_range',
-          description: `Field contains values outside expected range: ${
-            typeof range.min === 'number' ? `min: ${range.min}` : ''
-          }${
-            typeof range.min === 'number' && typeof range.max === 'number' ? ', ' : ''
-          }${
-            typeof range.max === 'number' ? `max: ${range.max}` : ''
-          }`,
+          description,
           severity,
           recordCount: outOfRangeCount,
           percentage: outOfRangePercentage,
           examples: outOfRangeValues.slice(0, options.maxExamples || 5),
-          suggestion: 'Check for data entry errors or update expected range'
+          suggestion: 'Validate data entry or adjust expected range'
         });
       }
     }
@@ -985,230 +1049,310 @@ class DataQualityService {
    * Detect pattern in a string
    */
   private detectPattern(value: string): string {
-    if (value === '') {
+    if (!value) {
       return 'empty';
     }
     
-    // Test for date patterns
-    const datePattern = /^\d{1,4}[.\/-]\d{1,2}[.\/-]\d{1,4}$/;
-    if (datePattern.test(value)) {
-      return 'date';
-    }
+    // Check for common formats
     
-    // Test for email pattern
-    const emailPattern = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
-    if (emailPattern.test(value)) {
+    // Email
+    if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) {
       return 'email';
     }
     
-    // Test for URL pattern
-    const urlPattern = /^(https?:\/\/)?([\da-z.-]+)\.([a-z.]{2,6})([/\w .-]*)*\/?$/;
-    if (urlPattern.test(value)) {
+    // URL
+    if (/^https?:\/\/[^\s]+$/.test(value)) {
       return 'url';
     }
     
-    // Test for phone number pattern
-    const phonePattern = /^[+]?[(]?[0-9]{3}[)]?[-\s.]?[0-9]{3}[-\s.]?[0-9]{4,6}$/;
-    if (phonePattern.test(value)) {
-      return 'phone';
+    // Date (common formats)
+    if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+      return 'date-iso';
     }
     
-    // Test for credit card pattern
-    const ccPattern = /^(?:\d{4}[- ]?){3}\d{4}|\d{16}$/;
-    if (ccPattern.test(value)) {
-      return 'credit_card';
+    if (/^\d{2}\/\d{2}\/\d{4}$/.test(value)) {
+      return 'date-mdy';
     }
     
-    // Test for postal code pattern
-    const postalPattern = /^\d{5}(?:[-\s]\d{4})?$/;
-    if (postalPattern.test(value)) {
-      return 'postal_code';
+    if (/^\d{2}\.\d{2}\.\d{4}$/.test(value)) {
+      return 'date-dmy-dot';
     }
     
-    // Test for numeric pattern
-    const numericPattern = /^-?\d+(?:\.\d+)?$/;
-    if (numericPattern.test(value)) {
-      return 'numeric';
+    // Phone number
+    if (/^\+?\d{10,15}$/.test(value)) {
+      return 'phone-digits';
     }
     
-    // Test for alphanumeric pattern
-    const alphanumericPattern = /^[a-zA-Z0-9]+$/;
-    if (alphanumericPattern.test(value)) {
+    if (/^\+?\d{1,4}[\s-]\d{3,4}[\s-]\d{3,4}[\s-]?\d{0,4}$/.test(value)) {
+      return 'phone-formatted';
+    }
+    
+    // ZIP/Postal code
+    if (/^\d{5}(-\d{4})?$/.test(value)) {
+      return 'zip-us';
+    }
+    
+    // Number
+    if (/^-?\d+(\.\d+)?$/.test(value)) {
+      return 'number';
+    }
+    
+    // Integer
+    if (/^-?\d+$/.test(value)) {
+      return 'integer';
+    }
+    
+    // Currency
+    if (/^[£$€¥]\s?\d+(\.\d{2})?$/.test(value) || /^\d+(\.\d{2})?\s?[£$€¥]$/.test(value)) {
+      return 'currency';
+    }
+    
+    // Boolean
+    if (/^(true|false|yes|no|0|1)$/i.test(value)) {
+      return 'boolean';
+    }
+    
+    // Identifier (UUID)
+    if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value)) {
+      return 'uuid';
+    }
+    
+    // Alpha only
+    if (/^[A-Za-z]+$/.test(value)) {
+      return 'alpha';
+    }
+    
+    // Alphanumeric
+    if (/^[A-Za-z0-9]+$/.test(value)) {
       return 'alphanumeric';
     }
     
-    // Test for alphabetic pattern
-    const alphabeticPattern = /^[a-zA-Z]+$/;
-    if (alphabeticPattern.test(value)) {
-      return 'alphabetic';
+    // Default pattern (character types)
+    let pattern = '';
+    
+    for (let i = 0; i < value.length; i++) {
+      const char = value[i];
+      
+      if (/[A-Za-z]/.test(char)) {
+        pattern += 'a';
+      } else if (/\d/.test(char)) {
+        pattern += '9';
+      } else {
+        pattern += char;
+      }
     }
     
-    // When no specific pattern is detected
-    return 'mixed';
+    // If the pattern is too long, summarize it
+    if (pattern.length > 20) {
+      const counts: Record<string, number> = {};
+      
+      for (const char of pattern) {
+        counts[char] = (counts[char] || 0) + 1;
+      }
+      
+      pattern = Object.entries(counts)
+        .map(([char, count]) => `${char}(${count})`)
+        .join('');
+    }
+    
+    return pattern;
   }
   
   /**
    * Calculate completeness score
    */
   private calculateCompletenessScore(fieldStats: Record<string, FieldStatistics>): number {
-    const fields = Object.values(fieldStats);
-    const fieldCount = fields.length;
-    
-    if (fieldCount === 0) {
-      return 100; // No fields to analyze
+    if (Object.keys(fieldStats).length === 0) {
+      return 100;
     }
     
-    const completenessSum = fields.reduce((sum, stats) => {
-      const nonNullPercentage = 100 - stats.nullPercentage;
-      const nonMissingPercentage = 100 - stats.missingPercentage;
-      return sum + (nonNullPercentage + nonMissingPercentage) / 2;
-    }, 0);
+    let totalScore = 0;
     
-    return Math.round(completenessSum / fieldCount);
+    for (const field in fieldStats) {
+      const stats = fieldStats[field];
+      const completeness = 100 - (stats.nullPercentage + stats.missingPercentage);
+      totalScore += completeness;
+    }
+    
+    return totalScore / Object.keys(fieldStats).length;
   }
   
   /**
    * Calculate accuracy score
    */
   private calculateAccuracyScore(issues: DataQualityIssue[]): number {
-    // Filter issues that affect accuracy
-    const accuracyIssues = issues.filter(issue => 
-      issue.type === 'outliers' || 
-      issue.type === 'wrong_type' || 
-      issue.type === 'out_of_range' || 
-      issue.type === 'invalid_format'
-    );
+    // Start with a perfect score
+    let score = 100;
     
-    if (accuracyIssues.length === 0) {
-      return 100; // No accuracy issues
+    // Subtract points for issues based on their severity
+    for (const issue of issues) {
+      if (issue.type === 'wrong_type' || issue.type === 'out_of_range' || issue.type === 'outliers') {
+        switch (issue.severity) {
+          case DataQualityIssueSeverity.CRITICAL:
+            score -= 25 * (issue.percentage / 100);
+            break;
+            
+          case DataQualityIssueSeverity.HIGH:
+            score -= 15 * (issue.percentage / 100);
+            break;
+            
+          case DataQualityIssueSeverity.MEDIUM:
+            score -= 10 * (issue.percentage / 100);
+            break;
+            
+          case DataQualityIssueSeverity.LOW:
+            score -= 5 * (issue.percentage / 100);
+            break;
+        }
+      }
     }
     
-    // Calculate weighted score based on issue severity
-    const totalWeight = accuracyIssues.reduce((sum, issue) => {
-      switch (issue.severity) {
-        case DataQualityIssueSeverity.CRITICAL:
-          return sum + 4;
-        case DataQualityIssueSeverity.HIGH:
-          return sum + 3;
-        case DataQualityIssueSeverity.MEDIUM:
-          return sum + 2;
-        case DataQualityIssueSeverity.LOW:
-          return sum + 1;
-        default:
-          return sum;
-      }
-    }, 0);
-    
-    // Maximum possible weight (if all issues were CRITICAL)
-    const maxWeight = accuracyIssues.length * 4;
-    
-    // Calculate score (higher weight = lower score)
-    return Math.round(100 - ((totalWeight / maxWeight) * 100));
+    // Ensure score is between 0 and 100
+    return Math.max(0, Math.min(100, score));
   }
   
   /**
    * Calculate consistency score
    */
   private calculateConsistencyScore(issues: DataQualityIssue[]): number {
-    // Filter issues that affect consistency
-    const consistencyIssues = issues.filter(issue => 
-      issue.type === 'inconsistent_format'
-    );
+    // Start with a perfect score
+    let score = 100;
     
-    if (consistencyIssues.length === 0) {
-      return 100; // No consistency issues
+    // Subtract points for issues based on their severity
+    for (const issue of issues) {
+      if (issue.type === 'inconsistent_format' || issue.type === 'invalid_format') {
+        switch (issue.severity) {
+          case DataQualityIssueSeverity.CRITICAL:
+            score -= 25 * (issue.percentage / 100);
+            break;
+            
+          case DataQualityIssueSeverity.HIGH:
+            score -= 15 * (issue.percentage / 100);
+            break;
+            
+          case DataQualityIssueSeverity.MEDIUM:
+            score -= 10 * (issue.percentage / 100);
+            break;
+            
+          case DataQualityIssueSeverity.LOW:
+            score -= 5 * (issue.percentage / 100);
+            break;
+        }
+      }
     }
     
-    // Calculate weighted score based on issue severity
-    const totalWeight = consistencyIssues.reduce((sum, issue) => {
-      switch (issue.severity) {
-        case DataQualityIssueSeverity.CRITICAL:
-          return sum + 4;
-        case DataQualityIssueSeverity.HIGH:
-          return sum + 3;
-        case DataQualityIssueSeverity.MEDIUM:
-          return sum + 2;
-        case DataQualityIssueSeverity.LOW:
-          return sum + 1;
-        default:
-          return sum;
-      }
-    }, 0);
-    
-    // Maximum possible weight (if all issues were CRITICAL)
-    const maxWeight = consistencyIssues.length * 4;
-    
-    // Calculate score (higher weight = lower score)
-    return Math.round(100 - ((totalWeight / maxWeight) * 100));
+    // Ensure score is between 0 and 100
+    return Math.max(0, Math.min(100, score));
   }
   
   /**
    * Calculate uniqueness score
    */
   private calculateUniquenessScore(fieldStats: Record<string, FieldStatistics>, issues: DataQualityIssue[]): number {
-    // For fields that should be unique, weight is higher
-    const uniquenessIssues = issues.filter(issue => 
-      issue.type === 'duplicate_values'
-    );
+    // Two components: field uniqueness and lack of duplicates
     
-    const fields = Object.values(fieldStats);
-    const fieldCount = fields.length;
+    // First component: average uniqueness of fields
+    let totalUniquePercentage = 0;
+    let fieldCount = 0;
     
-    if (fieldCount === 0) {
-      return 100; // No fields to analyze
+    for (const field in fieldStats) {
+      const stats = fieldStats[field];
+      
+      // Skip fields with no data
+      if (stats.count - stats.nullCount <= 0) {
+        continue;
+      }
+      
+      totalUniquePercentage += stats.uniquePercentage;
+      fieldCount++;
     }
     
-    // Sum up uniqueness percentages for all fields
-    const uniquenessSum = fields.reduce((sum, stats) => sum + stats.uniquePercentage, 0);
+    const fieldUniquenessScore = fieldCount === 0 ? 100 : totalUniquePercentage / fieldCount;
     
-    // Calculate base score
-    let score = Math.round(uniquenessSum / fieldCount);
+    // Second component: deduct for duplicate issues
+    let duplicateDeduction = 0;
     
-    // Penalize for duplicate value issues
-    if (uniquenessIssues.length > 0) {
-      const penalty = uniquenessIssues.reduce((sum, issue) => {
+    for (const issue of issues) {
+      if (issue.type === 'duplicate_values') {
         switch (issue.severity) {
           case DataQualityIssueSeverity.CRITICAL:
-            return sum + 20;
+            duplicateDeduction += 25 * (issue.percentage / 100);
+            break;
+            
           case DataQualityIssueSeverity.HIGH:
-            return sum + 15;
+            duplicateDeduction += 15 * (issue.percentage / 100);
+            break;
+            
           case DataQualityIssueSeverity.MEDIUM:
-            return sum + 10;
+            duplicateDeduction += 10 * (issue.percentage / 100);
+            break;
+            
           case DataQualityIssueSeverity.LOW:
-            return sum + 5;
-          default:
-            return sum;
+            duplicateDeduction += 5 * (issue.percentage / 100);
+            break;
         }
-      }, 0);
-      
-      score = Math.max(0, score - Math.min(penalty, score));
+      }
     }
     
-    return score;
+    // Combine both components
+    const score = (fieldUniquenessScore * 0.7) + ((100 - duplicateDeduction) * 0.3);
+    
+    // Ensure score is between 0 and 100
+    return Math.max(0, Math.min(100, score));
   }
   
   /**
    * Generate a summary of the analysis
    */
   private generateSummary(recordCount: number, fieldCount: number, issues: DataQualityIssue[], qualityScore: number): string {
+    // Count issues by severity
     const criticalIssues = issues.filter(issue => issue.severity === DataQualityIssueSeverity.CRITICAL).length;
     const highIssues = issues.filter(issue => issue.severity === DataQualityIssueSeverity.HIGH).length;
     const mediumIssues = issues.filter(issue => issue.severity === DataQualityIssueSeverity.MEDIUM).length;
     const lowIssues = issues.filter(issue => issue.severity === DataQualityIssueSeverity.LOW).length;
     
-    let qualityRating = '';
+    // Generate quality rating
+    let qualityRating: string;
     
     if (qualityScore >= 90) {
       qualityRating = 'Excellent';
-    } else if (qualityScore >= 75) {
+    } else if (qualityScore >= 80) {
       qualityRating = 'Good';
-    } else if (qualityScore >= 50) {
+    } else if (qualityScore >= 70) {
       qualityRating = 'Fair';
-    } else {
+    } else if (qualityScore >= 60) {
       qualityRating = 'Poor';
+    } else {
+      qualityRating = 'Very Poor';
     }
     
-    return `Analyzed ${recordCount} records across ${fieldCount} fields. Overall data quality is ${qualityRating} (${qualityScore}/100). Found ${issues.length} quality issues (${criticalIssues} critical, ${highIssues} high, ${mediumIssues} medium, ${lowIssues} low).`;
+    // Build summary
+    let summary = `Analyzed ${recordCount} records across ${fieldCount} fields.\n`;
+    summary += `Overall data quality score: ${qualityScore.toFixed(2)} (${qualityRating}).\n`;
+    
+    if (issues.length > 0) {
+      summary += `Found ${issues.length} quality issues:\n`;
+      
+      if (criticalIssues > 0) {
+        summary += `- ${criticalIssues} critical issues\n`;
+      }
+      
+      if (highIssues > 0) {
+        summary += `- ${highIssues} high-severity issues\n`;
+      }
+      
+      if (mediumIssues > 0) {
+        summary += `- ${mediumIssues} medium-severity issues\n`;
+      }
+      
+      if (lowIssues > 0) {
+        summary += `- ${lowIssues} low-severity issues\n`;
+      }
+    } else {
+      summary += 'No quality issues found.';
+    }
+    
+    return summary;
   }
   
   /**
@@ -1217,49 +1361,98 @@ class DataQualityService {
   private generateRecommendations(issues: DataQualityIssue[], fieldStats: Record<string, FieldStatistics>): string[] {
     const recommendations: string[] = [];
     
-    // Add recommendations based on specific issues
-    if (issues.some(issue => issue.type === 'null_values' && (issue.severity === DataQualityIssueSeverity.CRITICAL || issue.severity === DataQualityIssueSeverity.HIGH))) {
-      recommendations.push('Fill in missing values for critical fields or filter out incomplete records');
+    // Skip if no issues
+    if (issues.length === 0) {
+      recommendations.push('No data quality issues found. The dataset is in good condition.');
+      return recommendations;
     }
     
-    if (issues.some(issue => issue.type === 'outliers' && (issue.severity === DataQualityIssueSeverity.CRITICAL || issue.severity === DataQualityIssueSeverity.HIGH))) {
-      recommendations.push('Investigate outliers in numeric fields to identify data entry errors or genuine anomalies');
+    // Group issues by type
+    const issuesByType: Record<string, DataQualityIssue[]> = {};
+    
+    for (const issue of issues) {
+      if (!issuesByType[issue.type]) {
+        issuesByType[issue.type] = [];
+      }
+      
+      issuesByType[issue.type].push(issue);
     }
     
-    if (issues.some(issue => issue.type === 'inconsistent_format' || issue.type === 'invalid_format')) {
-      recommendations.push('Standardize data entry formats and consider implementing validation rules');
+    // Generate recommendations for each issue type
+    if (issuesByType['null_values']) {
+      const nullIssues = issuesByType['null_values'];
+      const criticalNullIssues = nullIssues.filter(issue => issue.severity === DataQualityIssueSeverity.CRITICAL || issue.severity === DataQualityIssueSeverity.HIGH);
+      
+      if (criticalNullIssues.length > 0) {
+        const fieldNames = criticalNullIssues.map(issue => issue.field).join(', ');
+        recommendations.push(`Address critical null value issues in fields: ${fieldNames}. Consider using data imputation techniques or removing records with null values.`);
+      } else if (nullIssues.length > 0) {
+        recommendations.push(`Review and address null values in the dataset. Consider using default values or data imputation techniques.`);
+      }
     }
     
-    if (issues.some(issue => issue.type === 'wrong_type')) {
-      recommendations.push('Convert fields to their expected data types or review data collection processes');
+    if (issuesByType['missing_values']) {
+      const missingIssues = issuesByType['missing_values'];
+      const criticalMissingIssues = missingIssues.filter(issue => issue.severity === DataQualityIssueSeverity.CRITICAL || issue.severity === DataQualityIssueSeverity.HIGH);
+      
+      if (criticalMissingIssues.length > 0) {
+        const fieldNames = criticalMissingIssues.map(issue => issue.field).join(', ');
+        recommendations.push(`Address critical missing value issues in fields: ${fieldNames}. Consider using default values or removing records with missing values.`);
+      } else if (missingIssues.length > 0) {
+        recommendations.push(`Review and address missing values in the dataset. Consider validating data entry or implementing required field constraints.`);
+      }
     }
     
-    if (issues.some(issue => issue.type === 'duplicate_values' && issue.percentage > 50)) {
-      recommendations.push('Deduplicate records or review data collection to prevent duplicate entries');
+    if (issuesByType['duplicate_values']) {
+      recommendations.push(`Review potential duplicate records in the dataset. Consider implementing deduplication strategies or unique constraints.`);
     }
     
-    if (issues.some(issue => issue.type === 'out_of_range')) {
-      recommendations.push('Validate data ranges during data entry or review expected value ranges');
+    if (issuesByType['outliers']) {
+      const outlierIssues = issuesByType['outliers'];
+      
+      if (outlierIssues.length > 0) {
+        const fieldNames = outlierIssues.map(issue => issue.field).join(', ');
+        recommendations.push(`Review outliers in fields: ${fieldNames}. Check for data entry errors or consider applying normalization techniques.`);
+      }
+    }
+    
+    if (issuesByType['inconsistent_format'] || issuesByType['invalid_format']) {
+      const formatIssues = [...(issuesByType['inconsistent_format'] || []), ...(issuesByType['invalid_format'] || [])];
+      
+      if (formatIssues.length > 0) {
+        const fieldNames = formatIssues.map(issue => issue.field).join(', ');
+        recommendations.push(`Standardize formats in fields: ${fieldNames}. Implement data validation rules or format normalization in your ETL pipeline.`);
+      }
+    }
+    
+    if (issuesByType['wrong_type']) {
+      const typeIssues = issuesByType['wrong_type'];
+      
+      if (typeIssues.length > 0) {
+        const fieldNames = typeIssues.map(issue => issue.field).join(', ');
+        recommendations.push(`Fix data type issues in fields: ${fieldNames}. Ensure consistent data types throughout the dataset.`);
+      }
+    }
+    
+    if (issuesByType['out_of_range']) {
+      const rangeIssues = issuesByType['out_of_range'];
+      
+      if (rangeIssues.length > 0) {
+        const fieldNames = rangeIssues.map(issue => issue.field).join(', ');
+        recommendations.push(`Address out-of-range values in fields: ${fieldNames}. Implement value range validation or normalization.`);
+      }
     }
     
     // Add general recommendations
-    recommendations.push('Review data quality on a regular basis to catch issues early');
+    recommendations.push(`Implement automated data quality checks in your ETL pipeline to catch issues early.`);
     
-    if (issues.length > 10) {
-      recommendations.push('Consider implementing automated data validation at the source');
-    }
-    
-    // Make sure we have at least some recommendations
-    if (recommendations.length === 0) {
-      if (issues.length > 0) {
-        recommendations.push('Address the identified data quality issues to improve overall data quality');
-      } else {
-        recommendations.push('Continue maintaining high data quality standards');
-      }
+    if (issues.filter(issue => issue.severity === DataQualityIssueSeverity.CRITICAL || issue.severity === DataQualityIssueSeverity.HIGH).length > 0) {
+      recommendations.push(`Consider a data quality initiative to address high-severity issues before proceeding with analysis.`);
     }
     
     return recommendations;
   }
 }
 
+// Export singleton instance
 export const dataQualityService = new DataQualityService();

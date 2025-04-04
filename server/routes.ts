@@ -477,6 +477,53 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
+  // Bulk import properties
+  app.post('/api/properties/bulk-import', async (req, res) => {
+    try {
+      const propertiesSchema = z.array(z.object({
+        parcelId: z.string(),
+        address: z.string(),
+        squareFeet: z.number(),
+        // Optional fields
+        owner: z.string().nullable().optional(),
+        value: z.union([z.string(), z.null()]).optional(),
+        salePrice: z.union([z.string(), z.null()]).optional(),
+        yearBuilt: z.number().nullable().optional(),
+        landValue: z.union([z.string(), z.null()]).optional(),
+        coordinates: z.array(z.number()).nullable().optional(),
+        latitude: z.number().nullable().optional(),
+        longitude: z.number().nullable().optional(),
+        neighborhood: z.string().nullable().optional(),
+        propertyType: z.string().nullable().optional(),
+        bedrooms: z.number().nullable().optional(),
+        bathrooms: z.number().nullable().optional(),
+        lotSize: z.number().nullable().optional(),
+        zoning: z.string().nullable().optional(),
+        lastSaleDate: z.string().nullable().optional(),
+        taxAssessment: z.union([z.string(), z.null()]).optional(),
+        pricePerSqFt: z.union([z.string(), z.null()]).optional(),
+        attributes: z.record(z.any()).nullable().optional(),
+        sourceId: z.string().nullable().optional(),
+        zillowId: z.string().nullable().optional()
+      }));
+      
+      const validationResult = propertiesSchema.safeParse(req.body);
+      
+      if (!validationResult.success) {
+        return res.status(400).json({ 
+          error: 'Invalid property data format', 
+          details: validationResult.error.format()
+        });
+      }
+      
+      const result = await storage.bulkImportProperties(validationResult.data);
+      res.json(result);
+    } catch (error) {
+      console.error('Error bulk importing properties:', error);
+      res.status(500).json({ error: 'Failed to bulk import properties' });
+    }
+  });
+  
   // Find similar properties
   app.get('/api/properties/similar/:id', async (req, res) => {
     try {

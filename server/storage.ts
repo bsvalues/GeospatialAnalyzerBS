@@ -53,6 +53,7 @@ export interface IStorage {
   }): Promise<Property[]>;
   getPropertiesInRegion(bounds: [number, number, number, number]): Promise<Property[]>;
   createProperty(property: InsertProperty): Promise<Property>;
+  bulkImportProperties(properties: InsertProperty[]): Promise<{ success: boolean; count: number; errors?: any[] }>;
   searchProperties(searchText: string): Promise<Property[]>;
   
   // Income approach functionality was removed
@@ -313,6 +314,70 @@ export class MemStorage implements IStorage {
     };
     this.properties[id] = property;
     return property;
+  }
+  
+  async bulkImportProperties(properties: InsertProperty[]): Promise<{ success: boolean; count: number; errors?: any[] }> {
+    try {
+      const errors: any[] = [];
+      let successCount = 0;
+      
+      // Check for duplicate parcel IDs
+      const existingParcelIds = new Set(Object.values(this.properties).map(p => p.parcelId));
+      const newParcelIds = new Set();
+      
+      for (const property of properties) {
+        try {
+          // Validate required fields
+          if (!property.parcelId || !property.address || property.squareFeet === undefined) {
+            errors.push({
+              property,
+              error: 'Missing required fields: parcelId, address, or squareFeet'
+            });
+            continue;
+          }
+          
+          // Check for duplicate parcel IDs within existing properties
+          if (existingParcelIds.has(property.parcelId)) {
+            errors.push({
+              property,
+              error: `Duplicate parcel ID: ${property.parcelId}`
+            });
+            continue;
+          }
+          
+          // Check for duplicate parcel IDs within the import batch
+          if (newParcelIds.has(property.parcelId)) {
+            errors.push({
+              property,
+              error: `Duplicate parcel ID within import batch: ${property.parcelId}`
+            });
+            continue;
+          }
+          
+          // Create the property
+          await this.createProperty(property);
+          newParcelIds.add(property.parcelId);
+          successCount++;
+        } catch (err) {
+          errors.push({
+            property,
+            error: err instanceof Error ? err.message : String(err)
+          });
+        }
+      }
+      
+      return {
+        success: successCount > 0,
+        count: successCount,
+        errors: errors.length > 0 ? errors : undefined
+      };
+    } catch (error) {
+      return {
+        success: false,
+        count: 0,
+        errors: [error instanceof Error ? error.message : String(error)]
+      };
+    }
   }
 
   async searchProperties(searchText: string): Promise<Property[]> {
