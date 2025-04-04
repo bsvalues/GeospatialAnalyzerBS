@@ -28,6 +28,8 @@ interface AssistantResponse {
     description: string;
     action?: string;
   }[];
+  // Flag to indicate if we're using the fallback mode (AI is not available)
+  isFallbackMode?: boolean;
 }
 
 interface OnboardingTips {
@@ -318,7 +320,14 @@ export function ETLAssistant({
     <Card className="w-full max-w-md shadow-lg">
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
         <div>
-          <CardTitle className="text-md font-bold">ETL Assistant</CardTitle>
+          <div className="flex items-center gap-2">
+            <CardTitle className="text-md font-bold">ETL Assistant</CardTitle>
+            {state.response?.isFallbackMode && (
+              <Badge variant="secondary" className="text-xs">
+                Offline Mode
+              </Badge>
+            )}
+          </div>
           <CardDescription>AI-powered guidance for ETL management</CardDescription>
         </div>
         <Badge variant="outline" className="px-2">
@@ -476,10 +485,14 @@ export function ETLAssistant({
           </div>
         </div>
         
-        {!isOpenAIConfigured() && (
+        {(!isOpenAIConfigured() || state.response?.isFallbackMode) && (
           <div className="flex items-center text-xs text-muted-foreground mt-2">
             <Lock className="h-3 w-3 mr-1" />
-            <span>Set OPENAI_API_KEY for enhanced capabilities</span>
+            <span>
+              {state.response?.isFallbackMode 
+                ? "AI assistance is in offline mode due to API limits" 
+                : "Set OPENAI_API_KEY for enhanced capabilities"}
+            </span>
           </div>
         )}
       </CardFooter>

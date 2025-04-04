@@ -454,14 +454,17 @@ export const getETLAssistance = async (
   message: string;
   tips: string[];
   suggestedActions: { label: string; description: string; action?: string }[];
+  isFallbackMode?: boolean;
 }> => {
-  const client = getOpenAIClient();
-  
-  if (!client) {
-    throw new Error('OpenAI API is not configured. Please set OPENAI_API_KEY environment variable.');
-  }
-  
   try {
+    const client = getOpenAIClient();
+    
+    // If OpenAI client is not available, return fallback response
+    if (!client) {
+      console.log('OpenAI API key not configured, using fallback response');
+      return getFallbackETLAssistance(context, dataSources, userExperience, false);
+    }
+    
     // Build a context description
     let contextDescription = `User is on the ${context.page} page`;
     if (context.action) {
@@ -535,78 +538,221 @@ export const getETLAssistance = async (
       Only respond with valid JSON.
     `;
     
-    // Make the API call
-    const response = await client.chat.completions.create({
-      model: 'gpt-4o', // the newest OpenAI model is "gpt-4o" which was released May 13, 2024. do not change this unless explicitly requested by the user
-      messages: [
-        {
-          role: 'system',
-          content: 'You are an ETL assistant for a property data management system. Your goal is to provide helpful, contextual guidance to users working with ETL processes. Be supportive, clear, and educational while avoiding overly technical jargon for beginners. For intermediate and expert users, provide more detailed technical information. Always aim to improve the user\'s understanding of ETL concepts and best practices.'
-        },
-        { role: 'user', content: prompt }
-      ],
-      temperature: 0.7,
-      max_tokens: 1024,
-      response_format: { type: 'json_object' }
-    });
-    
-    const content = response.choices[0]?.message?.content || '';
-    
     try {
-      // Parse the JSON response
-      const result = JSON.parse(content);
-      
-      // Format and validate the result
-      return {
-        message: result.message || 'Welcome to the ETL Management system! How can I help you today?',
-        tips: Array.isArray(result.tips) ? result.tips : [
-          'Make sure your data sources are properly configured before running ETL jobs',
-          'Regular validation of your transformation rules helps maintain data quality',
-          'Monitor job execution times to identify optimization opportunities'
-        ],
-        suggestedActions: Array.isArray(result.suggestedActions) ? result.suggestedActions : [
-          { 
-            label: 'Create New Data Source', 
-            description: 'Set up a connection to a new data source',
-            action: 'createDataSource'
-          },
+      // Make the API call
+      const response = await client.chat.completions.create({
+        model: 'gpt-4o', // the newest OpenAI model is "gpt-4o" which was released May 13, 2024. do not change this unless explicitly requested by the user
+        messages: [
           {
-            label: 'Configure Transformation Rules',
-            description: 'Define how data should be processed',
-            action: 'createTransformationRule'
-          }
-        ]
-      };
-    } catch (parseError) {
-      console.error('Error parsing AI response:', parseError);
-      
-      // Return a fallback if JSON parsing fails
-      return {
-        message: 'Welcome to the ETL Management system! I\'m here to help you manage your data pipelines effectively.',
-        tips: [
-          'Ensure your data sources have the correct connection details',
-          'Test connections before setting up transformation rules',
-          'Schedule regular ETL jobs for consistent data updates'
-        ],
-        suggestedActions: [
-          { 
-            label: 'Add Data Source', 
-            description: 'Connect to a new database, API, or file source',
-            action: 'createDataSource'
+            role: 'system',
+            content: 'You are an ETL assistant for a property data management system. Your goal is to provide helpful, contextual guidance to users working with ETL processes. Be supportive, clear, and educational while avoiding overly technical jargon for beginners. For intermediate and expert users, provide more detailed technical information. Always aim to improve the user\'s understanding of ETL concepts and best practices.'
           },
-          {
-            label: 'Create Transformation', 
-            description: 'Define rules to standardize and clean your data',
-            action: 'createTransformationRule'
-          }
-        ]
-      };
+          { role: 'user', content: prompt }
+        ],
+        temperature: 0.7,
+        max_tokens: 1024,
+        response_format: { type: 'json_object' }
+      });
+      
+      const content = response.choices[0]?.message?.content || '';
+      
+      try {
+        // Parse the JSON response
+        const result = JSON.parse(content);
+        
+        // Format and validate the result
+        return {
+          message: result.message || 'Welcome to the ETL Management system! How can I help you today?',
+          tips: Array.isArray(result.tips) ? result.tips : [
+            'Make sure your data sources are properly configured before running ETL jobs',
+            'Regular validation of your transformation rules helps maintain data quality',
+            'Monitor job execution times to identify optimization opportunities'
+          ],
+          suggestedActions: Array.isArray(result.suggestedActions) ? result.suggestedActions : [
+            { 
+              label: 'Create New Data Source', 
+              description: 'Set up a connection to a new data source',
+              action: 'createDataSource'
+            },
+            {
+              label: 'Configure Transformation Rules',
+              description: 'Define how data should be processed',
+              action: 'createTransformationRule'
+            }
+          ]
+        };
+      } catch (parseError) {
+        console.error('Error parsing AI response:', parseError);
+        // Return a fallback if JSON parsing fails
+        return getFallbackETLAssistance(context, dataSources, userExperience, false);
+      }
+    } catch (apiError: any) {
+      console.error('OpenAI API error:', apiError);
+      
+      // Check for rate limit or quota errors
+      if (apiError.status === 429 || 
+          (apiError.error && apiError.error.type === 'insufficient_quota') ||
+          (typeof apiError.message === 'string' && apiError.message.includes('rate limit'))) {
+        console.log('OpenAI API quota or rate limit exceeded, using fallback response');
+        return getFallbackETLAssistance(context, dataSources, userExperience, true);
+      }
+      
+      // For other API errors, also use fallback
+      return getFallbackETLAssistance(context, dataSources, userExperience, false);
     }
   } catch (error) {
     console.error('Error generating ETL assistance with OpenAI:', error);
-    throw new Error('Failed to generate ETL assistance');
+    // For any other errors, use fallback
+    return getFallbackETLAssistance(context, dataSources, userExperience, false);
   }
 };
+
+/**
+ * Generate fallback ETL assistance responses when OpenAI API is unavailable
+ */
+function getFallbackETLAssistance(
+  context: {
+    page: string;
+    action?: string;
+    selectedSource?: EtlDataSource;
+    selectedRule?: EtlTransformationRule;
+    selectedJob?: EtlJob;
+  },
+  dataSources: EtlDataSource[] = [],
+  userExperience: 'beginner' | 'intermediate' | 'expert' = 'beginner',
+  isApiError: boolean = false
+): {
+  message: string;
+  tips: string[];
+  suggestedActions: { label: string; description: string; action?: string }[];
+  isFallbackMode: boolean;
+} {
+  // Start with API status message
+  let message = isApiError
+    ? "AI assistance is currently running in offline mode due to API quota limits. Basic guidance is still available."
+    : "Welcome to the ETL Management system!";
+    
+  // Set fallback mode flag to be passed to the client
+  const isFallbackMode = true;
+  
+  const tips: string[] = [];
+  const suggestedActions: { label: string; description: string; action?: string }[] = [];
+  
+  // Add page-specific content
+  if (context.page === 'data-sources') {
+    message += " You're viewing your ETL data sources.";
+    tips.push(
+      "Ensure your connection details are accurate before testing connections",
+      "Different data source types (database, API, file) require different connection parameters",
+      "Use descriptive names and descriptions for easier identification"
+    );
+    suggestedActions.push(
+      {
+        label: "Add Data Source",
+        description: "Create a new connection to a database, API or file",
+        action: "createDataSource"
+      },
+      {
+        label: "Test Connections",
+        description: "Verify all data source connections are working",
+        action: "testConnections"
+      }
+    );
+    
+    // Add selected source specific tips
+    if (context.selectedSource) {
+      message += ` You've selected the "${context.selectedSource.name}" data source.`;
+      
+      if (!context.selectedSource.isConnected) {
+        tips.push(`The "${context.selectedSource.name}" is currently disconnected. Try connecting it.`);
+      }
+    }
+  } else if (context.page === 'transformations') {
+    message += " You're working with data transformation rules.";
+    tips.push(
+      "Transformation rules define how to clean, standardize, and restructure your data",
+      "Test transformation rules with sample data before applying them in jobs",
+      "Consider data type consistency when writing transformations"
+    );
+    suggestedActions.push(
+      {
+        label: "Add Transformation",
+        description: "Create a new data transformation rule",
+        action: "createTransformationRule"
+      },
+      {
+        label: "View Examples",
+        description: "See transformation rule examples",
+        action: "viewExamples"
+      }
+    );
+    
+    if (context.selectedRule) {
+      message += ` You've selected the "${context.selectedRule.name}" rule.`;
+    }
+  } else if (context.page === 'jobs' || context.page === 'etl-jobs') {
+    message += " You're managing your ETL jobs.";
+    tips.push(
+      "Schedule jobs during off-peak hours to minimize system impact",
+      "Monitor job execution times to optimize performance",
+      "Set up notifications for failed jobs to quickly address issues"
+    );
+    suggestedActions.push(
+      {
+        label: "Create Job",
+        description: "Set up a new ETL job with source, target and transformations",
+        action: "createJob"
+      },
+      {
+        label: "View Job History",
+        description: "Check past job execution status and results",
+        action: "viewJobHistory"
+      }
+    );
+    
+    if (context.selectedJob) {
+      message += ` You've selected the "${context.selectedJob.name}" job.`;
+      
+      if (context.selectedJob.status === 'failed') {
+        tips.push("This job has failed. Check the logs for error details.");
+      }
+    }
+  } else {
+    // Generic ETL management tips
+    message += " I'm here to help you manage your data pipelines.";
+    tips.push(
+      "Set up data sources before creating transformation rules",
+      "Organize your ETL workflow with clear naming conventions",
+      "Regularly review job performance metrics to optimize your pipelines"
+    );
+    suggestedActions.push(
+      {
+        label: "Explore Data Sources",
+        description: "View and manage your data connections",
+        action: "navigateToDataSources"
+      },
+      {
+        label: "Create ETL Job",
+        description: "Set up a new data pipeline",
+        action: "createJob"
+      }
+    );
+  }
+  
+  // Customize for user experience level
+  if (userExperience === 'beginner') {
+    tips.push("Take time to explore the interface and understand the ETL workflow");
+  } else if (userExperience === 'expert') {
+    tips.push("Consider creating reusable transformation templates for common data patterns");
+  }
+  
+  return {
+    message,
+    tips,
+    suggestedActions,
+    isFallbackMode
+  };
+}
 
 /**
  * Get onboarding tips for ETL management features

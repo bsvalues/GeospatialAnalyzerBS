@@ -1112,23 +1112,50 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
       
-      if (!isOpenAIConfigured()) {
-        return res.status(500).json({ 
-          error: 'OpenAI API is not configured. Please set the OPENAI_API_KEY environment variable.' 
+      // We don't need to check if OpenAI is configured anymore as our implementation now handles this gracefully
+      // with fallback responses in the getETLAssistance function
+      
+      try {
+        const result = await getETLAssistance(
+          context,
+          dataSources || [],
+          userExperience || 'beginner',
+          previousInteractions || []
+        );
+        
+        res.json(result);
+      } catch (error) {
+        console.error('Error in ETL assistant:', error);
+        
+        // Return a user-friendly fallback response instead of an error
+        res.json({
+          message: "AI assistance is currently running in offline mode. Basic guidance is still available.",
+          tips: [
+            "You can continue using the ETL features with standard functionality.",
+            "The system uses predefined guidance when AI assistance is unavailable.",
+            "Try selecting specific data sources to get contextual tips about them."
+          ],
+          suggestedActions: [
+            { 
+              label: "Continue",
+              description: "Proceed with basic assistance",
+              action: "continue"
+            },
+            {
+              label: "Learn ETL Basics",
+              description: "Read documentation on ETL concepts",
+              action: "learn_etl"
+            }
+          ],
+          isFallbackMode: true
         });
       }
-      
-      const result = await getETLAssistance(
-        context,
-        dataSources || [],
-        userExperience || 'beginner',
-        previousInteractions || []
-      );
-      
-      res.json(result);
     } catch (error) {
       console.error('Error generating ETL assistance:', error);
-      res.status(500).json({ error: 'Failed to generate ETL assistance' });
+      res.status(500).json({ 
+        error: 'Failed to generate ETL assistance',
+        message: "ETL Assistant is experiencing technical difficulties. Basic functionality is still available."
+      });
     }
   });
   
