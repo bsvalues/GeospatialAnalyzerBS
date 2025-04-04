@@ -1,25 +1,25 @@
-/**
- * AlertService is responsible for monitoring ETL jobs and creating alerts
- * when issues are detected.
- */
-
 import { ETLJob } from './ETLTypes';
-import { JobRun } from './ETLPipelineManager';
 
 /**
- * Alert Types
+ * Alert type enum
  */
 export enum AlertType {
-  JOB_FAILURE = 'JOB_FAILURE',
-  DATA_QUALITY = 'DATA_QUALITY',
-  PERFORMANCE = 'PERFORMANCE',
-  SCHEDULED_JOB_MISSED = 'SCHEDULED_JOB_MISSED',
-  SYSTEM = 'SYSTEM',
-  CUSTOM = 'CUSTOM'
+  JOB_SCHEDULED = 'job_scheduled',
+  JOB_STARTED = 'job_started',
+  JOB_COMPLETED = 'job_completed',
+  JOB_FAILURE = 'job_failure',
+  JOB_CANCELLED = 'job_cancelled',
+  DATA_QUALITY = 'data_quality',
+  OPTIMIZATION = 'optimization',
+  SYSTEM = 'system',
+  CONNECTION = 'connection',
+  TRANSFORMATION = 'transformation',
+  SECURITY = 'security',
+  CUSTOM = 'custom'
 }
 
 /**
- * Alert Severity Levels
+ * Alert severity enum
  */
 export enum AlertSeverity {
   INFO = 'info',
@@ -29,13 +29,29 @@ export enum AlertSeverity {
 }
 
 /**
- * Alert State
+ * Alert state enum
  */
 export enum AlertState {
   ACTIVE = 'active',
   ACKNOWLEDGED = 'acknowledged',
   RESOLVED = 'resolved',
-  SILENCED = 'silenced'
+  DISMISSED = 'dismissed'
+}
+
+/**
+ * Job metrics interface
+ */
+export interface JobMetrics {
+  recordsProcessed: number;
+  recordsCreated: number;
+  recordsUpdated: number;
+  recordsDeleted: number;
+  errorRecords: number;
+  duration: number;
+  startTime: Date;
+  endTime: Date;
+  peakMemoryUsage: number;
+  avgCpuUsage: number;
 }
 
 /**
@@ -43,120 +59,199 @@ export enum AlertState {
  */
 export interface Alert {
   id: string;
-  jobId?: string;
-  severity: AlertSeverity;
   type: AlertType;
+  title: string;
   message: string;
-  details?: any;
+  severity: AlertSeverity;
+  timestamp: Date;
   state: AlertState;
-  createdAt: Date;
-  updatedAt: Date;
-  acknowledgedAt?: Date;
-  resolvedAt?: Date;
-  silencedUntil?: Date;
-  notificationSent: boolean;
-}
-
-/**
- * Alert Creation interface
- */
-export interface AlertCreation {
   jobId?: string;
-  severity: AlertSeverity;
-  type: AlertType;
-  message: string;
-  details?: any;
+  jobName?: string;
+  details?: Record<string, any>;
+  actions?: { label: string, action: string }[];
+  createdAt?: Date;
+  updatedAt?: Date;
 }
 
 /**
- * Alert Rule types
+ * Alert rule interface
  */
-export enum AlertRuleType {
-  JOB_FAILURE = 'JOB_FAILURE',
-  JOB_DURATION = 'JOB_DURATION',
-  RECORD_COUNT = 'RECORD_COUNT',
-  ERROR_RATE = 'ERROR_RATE',
-  SCHEDULED_JOB_MISSED = 'SCHEDULED_JOB_MISSED',
-  CUSTOM = 'CUSTOM'
-}
-
-/**
- * Alert Rule interface
- */
-export interface AlertRule {
+interface AlertRule {
   id: string;
-  name: string;
-  description?: string;
-  type: AlertRuleType;
-  jobId?: string; // If null, applies to all jobs
-  enabled: boolean;
+  type: AlertType;
+  condition: (data: any) => boolean;
   severity: AlertSeverity;
-  conditions: any; // Depends on rule type
-  throttling?: {
-    silenceDuration: number; // Minutes
-    maxAlertsPerHour: number;
-  };
-  notificationChannels?: string[];
+  title: string;
+  message: string | ((data: any) => string);
+  enabled: boolean;
 }
 
+/**
+ * Alert listener interface
+ */
+type AlertListener = (alert: Alert) => void;
+
+/**
+ * Alert service for managing alerts in the ETL system
+ */
 class AlertService {
   private alerts: Alert[] = [];
   private rules: AlertRule[] = [];
+  private listeners: AlertListener[] = [];
+  private maxAlerts: number = 1000;
   
   constructor() {
-    // Initialize with default rules
+    this.createDefaultRules();
   }
   
   /**
-   * Create default monitoring rules
+   * Create default alert rules
    */
-  createDefaultRules(): void {
-    this.rules = [
-      {
-        id: 'rule-1',
-        name: 'Job Failure',
-        description: 'Alert when a job fails',
-        type: AlertRuleType.JOB_FAILURE,
-        enabled: true,
-        severity: AlertSeverity.ERROR,
-        conditions: {
-          status: 'failed'
-        }
-      },
-      {
-        id: 'rule-2',
-        name: 'Long Running Job',
-        description: 'Alert when a job takes too long to complete',
-        type: AlertRuleType.JOB_DURATION,
-        enabled: true,
-        severity: AlertSeverity.WARNING,
-        conditions: {
-          durationThreshold: 30 * 60 * 1000 // 30 minutes
-        }
-      },
-      {
-        id: 'rule-3',
-        name: 'Low Record Count',
-        description: 'Alert when a job processes fewer records than expected',
-        type: AlertRuleType.RECORD_COUNT,
-        enabled: true,
-        severity: AlertSeverity.WARNING,
-        conditions: {
-          minRecords: 100
-        }
-      },
-      {
-        id: 'rule-4',
-        name: 'Missed Scheduled Job',
-        description: 'Alert when a scheduled job is missed',
-        type: AlertRuleType.SCHEDULED_JOB_MISSED,
-        enabled: true,
-        severity: AlertSeverity.WARNING,
-        conditions: {
-          toleranceMinutes: 30
-        }
-      }
-    ] as AlertRule[];
+  private createDefaultRules(): void {
+    // Job started rule
+    this.addRule({
+      id: 'rule-job-started',
+      type: AlertType.JOB_STARTED,
+      condition: () => true,
+      severity: AlertSeverity.INFO,
+      title: 'Job Started',
+      message: (data) => `Job ${data.jobName} has started execution`,
+      enabled: true
+    });
+    
+    // Job completed rule
+    this.addRule({
+      id: 'rule-job-completed',
+      type: AlertType.JOB_COMPLETED,
+      condition: () => true,
+      severity: AlertSeverity.INFO,
+      title: 'Job Completed',
+      message: (data) => `Job ${data.jobName} has completed successfully (${data.duration}ms)`,
+      enabled: true
+    });
+    
+    // Job failure rule
+    this.addRule({
+      id: 'rule-job-failure',
+      type: AlertType.JOB_FAILURE,
+      condition: () => true,
+      severity: AlertSeverity.ERROR,
+      title: 'Job Failed',
+      message: (data) => `Job ${data.jobName} has failed: ${data.error}`,
+      enabled: true
+    });
+    
+    // Job cancelled rule
+    this.addRule({
+      id: 'rule-job-cancelled',
+      type: AlertType.JOB_CANCELLED,
+      condition: () => true,
+      severity: AlertSeverity.WARNING,
+      title: 'Job Cancelled',
+      message: (data) => `Job ${data.jobName} was cancelled`,
+      enabled: true
+    });
+    
+    // Low data quality rule
+    this.addRule({
+      id: 'rule-low-data-quality',
+      type: AlertType.DATA_QUALITY,
+      condition: (data) => data.qualityScore < 0.7,
+      severity: AlertSeverity.WARNING,
+      title: 'Low Data Quality',
+      message: (data) => `Job ${data.jobName} produced data with low quality score (${data.qualityScore})`,
+      enabled: true
+    });
+    
+    // Critical data quality rule
+    this.addRule({
+      id: 'rule-critical-data-quality',
+      type: AlertType.DATA_QUALITY,
+      condition: (data) => data.qualityScore < 0.5,
+      severity: AlertSeverity.ERROR,
+      title: 'Critical Data Quality',
+      message: (data) => `Job ${data.jobName} produced data with critically low quality score (${data.qualityScore})`,
+      enabled: true
+    });
+    
+    // High error rate rule
+    this.addRule({
+      id: 'rule-high-error-rate',
+      type: AlertType.DATA_QUALITY,
+      condition: (data) => data.metrics && data.metrics.errorRecords > 100,
+      severity: AlertSeverity.WARNING,
+      title: 'High Error Rate',
+      message: (data) => `Job ${data.jobName} had ${data.metrics.errorRecords} errors during processing`,
+      enabled: true
+    });
+    
+    // Connection failure rule
+    this.addRule({
+      id: 'rule-connection-failure',
+      type: AlertType.CONNECTION,
+      condition: () => true,
+      severity: AlertSeverity.ERROR,
+      title: 'Connection Failure',
+      message: (data) => `Failed to connect to ${data.connectionName}: ${data.error}`,
+      enabled: true
+    });
+    
+    // Optimization suggestion rule
+    this.addRule({
+      id: 'rule-optimization-suggestion',
+      type: AlertType.OPTIMIZATION,
+      condition: () => true,
+      severity: AlertSeverity.INFO,
+      title: 'Optimization Suggestion',
+      message: (data) => `New optimization suggestion for ${data.jobName}: ${data.suggestion}`,
+      enabled: true
+    });
+  }
+  
+  /**
+   * Add an alert rule
+   */
+  addRule(rule: AlertRule): void {
+    this.rules.push(rule);
+  }
+  
+  /**
+   * Remove an alert rule
+   */
+  removeRule(ruleId: string): void {
+    this.rules = this.rules.filter(rule => rule.id !== ruleId);
+  }
+  
+  /**
+   * Enable an alert rule
+   */
+  enableRule(ruleId: string): void {
+    const rule = this.rules.find(rule => rule.id === ruleId);
+    if (rule) {
+      rule.enabled = true;
+    }
+  }
+  
+  /**
+   * Disable an alert rule
+   */
+  disableRule(ruleId: string): void {
+    const rule = this.rules.find(rule => rule.id === ruleId);
+    if (rule) {
+      rule.enabled = false;
+    }
+  }
+  
+  /**
+   * Add alert listener
+   */
+  addListener(listener: AlertListener): () => void {
+    this.listeners.push(listener);
+    
+    // Return function to remove listener
+    return () => {
+      this.listeners = this.listeners.filter(l => l !== listener);
+    };
   }
   
   /**
@@ -167,6 +262,13 @@ class AlertService {
   }
   
   /**
+   * Get alerts by job
+   */
+  getAlertsByJob(jobId: string): Alert[] {
+    return this.alerts.filter(alert => alert.jobId === jobId);
+  }
+  
+  /**
    * Get active alerts
    */
   getActiveAlerts(): Alert[] {
@@ -174,181 +276,211 @@ class AlertService {
   }
   
   /**
-   * Get alerts by job ID
+   * Get alerts by type
    */
-  getAlertsByJob(jobId: string): Alert[] {
-    return this.alerts.filter(alert => alert.jobId === jobId);
+  getAlertsByType(type: AlertType): Alert[] {
+    return this.alerts.filter(alert => alert.type === type);
   }
   
   /**
-   * Create an alert
+   * Get alerts by severity
    */
-  createAlert(alertCreation: AlertCreation): Alert {
-    const now = new Date();
+  getAlertsBySeverity(severity: AlertSeverity): Alert[] {
+    return this.alerts.filter(alert => alert.severity === severity);
+  }
+  
+  /**
+   * Create an alert from a job event
+   */
+  createAlert(type: AlertType, data: Record<string, any>): Alert {
+    // Find matching rules
+    const matchingRules = this.rules.filter(rule => 
+      rule.type === type && 
+      rule.enabled && 
+      rule.condition(data)
+    );
     
+    if (matchingRules.length === 0) {
+      // No matching rules, don't create an alert
+      return null;
+    }
+    
+    // Use the highest severity rule that matched
+    const ruleSeverityOrder = [
+      AlertSeverity.INFO,
+      AlertSeverity.WARNING,
+      AlertSeverity.ERROR,
+      AlertSeverity.CRITICAL
+    ];
+    
+    matchingRules.sort((a, b) => 
+      ruleSeverityOrder.indexOf(b.severity) - ruleSeverityOrder.indexOf(a.severity)
+    );
+    
+    const rule = matchingRules[0];
+    
+    // Generate message if it's a function
+    const message = typeof rule.message === 'function' 
+      ? rule.message(data) 
+      : rule.message;
+    
+    // Create the alert
     const alert: Alert = {
-      id: `alert-${Date.now()}`,
-      jobId: alertCreation.jobId,
-      severity: alertCreation.severity,
-      type: alertCreation.type,
-      message: alertCreation.message,
-      details: alertCreation.details,
+      id: `alert-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      type,
+      title: rule.title,
+      message,
+      severity: rule.severity,
+      timestamp: new Date(),
       state: AlertState.ACTIVE,
-      createdAt: now,
-      updatedAt: now,
-      notificationSent: false
+      jobId: data.jobId,
+      jobName: data.jobName,
+      details: { ...data }
     };
     
-    this.alerts.push(alert);
-    
-    // In a real implementation, this would also send notifications
-    // based on the alert severity and notification channels
-    console.log(`Alert created: ${alert.message}`);
+    // Add the alert to the list
+    this.addAlert(alert);
     
     return alert;
   }
   
   /**
-   * Mark an alert as acknowledged
+   * Add an alert to the list
    */
-  acknowledgeAlert(alertId: string): Alert | undefined {
-    const alert = this.alerts.find(a => a.id === alertId);
+  private addAlert(alert: Alert): void {
+    this.alerts.unshift(alert);
     
-    if (alert && alert.state === AlertState.ACTIVE) {
+    // Trim the alerts list if it's too long
+    if (this.alerts.length > this.maxAlerts) {
+      this.alerts = this.alerts.slice(0, this.maxAlerts);
+    }
+    
+    // Notify listeners
+    this.notifyListeners(alert);
+  }
+  
+  /**
+   * Notify listeners of a new alert
+   */
+  private notifyListeners(alert: Alert): void {
+    for (const listener of this.listeners) {
+      try {
+        listener(alert);
+      } catch (error) {
+        console.error('Error in alert listener:', error);
+      }
+    }
+  }
+  
+  /**
+   * Acknowledge an alert
+   */
+  acknowledgeAlert(alertId: string): void {
+    const alert = this.alerts.find(alert => alert.id === alertId);
+    if (alert) {
       alert.state = AlertState.ACKNOWLEDGED;
-      alert.acknowledgedAt = new Date();
       alert.updatedAt = new Date();
-      console.log(`Alert ${alertId} acknowledged`);
     }
-    
-    return alert;
   }
   
   /**
-   * Mark an alert as resolved
+   * Resolve an alert
    */
-  resolveAlert(alertId: string): Alert | undefined {
-    const alert = this.alerts.find(a => a.id === alertId);
-    
-    if (alert && (alert.state === AlertState.ACTIVE || alert.state === AlertState.ACKNOWLEDGED)) {
+  resolveAlert(alertId: string): void {
+    const alert = this.alerts.find(alert => alert.id === alertId);
+    if (alert) {
       alert.state = AlertState.RESOLVED;
-      alert.resolvedAt = new Date();
       alert.updatedAt = new Date();
-      console.log(`Alert ${alertId} resolved`);
     }
-    
-    return alert;
   }
   
   /**
-   * Silence an alert for a duration
+   * Dismiss an alert
    */
-  silenceAlert(alertId: string, durationMinutes: number): Alert | undefined {
-    const alert = this.alerts.find(a => a.id === alertId);
-    
-    if (alert && alert.state === AlertState.ACTIVE) {
-      const silencedUntil = new Date();
-      silencedUntil.setMinutes(silencedUntil.getMinutes() + durationMinutes);
-      
-      alert.state = AlertState.SILENCED;
-      alert.silencedUntil = silencedUntil;
+  dismissAlert(alertId: string): void {
+    const alert = this.alerts.find(alert => alert.id === alertId);
+    if (alert) {
+      alert.state = AlertState.DISMISSED;
       alert.updatedAt = new Date();
-      console.log(`Alert ${alertId} silenced until ${silencedUntil.toISOString()}`);
-    }
-    
-    return alert;
-  }
-  
-  /**
-   * Process job run to check for alerts
-   */
-  processJobRun(jobRun: JobRun, job: ETLJob): void {
-    // Check each rule
-    for (const rule of this.rules.filter(r => r.enabled && (!r.jobId || r.jobId === job.id))) {
-      switch (rule.type) {
-        case AlertRuleType.JOB_FAILURE:
-          // Check if job failed
-          if (jobRun.status === 'failed') {
-            this.createAlert({
-              jobId: job.id,
-              severity: rule.severity,
-              type: AlertType.JOB_FAILURE,
-              message: `Job "${job.name}" failed`,
-              details: {
-                runId: jobRun.id,
-                errors: jobRun.errors
-              }
-            });
-          }
-          break;
-        
-        case AlertRuleType.JOB_DURATION:
-          // Check if job took too long
-          if (jobRun.endTime) {
-            const duration = new Date(jobRun.endTime).getTime() - new Date(jobRun.startTime).getTime();
-            if (duration > rule.conditions.durationThreshold) {
-              this.createAlert({
-                jobId: job.id,
-                severity: rule.severity,
-                type: AlertType.PERFORMANCE,
-                message: `Job "${job.name}" took too long to complete (${Math.round(duration / 1000)}s)`,
-                details: {
-                  runId: jobRun.id,
-                  duration,
-                  threshold: rule.conditions.durationThreshold
-                }
-              });
-            }
-          }
-          break;
-        
-        case AlertRuleType.RECORD_COUNT:
-          // Check if job processed enough records
-          if (jobRun.recordsProcessed < rule.conditions.minRecords) {
-            this.createAlert({
-              jobId: job.id,
-              severity: rule.severity,
-              type: AlertType.DATA_QUALITY,
-              message: `Job "${job.name}" processed fewer records than expected (${jobRun.recordsProcessed} < ${rule.conditions.minRecords})`,
-              details: {
-                runId: jobRun.id,
-                recordsProcessed: jobRun.recordsProcessed,
-                minRecords: rule.conditions.minRecords
-              }
-            });
-          }
-          break;
-      }
     }
   }
   
   /**
-   * Add a custom rule
+   * Clear all alerts
    */
-  addRule(rule: AlertRule): void {
-    this.rules.push(rule);
+  clearAlerts(): void {
+    this.alerts = [];
   }
   
   /**
-   * Get all rules
+   * Create a job started alert
    */
-  getRules(): AlertRule[] {
-    return this.rules;
+  createJobStartedAlert(job: ETLJob): Alert {
+    return this.createAlert(AlertType.JOB_STARTED, {
+      jobId: job.id,
+      jobName: job.name
+    });
   }
   
   /**
-   * Clear expired silenced alerts
+   * Create a job completed alert
    */
-  clearExpiredSilences(): void {
-    const now = new Date();
-    
-    for (const alert of this.alerts) {
-      if (alert.state === AlertState.SILENCED && alert.silencedUntil && alert.silencedUntil < now) {
-        alert.state = AlertState.ACTIVE;
-        alert.updatedAt = now;
-        console.log(`Silence expired for alert ${alert.id}`);
-      }
-    }
+  createJobCompletedAlert(job: ETLJob, duration: number): Alert {
+    return this.createAlert(AlertType.JOB_COMPLETED, {
+      jobId: job.id,
+      jobName: job.name,
+      duration
+    });
+  }
+  
+  /**
+   * Create a job failure alert
+   */
+  createJobFailureAlert(job: ETLJob, error: any): Alert {
+    return this.createAlert(AlertType.JOB_FAILURE, {
+      jobId: job.id,
+      jobName: job.name,
+      error: error instanceof Error ? error.message : String(error)
+    });
+  }
+  
+  /**
+   * Create a job cancelled alert
+   */
+  createJobCancelledAlert(job: ETLJob): Alert {
+    return this.createAlert(AlertType.JOB_CANCELLED, {
+      jobId: job.id,
+      jobName: job.name
+    });
+  }
+  
+  /**
+   * Create a data quality alert
+   */
+  createDataQualityAlert(job: ETLJob, qualityScore: number, details?: Record<string, any>): Alert {
+    return this.createAlert(AlertType.DATA_QUALITY, {
+      jobId: job.id,
+      jobName: job.name,
+      qualityScore,
+      ...details
+    });
+  }
+  
+  /**
+   * Create a connection failure alert
+   */
+  createConnectionFailureAlert(
+    connectionName: string, 
+    connectionType: string, 
+    error: any, 
+    details?: Record<string, any>
+  ): Alert {
+    return this.createAlert(AlertType.CONNECTION, {
+      connectionName,
+      connectionType,
+      error: error instanceof Error ? error.message : String(error),
+      ...details
+    });
   }
 }
 

@@ -1,425 +1,566 @@
-import { DataSource, ConnectionTestResult, DataSourceType, DatabaseType, ApiType, FileType } from './ETLTypes';
+import { DataSource, DataDestination, DatabaseType, ApiType, FileFormat, AuthType } from './ETLTypes';
+import { alertService } from './AlertService';
 
 /**
- * DataConnector is responsible for connecting to various data sources
- * and handling data extraction.
+ * Connection test result interface
+ */
+export interface ConnectionTestResult {
+  success: boolean;
+  message: string;
+  details?: Record<string, any>;
+  timestamp: Date;
+}
+
+/**
+ * Load result interface
+ */
+export interface LoadResult {
+  success: boolean;
+  created: number;
+  updated: number;
+  deleted: number;
+  errors: string[];
+}
+
+/**
+ * Data connector for working with data sources and destinations
  */
 class DataConnector {
+  // Cache connection test results
+  private connectionTests: Map<string, ConnectionTestResult> = new Map();
+  
+  constructor() {
+    // Default constructor
+  }
+  
   /**
-   * Test connection to a data source
+   * Test a connection to a data source
    */
-  async testConnection(dataSource: DataSource): Promise<ConnectionTestResult> {
-    // In a real implementation, this would actually test the connection
-    // For demo purposes, we'll simulate success/failure
+  async testConnection(source: DataSource): Promise<ConnectionTestResult> {
+    console.log(`Testing connection to ${source.name} (${source.type})`);
+    
+    const connectionId = `${source.id}`;
+    const startTime = new Date();
+    let success = false;
+    let message = '';
+    let details = {};
+    
     try {
-      console.log(`Testing connection to ${dataSource.name}`);
-      
-      // Simulate connection test based on data source type
-      switch (dataSource.type) {
-        case DataSourceType.DATABASE:
-          return this.testDatabaseConnection(dataSource);
-        
-        case DataSourceType.API:
-          return this.testApiConnection(dataSource);
-        
-        case DataSourceType.FILE:
-          return this.testFileConnection(dataSource);
-        
-        case DataSourceType.IN_MEMORY:
-          return this.testInMemoryConnection(dataSource);
-        
-        case DataSourceType.CUSTOM:
-          return {
-            success: true,
-            message: "Custom data source connection tested successfully",
-            timestamp: new Date()
-          };
-        
+      // Simulate connection test based on source type
+      switch (source.type) {
+        case 'database':
+          ({ success, message, details } = await this.testDatabaseConnection(source));
+          break;
+        case 'api':
+          ({ success, message, details } = await this.testApiConnection(source));
+          break;
+        case 'file':
+          ({ success, message, details } = await this.testFileConnection(source));
+          break;
+        case 'memory':
+          // Memory connections always succeed
+          success = true;
+          message = 'Memory connection is available';
+          break;
         default:
-          return {
-            success: false,
-            message: `Unknown data source type: ${dataSource.type}`,
-            timestamp: new Date()
-          };
+          throw new Error(`Unsupported source type: ${source.type}`);
+      }
+      
+      // Create a test result
+      const result: ConnectionTestResult = {
+        success,
+        message,
+        details,
+        timestamp: new Date()
+      };
+      
+      // Cache the result
+      this.connectionTests.set(connectionId, result);
+      
+      return result;
+    } catch (error) {
+      console.error(`Error testing connection to ${source.name}:`, error);
+      
+      // Create a failure alert
+      alertService.createConnectionFailureAlert(
+        source.name,
+        source.type,
+        error
+      );
+      
+      // Create a failure result
+      const result: ConnectionTestResult = {
+        success: false,
+        message: `Connection failed: ${error instanceof Error ? error.message : String(error)}`,
+        timestamp: new Date()
+      };
+      
+      // Cache the result
+      this.connectionTests.set(connectionId, result);
+      
+      return result;
+    }
+  }
+  
+  /**
+   * Fetch data from a data source
+   */
+  async fetchData(source: DataSource): Promise<any[]> {
+    console.log(`Fetching data from ${source.name} (${source.type})`);
+    
+    // First, test the connection
+    const testResult = await this.testConnection(source);
+    
+    if (!testResult.success) {
+      throw new Error(`Cannot fetch data, connection failed: ${testResult.message}`);
+    }
+    
+    try {
+      // Fetch data based on source type
+      switch (source.type) {
+        case 'database':
+          return await this.fetchDatabaseData(source);
+        case 'api':
+          return await this.fetchApiData(source);
+        case 'file':
+          return await this.fetchFileData(source);
+        case 'memory':
+          return this.fetchMemoryData(source);
+        default:
+          throw new Error(`Unsupported source type: ${source.type}`);
       }
     } catch (error) {
-      console.error('Error testing connection:', error);
-      return {
-        success: false,
-        message: error instanceof Error ? error.message : String(error),
-        timestamp: new Date(),
-        details: error
-      };
+      console.error(`Error fetching data from ${source.name}:`, error);
+      
+      // Create a failure alert
+      alertService.createConnectionFailureAlert(
+        source.name,
+        source.type,
+        error
+      );
+      
+      throw error;
     }
   }
   
   /**
-   * Test connection to a database
+   * Load data to a destination
    */
-  private testDatabaseConnection(dataSource: DataSource): ConnectionTestResult {
-    const dbConfig = dataSource.connection.database;
+  async loadData(destination: DataDestination, data: any[]): Promise<LoadResult> {
+    console.log(`Loading ${data.length} records to ${destination.name} (${destination.type})`);
     
-    if (!dbConfig) {
-      return {
-        success: false,
-        message: "Missing database configuration",
-        timestamp: new Date()
-      };
+    // First, test the connection
+    const testResult = await this.testConnection(destination);
+    
+    if (!testResult.success) {
+      throw new Error(`Cannot load data, connection failed: ${testResult.message}`);
     }
     
-    // Simulate different scenarios based on database type
-    switch (dbConfig.type) {
-      case DatabaseType.POSTGRESQL:
-      case DatabaseType.MYSQL:
-      case DatabaseType.MSSQL:
-        // Simulate success for these DB types
-        return {
-          success: true,
-          message: `Successfully connected to ${dbConfig.type} database at ${dbConfig.host}:${dbConfig.port}/${dbConfig.database}`,
-          timestamp: new Date(),
-          details: {
-            connectionString: dbConfig.connectionString ? dbConfig.connectionString.replace(/:[^:]*@/, ":***@") : undefined,
-            host: dbConfig.host,
-            port: dbConfig.port,
-            database: dbConfig.database
-          }
-        };
-      
-      case DatabaseType.MONGODB:
-        // Simulate potential failure for MongoDB
-        const isSuccess = Math.random() > 0.3; // 70% success rate
-        
-        return {
-          success: isSuccess,
-          message: isSuccess 
-            ? `Successfully connected to MongoDB at ${dbConfig.host}:${dbConfig.port}/${dbConfig.database}`
-            : `Failed to connect to MongoDB: Authentication failed`,
-          timestamp: new Date()
-        };
-      
-      default:
-        // For other DB types, return a generic success
-        return {
-          success: true,
-          message: `Successfully connected to ${dbConfig.type} database`,
-          timestamp: new Date()
-        };
-    }
-  }
-  
-  /**
-   * Test connection to an API
-   */
-  private testApiConnection(dataSource: DataSource): ConnectionTestResult {
-    const apiConfig = dataSource.connection.api;
-    
-    if (!apiConfig) {
-      return {
-        success: false,
-        message: "Missing API configuration",
-        timestamp: new Date()
-      };
-    }
-    
-    // Simulate API connection test
-    // In a real implementation, this would make an actual HTTP request
-    
-    // Check if URL is missing or malformed
-    if (!apiConfig.url || !apiConfig.url.startsWith('http')) {
-      return {
-        success: false,
-        message: `Invalid API URL: ${apiConfig.url}`,
-        timestamp: new Date()
-      };
-    }
-    
-    // Simulate success for most cases
-    const isSuccess = Math.random() > 0.2; // 80% success rate
-    
-    return {
-      success: isSuccess,
-      message: isSuccess 
-        ? `Successfully connected to API at ${apiConfig.url}`
-        : `Failed to connect to API: Timeout after 30 seconds`,
-      timestamp: new Date(),
-      details: {
-        url: apiConfig.url,
-        method: apiConfig.method || 'GET',
-        authType: apiConfig.authType || 'NONE'
+    try {
+      // Load data based on destination type
+      switch (destination.type) {
+        case 'database':
+          return await this.loadDatabaseData(destination, data);
+        case 'api':
+          return await this.loadApiData(destination, data);
+        case 'file':
+          return await this.loadFileData(destination, data);
+        case 'memory':
+          return this.loadMemoryData(destination, data);
+        default:
+          throw new Error(`Unsupported destination type: ${destination.type}`);
       }
+    } catch (error) {
+      console.error(`Error loading data to ${destination.name}:`, error);
+      
+      // Create a failure alert
+      alertService.createConnectionFailureAlert(
+        destination.name,
+        destination.type,
+        error
+      );
+      
+      throw error;
+    }
+  }
+  
+  /**
+   * Get a cached connection test result
+   */
+  getCachedConnectionTest(sourceId: string): ConnectionTestResult | undefined {
+    return this.connectionTests.get(sourceId);
+  }
+  
+  /**
+   * Clear cached connection tests
+   */
+  clearConnectionTests(): void {
+    this.connectionTests.clear();
+  }
+  
+  /**
+   * Test a database connection
+   */
+  private async testDatabaseConnection(source: DataSource): Promise<{ success: boolean, message: string, details?: Record<string, any> }> {
+    // In a real implementation, we would use a database client library
+    // For this simulation, we'll just check that the required config properties are present
+    const { config } = source;
+    
+    if (config.type !== 'database') {
+      throw new Error('Invalid configuration: not a database config');
+    }
+    
+    // Simulate a delay
+    await new Promise(resolve => setTimeout(resolve, 500));
+    
+    // Check required properties
+    if (!config.host) {
+      return { success: false, message: 'Missing host in database configuration' };
+    }
+    
+    if (!config.database) {
+      return { success: false, message: 'Missing database name in configuration' };
+    }
+    
+    // Simulate a successful connection
+    return { 
+      success: true, 
+      message: 'Database connection successful', 
+      details: {
+        dbType: config.dbType,
+        host: config.host,
+        database: config.database
+      } 
     };
   }
   
   /**
-   * Test connection to a file
+   * Test an API connection
    */
-  private testFileConnection(dataSource: DataSource): ConnectionTestResult {
-    const fileConfig = dataSource.connection.file;
+  private async testApiConnection(source: DataSource): Promise<{ success: boolean, message: string, details?: Record<string, any> }> {
+    // In a real implementation, we would use the fetch API or another HTTP client
+    // For this simulation, we'll just check that the required config properties are present
+    const { config } = source;
     
-    if (!fileConfig) {
-      return {
-        success: false,
-        message: "Missing file configuration",
-        timestamp: new Date()
-      };
+    if (config.type !== 'api') {
+      throw new Error('Invalid configuration: not an API config');
     }
     
-    // Simulate file connection test
-    // In a real implementation, this would check if the file exists and is readable
+    // Simulate a delay
+    await new Promise(resolve => setTimeout(resolve, 500));
     
-    // Check if path is missing
-    if (!fileConfig.path) {
-      return {
-        success: false,
-        message: "File path is required",
-        timestamp: new Date()
-      };
+    // Check required properties
+    if (!config.baseUrl) {
+      return { success: false, message: 'Missing baseUrl in API configuration' };
     }
     
-    // Simulate file existence check
-    const fileExists = !fileConfig.path.includes('not-found') && !fileConfig.path.includes('missing');
-    
-    if (!fileExists) {
-      return {
-        success: false,
-        message: `File not found: ${fileConfig.path}`,
-        timestamp: new Date()
-      };
-    }
-    
-    // Simulate file format validation based on type
-    switch (fileConfig.type) {
-      case FileType.CSV:
-        return {
-          success: true,
-          message: `Successfully validated CSV file at ${fileConfig.path}`,
-          timestamp: new Date(),
-          details: {
-            delimiter: fileConfig.delimiter || ',',
-            hasHeader: fileConfig.hasHeader !== false
-          }
-        };
-      
-      case FileType.JSON:
-        return {
-          success: true,
-          message: `Successfully validated JSON file at ${fileConfig.path}`,
-          timestamp: new Date()
-        };
-      
-      case FileType.EXCEL:
-        return {
-          success: true,
-          message: `Successfully validated Excel file at ${fileConfig.path}`,
-          timestamp: new Date(),
-          details: {
-            sheet: fileConfig.sheet || 'Sheet1'
-          }
-        };
-      
-      default:
-        return {
-          success: true,
-          message: `Successfully located file at ${fileConfig.path}`,
-          timestamp: new Date()
-        };
-    }
+    // Simulate a successful connection
+    return { 
+      success: true, 
+      message: 'API connection successful', 
+      details: {
+        apiType: config.apiType,
+        baseUrl: config.baseUrl,
+        endpoint: config.endpoint
+      } 
+    };
   }
   
   /**
-   * Test connection to an in-memory data source
+   * Test a file connection
    */
-  private testInMemoryConnection(dataSource: DataSource): ConnectionTestResult {
-    const inMemoryConfig = dataSource.connection.inMemory;
+  private async testFileConnection(source: DataSource): Promise<{ success: boolean, message: string, details?: Record<string, any> }> {
+    // In a real implementation, we would use the file system API
+    // For this simulation, we'll just check that the required config properties are present
+    const { config } = source;
     
-    if (!inMemoryConfig) {
-      return {
-        success: false,
-        message: "Missing in-memory configuration",
-        timestamp: new Date()
-      };
+    if (config.type !== 'file') {
+      throw new Error('Invalid configuration: not a file config');
     }
     
-    // Verify data exists
-    if (!inMemoryConfig.data || !Array.isArray(inMemoryConfig.data)) {
-      return {
-        success: false,
-        message: "In-memory data must be an array",
-        timestamp: new Date()
-      };
+    // Simulate a delay
+    await new Promise(resolve => setTimeout(resolve, 300));
+    
+    // Check required properties
+    if (!config.path) {
+      return { success: false, message: 'Missing path in file configuration' };
     }
     
-    // Return success with data count
+    if (!config.format) {
+      return { success: false, message: 'Missing format in file configuration' };
+    }
+    
+    // Simulate a successful connection
+    return { 
+      success: true, 
+      message: 'File connection successful', 
+      details: {
+        path: config.path,
+        format: config.format
+      } 
+    };
+  }
+  
+  /**
+   * Fetch data from a database source
+   */
+  private async fetchDatabaseData(source: DataSource): Promise<any[]> {
+    // In a real implementation, we would use a database client library
+    // For this simulation, we'll generate some sample data
+    const { config } = source;
+    
+    if (config.type !== 'database') {
+      throw new Error('Invalid configuration: not a database config');
+    }
+    
+    // Simulate a delay
+    await new Promise(resolve => setTimeout(resolve, 800));
+    
+    // Generate sample data based on database type
+    const sampleSize = 20 + Math.floor(Math.random() * 50);
+    return this.generateSampleData(String(source.id), sampleSize);
+  }
+  
+  /**
+   * Fetch data from an API source
+   */
+  private async fetchApiData(source: DataSource): Promise<any[]> {
+    // In a real implementation, we would use the fetch API or another HTTP client
+    // For this simulation, we'll generate some sample data
+    const { config } = source;
+    
+    if (config.type !== 'api') {
+      throw new Error('Invalid configuration: not an API config');
+    }
+    
+    // Simulate a delay
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    
+    // Generate sample data based on API endpoint
+    const sampleSize = 10 + Math.floor(Math.random() * 30);
+    return this.generateSampleData(String(source.id), sampleSize);
+  }
+  
+  /**
+   * Fetch data from a file source
+   */
+  private async fetchFileData(source: DataSource): Promise<any[]> {
+    // In a real implementation, we would use the file system API
+    // For this simulation, we'll generate some sample data
+    const { config } = source;
+    
+    if (config.type !== 'file') {
+      throw new Error('Invalid configuration: not a file config');
+    }
+    
+    // Simulate a delay
+    await new Promise(resolve => setTimeout(resolve, 600));
+    
+    // Generate sample data based on file format
+    const sampleSize = 30 + Math.floor(Math.random() * 40);
+    return this.generateSampleData(String(source.id), sampleSize);
+  }
+  
+  /**
+   * Fetch data from a memory source
+   */
+  private fetchMemoryData(source: DataSource): any[] {
+    // In a real implementation, we would use some in-memory data store
+    // For this simulation, we'll generate some sample data
+    const sampleSize = 5 + Math.floor(Math.random() * 20);
+    return this.generateSampleData(String(source.id), sampleSize);
+  }
+  
+  /**
+   * Load data to a database destination
+   */
+  private async loadDatabaseData(destination: DataDestination, data: any[]): Promise<LoadResult> {
+    // In a real implementation, we would use a database client library
+    // For this simulation, we'll just pretend to load the data
+    const { config } = destination;
+    
+    if (config.type !== 'database') {
+      throw new Error('Invalid configuration: not a database config');
+    }
+    
+    // Simulate a delay
+    await new Promise(resolve => setTimeout(resolve, 1200));
+    
+    // Simulate some errors for a small percentage of records
+    const errors: string[] = [];
+    const errorRate = 0.05;
+    
+    for (let i = 0; i < data.length; i++) {
+      if (Math.random() < errorRate) {
+        errors.push(`Error inserting record at index ${i}: Simulated database error`);
+      }
+    }
+    
+    // Calculate success rates
+    const successCount = data.length - errors.length;
+    const createdCount = Math.floor(successCount * 0.7);
+    const updatedCount = successCount - createdCount;
+    
+    return {
+      success: errors.length === 0,
+      created: createdCount,
+      updated: updatedCount,
+      deleted: 0,
+      errors
+    };
+  }
+  
+  /**
+   * Load data to an API destination
+   */
+  private async loadApiData(destination: DataDestination, data: any[]): Promise<LoadResult> {
+    // In a real implementation, we would use the fetch API or another HTTP client
+    // For this simulation, we'll just pretend to load the data
+    const { config } = destination;
+    
+    if (config.type !== 'api') {
+      throw new Error('Invalid configuration: not an API config');
+    }
+    
+    // Simulate a delay
+    await new Promise(resolve => setTimeout(resolve, 1500));
+    
+    // Simulate some errors for a small percentage of records
+    const errors: string[] = [];
+    const errorRate = 0.08;
+    
+    for (let i = 0; i < data.length; i++) {
+      if (Math.random() < errorRate) {
+        errors.push(`Error sending record at index ${i}: Simulated API error`);
+      }
+    }
+    
+    // Calculate success rates
+    const successCount = data.length - errors.length;
+    const createdCount = Math.floor(successCount * 0.9);
+    const updatedCount = successCount - createdCount;
+    
+    return {
+      success: errors.length === 0,
+      created: createdCount,
+      updated: updatedCount,
+      deleted: 0,
+      errors
+    };
+  }
+  
+  /**
+   * Load data to a file destination
+   */
+  private async loadFileData(destination: DataDestination, data: any[]): Promise<LoadResult> {
+    // In a real implementation, we would use the file system API
+    // For this simulation, we'll just pretend to load the data
+    const { config } = destination;
+    
+    if (config.type !== 'file') {
+      throw new Error('Invalid configuration: not a file config');
+    }
+    
+    // Simulate a delay
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    
+    // Files typically don't have updates/deletes, just creates
     return {
       success: true,
-      message: `Successfully validated in-memory data with ${inMemoryConfig.data.length} records`,
-      timestamp: new Date(),
-      details: {
-        recordCount: inMemoryConfig.data.length,
-        sampleFields: Object.keys(inMemoryConfig.data[0] || {}).slice(0, 5)
-      }
+      created: data.length,
+      updated: 0,
+      deleted: 0,
+      errors: []
     };
   }
   
   /**
-   * Extract data from a data source
+   * Load data to a memory destination
    */
-  async extractData(dataSource: DataSource, options?: any): Promise<any[]> {
-    // In a real implementation, this would extract actual data from the source
-    // For demo purposes, we'll return sample data
+  private loadMemoryData(destination: DataDestination, data: any[]): LoadResult {
+    // In a real implementation, we would use some in-memory data store
+    // For this simulation, we'll just pretend to load the data
     
-    console.log(`Extracting data from ${dataSource.name}`, options);
-    
-    // Simulate data extraction based on data source type
-    switch (dataSource.type) {
-      case DataSourceType.DATABASE:
-        return this.extractFromDatabase(dataSource, options);
-      
-      case DataSourceType.API:
-        return this.extractFromApi(dataSource, options);
-      
-      case DataSourceType.FILE:
-        return this.extractFromFile(dataSource, options);
-      
-      case DataSourceType.IN_MEMORY:
-        return this.extractFromInMemory(dataSource, options);
-      
-      case DataSourceType.CUSTOM:
-        return this.extractFromCustom(dataSource, options);
-      
-      default:
-        throw new Error(`Unknown data source type: ${dataSource.type}`);
-    }
+    // Memory typically doesn't have errors
+    return {
+      success: true,
+      created: data.length,
+      updated: 0,
+      deleted: 0,
+      errors: []
+    };
   }
   
   /**
-   * Extract data from a database
+   * Generate sample data for testing
    */
-  private async extractFromDatabase(dataSource: DataSource, options?: any): Promise<any[]> {
-    // Simulate database data extraction
-    // In a real implementation, this would execute a SQL query
+  private generateSampleData(seed: string, count: number): any[] {
+    const data: any[] = [];
     
-    // Generate sample property data
-    return this.generateSampleData(50);
-  }
-  
-  /**
-   * Extract data from an API
-   */
-  private async extractFromApi(dataSource: DataSource, options?: any): Promise<any[]> {
-    // Simulate API data extraction
-    // In a real implementation, this would make an HTTP request
-    
-    // Generate sample property data with tax information
-    return this.generateSampleData(30, true);
-  }
-  
-  /**
-   * Extract data from a file
-   */
-  private async extractFromFile(dataSource: DataSource, options?: any): Promise<any[]> {
-    // Simulate file data extraction
-    // In a real implementation, this would read and parse a file
-    
-    // Generate sample property data
-    return this.generateSampleData(20);
-  }
-  
-  /**
-   * Extract data from an in-memory data source
-   */
-  private async extractFromInMemory(dataSource: DataSource, options?: any): Promise<any[]> {
-    // Return the in-memory data directly
-    const inMemoryConfig = dataSource.connection.inMemory;
-    
-    if (!inMemoryConfig || !inMemoryConfig.data) {
-      return [];
-    }
-    
-    return inMemoryConfig.data;
-  }
-  
-  /**
-   * Extract data from a custom data source
-   */
-  private async extractFromCustom(dataSource: DataSource, options?: any): Promise<any[]> {
-    // Simulate custom data extraction
-    // In a real implementation, this would use a custom connector
-    
-    // Generate sample property data
-    return this.generateSampleData(10);
-  }
-  
-  /**
-   * Generate sample property data
-   */
-  private generateSampleData(count: number, includeTaxInfo = false): any[] {
-    const propertyTypes = ['residential', 'commercial', 'industrial', 'land'];
-    const cities = ['Seattle', 'Bellevue', 'Redmond', 'Kirkland', 'Renton'];
-    const data = [];
+    // Use the seed to make the data consistent for the same source
+    const seedNumber = seed.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
     
     for (let i = 0; i < count; i++) {
-      const property = {
-        id: i + 1,
-        address: `${1000 + i} Main St`,
-        city: cities[Math.floor(Math.random() * cities.length)],
-        state: 'WA',
-        zip: `9800${Math.floor(Math.random() * 10)}`,
-        price: Math.floor(Math.random() * 1000000) + 200000,
-        bedrooms: Math.floor(Math.random() * 5) + 1,
-        bathrooms: Math.floor(Math.random() * 4) + 1,
-        sqft: Math.floor(Math.random() * 3000) + 800,
-        year_built: Math.floor(Math.random() * 70) + 1950,
-        property_type: propertyTypes[Math.floor(Math.random() * propertyTypes.length)],
-        status: Math.random() > 0.2 ? 'active' : 'inactive'
+      // Generate a pseudo-random number based on seed and index
+      const random = (seedNumber * (i + 1)) % 1000 / 1000;
+      
+      // Create a sample record
+      const record: Record<string, any> = {
+        id: `${seed}-${i + 1}`,
+        index: i,
+        value: Math.floor(random * 100),
+        name: `Item ${i + 1}`,
+        description: `Description for item ${i + 1}`,
+        date: new Date(Date.now() - i * 86400000), // Days in the past
+        active: random > 0.3,
+        category: ['A', 'B', 'C', 'D'][Math.floor(random * 4)],
+        tags: this.generateTags(random),
+        metadata: {
+          source: seed,
+          created: new Date(),
+          score: random * 10
+        }
       };
       
-      // Add tax info if requested
-      if (includeTaxInfo) {
-        Object.assign(property, {
-          parcel_id: `P-${100000 + i}`,
-          tax_year: 2024,
-          assessed_value: Math.floor(property.price * 0.8),
-          tax_amount: Math.floor(property.price * 0.012),
-          owner_name: `Owner ${i + 1}`
-        });
+      // Add some property-specific fields
+      if (seed.includes('property')) {
+        record.address = `${Math.floor(random * 999) + 1} Main St`;
+        record.city = ['Seattle', 'Portland', 'San Francisco', 'Los Angeles'][Math.floor(random * 4)];
+        record.state = ['WA', 'OR', 'CA', 'NY'][Math.floor(random * 4)];
+        record.zipCode = `${Math.floor(random * 90000) + 10000}`;
+        record.price = Math.floor(random * 900000) + 100000;
+        record.sqft = Math.floor(random * 3000) + 500;
+        record.bedrooms = Math.floor(random * 5) + 1;
+        record.bathrooms = Math.floor((random * 5) + 1);
+        record.yearBuilt = Math.floor(random * 70) + 1950;
+        record.propertyType = ['Single Family', 'Condo', 'Townhouse', 'Multi-Family'][Math.floor(random * 4)];
       }
       
-      data.push(property);
+      data.push(record);
     }
     
     return data;
   }
   
   /**
-   * Load data to a destination
+   * Generate sample tags
    */
-  async loadData(data: any[], destination: DataSource): Promise<boolean> {
-    console.log(`Loading ${data.length} records to ${destination.name}`);
+  private generateTags(random: number): string[] {
+    const allTags = ['new', 'featured', 'sale', 'premium', 'budget', 'trending', 'popular', 'recommended'];
+    const tagCount = Math.floor(random * 4) + 1;
+    const tags: string[] = [];
     
-    // In a real implementation, this would actually load the data to the destination
-    // For demo purposes, we'll simulate success
+    // Select random tags
+    for (let i = 0; i < tagCount; i++) {
+      const tagIndex = Math.floor(random * allTags.length * (i + 1)) % allTags.length;
+      const tag = allTags[tagIndex];
+      
+      if (!tags.includes(tag)) {
+        tags.push(tag);
+      }
+    }
     
-    // Simulate failures occasionally
-    const success = Math.random() > 0.1; // 90% success rate
-    
-    // Add a small delay to simulate processing time
-    await new Promise(resolve => setTimeout(resolve, 500));
-    
-    return success;
-  }
-  
-  /**
-   * Close all connections
-   */
-  async closeAllConnections(): Promise<void> {
-    console.log('Closing all data source connections');
-    
-    // In a real implementation, this would close all open connections
-    // For demo purposes, this is just a placeholder
-    
-    // Simulate connection closing with a small delay
-    await new Promise(resolve => setTimeout(resolve, 300));
+    return tags;
   }
 }
 
