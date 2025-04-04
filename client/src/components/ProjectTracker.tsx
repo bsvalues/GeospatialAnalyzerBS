@@ -517,6 +517,33 @@ export function ProjectTracker() {
     blocked: milestones.flatMap(m => m.tasks).filter(t => t.status === 'blocked').length
   };
   
+  // Count tasks by priority
+  const allTasks = milestones.flatMap(m => m.tasks);
+  const priorityCounts = {
+    high: allTasks.filter(t => t.priority === 'high').length,
+    medium: allTasks.filter(t => t.priority === 'medium').length,
+    low: allTasks.filter(t => t.priority === 'low').length
+  };
+  
+  // Calculate completion rate by priority
+  const priorityCompletionRate = {
+    high: priorityCounts.high > 0 
+      ? Math.round((allTasks.filter(t => t.priority === 'high' && t.status === 'completed').length / priorityCounts.high) * 100)
+      : 0,
+    medium: priorityCounts.medium > 0 
+      ? Math.round((allTasks.filter(t => t.priority === 'medium' && t.status === 'completed').length / priorityCounts.medium) * 100)
+      : 0,
+    low: priorityCounts.low > 0 
+      ? Math.round((allTasks.filter(t => t.priority === 'low' && t.status === 'completed').length / priorityCounts.low) * 100)
+      : 0
+  };
+  
+  // Count tasks by category
+  const categoryCounts = allTasks.reduce((counts, task) => {
+    counts[task.category] = (counts[task.category] || 0) + 1;
+    return counts;
+  }, {} as Record<string, number>);
+  
   // Filter tasks based on current filters and search query
   const filteredTasks = milestones.flatMap(milestone => 
     milestone.tasks.map(task => ({ ...task, milestone: milestone.title }))
@@ -836,6 +863,217 @@ export function ProjectTracker() {
               </Card>
             </div>
             
+            {/* Project Statistics */}
+            <div className="mt-6">
+              <h3 className="text-lg font-medium mb-3">Project Statistics</h3>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                {/* Task Status Distribution */}
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-md">Task Status</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="flex justify-center mb-2">
+                      {/* Visual task status distribution */}
+                      <div className="w-32 h-32 rounded-full flex items-center justify-center relative">
+                        {/* Completed segment */}
+                        <div 
+                          className="absolute inset-0 bg-green-500" 
+                          style={{
+                            clipPath: taskCounts.all > 0 
+                              ? `polygon(50% 50%, 50% 0%, ${50 + 50 * Math.sin(2 * Math.PI * taskCounts.completed / taskCounts.all)}% ${50 - 50 * Math.cos(2 * Math.PI * taskCounts.completed / taskCounts.all)}%, 50% 50%)`
+                              : 'none'
+                          }}
+                        />
+                        {/* In-progress segment */}
+                        <div 
+                          className="absolute inset-0 bg-blue-500" 
+                          style={{
+                            clipPath: taskCounts.all > 0 
+                              ? `polygon(50% 50%, ${50 + 50 * Math.sin(2 * Math.PI * taskCounts.completed / taskCounts.all)}% ${50 - 50 * Math.cos(2 * Math.PI * taskCounts.completed / taskCounts.all)}%, ${50 + 50 * Math.sin(2 * Math.PI * (taskCounts.completed + taskCounts['in-progress']) / taskCounts.all)}% ${50 - 50 * Math.cos(2 * Math.PI * (taskCounts.completed + taskCounts['in-progress']) / taskCounts.all)}%, 50% 50%)`
+                              : 'none'
+                          }}
+                        />
+                        {/* Planned segment */}
+                        <div 
+                          className="absolute inset-0 bg-amber-500" 
+                          style={{
+                            clipPath: taskCounts.all > 0 
+                              ? `polygon(50% 50%, ${50 + 50 * Math.sin(2 * Math.PI * (taskCounts.completed + taskCounts['in-progress']) / taskCounts.all)}% ${50 - 50 * Math.cos(2 * Math.PI * (taskCounts.completed + taskCounts['in-progress']) / taskCounts.all)}%, ${50 + 50 * Math.sin(2 * Math.PI * (taskCounts.completed + taskCounts['in-progress'] + taskCounts.planned) / taskCounts.all)}% ${50 - 50 * Math.cos(2 * Math.PI * (taskCounts.completed + taskCounts['in-progress'] + taskCounts.planned) / taskCounts.all)}%, 50% 50%)`
+                              : 'none'
+                          }}
+                        />
+                        {/* Blocked segment */}
+                        <div 
+                          className="absolute inset-0 bg-red-500" 
+                          style={{
+                            clipPath: taskCounts.all > 0 
+                              ? `polygon(50% 50%, ${50 + 50 * Math.sin(2 * Math.PI * (taskCounts.completed + taskCounts['in-progress'] + taskCounts.planned) / taskCounts.all)}% ${50 - 50 * Math.cos(2 * Math.PI * (taskCounts.completed + taskCounts['in-progress'] + taskCounts.planned) / taskCounts.all)}%, ${50 + 50 * Math.sin(2 * Math.PI)}% ${50 - 50 * Math.cos(2 * Math.PI)}%, 50% 50%)`
+                              : 'none'
+                          }}
+                        />
+                        <div className="bg-white w-24 h-24 rounded-full flex items-center justify-center z-10">
+                          <span className="font-medium">{taskCounts.all} Tasks</span>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-y-2 text-xs">
+                      <div className="flex items-center gap-1">
+                        <div className="w-3 h-3 bg-green-500 rounded-full"></div>
+                        <span>Completed</span>
+                      </div>
+                      <div className="text-right">{taskCounts.all > 0 ? Math.round(taskCounts.completed / taskCounts.all * 100) : 0}%</div>
+                      
+                      <div className="flex items-center gap-1">
+                        <div className="w-3 h-3 bg-blue-500 rounded-full"></div>
+                        <span>In Progress</span>
+                      </div>
+                      <div className="text-right">{taskCounts.all > 0 ? Math.round(taskCounts['in-progress'] / taskCounts.all * 100) : 0}%</div>
+                      
+                      <div className="flex items-center gap-1">
+                        <div className="w-3 h-3 bg-amber-500 rounded-full"></div>
+                        <span>Planned</span>
+                      </div>
+                      <div className="text-right">{taskCounts.all > 0 ? Math.round(taskCounts.planned / taskCounts.all * 100) : 0}%</div>
+                      
+                      <div className="flex items-center gap-1">
+                        <div className="w-3 h-3 bg-red-500 rounded-full"></div>
+                        <span>Blocked</span>
+                      </div>
+                      <div className="text-right">{taskCounts.all > 0 ? Math.round(taskCounts.blocked / taskCounts.all * 100) : 0}%</div>
+                    </div>
+                  </CardContent>
+                </Card>
+                
+                {/* Priority Distribution */}
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-md">Task Priorities</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-3">
+                      {/* High Priority Progress */}
+                      <div>
+                        <div className="flex justify-between text-xs mb-1">
+                          <span className="font-medium text-red-500">High Priority</span>
+                          <span>{priorityCounts.high} tasks</span>
+                        </div>
+                        <div className="w-full bg-gray-100 rounded-full h-2.5">
+                          <div 
+                            className="bg-red-500 h-2.5 rounded-full" 
+                            style={{ width: `${taskCounts.all > 0 ? (priorityCounts.high / taskCounts.all) * 100 : 0}%` }}
+                          ></div>
+                        </div>
+                      </div>
+                      
+                      {/* Medium Priority Progress */}
+                      <div>
+                        <div className="flex justify-between text-xs mb-1">
+                          <span className="font-medium text-amber-500">Medium Priority</span>
+                          <span>{priorityCounts.medium} tasks</span>
+                        </div>
+                        <div className="w-full bg-gray-100 rounded-full h-2.5">
+                          <div 
+                            className="bg-amber-500 h-2.5 rounded-full" 
+                            style={{ width: `${taskCounts.all > 0 ? (priorityCounts.medium / taskCounts.all) * 100 : 0}%` }}
+                          ></div>
+                        </div>
+                      </div>
+                      
+                      {/* Low Priority Progress */}
+                      <div>
+                        <div className="flex justify-between text-xs mb-1">
+                          <span className="font-medium text-green-500">Low Priority</span>
+                          <span>{priorityCounts.low} tasks</span>
+                        </div>
+                        <div className="w-full bg-gray-100 rounded-full h-2.5">
+                          <div 
+                            className="bg-green-500 h-2.5 rounded-full" 
+                            style={{ width: `${taskCounts.all > 0 ? (priorityCounts.low / taskCounts.all) * 100 : 0}%` }}
+                          ></div>
+                        </div>
+                      </div>
+                      
+                      <div className="mt-4 pt-2 border-t border-gray-100">
+                        <div className="text-xs text-muted-foreground">Completion by Priority</div>
+                        <div className="grid grid-cols-3 gap-2 mt-2">
+                          <div className="text-center">
+                            <div className="text-lg font-medium text-red-500">{priorityCompletionRate.high}%</div>
+                            <div className="text-xs">High</div>
+                          </div>
+                          <div className="text-center">
+                            <div className="text-lg font-medium text-amber-500">{priorityCompletionRate.medium}%</div>
+                            <div className="text-xs">Medium</div>
+                          </div>
+                          <div className="text-center">
+                            <div className="text-lg font-medium text-green-500">{priorityCompletionRate.low}%</div>
+                            <div className="text-xs">Low</div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+                
+                {/* Category Distribution */}
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-md">Categories</CardTitle>
+                  </CardHeader>
+                  <CardContent className="p-4">
+                    <div className="space-y-3">
+                      {Object.entries(categoryCounts)
+                        .sort(([, countA], [, countB]) => countB - countA)
+                        .slice(0, 5)
+                        .map(([categoryId, count]) => {
+                          const category = projectCategories.find(c => c.id === categoryId);
+                          if (!category) return null;
+                          
+                          // Get percentage for this category
+                          const percentage = taskCounts.all > 0 ? Math.round((count / taskCounts.all) * 100) : 0;
+                          
+                          // Get color class
+                          let bgColorClass = '';
+                          switch (category.color) {
+                            case 'blue': bgColorClass = 'bg-blue-500'; break;
+                            case 'green': bgColorClass = 'bg-green-500'; break;
+                            case 'purple': bgColorClass = 'bg-purple-500'; break;
+                            case 'orange': bgColorClass = 'bg-orange-500'; break;
+                            case 'red': bgColorClass = 'bg-red-500'; break;
+                            case 'amber': bgColorClass = 'bg-amber-500'; break;
+                            case 'teal': bgColorClass = 'bg-teal-500'; break;
+                            case 'indigo': bgColorClass = 'bg-indigo-500'; break;
+                            default: bgColorClass = 'bg-gray-500';
+                          }
+                          
+                          return (
+                            <div key={categoryId}>
+                              <div className="flex justify-between text-xs mb-1">
+                                <span className="font-medium">{category.name}</span>
+                                <span>{count} tasks ({percentage}%)</span>
+                              </div>
+                              <div className="w-full bg-gray-100 rounded-full h-2.5">
+                                <div 
+                                  className={`${bgColorClass} h-2.5 rounded-full`} 
+                                  style={{ width: `${percentage}%` }}
+                                ></div>
+                              </div>
+                            </div>
+                          );
+                        })
+                      }
+                      
+                      {Object.keys(categoryCounts).length > 5 && (
+                        <div className="text-xs text-center text-muted-foreground pt-2">
+                          +{Object.keys(categoryCounts).length - 5} more categories
+                        </div>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            </div>
+            
             {/* Project Timeline */}
             <div className="mt-6">
               <h3 className="text-lg font-medium mb-3">Project Timeline</h3>
@@ -1000,6 +1238,117 @@ export function ProjectTracker() {
                     ))}
                   </SelectContent>
                 </Select>
+              </div>
+            </div>
+            
+            {/* Project Timeline */}
+            <div className="mb-8">
+              <h3 className="text-lg font-medium mb-3">Project Timeline</h3>
+              <div className="relative overflow-x-auto bg-gray-50 p-4 rounded-md">
+                {/* Timeline headers */}
+                <div className="flex border-b pb-2 mb-4">
+                  <div className="w-1/4 font-medium">Milestone</div>
+                  <div className="w-3/4 flex">
+                    {Array.from({ length: 10 }).map((_, i) => (
+                      <div key={i} className="flex-1 text-center text-xs font-medium">
+                        Phase {i + 1}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                
+                {/* Timeline rows */}
+                <div className="space-y-6">
+                  {milestones.map((milestone) => (
+                    <div key={milestone.id} className="flex items-center">
+                      <div className="w-1/4 pr-4 font-medium text-sm truncate" title={milestone.title}>
+                        {milestone.title}
+                      </div>
+                      <div className="w-3/4 flex items-center">
+                        {/* Timeline bar */}
+                        <div className="w-full bg-gray-200 h-5 rounded-full relative">
+                          {/* Progress indicator */}
+                          <div 
+                            className="h-full rounded-full bg-primary transition-all duration-500 ease-in-out"
+                            style={{ width: `${milestone.progress}%` }}
+                          >
+                            {milestone.progress > 15 && (
+                              <span className="absolute inset-0 flex items-center justify-center text-xs font-medium text-white">
+                                {milestone.progress}%
+                              </span>
+                            )}
+                          </div>
+                          {milestone.progress <= 15 && (
+                            <span className="absolute inset-0 flex items-center justify-center text-xs font-medium text-gray-700">
+                              {milestone.progress}%
+                            </span>
+                          )}
+                          
+                          {/* Task markers */}
+                          {milestone.tasks.map((task) => {
+                            // Calculate position based on status (completed tasks go to the right)
+                            let position;
+                            switch(task.status) {
+                              case 'completed': 
+                                position = Math.min(95, Math.max(milestone.progress - 5, 0)); 
+                                break;
+                              case 'in-progress': 
+                                position = Math.min(Math.max(milestone.progress - 15, 0), 85);
+                                break;
+                              case 'planned':
+                                position = Math.min(Math.max(milestone.progress + 10, 0), 80);
+                                break;
+                              case 'blocked':
+                                position = Math.min(Math.max(milestone.progress - 10, 0), 70);
+                                break;
+                              default:
+                                position = 50;
+                            }
+                            
+                            // Get color based on status
+                            let bgColor;
+                            switch(task.status) {
+                              case 'completed': bgColor = 'bg-green-500'; break;
+                              case 'in-progress': bgColor = 'bg-blue-500'; break;
+                              case 'planned': bgColor = 'bg-amber-500'; break;
+                              case 'blocked': bgColor = 'bg-red-500'; break;
+                              default: bgColor = 'bg-gray-500';
+                            }
+                            
+                            return (
+                              <div 
+                                key={task.id}
+                                className={`absolute top-0 w-3 h-3 rounded-full ${bgColor} border-2 border-white transform -translate-y-1/2`}
+                                style={{ left: `${position}%` }}
+                                title={`${task.title} (${task.status})`}
+                              />
+                            );
+                          })}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                
+                {/* Legend */}
+                <div className="flex gap-4 mt-4 justify-end">
+                  <div className="flex items-center gap-1">
+                    <div className="w-3 h-3 rounded-full bg-green-500"></div>
+                    <span className="text-xs">Completed</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <div className="w-3 h-3 rounded-full bg-blue-500"></div>
+                    <span className="text-xs">In Progress</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <div className="w-3 h-3 rounded-full bg-amber-500"></div>
+                    <span className="text-xs">Planned</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <div className="w-3 h-3 rounded-full bg-red-500"></div>
+                    <span className="text-xs">Blocked</span>
+                  </div>
+                </div>
               </div>
             </div>
             
