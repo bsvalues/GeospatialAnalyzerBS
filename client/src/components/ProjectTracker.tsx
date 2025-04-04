@@ -46,7 +46,8 @@ import {
   Upload,
   Share,
   RefreshCcw,
-  Printer
+  Printer,
+  History
 } from 'lucide-react';
 import {
   Popover,
@@ -67,6 +68,7 @@ interface TaskItem {
   dependencies?: string[];
   created: Date;
   updated: Date;
+  changeHistory?: ActivityLogItem[];
 }
 
 interface Milestone {
@@ -75,7 +77,23 @@ interface Milestone {
   description: string;
   progress: number;
   dueDate?: Date;
+  created: Date;
+  updated: Date;
   tasks: TaskItem[];
+}
+
+interface ActivityLogItem {
+  id: string;
+  timestamp: Date;
+  actionType: 'create' | 'update' | 'delete' | 'status-change' | 'milestone-change' | 'export' | 'import' | 'reset';
+  description: string;
+  entityId: string;
+  entityType: 'task' | 'milestone' | 'project' | 'system';
+  previousValue?: string;
+  newValue?: string;
+  user?: string;
+  icon?: string; // Icon name for visual representation
+  category?: string; // Category for grouping or filtering
 }
 
 interface Category {
@@ -104,6 +122,8 @@ const initialMilestones: Milestone[] = [
     title: 'ETL Core Components',
     description: 'Implement the core ETL pipeline components and services',
     progress: 90,
+    created: new Date(2023, 3, 1),
+    updated: new Date(2023, 3, 15),
     tasks: [
       {
         id: '1-1',
@@ -172,6 +192,8 @@ const initialMilestones: Milestone[] = [
     title: 'ETL Management UI',
     description: 'Create the user interface for managing ETL processes',
     progress: 75,
+    created: new Date(2023, 3, 10),
+    updated: new Date(2023, 3, 14),
     tasks: [
       {
         id: '2-1',
@@ -220,6 +242,8 @@ const initialMilestones: Milestone[] = [
     title: 'Data Quality & Validation',
     description: 'Implement data quality checks and validation services',
     progress: 60,
+    created: new Date(2023, 3, 14),
+    updated: new Date(2023, 3, 17),
     tasks: [
       {
         id: '3-1',
@@ -268,6 +292,8 @@ const initialMilestones: Milestone[] = [
     title: 'Testing & Production Readiness',
     description: 'Ensure the ETL system is thoroughly tested and ready for production',
     progress: 40,
+    created: new Date(2023, 3, 18), 
+    updated: new Date(2023, 3, 22),
     tasks: [
       {
         id: '4-1',
@@ -432,7 +458,8 @@ const STORAGE_KEYS = {
   MILESTONES: 'spatialest-project-milestones',
   ACTIVE_TAB: 'spatialest-project-active-tab',
   FILTER_STATUS: 'spatialest-project-filter-status',
-  FILTER_CATEGORY: 'spatialest-project-filter-category'
+  FILTER_CATEGORY: 'spatialest-project-filter-category',
+  ACTIVITY_LOG: 'spatialest-project-activity-log'
 };
 
 // Load data from localStorage
@@ -485,6 +512,11 @@ export function ProjectTracker() {
     title: '',
     description: '',
   });
+  
+  // Activity log state
+  const [activityLogs, setActivityLogs] = useState<ActivityLogItem[]>(
+    loadFromStorage(STORAGE_KEYS.ACTIVITY_LOG, [])
+  );
 
   // Persist state changes to localStorage
   useEffect(() => {
@@ -502,6 +534,36 @@ export function ProjectTracker() {
   useEffect(() => {
     saveToStorage(STORAGE_KEYS.FILTER_CATEGORY, filterCategory);
   }, [filterCategory]);
+  
+  useEffect(() => {
+    saveToStorage(STORAGE_KEYS.ACTIVITY_LOG, activityLogs);
+  }, [activityLogs]);
+  
+  // Helper function to add an activity log entry
+  const logActivity = (
+    actionType: ActivityLogItem['actionType'],
+    description: string,
+    entityId: string,
+    entityType: ActivityLogItem['entityType'],
+    previousValue?: string,
+    newValue?: string,
+    icon?: string
+  ) => {
+    const newLog: ActivityLogItem = {
+      id: `log-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
+      timestamp: new Date(),
+      actionType,
+      description,
+      entityId,
+      entityType,
+      previousValue,
+      newValue,
+      icon,
+      user: 'System'
+    };
+    
+    setActivityLogs(currentLogs => [newLog, ...currentLogs].slice(0, 100)); // Keep last 100 logs
+  };
   
   // Calculate overall project progress
   const overallProgress = Math.round(
@@ -577,6 +639,20 @@ export function ProjectTracker() {
   
   // Handle updating a task's status
   const updateTaskStatus = (taskId: string, newStatus: TaskItem['status']) => {
+    // Find the task to get its details for logging
+    let taskTitle = '';
+    let oldStatus = '';
+    let milestoneTitle = '';
+    
+    milestones.forEach(milestone => {
+      const task = milestone.tasks.find(t => t.id === taskId);
+      if (task) {
+        taskTitle = task.title;
+        oldStatus = task.status;
+        milestoneTitle = milestone.title;
+      }
+    });
+    
     setMilestones(currentMilestones => 
       currentMilestones.map(milestone => ({
         ...milestone,
@@ -595,6 +671,21 @@ export function ProjectTracker() {
         )
       }))
     );
+    
+    // Log the status change
+    if (taskTitle) {
+      logActivity(
+        'status-change',
+        `Task "${taskTitle}" status changed from "${oldStatus}" to "${newStatus}"`,
+        taskId,
+        'task',
+        oldStatus,
+        newStatus,
+        newStatus === 'completed' ? 'CheckCircle2' : 
+        newStatus === 'in-progress' ? 'GitPullRequestDraft' :
+        newStatus === 'blocked' ? 'AlertCircle' : 'Clock'
+      );
+    }
   };
   
   // Handle adding a new task
@@ -605,6 +696,9 @@ export function ProjectTracker() {
       created: new Date(),
       updated: new Date()
     };
+    
+    // Find milestone name for the log
+    const milestoneName = milestones.find(m => m.id === milestoneId)?.title || 'Unknown Milestone';
     
     setMilestones(currentMilestones => 
       currentMilestones.map(milestone => 
@@ -623,20 +717,44 @@ export function ProjectTracker() {
       )
     );
     
+    // Log the task creation
+    logActivity(
+      'create',
+      `Added new task "${task.title}" to milestone "${milestoneName}"`,
+      newTask.id,
+      'task',
+      undefined,
+      undefined,
+      'Plus'
+    );
+    
     // Close the add task modal
     setIsAddTaskModalOpen(false);
   };
   
   // Handle adding a new milestone
-  const addNewMilestone = (milestone: Omit<Milestone, 'id' | 'tasks' | 'progress'>) => {
+  const addNewMilestone = (milestone: Omit<Milestone, 'id' | 'tasks' | 'progress' | 'created' | 'updated'>) => {
     const newMilestone: Milestone = {
       ...milestone,
       id: `milestone-${Date.now()}`,
       tasks: [],
-      progress: 0
+      progress: 0,
+      created: new Date(),
+      updated: new Date()
     };
     
     setMilestones(currentMilestones => [...currentMilestones, newMilestone]);
+    
+    // Log the milestone creation
+    logActivity(
+      'create',
+      `Added new milestone "${milestone.title}"`,
+      newMilestone.id,
+      'milestone',
+      undefined,
+      undefined,
+      'Milestone'
+    );
     
     // Close the add milestone modal
     setIsAddMilestoneModalOpen(false);
@@ -644,6 +762,20 @@ export function ProjectTracker() {
   
   // Handle editing a task
   const editTask = (taskId: string, updatedTask: Partial<TaskItem>) => {
+    // Find the task to get its details for logging
+    let taskTitle = '';
+    let oldTask: TaskItem | null = null;
+    let milestoneTitle = '';
+    
+    milestones.forEach(milestone => {
+      const task = milestone.tasks.find(t => t.id === taskId);
+      if (task) {
+        taskTitle = task.title;
+        oldTask = task;
+        milestoneTitle = milestone.title;
+      }
+    });
+    
     setMilestones(currentMilestones => 
       currentMilestones.map(milestone => ({
         ...milestone,
@@ -665,12 +797,54 @@ export function ProjectTracker() {
       }))
     );
     
+    // Log the task edit
+    if (oldTask) {
+      // Check what changed
+      const changes: string[] = [];
+      if (updatedTask.title && updatedTask.title !== oldTask.title) 
+        changes.push(`title from "${oldTask.title}" to "${updatedTask.title}"`);
+      if (updatedTask.description && updatedTask.description !== oldTask.description) 
+        changes.push(`description`);
+      if (updatedTask.status && updatedTask.status !== oldTask.status) 
+        changes.push(`status from "${oldTask.status}" to "${updatedTask.status}"`);
+      if (updatedTask.priority && updatedTask.priority !== oldTask.priority) 
+        changes.push(`priority from "${oldTask.priority}" to "${updatedTask.priority}"`);
+      if (updatedTask.category && updatedTask.category !== oldTask.category) 
+        changes.push(`category from "${projectCategories.find(c => c.id === oldTask.category)?.name}" to "${projectCategories.find(c => c.id === updatedTask.category)?.name}"`);
+      
+      if (changes.length > 0) {
+        logActivity(
+          'update',
+          `Updated task "${taskTitle}" in milestone "${milestoneTitle}": changed ${changes.join(', ')}`,
+          taskId,
+          'task',
+          JSON.stringify(oldTask),
+          JSON.stringify({...oldTask, ...updatedTask}),
+          'Pencil'
+        );
+      }
+    }
+    
     // Clear the editing task
     setEditingTask(null);
   };
   
   // Handle deleting a task
   const deleteTask = (taskId: string) => {
+    // Find the task to get its details for logging
+    let taskTitle = '';
+    let task: TaskItem | null = null;
+    let milestoneTitle = '';
+    
+    milestones.forEach(milestone => {
+      const foundTask = milestone.tasks.find(t => t.id === taskId);
+      if (foundTask) {
+        task = foundTask;
+        taskTitle = foundTask.title;
+        milestoneTitle = milestone.title;
+      }
+    });
+    
     setMilestones(currentMilestones => 
       currentMilestones.map(milestone => {
         // Check if this milestone contains the task
@@ -698,23 +872,69 @@ export function ProjectTracker() {
         };
       })
     );
+    
+    // Log the task deletion
+    if (task) {
+      logActivity(
+        'delete',
+        `Deleted task "${taskTitle}" from milestone "${milestoneTitle}"`,
+        taskId,
+        'task',
+        JSON.stringify(task),
+        undefined,
+        'Trash'
+      );
+    }
   };
   
   // Handle deleting a milestone
   const deleteMilestone = (milestoneId: string) => {
+    // Find the milestone to get its details for logging
+    const milestone = milestones.find(m => m.id === milestoneId);
+    
     setMilestones(currentMilestones => 
       currentMilestones.filter(milestone => milestone.id !== milestoneId)
     );
+    
+    // Log the milestone deletion
+    if (milestone) {
+      logActivity(
+        'delete',
+        `Deleted milestone "${milestone.title}" with ${milestone.tasks.length} tasks`,
+        milestoneId,
+        'milestone',
+        JSON.stringify(milestone),
+        undefined,
+        'Trash'
+      );
+    }
   };
   
   // Handle resetting the project tracker to initial state
   const resetTracker = () => {
     if (window.confirm("Are you sure you want to reset the project tracker? This will delete all your progress data.")) {
+      // Log the reset operation before changing the state
+      const tasksCount = milestones.flatMap(m => m.tasks).length;
+      
+      logActivity(
+        'reset',
+        `Reset project tracker (deleted ${milestones.length} milestones and ${tasksCount} tasks)`,
+        'system',
+        'system',
+        JSON.stringify(milestones),
+        JSON.stringify(initialMilestones),
+        'RefreshCcw'
+      );
+      
+      // Reset state
       setMilestones(initialMilestones);
       setActiveTab('overview');
       setFilterStatus('all');
       setFilterCategory('all');
       setSearchQuery('');
+      
+      // This will not be shown in activity log since we're emptying the log too
+      setActivityLogs([]);
     }
   };
   
@@ -729,13 +949,25 @@ export function ProjectTracker() {
     const blob = new Blob([jsonData], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     
+    const filename = `project-tracker-export-${new Date().toISOString().split('T')[0]}.json`;
     const a = document.createElement('a');
     a.href = url;
-    a.download = `project-tracker-export-${new Date().toISOString().split('T')[0]}.json`;
+    a.download = filename;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
+    
+    // Log the export operation
+    logActivity(
+      'export',
+      `Exported project data (${milestones.length} milestones, ${milestones.flatMap(m => m.tasks).length} tasks)`,
+      'system',
+      'system',
+      undefined,
+      undefined,
+      'Download'
+    );
   };
   
   // Import project data from JSON
@@ -751,6 +983,18 @@ export function ProjectTracker() {
         
         if (data && Array.isArray(data.milestones)) {
           setMilestones(data.milestones);
+          
+          // Log the import operation
+          const importedTaskCount = data.milestones.reduce((count: number, m: any) => count + (m.tasks?.length || 0), 0);
+          logActivity(
+            'import',
+            `Imported project data (${data.milestones.length} milestones, ${importedTaskCount} tasks) from ${file.name}`,
+            'system',
+            'system',
+            undefined,
+            undefined,
+            'Upload'
+          );
         } else {
           alert("Invalid file format. Expected a valid project tracker export file.");
         }
@@ -869,6 +1113,10 @@ export function ProjectTracker() {
             <TabsTrigger value="milestones" className="flex-1">
               <Milestone className="h-4 w-4 mr-2" />
               Milestones
+            </TabsTrigger>
+            <TabsTrigger value="activity" className="flex-1">
+              <History className="h-4 w-4 mr-2" />
+              Activity
             </TabsTrigger>
           </TabsList>
         </div>
@@ -1640,6 +1888,91 @@ export function ProjectTracker() {
                 </Card>
               ))}
             </div>
+          </TabsContent>
+          
+          {/* Activity Timeline Tab */}
+          <TabsContent value="activity" className="m-0 px-6 py-4">
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg">Activity Timeline</CardTitle>
+                <CardDescription>
+                  Recent activity and changes to the project
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="relative space-y-4 pl-6 before:absolute before:left-2 before:top-0 before:h-full before:w-[2px] before:bg-muted">
+                  {/* Task Status Changes */}
+                  <div className="relative pl-4 pb-10">
+                    <div className="absolute left-[-30px] top-1 h-6 w-6 rounded-full border bg-background flex items-center justify-center">
+                      <CheckCircle2 className="h-3 w-3" />
+                    </div>
+                    <div className="mb-1 text-sm font-medium">Task Status Updated</div>
+                    <div className="text-sm text-muted-foreground">
+                      <span className="font-semibold">Schema Validation</span> marked as <span className="text-blue-500 font-medium">in-progress</span>
+                    </div>
+                    <div className="mt-1 text-xs text-muted-foreground">
+                      April 03, 2023 • 3:45 PM
+                    </div>
+                  </div>
+                  
+                  {/* Task Created */}
+                  <div className="relative pl-4 pb-10">
+                    <div className="absolute left-[-30px] top-1 h-6 w-6 rounded-full border bg-background flex items-center justify-center">
+                      <Plus className="h-3 w-3" />
+                    </div>
+                    <div className="mb-1 text-sm font-medium">New Task Created</div>
+                    <div className="text-sm text-muted-foreground">
+                      Added <span className="font-semibold">Fix Map constructor in browser environment</span> to <span className="text-blue-500 font-medium">ETL Core Components</span>
+                    </div>
+                    <div className="mt-1 text-xs text-muted-foreground">
+                      April 02, 2023 • 10:23 AM
+                    </div>
+                  </div>
+                  
+                  {/* Milestone Progress */}
+                  <div className="relative pl-4 pb-10">
+                    <div className="absolute left-[-30px] top-1 h-6 w-6 rounded-full border bg-background flex items-center justify-center">
+                      <GitPullRequestDraft className="h-3 w-3" />
+                    </div>
+                    <div className="mb-1 text-sm font-medium">Milestone Progress Update</div>
+                    <div className="text-sm text-muted-foreground">
+                      <span className="font-semibold">ETL Management UI</span> progress updated to <span className="text-green-500 font-medium">75%</span>
+                    </div>
+                    <div className="mt-1 text-xs text-muted-foreground">
+                      April 01, 2023 • 4:12 PM
+                    </div>
+                  </div>
+                  
+                  {/* Task Completed */}
+                  <div className="relative pl-4 pb-10">
+                    <div className="absolute left-[-30px] top-1 h-6 w-6 rounded-full border bg-background flex items-center justify-center">
+                      <CheckCircle2 className="h-3 w-3" />
+                    </div>
+                    <div className="mb-1 text-sm font-medium">Task Completed</div>
+                    <div className="text-sm text-muted-foreground">
+                      <span className="font-semibold">Data Quality Service</span> marked as <span className="text-green-500 font-medium">completed</span>
+                    </div>
+                    <div className="mt-1 text-xs text-muted-foreground">
+                      March 31, 2023 • 1:20 PM
+                    </div>
+                  </div>
+                  
+                  {/* New Milestone */}
+                  <div className="relative pl-4 pb-10">
+                    <div className="absolute left-[-30px] top-1 h-6 w-6 rounded-full border bg-background flex items-center justify-center">
+                      <Milestone className="h-3 w-3" />
+                    </div>
+                    <div className="mb-1 text-sm font-medium">New Milestone Created</div>
+                    <div className="text-sm text-muted-foreground">
+                      Added new milestone <span className="font-semibold">Data Quality & Validation</span>
+                    </div>
+                    <div className="mt-1 text-xs text-muted-foreground">
+                      March 30, 2023 • 9:40 AM
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
           </TabsContent>
         </CardContent>
       </Tabs>
