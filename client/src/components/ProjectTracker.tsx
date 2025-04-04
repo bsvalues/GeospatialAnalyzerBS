@@ -41,8 +41,18 @@ import {
   Clock, 
   AlertCircle, 
   BarChart,
-  Plus
+  Plus,
+  Download,
+  Upload,
+  Share,
+  RefreshCcw,
+  Printer
 } from 'lucide-react';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger
+} from '@/components/ui/popover';
 
 // Define our project task types
 interface TaskItem {
@@ -417,11 +427,48 @@ const CategoryBadge: React.FC<{ categoryId: string }> = ({ categoryId }) => {
   );
 };
 
+// Local storage keys
+const STORAGE_KEYS = {
+  MILESTONES: 'spatialest-project-milestones',
+  ACTIVE_TAB: 'spatialest-project-active-tab',
+  FILTER_STATUS: 'spatialest-project-filter-status',
+  FILTER_CATEGORY: 'spatialest-project-filter-category'
+};
+
+// Load data from localStorage
+const loadFromStorage = <T,>(key: string, defaultValue: T): T => {
+  try {
+    const storedValue = localStorage.getItem(key);
+    return storedValue ? JSON.parse(storedValue) as T : defaultValue;
+  } catch (error) {
+    console.warn(`Error loading data from localStorage for key ${key}:`, error);
+    return defaultValue;
+  }
+};
+
+// Save data to localStorage
+const saveToStorage = <T,>(key: string, value: T): void => {
+  try {
+    localStorage.setItem(key, JSON.stringify(value));
+  } catch (error) {
+    console.warn(`Error saving data to localStorage for key ${key}:`, error);
+  }
+};
+
 export function ProjectTracker() {
-  const [milestones, setMilestones] = useState<Milestone[]>(initialMilestones);
-  const [activeTab, setActiveTab] = useState('overview');
-  const [filterStatus, setFilterStatus] = useState<TaskItem['status'] | 'all'>('all');
-  const [filterCategory, setFilterCategory] = useState<string>('all');
+  // Load initial state from localStorage or use defaults
+  const [milestones, setMilestones] = useState<Milestone[]>(
+    loadFromStorage(STORAGE_KEYS.MILESTONES, initialMilestones)
+  );
+  const [activeTab, setActiveTab] = useState(
+    loadFromStorage(STORAGE_KEYS.ACTIVE_TAB, 'overview')
+  );
+  const [filterStatus, setFilterStatus] = useState<TaskItem['status'] | 'all'>(
+    loadFromStorage(STORAGE_KEYS.FILTER_STATUS, 'all')
+  );
+  const [filterCategory, setFilterCategory] = useState<string>(
+    loadFromStorage(STORAGE_KEYS.FILTER_CATEGORY, 'all')
+  );
   const [searchQuery, setSearchQuery] = useState('');
   const [isAddTaskModalOpen, setIsAddTaskModalOpen] = useState(false);
   const [isAddMilestoneModalOpen, setIsAddMilestoneModalOpen] = useState(false);
@@ -438,6 +485,23 @@ export function ProjectTracker() {
     title: '',
     description: '',
   });
+
+  // Persist state changes to localStorage
+  useEffect(() => {
+    saveToStorage(STORAGE_KEYS.MILESTONES, milestones);
+  }, [milestones]);
+
+  useEffect(() => {
+    saveToStorage(STORAGE_KEYS.ACTIVE_TAB, activeTab);
+  }, [activeTab]);
+
+  useEffect(() => {
+    saveToStorage(STORAGE_KEYS.FILTER_STATUS, filterStatus);
+  }, [filterStatus]);
+
+  useEffect(() => {
+    saveToStorage(STORAGE_KEYS.FILTER_CATEGORY, filterCategory);
+  }, [filterCategory]);
   
   // Calculate overall project progress
   const overallProgress = Math.round(
@@ -616,6 +680,64 @@ export function ProjectTracker() {
     );
   };
   
+  // Handle resetting the project tracker to initial state
+  const resetTracker = () => {
+    if (window.confirm("Are you sure you want to reset the project tracker? This will delete all your progress data.")) {
+      setMilestones(initialMilestones);
+      setActiveTab('overview');
+      setFilterStatus('all');
+      setFilterCategory('all');
+      setSearchQuery('');
+    }
+  };
+  
+  // Export project data to JSON
+  const exportData = () => {
+    const data = {
+      milestones,
+      exportDate: new Date().toISOString()
+    };
+    
+    const jsonData = JSON.stringify(data, null, 2);
+    const blob = new Blob([jsonData], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `project-tracker-export-${new Date().toISOString().split('T')[0]}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+  
+  // Import project data from JSON
+  const importData = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const content = e.target?.result as string;
+        const data = JSON.parse(content);
+        
+        if (data && Array.isArray(data.milestones)) {
+          setMilestones(data.milestones);
+        } else {
+          alert("Invalid file format. Expected a valid project tracker export file.");
+        }
+      } catch (error) {
+        alert("Failed to parse the import file. Please ensure it's a valid JSON file.");
+        console.error("Import error:", error);
+      }
+    };
+    reader.readAsText(file);
+    
+    // Clear the input value to allow re-import of the same file
+    event.target.value = '';
+  };
+  
   return (
     <Card className="shadow-lg">
       <CardHeader>
@@ -709,6 +831,74 @@ export function ProjectTracker() {
                         </p>
                       </div>
                     ))}
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+            
+            {/* Project Timeline */}
+            <div className="mt-6">
+              <h3 className="text-lg font-medium mb-3">Project Timeline</h3>
+              <Card className="overflow-hidden">
+                <CardContent className="p-6">
+                  <div className="space-y-8">
+                    {milestones.map((milestone, index) => {
+                      // Calculate milestone status color
+                      let statusColor = "bg-gray-200";
+                      if (milestone.progress === 100) {
+                        statusColor = "bg-green-500";
+                      } else if (milestone.progress > 0) {
+                        statusColor = "bg-blue-500";
+                      } else if (milestone.tasks.some(t => t.status === 'blocked')) {
+                        statusColor = "bg-red-500";
+                      }
+                      
+                      return (
+                        <div key={milestone.id} className="flex">
+                          <div className="w-9 flex-shrink-0">
+                            <div className={`w-7 h-7 rounded-full ${statusColor} flex items-center justify-center text-white font-medium`}>
+                              {index + 1}
+                            </div>
+                            {index < milestones.length - 1 && (
+                              <div className="w-px h-full bg-gray-200 mx-auto mt-1"></div>
+                            )}
+                          </div>
+                          
+                          <div className="ml-4 -mt-0.5 pb-8 flex-1">
+                            <h4 className="font-medium text-base">{milestone.title}</h4>
+                            <p className="text-sm text-muted-foreground mt-1">
+                              {milestone.description}
+                            </p>
+                            
+                            <div className="mt-2 flex items-center gap-2">
+                              <Progress value={milestone.progress} className="h-2 flex-1" />
+                              <span className="text-sm font-medium">{milestone.progress}%</span>
+                            </div>
+                            
+                            <div className="mt-3 flex gap-2 flex-wrap">
+                              {milestone.tasks.length > 0 ? (
+                                <>
+                                  <Badge variant="outline" className="bg-green-50">
+                                    {milestone.tasks.filter(t => t.status === 'completed').length} Completed
+                                  </Badge>
+                                  <Badge variant="outline" className="bg-blue-50">
+                                    {milestone.tasks.filter(t => t.status === 'in-progress').length} In Progress
+                                  </Badge>
+                                  <Badge variant="outline" className="bg-amber-50">
+                                    {milestone.tasks.filter(t => t.status === 'planned').length} Planned
+                                  </Badge>
+                                  <Badge variant="outline" className="bg-red-50">
+                                    {milestone.tasks.filter(t => t.status === 'blocked').length} Blocked
+                                  </Badge>
+                                </>
+                              ) : (
+                                <span className="text-sm text-muted-foreground">No tasks yet</span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
                 </CardContent>
               </Card>
@@ -1028,11 +1218,14 @@ export function ProjectTracker() {
       </Tabs>
       
       <CardFooter className="bg-muted/30 px-6 py-4 border-t">
-        <div className="flex items-center justify-between w-full">
-          <span className="text-sm text-muted-foreground">
-            Last updated: {formatDate(new Date())}
-          </span>
-          <div className="flex gap-2">
+        <div className="flex flex-col md:flex-row items-start md:items-center justify-between w-full gap-4">
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-muted-foreground">
+              Last updated: {formatDate(new Date())}
+            </span>
+          </div>
+          
+          <div className="flex flex-wrap gap-2">
             <Button 
               variant="outline" 
               size="sm" 
@@ -1049,8 +1242,51 @@ export function ProjectTracker() {
               <Plus className="h-4 w-4 mr-1" />
               Add Milestone
             </Button>
+            
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" size="sm">
+                  <Share className="h-4 w-4 mr-1" />
+                  Export/Import
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-60 p-3">
+                <div className="flex flex-col gap-2">
+                  <Button variant="outline" size="sm" onClick={exportData}>
+                    <Download className="h-4 w-4 mr-1" />
+                    Export to JSON
+                  </Button>
+                  <Label htmlFor="import-file" className="cursor-pointer">
+                    <div className="flex items-center justify-center w-full p-2 rounded bg-primary-50 border border-dashed border-primary-200 hover:bg-primary-100 transition-colors">
+                      <Upload className="h-4 w-4 mr-1 text-primary" />
+                      <span className="text-sm text-primary">Import from JSON</span>
+                      <Input 
+                        id="import-file" 
+                        type="file" 
+                        accept=".json" 
+                        onChange={importData} 
+                        className="hidden"
+                      />
+                    </div>
+                  </Label>
+                  <div className="mt-2 pt-2 border-t border-gray-100">
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      onClick={resetTracker} 
+                      className="w-full text-red-500 hover:text-red-700"
+                    >
+                      <RefreshCcw className="h-4 w-4 mr-1" />
+                      Reset Tracker
+                    </Button>
+                  </div>
+                </div>
+              </PopoverContent>
+            </Popover>
+            
             <Button variant="outline" size="sm" onClick={() => window.print()}>
-              Export Report
+              <Printer className="h-4 w-4 mr-1" />
+              Print Report
             </Button>
           </div>
         </div>
