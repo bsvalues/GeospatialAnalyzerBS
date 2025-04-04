@@ -57,3 +57,87 @@ export function formatNumber(value: number, decimalPlaces: number = 0): string {
     maximumFractionDigits: decimalPlaces
   }).format(value);
 }
+
+/**
+ * Calculate the distance between two geographical coordinates using the haversine formula
+ * @param coord1 First coordinate [lat, lng]
+ * @param coord2 Second coordinate [lat, lng]
+ * @returns Distance in kilometers
+ */
+export function haversineDistance(
+  coord1: [number, number],
+  coord2: [number, number]
+): number {
+  // Earth's radius in kilometers
+  const R = 6371;
+  
+  // Convert latitude and longitude from degrees to radians
+  const lat1 = (coord1[0] * Math.PI) / 180;
+  const lon1 = (coord1[1] * Math.PI) / 180;
+  const lat2 = (coord2[0] * Math.PI) / 180;
+  const lon2 = (coord2[1] * Math.PI) / 180;
+  
+  // Differences in coordinates
+  const dLat = lat2 - lat1;
+  const dLon = lon2 - lon1;
+  
+  // Haversine formula
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  const distance = R * c;
+  
+  return distance;
+}
+
+/**
+ * Format a date object to a human-readable string
+ * @param date Date object to format
+ * @param options Intl.DateTimeFormatOptions object to customize formatting
+ * @returns Formatted date string
+ */
+export function formatDate(date: Date, options: Intl.DateTimeFormatOptions = {}): string {
+  if (!date || !(date instanceof Date) || isNaN(date.getTime())) {
+    return 'Invalid date';
+  }
+  
+  const defaultOptions: Intl.DateTimeFormatOptions = {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    ...options
+  };
+  
+  return new Intl.DateTimeFormat('en-US', defaultOptions).format(date);
+}
+
+/**
+ * Parse a string or number value to a numeric value
+ * @param value The value to parse
+ * @param defaultValue The default value to return if parsing fails
+ * @returns The parsed numeric value
+ */
+export function parseNumericValue(value: string | number | undefined | null, defaultValue: number = 0): number {
+  if (value === undefined || value === null) {
+    return defaultValue;
+  }
+  
+  if (typeof value === 'number') {
+    return isNaN(value) ? defaultValue : value;
+  }
+  
+  // Handle string values
+  if (typeof value === 'string') {
+    // Remove currency symbols, commas, and other non-numeric characters
+    const cleaned = value.replace(/[$,\s]/g, '');
+    
+    // Convert to number
+    const parsed = parseFloat(cleaned);
+    
+    // Return defaultValue if parsing failed
+    return isNaN(parsed) ? defaultValue : parsed;
+  }
+  
+  return defaultValue;
+}

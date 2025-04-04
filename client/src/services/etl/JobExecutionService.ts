@@ -1,5 +1,5 @@
-// No imports needed
 import { EtlJob } from "@shared/schema";
+import { ETLExecutionError } from "./ETLTypes";
 
 export interface JobExecutionResult {
   success: boolean;
@@ -20,6 +20,7 @@ export interface JobExecutionResult {
     errorCount: number;
     warningCount: number;
   };
+  errors?: ETLExecutionError[];
 }
 
 export interface JobSchedule {
@@ -56,13 +57,20 @@ export class JobExecutionService {
     } catch (error) {
       console.error('Error executing job:', error);
       
+      const errorMessage = error instanceof Error ? error.message : 'Failed to execute job';
+      
       return {
         success: false,
-        message: error instanceof Error ? error.message : 'Failed to execute job',
+        message: errorMessage,
         jobId,
         startTime: new Date(),
         status: 'failed',
-        logs: ['Job execution failed to start', error instanceof Error ? error.message : 'Unknown error']
+        logs: ['Job execution failed to start', errorMessage],
+        errors: [{
+          code: 'job_execution_failed',
+          message: errorMessage,
+          timestamp: new Date()
+        }]
       };
     }
   }
@@ -74,6 +82,7 @@ export class JobExecutionService {
     status: 'idle' | 'running' | 'success' | 'failed' | 'warning';
     lastRunAt?: Date;
     message?: string;
+    errors?: ETLExecutionError[];
   }> {
     try {
       const response = await fetch(`/api/etl/jobs/${jobId}`);
@@ -83,7 +92,10 @@ export class JobExecutionService {
         throw new Error(errorData.error || 'Failed to get job status');
       }
 
-      const job: EtlJob = await response.json();
+      // Cast to include possible metrics field
+      const job = await response.json() as EtlJob & { 
+        metrics?: { message?: string } 
+      };
       
       return {
         status: job.status as any,
@@ -93,8 +105,15 @@ export class JobExecutionService {
     } catch (error) {
       console.error('Error getting job status:', error);
       
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error getting job status';
+      
       return {
-        status: 'idle'
+        status: 'idle',
+        errors: [{
+          code: 'job_status_error',
+          message: errorMessage,
+          timestamp: new Date()
+        }]
       };
     }
   }
@@ -102,7 +121,11 @@ export class JobExecutionService {
   /**
    * Cancel a running job
    */
-  public static async cancelJob(jobId: number): Promise<boolean> {
+  public static async cancelJob(jobId: number): Promise<{
+    success: boolean;
+    message?: string;
+    errors?: ETLExecutionError[];
+  }> {
     try {
       const response = await fetch(`/api/etl/jobs/${jobId}/cancel`, {
         method: 'POST',
@@ -120,18 +143,35 @@ export class JobExecutionService {
       
       console.log(`Job #${jobId} has been cancelled`);
       
-      return result.success;
+      return {
+        success: result.success,
+        message: `Job #${jobId} has been cancelled successfully`
+      };
     } catch (error) {
       console.error('Error cancelling job:', error);
       
-      return false;
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error cancelling job';
+      
+      return {
+        success: false,
+        message: errorMessage,
+        errors: [{
+          code: 'job_cancel_error',
+          message: errorMessage,
+          timestamp: new Date()
+        }]
+      };
     }
   }
 
   /**
    * Schedule an ETL job
    */
-  public static async scheduleJob(jobId: number, schedule: JobSchedule): Promise<boolean> {
+  public static async scheduleJob(jobId: number, schedule: JobSchedule): Promise<{
+    success: boolean;
+    message?: string;
+    errors?: ETLExecutionError[];
+  }> {
     try {
       const response = await fetch(`/api/etl/jobs/${jobId}`, {
         method: 'PATCH',
@@ -150,11 +190,24 @@ export class JobExecutionService {
 
       console.log(`Job #${jobId} has been scheduled successfully`);
       
-      return true;
+      return {
+        success: true,
+        message: `Job #${jobId} has been scheduled successfully`
+      };
     } catch (error) {
       console.error('Error scheduling job:', error);
       
-      return false;
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error scheduling job';
+      
+      return {
+        success: false,
+        message: errorMessage,
+        errors: [{
+          code: 'job_schedule_error',
+          message: errorMessage,
+          timestamp: new Date()
+        }]
+      };
     }
   }
 
@@ -169,6 +222,7 @@ export class JobExecutionService {
     success: boolean;
     batchJobId?: number;
     message: string;
+    errors?: ETLExecutionError[];
   }> {
     try {
       const response = await fetch('/api/etl/batch-jobs', {
@@ -213,9 +267,16 @@ export class JobExecutionService {
     } catch (error) {
       console.error('Error executing batch job:', error);
       
+      const errorMessage = error instanceof Error ? error.message : 'Failed to execute batch job';
+      
       return {
         success: false,
-        message: error instanceof Error ? error.message : 'Failed to execute batch job'
+        message: errorMessage,
+        errors: [{
+          code: 'batch_job_execution_error',
+          message: errorMessage,
+          timestamp: new Date()
+        }]
       };
     }
   }
@@ -223,7 +284,10 @@ export class JobExecutionService {
   /**
    * Get the execution history of a job
    */
-  public static async getJobExecutionHistory(jobId: number): Promise<JobExecutionResult[]> {
+  public static async getJobExecutionHistory(jobId: number): Promise<{
+    history: JobExecutionResult[];
+    errors?: ETLExecutionError[];
+  }> {
     try {
       const response = await fetch(`/api/etl/jobs/${jobId}/history`);
 
@@ -232,10 +296,22 @@ export class JobExecutionService {
         throw new Error(errorData.error || 'Failed to get job execution history');
       }
 
-      return await response.json();
+      const history = await response.json();
+      
+      return { history };
     } catch (error) {
       console.error('Error getting job execution history:', error);
-      return [];
+      
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error getting job history';
+      
+      return {
+        history: [],
+        errors: [{
+          code: 'job_history_error',
+          message: errorMessage,
+          timestamp: new Date()
+        }]
+      };
     }
   }
 
@@ -280,7 +356,8 @@ export class JobExecutionService {
       
       // Default for complex expressions
       return cronExpression;
-    } catch (e) {
+    } catch (error) {
+      console.error('Error parsing cron expression:', error);
       return cronExpression;
     }
   }
@@ -318,7 +395,8 @@ export class JobExecutionService {
         default:
           return '0 0 * * *'; // Default daily at midnight
       }
-    } catch (e) {
+    } catch (error) {
+      console.error('Error creating cron expression:', error);
       return '0 0 * * *'; // Default daily at midnight
     }
   }
