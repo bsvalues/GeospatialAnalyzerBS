@@ -1,289 +1,390 @@
 /**
- * ETL Metrics Collector
+ * MetricsCollector.ts
  * 
- * This service collects and manages metrics for ETL jobs, including execution time,
- * memory usage, CPU utilization, and error counts.
+ * Service for collecting and tracking ETL job metrics
  */
 
-export interface MemoryUsage {
-  initialHeapSize: number;
-  finalHeapSize: number;
-  peakHeapSize: number;
-}
+import { JobMetrics } from './ETLTypes';
 
-export interface TaskMetrics {
-  taskId: string;
-  taskName: string;
-  startTime: Date;
-  endTime: Date | null;
-  executionTime: number;
-  recordsProcessed: number;
-}
-
-export interface ETLJobMetrics {
-  jobId: string;
-  jobName: string;
-  startTime: Date;
-  endTime: Date | null;
-  executionTime: number;
-  taskMetrics: TaskMetrics[];
-  recordsProcessed: number;
-  errorCount: number;
-  memoryUsage: MemoryUsage;
-  cpuUtilization: number; // percentage of available CPU
-}
-
-type MetricsUpdateCallback = (metrics: ETLJobMetrics) => void;
-
-/**
- * Metrics Collector Service
- */
 class MetricsCollector {
-  private activeJobMetrics: Map<string, ETLJobMetrics>;
-  private historicalMetrics: ETLJobMetrics[];
-  private updateCallbacks: MetricsUpdateCallback[];
-
-  constructor() {
-    this.activeJobMetrics = new Map();
-    this.historicalMetrics = [];
-    this.updateCallbacks = [];
-  }
-
+  // Store job metrics by job ID
+  private jobMetrics: Map<number, {
+    startTime: Date;
+    endTime?: Date;
+    extractStartTime?: Date;
+    extractEndTime?: Date;
+    transformStartTime?: Date;
+    transformEndTime?: Date;
+    loadStartTime?: Date;
+    loadEndTime?: Date;
+    recordsProcessed: number;
+    recordsValid: number;
+    recordsInvalid: number;
+    cpuSamples: number[];
+    memorySamples: number[];
+  }> = new Map();
+  
+  // Timer IDs for performance sampling
+  private performanceSamplers: Map<number, NodeJS.Timeout> = new Map();
+  
   /**
-   * Start collecting metrics for a job
+   * Start metrics collection for a job
    */
-  startJobMetrics(jobId: string, jobName: string): ETLJobMetrics {
-    const metrics: ETLJobMetrics = {
-      jobId,
-      jobName,
+  startJobMetrics(jobId: number): void {
+    console.log(`Starting metrics collection for job ${jobId}`);
+    
+    // Initialize metrics for this job
+    this.jobMetrics.set(jobId, {
       startTime: new Date(),
-      endTime: null,
-      executionTime: 0,
-      taskMetrics: [],
       recordsProcessed: 0,
-      errorCount: 0,
-      memoryUsage: {
-        initialHeapSize: this.getCurrentHeapSize(),
-        finalHeapSize: 0,
-        peakHeapSize: this.getCurrentHeapSize()
-      },
-      cpuUtilization: 0
-    };
-
-    this.activeJobMetrics.set(jobId, metrics);
-    return metrics;
-  }
-
-  /**
-   * Get current metrics for a job (both active and historical)
-   */
-  getJobMetrics(jobId: string): ETLJobMetrics | null {
-    // Check active jobs first
-    const activeMetrics = this.activeJobMetrics.get(jobId);
-    if (activeMetrics) {
-      // Update execution time for active jobs
-      if (!activeMetrics.endTime) {
-        activeMetrics.executionTime = this.calculateExecutionTime(activeMetrics.startTime);
-      }
-      return activeMetrics;
-    }
-
-    // Then check historical metrics
-    const historicalMetrics = this.historicalMetrics.find(m => m.jobId === jobId);
-    return historicalMetrics || null;
-  }
-
-  /**
-   * Get all historical job metrics
-   */
-  getHistoricalJobMetrics(): ETLJobMetrics[] {
-    return [...this.historicalMetrics];
-  }
-
-  /**
-   * Complete metrics collection for a job
-   */
-  completeJobMetrics(jobId: string): ETLJobMetrics | null {
-    const metrics = this.activeJobMetrics.get(jobId);
-    if (!metrics) return null;
-
-    // Capture final metrics
-    metrics.endTime = new Date();
-    metrics.executionTime = this.calculateExecutionTime(metrics.startTime, metrics.endTime);
-    metrics.memoryUsage.finalHeapSize = this.getCurrentHeapSize();
-    metrics.cpuUtilization = this.calculateCpuUtilization();
-
-    // Calculate total records processed from all tasks
-    metrics.recordsProcessed = metrics.taskMetrics.reduce(
-      (total, task) => total + task.recordsProcessed, 
-      0
-    );
-
-    // Move to historical metrics
-    this.historicalMetrics.push({ ...metrics });
-    
-    // Notify subscribers
-    this.notifyMetricsUpdated(metrics);
-
-    return metrics;
-  }
-
-  /**
-   * Start collecting metrics for a task
-   */
-  startTaskMetrics(jobId: string, taskId: string, taskName: string): TaskMetrics | null {
-    const jobMetrics = this.activeJobMetrics.get(jobId);
-    if (!jobMetrics) return null;
-
-    const taskMetrics: TaskMetrics = {
-      taskId,
-      taskName,
-      startTime: new Date(),
-      endTime: null,
-      executionTime: 0,
-      recordsProcessed: 0
-    };
-
-    jobMetrics.taskMetrics.push(taskMetrics);
-    
-    // Update job metrics with current memory usage
-    const currentHeapSize = this.getCurrentHeapSize();
-    if (currentHeapSize > jobMetrics.memoryUsage.peakHeapSize) {
-      jobMetrics.memoryUsage.peakHeapSize = currentHeapSize;
-    }
-
-    // Notify subscribers
-    this.notifyMetricsUpdated(jobMetrics);
-
-    return taskMetrics;
-  }
-
-  /**
-   * Complete metrics collection for a task
-   */
-  completeTaskMetrics(jobId: string, taskId: string): TaskMetrics | null {
-    const jobMetrics = this.activeJobMetrics.get(jobId);
-    if (!jobMetrics) return null;
-
-    const taskMetrics = jobMetrics.taskMetrics.find(t => t.taskId === taskId);
-    if (!taskMetrics) return null;
-
-    // Capture final metrics
-    taskMetrics.endTime = new Date();
-    taskMetrics.executionTime = this.calculateExecutionTime(
-      taskMetrics.startTime, 
-      taskMetrics.endTime
-    );
-
-    // Update job metrics with current memory usage
-    const currentHeapSize = this.getCurrentHeapSize();
-    if (currentHeapSize > jobMetrics.memoryUsage.peakHeapSize) {
-      jobMetrics.memoryUsage.peakHeapSize = currentHeapSize;
-    }
-
-    // Notify subscribers
-    this.notifyMetricsUpdated(jobMetrics);
-
-    return taskMetrics;
-  }
-
-  /**
-   * Update record count for a task
-   */
-  updateRecordCount(
-    jobId: string, 
-    recordCount: number, 
-    taskId?: string
-  ): boolean {
-    const jobMetrics = this.activeJobMetrics.get(jobId);
-    if (!jobMetrics) return false;
-
-    if (taskId) {
-      // Update record count for specific task
-      const taskMetrics = jobMetrics.taskMetrics.find(t => t.taskId === taskId);
-      if (!taskMetrics) return false;
-      taskMetrics.recordsProcessed = recordCount;
-    } else {
-      // Update job-level record count
-      jobMetrics.recordsProcessed = recordCount;
-    }
-
-    // Notify subscribers
-    this.notifyMetricsUpdated(jobMetrics);
-
-    return true;
-  }
-
-  /**
-   * Record an error occurrence
-   */
-  recordError(jobId: string): boolean {
-    const jobMetrics = this.activeJobMetrics.get(jobId);
-    if (!jobMetrics) return false;
-
-    jobMetrics.errorCount++;
-
-    // Notify subscribers
-    this.notifyMetricsUpdated(jobMetrics);
-
-    return true;
-  }
-
-  /**
-   * Subscribe to metrics updates
-   */
-  subscribeToMetricsUpdates(callback: MetricsUpdateCallback): () => void {
-    this.updateCallbacks.push(callback);
-    
-    // Return unsubscribe function
-    return () => {
-      this.updateCallbacks = this.updateCallbacks.filter(cb => cb !== callback);
-    };
-  }
-
-  /**
-   * Notify subscribers of metrics updates
-   */
-  private notifyMetricsUpdated(metrics: ETLJobMetrics): void {
-    this.updateCallbacks.forEach(callback => {
-      callback({ ...metrics });
+      recordsValid: 0,
+      recordsInvalid: 0,
+      cpuSamples: [],
+      memorySamples: []
     });
+    
+    // Start performance sampling
+    this.startPerformanceSampling(jobId);
   }
-
+  
   /**
-   * Calculate execution time between two timestamps
+   * Start extract phase metrics
    */
-  private calculateExecutionTime(startTime: Date, endTime: Date | null = null): number {
-    const end = endTime || new Date();
-    return end.getTime() - startTime.getTime();
-  }
-
-  /**
-   * Get current heap size (using performance API when available)
-   */
-  private getCurrentHeapSize(): number {
-    // Note: performance.memory is a non-standard Chrome-only feature
-    // TypeScript doesn't have types for it by default, so we use this workaround
-    const perf = performance as any;
-    if (typeof perf !== 'undefined' && 
-        perf.memory && 
-        perf.memory.usedJSHeapSize) {
-      return perf.memory.usedJSHeapSize;
+  startExtractPhase(jobId: number): void {
+    const metrics = this.jobMetrics.get(jobId);
+    
+    if (!metrics) {
+      console.warn(`No metrics found for job ${jobId}`);
+      return;
     }
-    // Fallback when actual memory metrics aren't available
-    return Math.floor(Math.random() * 1000000) + 500000;
+    
+    metrics.extractStartTime = new Date();
   }
-
+  
   /**
-   * Calculate CPU utilization (mockup implementation)
+   * End extract phase metrics
    */
-  private calculateCpuUtilization(): number {
-    // This is a mockup implementation since browsers don't provide direct CPU metrics
-    // In a production app, this could be approximated using task execution times
-    // or could be provided by server-side metrics
-    return Math.min(95, Math.floor(Math.random() * 60) + 20);
+  endExtractPhase(jobId: number): void {
+    const metrics = this.jobMetrics.get(jobId);
+    
+    if (!metrics) {
+      console.warn(`No metrics found for job ${jobId}`);
+      return;
+    }
+    
+    metrics.extractEndTime = new Date();
+  }
+  
+  /**
+   * Start transform phase metrics
+   */
+  startTransformPhase(jobId: number): void {
+    const metrics = this.jobMetrics.get(jobId);
+    
+    if (!metrics) {
+      console.warn(`No metrics found for job ${jobId}`);
+      return;
+    }
+    
+    metrics.transformStartTime = new Date();
+  }
+  
+  /**
+   * End transform phase metrics
+   */
+  endTransformPhase(jobId: number): void {
+    const metrics = this.jobMetrics.get(jobId);
+    
+    if (!metrics) {
+      console.warn(`No metrics found for job ${jobId}`);
+      return;
+    }
+    
+    metrics.transformEndTime = new Date();
+  }
+  
+  /**
+   * Start load phase metrics
+   */
+  startLoadPhase(jobId: number): void {
+    const metrics = this.jobMetrics.get(jobId);
+    
+    if (!metrics) {
+      console.warn(`No metrics found for job ${jobId}`);
+      return;
+    }
+    
+    metrics.loadStartTime = new Date();
+  }
+  
+  /**
+   * End load phase metrics
+   */
+  endLoadPhase(jobId: number): void {
+    const metrics = this.jobMetrics.get(jobId);
+    
+    if (!metrics) {
+      console.warn(`No metrics found for job ${jobId}`);
+      return;
+    }
+    
+    metrics.loadEndTime = new Date();
+  }
+  
+  /**
+   * Update records processed count
+   */
+  updateRecordsProcessed(jobId: number, count: number): void {
+    const metrics = this.jobMetrics.get(jobId);
+    
+    if (!metrics) {
+      console.warn(`No metrics found for job ${jobId}`);
+      return;
+    }
+    
+    metrics.recordsProcessed = count;
+  }
+  
+  /**
+   * Update records valid/invalid counts
+   */
+  updateValidationCounts(jobId: number, valid: number, invalid: number): void {
+    const metrics = this.jobMetrics.get(jobId);
+    
+    if (!metrics) {
+      console.warn(`No metrics found for job ${jobId}`);
+      return;
+    }
+    
+    metrics.recordsValid = valid;
+    metrics.recordsInvalid = invalid;
+  }
+  
+  /**
+   * End metrics collection and return final metrics
+   */
+  endJobMetrics(jobId: number): JobMetrics {
+    console.log(`Ending metrics collection for job ${jobId}`);
+    
+    const metrics = this.jobMetrics.get(jobId);
+    
+    if (!metrics) {
+      console.warn(`No metrics found for job ${jobId}`);
+      return this.createEmptyMetrics();
+    }
+    
+    // Stop performance sampling
+    this.stopPerformanceSampling(jobId);
+    
+    // Set end time if not already set
+    if (!metrics.endTime) {
+      metrics.endTime = new Date();
+    }
+    
+    // Calculate durations and other metrics
+    const startTime = metrics.startTime;
+    const endTime = metrics.endTime;
+    const duration = endTime.getTime() - startTime.getTime();
+    
+    // Calculate phase timings
+    const extractTime = metrics.extractStartTime && metrics.extractEndTime
+      ? metrics.extractEndTime.getTime() - metrics.extractStartTime.getTime()
+      : 0;
+      
+    const transformTime = metrics.transformStartTime && metrics.transformEndTime
+      ? metrics.transformEndTime.getTime() - metrics.transformStartTime.getTime()
+      : 0;
+      
+    const loadTime = metrics.loadStartTime && metrics.loadEndTime
+      ? metrics.loadEndTime.getTime() - metrics.loadStartTime.getTime()
+      : 0;
+    
+    // Calculate throughput (records per second)
+    const throughput = duration > 0
+      ? (metrics.recordsProcessed / duration) * 1000
+      : 0;
+    
+    // Calculate average CPU and memory usage
+    const avgCpuUsage = metrics.cpuSamples.length > 0
+      ? metrics.cpuSamples.reduce((sum, sample) => sum + sample, 0) / metrics.cpuSamples.length
+      : undefined;
+      
+    const avgMemoryUsage = metrics.memorySamples.length > 0
+      ? metrics.memorySamples.reduce((sum, sample) => sum + sample, 0) / metrics.memorySamples.length
+      : undefined;
+    
+    // Compile final metrics
+    const finalMetrics: JobMetrics = {
+      startTime,
+      endTime,
+      duration,
+      extractTime,
+      transformTime,
+      loadTime,
+      recordsProcessed: metrics.recordsProcessed,
+      recordsValid: metrics.recordsValid,
+      recordsInvalid: metrics.recordsInvalid,
+      throughput,
+      cpuUsage: avgCpuUsage,
+      memoryUsage: avgMemoryUsage
+    };
+    
+    // Keep the raw metrics for historical data
+    // But move out of the active job metrics map
+    // In a real implementation, these would likely be stored in a database
+    
+    // Remove from active job metrics
+    this.jobMetrics.delete(jobId);
+    
+    return finalMetrics;
+  }
+  
+  /**
+   * Get current job metrics (snapshot)
+   */
+  getJobMetrics(jobId: number): JobMetrics | null {
+    const metrics = this.jobMetrics.get(jobId);
+    
+    if (!metrics) {
+      return null;
+    }
+    
+    // Create a snapshot of current metrics
+    const now = new Date();
+    const duration = now.getTime() - metrics.startTime.getTime();
+    
+    // Calculate phase timings
+    const extractTime = metrics.extractStartTime
+      ? (metrics.extractEndTime || now).getTime() - metrics.extractStartTime.getTime()
+      : 0;
+      
+    const transformTime = metrics.transformStartTime
+      ? (metrics.transformEndTime || now).getTime() - metrics.transformStartTime.getTime()
+      : 0;
+      
+    const loadTime = metrics.loadStartTime
+      ? (metrics.loadEndTime || now).getTime() - metrics.loadStartTime.getTime()
+      : 0;
+    
+    // Calculate throughput (records per second)
+    const throughput = duration > 0
+      ? (metrics.recordsProcessed / duration) * 1000
+      : 0;
+    
+    // Calculate average CPU and memory usage
+    const avgCpuUsage = metrics.cpuSamples.length > 0
+      ? metrics.cpuSamples.reduce((sum, sample) => sum + sample, 0) / metrics.cpuSamples.length
+      : undefined;
+      
+    const avgMemoryUsage = metrics.memorySamples.length > 0
+      ? metrics.memorySamples.reduce((sum, sample) => sum + sample, 0) / metrics.memorySamples.length
+      : undefined;
+    
+    return {
+      startTime: metrics.startTime,
+      endTime: metrics.endTime || now,
+      duration,
+      extractTime,
+      transformTime,
+      loadTime,
+      recordsProcessed: metrics.recordsProcessed,
+      recordsValid: metrics.recordsValid,
+      recordsInvalid: metrics.recordsInvalid,
+      throughput,
+      cpuUsage: avgCpuUsage,
+      memoryUsage: avgMemoryUsage
+    };
+  }
+  
+  /**
+   * Clear all metrics
+   */
+  clearAllMetrics(): void {
+    // Stop all performance samplers
+    for (const [jobId] of this.performanceSamplers) {
+      this.stopPerformanceSampling(jobId);
+    }
+    
+    // Clear all metrics
+    this.jobMetrics.clear();
+  }
+  
+  /**
+   * Start performance sampling for a job
+   */
+  private startPerformanceSampling(jobId: number): void {
+    // Check if already sampling
+    if (this.performanceSamplers.has(jobId)) {
+      return;
+    }
+    
+    // Start a timer to sample performance metrics
+    // In a real implementation, this would use actual process metrics
+    // For this demo, we'll use random values
+    const samplingInterval = 1000; // 1 second
+    
+    const timerId = setInterval(() => {
+      this.samplePerformanceMetrics(jobId);
+    }, samplingInterval);
+    
+    this.performanceSamplers.set(jobId, timerId);
+  }
+  
+  /**
+   * Stop performance sampling for a job
+   */
+  private stopPerformanceSampling(jobId: number): void {
+    const timerId = this.performanceSamplers.get(jobId);
+    
+    if (timerId) {
+      clearInterval(timerId);
+      this.performanceSamplers.delete(jobId);
+    }
+  }
+  
+  /**
+   * Sample performance metrics for a job
+   */
+  private samplePerformanceMetrics(jobId: number): void {
+    const metrics = this.jobMetrics.get(jobId);
+    
+    if (!metrics) {
+      this.stopPerformanceSampling(jobId);
+      return;
+    }
+    
+    // In a real implementation, these would be actual CPU and memory metrics
+    // For this demo, we'll use simulated values
+    // CPU usage as percentage (0-100)
+    const cpuUsage = Math.random() * 20 + 10; // Random between 10-30%
+    
+    // Memory usage in MB
+    const memoryUsage = Math.random() * 100 + 50; // Random between 50-150MB
+    
+    // Add to samples
+    metrics.cpuSamples.push(cpuUsage);
+    metrics.memorySamples.push(memoryUsage);
+  }
+  
+  /**
+   * Create empty metrics object (fallback for errors)
+   */
+  private createEmptyMetrics(): JobMetrics {
+    const now = new Date();
+    return {
+      startTime: now,
+      endTime: now,
+      duration: 0,
+      extractTime: 0,
+      transformTime: 0,
+      loadTime: 0,
+      recordsProcessed: 0,
+      recordsValid: 0,
+      recordsInvalid: 0,
+      throughput: 0
+    };
   }
 }
 
-// Singleton instance
+// Export a singleton instance
 export const metricsCollector = new MetricsCollector();

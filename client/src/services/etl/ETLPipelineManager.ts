@@ -1,563 +1,359 @@
 /**
- * ETL Pipeline Manager
+ * ETLPipelineManager.ts
  * 
- * This service manages ETL jobs, transformations, and executions.
+ * Manages ETL pipelines, scheduling, and execution
  */
 
-import { v4 as uuidv4 } from 'uuid';
-import { metricsCollector } from './MetricsCollector';
-import { dataConnector } from './DataConnector';
-import { 
-  ETLJob, 
-  ETLJobStatus,
-  TransformationRule,
-  ETLExecutionLog,
-  ETLExecutionError
+import { etlPipeline } from './ETLPipeline';
+import {
+  ETLJob,
+  JobStatus,
+  JobFrequency,
+  JobSchedule,
+  TransformationRule
 } from './ETLTypes';
 
-/**
- * ETL Pipeline Manager Service
- */
 class ETLPipelineManager {
-  private jobs: Map<string, ETLJob>;
-  private activePipelines: Map<string, any>; // In a real app, this would hold running pipeline instances
-  private executionLogs: ETLExecutionLog[];
-
-  constructor() {
-    this.jobs = new Map();
-    this.activePipelines = new Map();
-    this.executionLogs = [];
-    
-    // Initialize with some sample jobs
-    this.initializeSampleJobs();
-  }
-
-  /**
-   * Get a job by ID
-   */
-  getJob(jobId: string): ETLJob | undefined {
-    return this.jobs.get(jobId);
-  }
-
-  /**
-   * Get all jobs
-   */
-  getAllJobs(): ETLJob[] {
-    return Array.from(this.jobs.values());
-  }
-
-  /**
-   * Create a new ETL job
-   */
-  createJob(params: {
-    name: string;
-    description?: string;
-    sourceId: string;
-    targetId: string;
+  private scheduledJobs: Map<number, {
+    job: ETLJob;
     transformationRules: TransformationRule[];
-    schedule?: any;
-  }): ETLJob {
-    const jobId = uuidv4();
-    
-    const job: ETLJob = {
-      id: jobId,
-      name: params.name,
-      description: params.description || '',
-      status: 'created' as ETLJobStatus,
-      sourceId: params.sourceId,
-      targetId: params.targetId,
-      transformationIds: params.transformationRules.map(rule => rule.id),
-      transformationRules: params.transformationRules, // Keep for backward compatibility
-      schedule: params.schedule,
-      createdAt: new Date(),
-      updatedAt: new Date()
-    };
-    
-    this.jobs.set(jobId, job);
-    return job;
-  }
-
+    nextRunTimeout?: NodeJS.Timeout;
+  }> = new Map();
+  
   /**
-   * Update an existing ETL job
+   * Schedule a job for execution based on its schedule
    */
-  updateJob(jobId: string, updates: Partial<ETLJob>): ETLJob | undefined {
-    const job = this.jobs.get(jobId);
-    if (!job) return undefined;
-    
-    // Update fields
-    const updatedJob: ETLJob = {
-      ...job,
-      ...updates,
-      updatedAt: new Date()
-    };
-    
-    this.jobs.set(jobId, updatedJob);
-    return updatedJob;
-  }
-
-  /**
-   * Delete an ETL job
-   */
-  deleteJob(jobId: string): boolean {
-    // Ensure the job isn't currently running
-    if (this.activePipelines.has(jobId)) {
+  scheduleJob(job: ETLJob, transformationRules: TransformationRule[]): boolean {
+    // Skip if job has no schedule
+    if (!job.schedule) {
+      console.warn(`Job ${job.id} has no schedule defined`);
       return false;
     }
     
-    return this.jobs.delete(jobId);
+    // Skip if job is already scheduled
+    if (this.scheduledJobs.has(job.id)) {
+      console.warn(`Job ${job.id} is already scheduled`);
+      return false;
+    }
+    
+    // Calculate next run time
+    const nextRunTime = this.calculateNextRunTime(job.schedule);
+    
+    if (!nextRunTime) {
+      console.warn(`Could not determine next run time for job ${job.id}`);
+      return false;
+    }
+    
+    // Store the job in scheduled jobs
+    this.scheduledJobs.set(job.id, {
+      job,
+      transformationRules
+    });
+    
+    // Schedule the job
+    this.scheduleNextRun(job.id, nextRunTime);
+    
+    console.log(`Job ${job.id} scheduled to run at ${nextRunTime.toISOString()}`);
+    return true;
   }
-
+  
   /**
-   * Execute an ETL job
+   * Unschedule a job
    */
-  async executeJob(jobId: string): Promise<ETLExecutionLog | undefined> {
-    const job = this.jobs.get(jobId);
-    if (!job) return undefined;
+  unscheduleJob(jobId: number): boolean {
+    const scheduledJob = this.scheduledJobs.get(jobId);
     
-    // Update job status
-    this.updateJob(jobId, { status: 'running' });
+    if (!scheduledJob) {
+      console.warn(`Job ${jobId} is not scheduled`);
+      return false;
+    }
     
-    // Start metrics collection
-    metricsCollector.startJobMetrics(jobId, job.name);
+    // Clear the timeout if exists
+    if (scheduledJob.nextRunTimeout) {
+      clearTimeout(scheduledJob.nextRunTimeout);
+    }
     
-    // Create execution log
-    const executionLog: ETLExecutionLog = {
-      id: uuidv4(),
+    // Remove from scheduled jobs
+    this.scheduledJobs.delete(jobId);
+    
+    console.log(`Job ${jobId} unscheduled`);
+    return true;
+  }
+  
+  /**
+   * Update the schedule for a job
+   */
+  updateJobSchedule(jobId: number, schedule: JobSchedule): boolean {
+    const scheduledJob = this.scheduledJobs.get(jobId);
+    
+    if (!scheduledJob) {
+      console.warn(`Job ${jobId} is not scheduled`);
+      return false;
+    }
+    
+    // Update the job schedule
+    scheduledJob.job.schedule = schedule;
+    
+    // Clear existing timeout
+    if (scheduledJob.nextRunTimeout) {
+      clearTimeout(scheduledJob.nextRunTimeout);
+    }
+    
+    // Calculate new next run time
+    const nextRunTime = this.calculateNextRunTime(schedule);
+    
+    if (!nextRunTime) {
+      console.warn(`Could not determine next run time for job ${jobId}`);
+      this.scheduledJobs.delete(jobId);
+      return false;
+    }
+    
+    // Schedule the next run
+    this.scheduleNextRun(jobId, nextRunTime);
+    
+    console.log(`Job ${jobId} rescheduled to run at ${nextRunTime.toISOString()}`);
+    return true;
+  }
+  
+  /**
+   * Get all scheduled jobs
+   */
+  getScheduledJobs(): { jobId: number; nextRunTime: Date | null }[] {
+    return Array.from(this.scheduledJobs.entries()).map(([jobId, { job, nextRunTimeout }]) => ({
       jobId,
-      startTime: new Date(),
-      status: 'success',
-      recordsProcessed: 0,
-      errors: []
-    };
+      nextRunTime: job.nextRun || null
+    }));
+  }
+  
+  /**
+   * Execute a job immediately
+   */
+  async executeJob(jobId: number): Promise<boolean> {
+    const scheduledJob = this.scheduledJobs.get(jobId);
+    
+    if (!scheduledJob) {
+      console.warn(`Job ${jobId} is not found in scheduler`);
+      return false;
+    }
     
     try {
-      // 1. Extract phase
-      const extractTaskId = 'extract-' + uuidv4();
-      metricsCollector.startTaskMetrics(jobId, extractTaskId, 'Extract Data');
+      console.log(`Manually executing job ${jobId}`);
       
-      const source = dataConnector.getDataSource(job.sourceId);
-      if (!source) {
-        throw new Error(`Source data source (${job.sourceId}) not found`);
-      }
-      
-      // Simulate data extraction (would connect to actual data source in real app)
-      await this.simulateDelay(1500);
-      const extractedData = this.simulateDataExtraction(source.type, 1000);
-      
-      metricsCollector.updateRecordCount(jobId, extractedData.length, extractTaskId);
-      metricsCollector.completeTaskMetrics(jobId, extractTaskId);
-      
-      // 2. Transform phase
-      const transformTaskId = 'transform-' + uuidv4();
-      metricsCollector.startTaskMetrics(jobId, transformTaskId, 'Transform Data');
-      
-      // Apply transformations (would apply actual transformations in real app)
-      await this.simulateDelay(800);
-      const transformRules = job.transformationRules || [];
-      const transformedData = this.simulateDataTransformation(extractedData, transformRules);
-      
-      metricsCollector.updateRecordCount(jobId, transformedData.length, transformTaskId);
-      metricsCollector.completeTaskMetrics(jobId, transformTaskId);
-      
-      // 3. Load phase
-      const loadTaskId = 'load-' + uuidv4();
-      metricsCollector.startTaskMetrics(jobId, loadTaskId, 'Load Data');
-      
-      const target = dataConnector.getDataSource(job.targetId);
-      if (!target) {
-        throw new Error(`Target data source (${job.targetId}) not found`);
-      }
-      
-      // Simulate data loading (would load to actual target in real app)
-      await this.simulateDelay(1200);
-      const loadedRecords = this.simulateDataLoading(transformedData, target.type);
-      
-      metricsCollector.updateRecordCount(jobId, loadedRecords, loadTaskId);
-      metricsCollector.completeTaskMetrics(jobId, loadTaskId);
-      
-      // 4. Complete execution
-      executionLog.endTime = new Date();
-      executionLog.recordsProcessed = loadedRecords;
-      this.executionLogs.push(executionLog);
+      // Execute the job
+      const result = await etlPipeline.executeJob(scheduledJob.job, scheduledJob.transformationRules);
       
       // Update job status
-      this.updateJob(jobId, { 
-        status: 'completed',
-        lastRunAt: new Date()
-      });
+      scheduledJob.job.status = result.status;
+      scheduledJob.job.lastRun = new Date();
       
+      // If job has schedule, calculate next run time
+      if (scheduledJob.job.schedule && result.status !== JobStatus.FAILED) {
+        const nextRunTime = this.calculateNextRunTime(scheduledJob.job.schedule);
+        
+        if (nextRunTime) {
+          scheduledJob.job.nextRun = nextRunTime;
+          
+          // If there's an existing timeout, clear it
+          if (scheduledJob.nextRunTimeout) {
+            clearTimeout(scheduledJob.nextRunTimeout);
+          }
+          
+          // Schedule the next run
+          this.scheduleNextRun(jobId, nextRunTime);
+        }
+      }
+      
+      return result.status === JobStatus.COMPLETED;
     } catch (error) {
-      // Handle error
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      
-      executionLog.status = 'error';
-      executionLog.endTime = new Date();
-      executionLog.message = errorMessage;
-      executionLog.errors.push({
-        code: 'ETL-ERR-001',
-        message: errorMessage,
-        timestamp: new Date()
-      });
-      
-      this.executionLogs.push(executionLog);
-      
-      // Record error in metrics
-      metricsCollector.recordError(jobId);
-      
-      // Update job status
-      this.updateJob(jobId, { status: 'failed' });
+      console.error(`Error executing job ${jobId}:`, error);
+      return false;
     }
-    
-    // Complete metrics collection
-    metricsCollector.completeJobMetrics(jobId);
-    
-    return executionLog;
   }
-
+  
   /**
-   * Get execution logs for a job
+   * Check if any jobs are currently running
    */
-  getJobExecutionLogs(jobId: string): ETLExecutionLog[] {
-    return this.executionLogs.filter(log => log.jobId === jobId);
+  hasRunningJobs(): boolean {
+    return Array.from(this.scheduledJobs.values()).some(({ job }) => job.status === JobStatus.RUNNING);
   }
-
-  /**
-   * Get all execution logs
-   */
-  getAllExecutionLogs(): ETLExecutionLog[] {
-    return [...this.executionLogs];
-  }
-
-  /**
-   * Pause a running job
-   */
-  pauseJob(jobId: string): boolean {
-    const job = this.jobs.get(jobId);
-    if (!job || job.status !== 'running') return false;
+  
+  // Private methods
+  
+  private calculateNextRunTime(schedule: JobSchedule): Date | null {
+    const now = new Date();
+    let nextRun: Date | null = null;
     
-    // Update job status
-    this.updateJob(jobId, { status: 'paused' });
-    return true;
-  }
-
-  /**
-   * Resume a paused job
-   */
-  resumeJob(jobId: string): boolean {
-    const job = this.jobs.get(jobId);
-    if (!job || job.status !== 'paused') return false;
-    
-    // Update job status
-    this.updateJob(jobId, { status: 'running' });
-    return true;
-  }
-
-  /**
-   * Initialize with sample jobs
-   */
-  private initializeSampleJobs() {
-    // Create sample transformation rules
-    const transformationRules: TransformationRule[] = [
-      {
-        id: 'rule-1',
-        name: 'Uppercase Names',
-        description: 'Convert property names to uppercase',
-        dataType: 'text',
-        transformationCode: 'UPPER(name)',
-        isActive: true,
-        createdAt: new Date(),
-        updatedAt: new Date()
-      },
-      {
-        id: 'rule-2',
-        name: 'Calculate Area',
-        description: 'Calculate property area from length and width',
-        dataType: 'number',
-        transformationCode: 'LENGTH * WIDTH',
-        isActive: true,
-        createdAt: new Date(),
-        updatedAt: new Date()
-      },
-      {
-        id: 'rule-3',
-        name: 'Format Date',
-        description: 'Format date to ISO format',
-        dataType: 'date',
-        transformationCode: 'FORMAT_DATE(date, "YYYY-MM-DD")',
-        isActive: true,
-        createdAt: new Date(),
-        updatedAt: new Date()
-      },
-      {
-        id: 'rule-4',
-        name: 'Extract Lat/Long',
-        description: 'Extract latitude and longitude from location data',
-        dataType: 'location',
-        transformationCode: 'SPLIT_LOCATION(coordinates)',
-        isActive: true,
-        createdAt: new Date(),
-        updatedAt: new Date()
-      },
-      {
-        id: 'rule-5',
-        name: 'Parse Address Components',
-        description: 'Parse address into components (street, city, state, zip)',
-        dataType: 'address',
-        transformationCode: 'PARSE_ADDRESS(address)',
-        isActive: true,
-        createdAt: new Date(),
-        updatedAt: new Date()
-      },
-      {
-        id: 'rule-6',
-        name: 'Generate POI Score',
-        description: 'Generate point-of-interest score based on nearby amenities',
-        dataType: 'number',
-        transformationCode: 'CALCULATE_POI_SCORE(latitude, longitude)',
-        isActive: true,
-        createdAt: new Date(),
-        updatedAt: new Date()
-      }
-    ];
-    
-    // Create sample job 1
-    const job1: ETLJob = {
-      id: 'job-1',
-      name: 'Property Data Import',
-      description: 'Import property data from county database to local storage',
-      status: 'completed',
-      sourceId: 'source-1',
-      targetId: 'target-1',
-      transformationIds: [transformationRules[0].id, transformationRules[1].id],
-      transformationRules: [transformationRules[0], transformationRules[1]], // For backward compatibility
-      createdAt: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000), // 7 days ago
-      updatedAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000), // 2 days ago
-      lastRunAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000)  // 2 days ago
-    };
-    
-    // Create sample job 2
-    const job2: ETLJob = {
-      id: 'job-2',
-      name: 'Demographic Data Sync',
-      description: 'Sync demographic data from census API',
-      status: 'scheduled',
-      sourceId: 'source-2',
-      targetId: 'target-1',
-      transformationIds: [transformationRules[2].id],
-      transformationRules: [transformationRules[2]], // For backward compatibility
-      schedule: {
-        frequency: 'daily',
-        startDate: new Date(Date.now() + 24 * 60 * 60 * 1000) // Tomorrow
-      },
-      createdAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000), // 3 days ago
-      updatedAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000)  // 1 day ago
-    };
-    
-    // Create sample job 3
-    const job3: ETLJob = {
-      id: 'job-3',
-      name: 'Market Analysis Data',
-      description: 'Process market analysis data from multiple sources',
-      status: 'created',
-      sourceId: 'source-3',
-      targetId: 'target-2',
-      transformationIds: transformationRules.map(rule => rule.id),
-      transformationRules: transformationRules, // For backward compatibility
-      createdAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000), // 1 day ago
-      updatedAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000)  // 1 day ago
-    };
-    
-    // Create sample job 4 - Google Maps Location Import
-    const job4: ETLJob = {
-      id: 'job-4',
-      name: 'Google Maps POI Import',
-      description: 'Import Points of Interest data from Google Maps API for Benton County properties',
-      status: 'created',
-      sourceId: 'google-maps-source', // Will be replaced by actual source ID when registered
-      targetId: 'target-1',
-      transformationIds: [transformationRules[3].id, transformationRules[4].id, transformationRules[5].id],
-      transformationRules: [transformationRules[3], transformationRules[4], transformationRules[5]], // For backward compatibility
-      createdAt: new Date(),
-      updatedAt: new Date()
-    };
-    
-    // Add jobs to map
-    this.jobs.set(job1.id, job1);
-    this.jobs.set(job2.id, job2);
-    this.jobs.set(job3.id, job3);
-    this.jobs.set(job4.id, job4);
-    
-    // Create sample execution logs
-    const log1: ETLExecutionLog = {
-      id: 'log-1',
-      jobId: job1.id,
-      startTime: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000), // 2 days ago
-      endTime: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000 + 30 * 60 * 1000), // +30 minutes
-      status: 'success',
-      recordsProcessed: 5000,
-      errors: []
-    };
-    
-    const log2: ETLExecutionLog = {
-      id: 'log-2',
-      jobId: job1.id,
-      startTime: new Date(Date.now() - 9 * 24 * 60 * 60 * 1000), // 9 days ago
-      endTime: new Date(Date.now() - 9 * 24 * 60 * 60 * 1000 + 45 * 60 * 1000), // +45 minutes
-      status: 'warning',
-      recordsProcessed: 4800,
-      message: 'Some records could not be processed',
-      errors: [
-        {
-          code: 'ETL-WARN-001',
-          message: '200 records had invalid format',
-          timestamp: new Date(Date.now() - 9 * 24 * 60 * 60 * 1000 + 40 * 60 * 1000)
-        }
-      ]
-    };
-    
-    // Add logs to array
-    this.executionLogs.push(log1);
-    this.executionLogs.push(log2);
-  }
-
-  /**
-   * Simulate a delay (for async operations)
-   */
-  private simulateDelay(ms: number): Promise<void> {
-    return new Promise(resolve => setTimeout(resolve, ms));
-  }
-
-  /**
-   * Simulate data extraction
-   */
-  private simulateDataExtraction(sourceType: string, count: number): any[] {
-    const data = [];
-    
-    for (let i = 0; i < count; i++) {
-      if (sourceType === 'database') {
-        data.push({
-          id: i,
-          name: `Property ${i}`,
-          value: Math.floor(Math.random() * 1000000) + 100000,
-          address: `${i} Main St`,
-          city: 'Benton',
-          state: 'WA',
-          zip: '99320',
-          latitude: 46.2 + (Math.random() * 0.5),
-          longitude: -119.1 + (Math.random() * 0.5),
-          createdAt: new Date()
-        });
-      } else if (sourceType === 'api') {
-        data.push({
-          id: i,
-          population: Math.floor(Math.random() * 10000) + 1000,
-          medianIncome: Math.floor(Math.random() * 50000) + 30000,
-          housingUnits: Math.floor(Math.random() * 5000) + 500,
-          region: `Region-${Math.floor(i / 100)}`,
-          timestamp: new Date()
-        });
-      } else {
-        data.push({
-          id: i,
-          value: Math.random() * 1000,
-          timestamp: new Date()
-        });
+    // If start time is in the future, use that
+    if (schedule.startTime && new Date(schedule.startTime) > now) {
+      nextRun = new Date(schedule.startTime);
+    } else {
+      // Calculate based on frequency
+      switch (schedule.frequency) {
+        case JobFrequency.ONCE:
+          // For once, if start time is in the past, don't schedule
+          if (schedule.startTime && new Date(schedule.startTime) > now) {
+            nextRun = new Date(schedule.startTime);
+          }
+          break;
+          
+        case JobFrequency.HOURLY:
+          nextRun = new Date(now);
+          nextRun.setHours(nextRun.getHours() + 1);
+          nextRun.setMinutes(0);
+          nextRun.setSeconds(0);
+          nextRun.setMilliseconds(0);
+          break;
+          
+        case JobFrequency.DAILY:
+          nextRun = new Date(now);
+          nextRun.setDate(nextRun.getDate() + 1);
+          nextRun.setHours(0);
+          nextRun.setMinutes(0);
+          nextRun.setSeconds(0);
+          nextRun.setMilliseconds(0);
+          break;
+          
+        case JobFrequency.WEEKLY:
+          nextRun = new Date(now);
+          // Calculate days until next occurrence
+          const daysUntilNextRun = schedule.daysOfWeek && schedule.daysOfWeek.length > 0
+            ? this.calculateDaysUntilNextWeekday(now.getDay(), schedule.daysOfWeek)
+            : 7; // Default to 7 days if no specific days
+          nextRun.setDate(nextRun.getDate() + daysUntilNextRun);
+          nextRun.setHours(0);
+          nextRun.setMinutes(0);
+          nextRun.setSeconds(0);
+          nextRun.setMilliseconds(0);
+          break;
+          
+        case JobFrequency.MONTHLY:
+          nextRun = new Date(now);
+          // Move to next month
+          nextRun.setMonth(nextRun.getMonth() + 1);
+          // Set specific day of month if specified
+          if (schedule.dayOfMonth && schedule.dayOfMonth >= 1 && schedule.dayOfMonth <= 31) {
+            nextRun.setDate(Math.min(schedule.dayOfMonth, this.getDaysInMonth(nextRun.getFullYear(), nextRun.getMonth())));
+          } else {
+            nextRun.setDate(1); // Default to first day of month
+          }
+          nextRun.setHours(0);
+          nextRun.setMinutes(0);
+          nextRun.setSeconds(0);
+          nextRun.setMilliseconds(0);
+          break;
+          
+        case JobFrequency.CUSTOM:
+          // For custom frequency, we would parse the cron expression
+          // This is a simplification and would need a cron parser in real implementation
+          console.warn('Custom frequency scheduling not fully implemented');
+          nextRun = new Date(now);
+          nextRun.setDate(nextRun.getDate() + 1); // Default to daily
+          break;
+          
+        default:
+          console.warn(`Unknown job frequency: ${schedule.frequency}`);
+          return null;
       }
     }
     
-    return data;
-  }
-
-  /**
-   * Simulate data transformation
-   */
-  private simulateDataTransformation(data: any[], rules: TransformationRule[]): any[] {
-    // In a real app, this would apply the actual transformation rules
-    // Here we just simulate some basic transformations
+    // Check if the calculated next run is before the end time (if specified)
+    if (schedule.endTime && nextRun && nextRun > new Date(schedule.endTime)) {
+      console.log('Next run time is after schedule end time, not scheduling');
+      return null;
+    }
     
-    return data.map(item => {
-      const transformed = { ...item };
+    return nextRun;
+  }
+  
+  private scheduleNextRun(jobId: number, nextRunTime: Date): void {
+    const scheduledJob = this.scheduledJobs.get(jobId);
+    
+    if (!scheduledJob) {
+      console.warn(`Job ${jobId} not found in scheduled jobs`);
+      return;
+    }
+    
+    // Calculate milliseconds until next run
+    const now = new Date();
+    const msUntilNextRun = nextRunTime.getTime() - now.getTime();
+    
+    // Update job nextRun property
+    scheduledJob.job.nextRun = nextRunTime;
+    
+    // Set timeout for next run
+    const timeout = setTimeout(async () => {
+      console.log(`Scheduled execution of job ${jobId}`);
       
-      // Apply some mock transformations based on rule names
-      rules.forEach(rule => {
-        if (rule.isActive) {
-          if (rule.name.includes('Uppercase') && transformed.name) {
-            transformed.name = transformed.name.toUpperCase();
-          }
+      try {
+        // Execute the job
+        const result = await etlPipeline.executeJob(scheduledJob.job, scheduledJob.transformationRules);
+        
+        // Update job status
+        scheduledJob.job.status = result.status;
+        scheduledJob.job.lastRun = new Date();
+        
+        // Calculate next run time if not a one-time job
+        if (scheduledJob.job.schedule && scheduledJob.job.schedule.frequency !== JobFrequency.ONCE) {
+          const nextRunTime = this.calculateNextRunTime(scheduledJob.job.schedule);
           
-          if (rule.name.includes('Calculate Area') && transformed.length && transformed.width) {
-            transformed.area = transformed.length * transformed.width;
+          if (nextRunTime) {
+            // Schedule the next run
+            this.scheduleNextRun(jobId, nextRunTime);
+          } else {
+            console.log(`No more runs scheduled for job ${jobId}`);
+            // Remove from scheduled jobs if it was a one-time job or reached end time
+            this.scheduledJobs.delete(jobId);
           }
-          
-          if (rule.name.includes('Format Date') && transformed.timestamp) {
-            transformed.formattedDate = transformed.timestamp.toISOString().split('T')[0];
-          }
-          
-          // Handle geospatial transformations
-          if (rule.name.includes('Extract Lat/Long') && transformed.coordinates) {
-            if (Array.isArray(transformed.coordinates) && transformed.coordinates.length >= 2) {
-              transformed.latitude = transformed.coordinates[0];
-              transformed.longitude = transformed.coordinates[1];
-            }
-          }
-          
-          // Handle address parsing
-          if (rule.name.includes('Parse Address') && transformed.address) {
-            const addressParts = transformed.address.split(',').map((part: string) => part.trim());
-            
-            if (addressParts.length >= 3) {
-              transformed.street = addressParts[0];
-              transformed.city = addressParts[1];
-              
-              // Handle state and zip in the last part
-              const stateZip = addressParts[2].split(' ');
-              if (stateZip.length >= 2) {
-                transformed.state = stateZip[0];
-                transformed.zip = stateZip[stateZip.length - 1];
-              }
-            }
-          }
-          
-          // Handle POI score generation
-          if (rule.name.includes('Generate POI Score') && transformed.latitude && transformed.longitude) {
-            // Generate a POI score based on some algorithm
-            // Higher scores for properties in locations with more amenities
-            const baseScore = Math.random() * 80 + 20; // 20-100 base score
-            
-            // Modify score based on property attributes 
-            // This would be based on real data like schools, shopping centers, etc.
-            transformed.poiScore = Math.min(100, Math.round(baseScore));
-            transformed.poiBreakdown = {
-              schools: Math.round(Math.random() * 25),
-              transportation: Math.round(Math.random() * 25),
-              shopping: Math.round(Math.random() * 25),
-              recreation: Math.round(Math.random() * 25)
-            };
-          }
+        } else {
+          // One-time job completed, remove from scheduled
+          this.scheduledJobs.delete(jobId);
         }
-      });
-      
-      return transformed;
-    });
-  }
-
-  /**
-   * Simulate data loading
-   */
-  private simulateDataLoading(data: any[], targetType: string): number {
-    // Simulate some data loss or failure during loading
-    const successRate = 0.98; // 98% success rate
-    let loadedCount = 0;
-    
-    data.forEach(item => {
-      if (Math.random() < successRate) {
-        loadedCount++;
+      } catch (error) {
+        console.error(`Error executing scheduled job ${jobId}:`, error);
+        
+        // Even if job failed, try to schedule next run
+        if (scheduledJob.job.schedule && scheduledJob.job.schedule.frequency !== JobFrequency.ONCE) {
+          const nextRunTime = this.calculateNextRunTime(scheduledJob.job.schedule);
+          
+          if (nextRunTime) {
+            this.scheduleNextRun(jobId, nextRunTime);
+          }
+        } else {
+          this.scheduledJobs.delete(jobId);
+        }
       }
-    });
+    }, Math.max(0, msUntilNextRun));
     
-    return loadedCount;
+    // Store the timeout reference
+    scheduledJob.nextRunTimeout = timeout;
+  }
+  
+  private calculateDaysUntilNextWeekday(currentDay: number, targetDays: number[]): number {
+    // Ensure target days are valid (0-6, where 0 is Sunday)
+    const validTargetDays = targetDays.filter(d => d >= 0 && d <= 6);
+    
+    if (validTargetDays.length === 0) {
+      return 7; // Default to 7 days if no valid target days
+    }
+    
+    // Sort the days to make the calculation easier
+    validTargetDays.sort((a, b) => a - b);
+    
+    // Find the next day that's greater than current day
+    for (const targetDay of validTargetDays) {
+      if (targetDay > currentDay) {
+        return targetDay - currentDay;
+      }
+    }
+    
+    // If we get here, we need to wrap around to the next week
+    return 7 - currentDay + validTargetDays[0];
+  }
+  
+  private getDaysInMonth(year: number, month: number): number {
+    return new Date(year, month + 1, 0).getDate();
   }
 }
 
-// Singleton instance
+// Export a singleton instance
 export const etlPipelineManager = new ETLPipelineManager();

@@ -5,7 +5,7 @@
  * It periodically checks for jobs that need to be run based on their schedules.
  */
 
-import ETLPipeline from './ETLPipeline';
+import { etlPipeline as ETLPipeline } from './ETLPipeline';
 
 /**
  * Helper to parse cron expressions
