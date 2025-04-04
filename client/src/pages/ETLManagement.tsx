@@ -91,13 +91,21 @@ function DataSourcesTab() {
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [selectedDataSource, setSelectedDataSource] = useState<any>(null);
   const [isConnecting, setIsConnecting] = useState(false);
+  const [dataSources, setDataSources] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   
   const queryClient = useQueryClient();
   
-  const { data: dataSources = [], isLoading } = useQuery<any[]>({
-    queryKey: ['/api/etl/data-sources'],
-    staleTime: 10000
-  });
+  // Load data sources directly from DataConnector
+  useEffect(() => {
+    // Use dataConnector to get all data sources
+    const sources = dataConnector.getAllDataSources();
+    setDataSources(sources);
+    setIsLoading(false);
+    
+    // Log for debugging
+    console.log("Loaded data sources:", sources);
+  }, []);
   
   const createDataSourceMutation = useMutation({
     mutationFn: (dataSource: any) => apiRequest('/api/etl/data-sources', 'POST', dataSource),
@@ -175,7 +183,9 @@ function DataSourcesTab() {
       
       // If connection was successful, refresh data sources
       if (result.success) {
-        queryClient.invalidateQueries({ queryKey: ['/api/etl/data-sources'] });
+        // Get fresh data sources
+        const sources = dataConnector.getAllDataSources();
+        setDataSources(sources);
       }
     } catch (error) {
       toast({
@@ -211,7 +221,8 @@ function DataSourcesTab() {
       });
       
       // Refresh data sources to update the UI
-      queryClient.invalidateQueries({ queryKey: ['/api/etl/data-sources'] });
+      const updatedSources = dataConnector.getAllDataSources();
+      setDataSources(updatedSources);
     } catch (error) {
       toast({
         title: 'Connection error',
@@ -244,7 +255,8 @@ function DataSourcesTab() {
       });
       
       // Refresh data sources to update the UI
-      queryClient.invalidateQueries({ queryKey: ['/api/etl/data-sources'] });
+      const updatedSources = dataConnector.getAllDataSources();
+      setDataSources(updatedSources);
     } catch (error) {
       toast({
         title: 'Disconnect error',
