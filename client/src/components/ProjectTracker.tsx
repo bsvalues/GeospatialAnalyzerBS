@@ -775,6 +775,84 @@ export function ProjectTracker() {
         <CardDescription>
           Track the progress of the ETL system implementation
         </CardDescription>
+        
+        {/* Project Actions Toolbar */}
+        <div className="flex justify-between items-center mt-4 pt-4 border-t">
+          <div className="flex gap-2">
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={() => {
+                setSelectedMilestoneId('');
+                setNewMilestoneData({
+                  title: '',
+                  description: '',
+                });
+                setIsAddMilestoneModalOpen(true);
+              }}
+              className="flex items-center gap-1"
+            >
+              <Plus className="h-3.5 w-3.5" />
+              Add Milestone
+            </Button>
+            
+            <Button 
+              variant="outline" 
+              size="sm"
+              onClick={resetTracker}
+              className="flex items-center gap-1 text-red-500"
+            >
+              <RefreshCcw className="h-3.5 w-3.5" />
+              Reset Tracker
+            </Button>
+          </div>
+          
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button variant="ghost" size="sm" className="flex items-center gap-1">
+                <Share className="h-3.5 w-3.5" />
+                Export/Import
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-56 p-3" align="end">
+              <div className="space-y-2">
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="w-full justify-start"
+                  onClick={exportData}
+                >
+                  <Download className="h-3.5 w-3.5 mr-2" />
+                  Export Data
+                </Button>
+                
+                <label htmlFor="import-file" className="cursor-pointer">
+                  <div className="flex w-full items-center justify-start rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm hover:bg-accent hover:text-accent-foreground">
+                    <Upload className="h-3.5 w-3.5 mr-2" />
+                    Import Data
+                  </div>
+                  <input 
+                    id="import-file" 
+                    type="file" 
+                    accept=".json" 
+                    className="hidden" 
+                    onChange={importData}
+                  />
+                </label>
+                
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="w-full justify-start"
+                  onClick={() => window.print()}
+                >
+                  <Printer className="h-3.5 w-3.5 mr-2" />
+                  Print Report
+                </Button>
+              </div>
+            </PopoverContent>
+          </Popover>
+        </div>
       </CardHeader>
       
       <Tabs value={activeTab} onValueChange={setActiveTab}>
