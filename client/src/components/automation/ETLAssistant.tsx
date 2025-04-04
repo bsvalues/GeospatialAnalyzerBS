@@ -40,6 +40,22 @@ interface OnboardingTips {
   commonPitfalls: string[];
 }
 
+interface DataQualityItem {
+  field: string;
+  issue: string;
+  severity: 'low' | 'medium' | 'high';
+  recommendation: string;
+}
+
+interface DataQualityAnalysis {
+  totalIssues: number;
+  completeness: number; // percentage of complete data (no nulls)
+  accuracy: number; // percentage of accurate data 
+  consistency: number; // percentage of consistent data
+  issues: DataQualityItem[];
+  summary: string;
+}
+
 interface ETLAssistantState {
   loading: boolean;
   response?: AssistantResponse;
@@ -55,6 +71,9 @@ interface ETLAssistantState {
     rows: any[][];
     totalRows: number;
   };
+  showDataQuality: boolean;
+  dataQualityLoading: boolean;
+  dataQualityAnalysis?: DataQualityAnalysis;
 }
 
 export function ETLAssistant({
@@ -77,6 +96,8 @@ export function ETLAssistant({
     userQuestion: '',
     showDataPreview: false,
     dataPreviewLoading: false,
+    showDataQuality: false,
+    dataQualityLoading: false,
   });
   
   const { toast } = useToast();
@@ -240,6 +261,65 @@ export function ETLAssistant({
   // Close data preview
   const closeDataPreview = () => {
     setState(prev => ({ ...prev, showDataPreview: false }));
+  };
+  
+  // Handle fetching data quality analysis for the selected source
+  const fetchDataQualityAnalysis = async () => {
+    if (!selectedSource) {
+      toast({
+        title: 'No data source selected',
+        description: 'Please select a data source to analyze its data quality.',
+        variant: 'destructive',
+      });
+      return;
+    }
+    
+    setState(prev => ({ ...prev, dataQualityLoading: true, showDataQuality: true }));
+    
+    try {
+      const response = await fetch(`/api/etl/data-sources/${selectedSource.id}/quality`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to fetch data quality analysis');
+      }
+      
+      const data = await response.json();
+      
+      setState(prev => ({ 
+        ...prev, 
+        dataQualityLoading: false,
+        dataQualityAnalysis: data
+      }));
+    } catch (error) {
+      console.error('Error fetching data quality analysis:', error);
+      setState(prev => ({ 
+        ...prev, 
+        dataQualityLoading: false,
+        dataQualityAnalysis: {
+          totalIssues: 0,
+          completeness: 0,
+          accuracy: 0,
+          consistency: 0,
+          issues: [],
+          summary: 'Could not analyze data quality. The data source might be disconnected or invalid.'
+        }
+      }));
+      toast({
+        title: 'Error',
+        description: 'Could not analyze data quality. Please check if the data source is connected.',
+        variant: 'destructive',
+      });
+    }
+  };
+  
+  // Close data quality analysis
+  const closeDataQualityAnalysis = () => {
+    setState(prev => ({ ...prev, showDataQuality: false }));
   };
   
   // Handle user asking a question
@@ -463,6 +543,100 @@ export function ETLAssistant({
     );
   }
   
+  // If showing data quality analysis, render the analysis card
+  if (state.showDataQuality) {
+    return (
+      <Card className="w-full max-w-md shadow-lg">
+        <CardHeader>
+          <div className="flex justify-between items-center">
+            <div>
+              <CardTitle className="text-md font-bold">Data Quality Analysis</CardTitle>
+              {selectedSource && (
+                <CardDescription>
+                  {selectedSource.name} ({selectedSource.type})
+                </CardDescription>
+              )}
+            </div>
+            <Button variant="ghost" size="sm" onClick={closeDataQualityAnalysis} className="h-8 w-8 p-0">
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {state.dataQualityLoading ? (
+            <div className="flex flex-col items-center justify-center py-8">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+              <p className="mt-2 text-sm text-muted-foreground">Analyzing data quality...</p>
+            </div>
+          ) : state.dataQualityAnalysis ? (
+            <div className="space-y-4">
+              <div className="rounded-lg bg-primary/10 p-4">
+                <p className="text-sm">{state.dataQualityAnalysis.summary}</p>
+              </div>
+              
+              <div className="grid grid-cols-3 gap-2">
+                <div className="rounded-lg bg-background border p-3 text-center">
+                  <div className="text-2xl font-bold">{state.dataQualityAnalysis.completeness}%</div>
+                  <div className="text-xs text-muted-foreground">Completeness</div>
+                </div>
+                <div className="rounded-lg bg-background border p-3 text-center">
+                  <div className="text-2xl font-bold">{state.dataQualityAnalysis.accuracy}%</div>
+                  <div className="text-xs text-muted-foreground">Accuracy</div>
+                </div>
+                <div className="rounded-lg bg-background border p-3 text-center">
+                  <div className="text-2xl font-bold">{state.dataQualityAnalysis.consistency}%</div>
+                  <div className="text-xs text-muted-foreground">Consistency</div>
+                </div>
+              </div>
+              
+              {state.dataQualityAnalysis.issues.length > 0 ? (
+                <div className="space-y-2">
+                  <h3 className="text-sm font-medium">Identified Issues ({state.dataQualityAnalysis.totalIssues})</h3>
+                  <div className="overflow-y-auto max-h-[200px]">
+                    {state.dataQualityAnalysis.issues.map((issue, index) => (
+                      <div key={index} className="mb-2 p-2 border rounded-md text-xs">
+                        <div className="flex justify-between">
+                          <span className="font-medium">{issue.field}</span>
+                          <Badge variant={
+                            issue.severity === 'high' ? 'destructive' : 
+                            issue.severity === 'medium' ? 'default' : 
+                            'outline'
+                          } className="text-xs">
+                            {issue.severity}
+                          </Badge>
+                        </div>
+                        <div className="mt-1 text-muted-foreground">{issue.issue}</div>
+                        <div className="mt-1 text-primary">Recommendation: {issue.recommendation}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <div className="text-center py-4 text-sm text-muted-foreground">
+                  No quality issues detected
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="flex flex-col items-center justify-center py-8">
+              <Settings className="h-12 w-12 text-muted-foreground" />
+              <p className="mt-2 text-sm text-muted-foreground">No quality analysis available</p>
+            </div>
+          )}
+        </CardContent>
+        <CardFooter>
+          <Button 
+            variant="outline" 
+            className="w-full" 
+            onClick={closeDataQualityAnalysis}
+          >
+            Return to Assistant
+          </Button>
+        </CardFooter>
+      </Card>
+    );
+  }
+  
   // Main assistant card
   return (
     <Card className="w-full max-w-md shadow-lg">
@@ -606,6 +780,16 @@ export function ETLAssistant({
                     >
                       <TableIcon className="h-3 w-3 mr-1" />
                       Preview Data
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="text-xs"
+                      onClick={fetchDataQualityAnalysis}
+                      disabled={state.dataQualityLoading}
+                    >
+                      <Settings className="h-3 w-3 mr-1" />
+                      Analyze Quality
                     </Button>
                   </div>
                 </div>

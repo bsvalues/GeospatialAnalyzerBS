@@ -1396,6 +1396,161 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     }
   });
+  
+  // Data quality analysis endpoint for ETL data sources
+  app.get('/api/etl/data-sources/:id/quality', async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ error: 'Invalid data source ID' });
+      }
+      
+      const dataSource = await storage.getEtlDataSourceById(id);
+      if (!dataSource) {
+        return res.status(404).json({ error: 'Data source not found' });
+      }
+      
+      // This would normally connect to the actual data source and analyze its data quality
+      // For demo purposes, we're generating quality analysis results based on the data source type
+      
+      // Define the quality analysis interface
+      interface DataQualityItem {
+        field: string;
+        issue: string;
+        severity: 'low' | 'medium' | 'high';
+        recommendation: string;
+      }
+      
+      interface DataQualityAnalysis {
+        totalIssues: number;
+        completeness: number;
+        accuracy: number;
+        consistency: number;
+        issues: DataQualityItem[];
+        summary: string;
+      }
+      
+      let qualityAnalysis: DataQualityAnalysis;
+      
+      // Generate different quality analysis based on the type of data source
+      switch (dataSource.type) {
+        case 'postgres':
+        case 'mysql':
+          qualityAnalysis = {
+            totalIssues: 3,
+            completeness: 94,
+            accuracy: 88,
+            consistency: 92,
+            issues: [
+              {
+                field: 'address',
+                issue: 'Found 128 records with incomplete or malformed address data',
+                severity: 'medium',
+                recommendation: 'Apply address standardization transformation to normalize address formats'
+              },
+              {
+                field: 'last_updated',
+                issue: 'Found 56 records with future dates',
+                severity: 'high',
+                recommendation: 'Add date validation rule to prevent invalid dates'
+              },
+              {
+                field: 'value',
+                issue: 'Found 212 records with outlier values (>3 std. dev. from mean)',
+                severity: 'low',
+                recommendation: 'Review outlier detection parameters and add validation rule'
+              }
+            ],
+            summary: 'Database quality analysis detected several issues with data consistency and completeness. Address formatting issues and date validation errors should be addressed before using this data source in production.'
+          };
+          break;
+          
+        case 'api':
+          qualityAnalysis = {
+            totalIssues: 2,
+            completeness: 96,
+            accuracy: 91,
+            consistency: 89,
+            issues: [
+              {
+                field: 'location',
+                issue: 'Found 45 records with coordinates outside the expected region bounds',
+                severity: 'medium',
+                recommendation: 'Add geospatial validation rule to flag coordinates outside the county boundary'
+              },
+              {
+                field: 'assessed_value',
+                issue: 'Found inconsistent value formats and potential currency conversion issues',
+                severity: 'high',
+                recommendation: 'Implement currency standardization in the transformation pipeline'
+              }
+            ],
+            summary: 'API data source has good completeness but shows some inconsistency in location data and value formatting. Adding proper validation rules would significantly improve data quality.'
+          };
+          break;
+          
+        case 'csv':
+        case 'excel':
+          qualityAnalysis = {
+            totalIssues: 4,
+            completeness: 87,
+            accuracy: 82,
+            consistency: 78,
+            issues: [
+              {
+                field: 'PropertyID',
+                issue: 'Found 18 duplicate PropertyID values',
+                severity: 'high',
+                recommendation: 'Add deduplication step in the transformation pipeline'
+              },
+              {
+                field: 'ZIP',
+                issue: 'Found 124 records with invalid or incomplete ZIP codes',
+                severity: 'medium',
+                recommendation: 'Implement ZIP code validation and standardization'
+              },
+              {
+                field: 'YearBuilt',
+                issue: 'Found 56 records with YearBuilt in the future',
+                severity: 'medium',
+                recommendation: 'Add date validation to prevent future years'
+              },
+              {
+                field: 'Value',
+                issue: 'Found 211 null or zero values',
+                severity: 'high',
+                recommendation: 'Add data completeness check and implement fallback value estimation'
+              }
+            ],
+            summary: 'The CSV data source has significant data quality issues including duplicate IDs, invalid ZIP codes, and missing values. Implementing the recommended transformations would improve data quality by approximately 15%.'
+          };
+          break;
+          
+        default:
+          qualityAnalysis = {
+            totalIssues: 0,
+            completeness: 0,
+            accuracy: 0,
+            consistency: 0,
+            issues: [],
+            summary: 'Unable to analyze data quality for this source type. Please connect to the data source and try again.'
+          };
+      }
+      
+      res.json(qualityAnalysis);
+    } catch (error: any) {
+      console.error('Error analyzing data quality:', error);
+      res.status(500).json({ 
+        error: error.message || 'Failed to analyze data quality',
+        totalIssues: 0,
+        completeness: 0,
+        accuracy: 0,
+        consistency: 0,
+        issues: [],
+        summary: 'An error occurred while analyzing data quality'
+      });
+    }
+  });
 
   // ETL Transformation Rules endpoints
   app.get('/api/etl/transformation-rules', async (req, res) => {
