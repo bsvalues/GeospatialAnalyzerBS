@@ -1,357 +1,452 @@
-import { TransformationType, TransformationRule, ETLJob, JobStatus, LoadMode } from './ETLTypes';
-import { transformationService } from './TransformationService';
-import { dataConnector } from './DataConnector';
+import { 
+  ETLJob, 
+  JobStatus, 
+  RecordCounts, 
+  DataSource, 
+  TransformationRule 
+} from './ETLTypes';
+import { dataConnector, ExtractResult, LoadResult } from './DataConnector';
+import { transformationService, TransformationResult } from './TransformationService';
 import { dataQualityService } from './DataQualityService';
-import { alertService, AlertType, AlertCategory, AlertSeverity } from './AlertService';
+import { alertService, AlertType, AlertSeverity, AlertCategory } from './AlertService';
 
 /**
- * ETL pipeline execution status
+ * Interface representing a running ETL job
  */
-export interface ETLPipelineStatus {
+export interface JobRun {
+  /** Run ID */
+  id: string;
+  
   /** Job ID */
   jobId: number;
   
-  /** Current status */
+  /** Run status */
   status: JobStatus;
   
-  /** Total records processed */
-  recordsProcessed: number;
+  /** Start timestamp */
+  startTime: Date;
   
-  /** Total records extracted */
-  recordsExtracted: number;
+  /** End timestamp */
+  endTime?: Date;
   
-  /** Total records transformed */
-  recordsTransformed: number;
+  /** Execution time (ms) */
+  executionTime: number;
   
-  /** Total records loaded */
-  recordsLoaded: number;
-  
-  /** Total records failed */
-  recordsFailed: number;
+  /** Record counts */
+  recordCounts: RecordCounts;
   
   /** Error message */
   error?: string;
   
-  /** Start time */
-  startTime: Date;
-  
-  /** End time */
-  endTime?: Date;
-  
-  /** Execution time in milliseconds */
-  executionTime: number;
+  /** Whether this was a manual run */
+  isManual: boolean;
 }
 
 /**
- * ETL pipeline class
+ * ETL Pipeline
+ * 
+ * This class is responsible for coordinating the ETL process.
  */
 class ETLPipeline {
+  private nextRunId = 1;
+  
   /**
    * Execute an ETL job
    */
-  async executeJob(job: ETLJob, 
-    progressCallback?: (status: ETLPipelineStatus) => void
-  ): Promise<ETLPipelineStatus> {
-    const status: ETLPipelineStatus = {
+  async executeJob(
+    job: ETLJob,
+    dataSources: Map<number, DataSource>,
+    transformationRules: Map<number, TransformationRule>,
+    isManual: boolean = false
+  ): Promise<JobRun> {
+    // Create a job run
+    const runId = `run-${job.id}-${this.nextRunId++}`;
+    const startTime = new Date();
+    const recordCounts: RecordCounts = {
+      extracted: 0,
+      transformed: 0,
+      loaded: 0,
+      failed: 0
+    };
+    
+    // Initialize job run
+    const jobRun: JobRun = {
+      id: runId,
       jobId: job.id,
       status: JobStatus.RUNNING,
-      recordsProcessed: 0,
-      recordsExtracted: 0,
-      recordsTransformed: 0,
-      recordsLoaded: 0,
-      recordsFailed: 0,
-      startTime: new Date(),
-      executionTime: 0
+      startTime,
+      executionTime: 0,
+      recordCounts,
+      isManual
     };
     
     try {
-      // Update job status
-      this.updateStatus(status, progressCallback);
-      
-      // Check if job can be executed
+      // Check if job is enabled
       if (!job.enabled) {
-        throw new Error('Job is disabled');
+        throw new Error(`Job is disabled: ${job.name}`);
       }
       
+      // Check if job has sources
       if (job.sources.length === 0) {
-        throw new Error('No sources specified');
+        throw new Error(`Job has no sources: ${job.name}`);
       }
       
+      // Check if job has destinations
       if (job.destinations.length === 0) {
-        throw new Error('No destinations specified');
+        throw new Error(`Job has no destinations: ${job.name}`);
       }
       
-      // Get sources and destinations
-      const sources = job.sources.map(id => dataConnector.getDataSource(id));
-      const destinations = job.destinations.map(id => dataConnector.getDataSource(id));
-      
-      // Check if all sources and destinations are available
-      const missingSources = job.sources.filter(id => !dataConnector.getDataSource(id));
-      if (missingSources.length > 0) {
-        throw new Error(`Missing sources: ${missingSources.join(', ')}`);
-      }
-      
-      const missingDestinations = job.destinations.filter(id => !dataConnector.getDataSource(id));
-      if (missingDestinations.length > 0) {
-        throw new Error(`Missing destinations: ${missingDestinations.join(', ')}`);
-      }
-      
-      // Log start of extraction
+      // Log job start
       alertService.createAlert({
         type: AlertType.INFO,
         severity: AlertSeverity.LOW,
-        category: AlertCategory.TRANSFORMATION,
-        title: `ETL Job Started: ${job.name}`,
-        message: `ETL job "${job.name}" (ID: ${job.id}) has started extraction from ${sources.length} source(s)`
+        category: AlertCategory.JOB,
+        title: `Job Started: ${job.name}`,
+        message: `ETL job "${job.name}" (ID: ${job.id}) has started execution`,
+        context: { jobId: job.id, runId }
       });
       
       // Extract data from sources
-      const extractedData: any[] = [];
-      for (const sourceId of job.sources) {
-        const extractResult = await dataConnector.extract(sourceId);
-        
-        if (!extractResult.success) {
-          throw new Error(`Extraction failed: ${extractResult.error}`);
-        }
-        
-        extractedData.push(...extractResult.data);
-        status.recordsExtracted += extractResult.data.length;
-        this.updateStatus(status, progressCallback);
+      const extractedData = await this.extractData(job.sources, dataSources, recordCounts);
+      
+      // Transform data
+      const transformedData = await this.transformData(
+        extractedData,
+        job.transformations,
+        transformationRules,
+        recordCounts
+      );
+      
+      // Load data into destinations
+      await this.loadData(job.destinations, transformedData, dataSources, recordCounts);
+      
+      // Update job run status
+      jobRun.status = JobStatus.SUCCEEDED;
+      jobRun.endTime = new Date();
+      jobRun.executionTime = jobRun.endTime.getTime() - startTime.getTime();
+      jobRun.recordCounts = recordCounts;
+      
+      // Log job completion
+      alertService.createAlert({
+        type: AlertType.SUCCESS,
+        severity: AlertSeverity.LOW,
+        category: AlertCategory.JOB,
+        title: `Job Completed: ${job.name}`,
+        message: `ETL job "${job.name}" (ID: ${job.id}) completed successfully. Processed ${recordCounts.loaded} records in ${jobRun.executionTime}ms.`,
+        context: { jobId: job.id, runId, recordCounts }
+      });
+      
+      return jobRun;
+    } catch (error) {
+      // Handle job error
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      
+      // Update job run status
+      jobRun.status = JobStatus.FAILED;
+      jobRun.endTime = new Date();
+      jobRun.executionTime = jobRun.endTime.getTime() - startTime.getTime();
+      jobRun.error = errorMessage;
+      
+      // Log job failure
+      alertService.createAlert({
+        type: AlertType.ERROR,
+        severity: AlertSeverity.HIGH,
+        category: AlertCategory.JOB,
+        title: `Job Failed: ${job.name}`,
+        message: `ETL job "${job.name}" (ID: ${job.id}) failed: ${errorMessage}`,
+        context: { jobId: job.id, runId, error: errorMessage }
+      });
+      
+      return jobRun;
+    }
+  }
+  
+  /**
+   * Extract data from sources
+   */
+  private async extractData(
+    sourceIds: number[],
+    dataSources: Map<number, DataSource>,
+    recordCounts: RecordCounts
+  ): Promise<any[]> {
+    let allData: any[] = [];
+    
+    for (const sourceId of sourceIds) {
+      const dataSource = dataSources.get(sourceId);
+      
+      if (!dataSource) {
+        alertService.createAlert({
+          type: AlertType.WARNING,
+          severity: AlertSeverity.MEDIUM,
+          category: AlertCategory.DATA_SOURCE,
+          title: `Data Source Not Found`,
+          message: `Data source with ID ${sourceId} not found`
+        });
+        continue;
       }
       
-      if (extractedData.length === 0) {
+      if (!dataSource.enabled) {
+        alertService.createAlert({
+          type: AlertType.WARNING,
+          severity: AlertSeverity.MEDIUM,
+          category: AlertCategory.DATA_SOURCE,
+          title: `Data Source Disabled`,
+          message: `Data source "${dataSource.name}" (ID: ${sourceId}) is disabled`
+        });
+        continue;
+      }
+      
+      try {
+        const extractResult: ExtractResult = await dataConnector.extract(sourceId);
+        
+        if (!extractResult.success) {
+          alertService.createAlert({
+            type: AlertType.ERROR,
+            severity: AlertSeverity.HIGH,
+            category: AlertCategory.DATA_SOURCE,
+            title: `Data Extraction Failed: ${dataSource.name}`,
+            message: `Failed to extract data from "${dataSource.name}" (ID: ${sourceId}): ${extractResult.error}`
+          });
+          continue;
+        }
+        
+        // Add data to combined result
+        allData = allData.concat(extractResult.data);
+        recordCounts.extracted += extractResult.count;
+        
+        alertService.createAlert({
+          type: AlertType.SUCCESS,
+          severity: AlertSeverity.LOW,
+          category: AlertCategory.DATA_SOURCE,
+          title: `Data Extracted: ${dataSource.name}`,
+          message: `Successfully extracted ${extractResult.count} records from "${dataSource.name}" (ID: ${sourceId}) in ${extractResult.executionTime}ms`
+        });
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        
+        alertService.createAlert({
+          type: AlertType.ERROR,
+          severity: AlertSeverity.HIGH,
+          category: AlertCategory.DATA_SOURCE,
+          title: `Data Extraction Error: ${dataSource.name}`,
+          message: `Error extracting data from "${dataSource.name}" (ID: ${sourceId}): ${errorMessage}`
+        });
+      }
+    }
+    
+    return allData;
+  }
+  
+  /**
+   * Transform data using transformation rules
+   */
+  private async transformData(
+    data: any[],
+    transformationIds: number[],
+    transformationRules: Map<number, TransformationRule>,
+    recordCounts: RecordCounts
+  ): Promise<any[]> {
+    if (data.length === 0) {
+      return [];
+    }
+    
+    // Sort transformation rules by order
+    const sortedTransformationIds = [...transformationIds].sort((a, b) => {
+      const ruleA = transformationRules.get(a);
+      const ruleB = transformationRules.get(b);
+      return (ruleA?.order || 0) - (ruleB?.order || 0);
+    });
+    
+    let transformedData = [...data];
+    
+    for (const transformationId of sortedTransformationIds) {
+      const rule = transformationRules.get(transformationId);
+      
+      if (!rule) {
         alertService.createAlert({
           type: AlertType.WARNING,
           severity: AlertSeverity.MEDIUM,
           category: AlertCategory.TRANSFORMATION,
-          title: `No Data Extracted: ${job.name}`,
-          message: `No data was extracted for ETL job "${job.name}" (ID: ${job.id})`
+          title: `Transformation Rule Not Found`,
+          message: `Transformation rule with ID ${transformationId} not found`
         });
-        
-        // Complete job with warning
-        status.status = JobStatus.SUCCEEDED;
-        status.endTime = new Date();
-        status.executionTime = status.endTime.getTime() - status.startTime.getTime();
-        this.updateStatus(status, progressCallback);
-        
-        return status;
+        continue;
       }
       
-      // Log start of transformation
-      alertService.createAlert({
-        type: AlertType.INFO,
-        severity: AlertSeverity.LOW,
-        category: AlertCategory.TRANSFORMATION,
-        title: `ETL Transformation Started: ${job.name}`,
-        message: `ETL job "${job.name}" (ID: ${job.id}) has started transformation of ${extractedData.length} record(s)`
-      });
-      
-      // Apply transformations
-      let transformedData = [...extractedData];
-      let transformedDataSource = [...extractedData];
-      
-      // Get rules if specified
-      let rules: TransformationRule[] = [];
-      if (job.rules && job.rules.length > 0) {
-        // In a real implementation, this would fetch transformation rules from a repository
-        // Here, we'll use a mock implementation
-        rules = this.getMockTransformationRules(job.rules);
+      if (!rule.enabled) {
+        alertService.createAlert({
+          type: AlertType.WARNING,
+          severity: AlertSeverity.LOW,
+          category: AlertCategory.TRANSFORMATION,
+          title: `Transformation Rule Disabled`,
+          message: `Transformation rule "${rule.name}" (ID: ${transformationId}) is disabled`
+        });
+        continue;
       }
       
-      // Sort rules by order
-      rules.sort((a, b) => a.order - b.order);
-      
-      // Apply each transformation rule
-      for (const rule of rules) {
-        if (!rule.enabled) {
-          continue;
-        }
-        
-        const transformResult = transformationService.applyTransformation(
-          transformedDataSource,
+      try {
+        const transformResult: TransformationResult = transformationService.applyTransformation(
+          transformedData,
           rule.type,
           rule.config
         );
         
         if (!transformResult.success) {
           alertService.createAlert({
-            type: AlertType.WARNING,
-            severity: AlertSeverity.MEDIUM,
+            type: AlertType.ERROR,
+            severity: AlertSeverity.HIGH,
             category: AlertCategory.TRANSFORMATION,
-            title: `Transformation Warning: ${rule.name}`,
-            message: `Transformation "${rule.name}" (ID: ${rule.id}) had errors: ${transformResult.errors.map(e => e.message).join(', ')}`
+            title: `Transformation Failed: ${rule.name}`,
+            message: `Failed to apply transformation "${rule.name}" (ID: ${transformationId}): ${transformResult.errors[0]?.message}`
           });
+          continue;
         }
         
-        transformedDataSource = transformResult.data;
-        status.recordsProcessed += transformResult.recordsProcessed;
-        this.updateStatus(status, progressCallback);
-      }
-      
-      transformedData = transformedDataSource;
-      status.recordsTransformed = transformedData.length;
-      this.updateStatus(status, progressCallback);
-      
-      // Log start of load
-      alertService.createAlert({
-        type: AlertType.INFO,
-        severity: AlertSeverity.LOW,
-        category: AlertCategory.TRANSFORMATION,
-        title: `ETL Load Started: ${job.name}`,
-        message: `ETL job "${job.name}" (ID: ${job.id}) has started loading ${transformedData.length} record(s) to ${destinations.length} destination(s)`
-      });
-      
-      // Load data to destinations
-      for (const destinationId of job.destinations) {
-        const loadResult = await dataConnector.load(destinationId, transformedData, {
-          mode: LoadMode.INSERT,
-          target: 'default' // Use actual target in real implementation
+        transformedData = transformResult.data;
+        recordCounts.transformed = transformedData.length;
+        
+        alertService.createAlert({
+          type: AlertType.SUCCESS,
+          severity: AlertSeverity.LOW,
+          category: AlertCategory.TRANSFORMATION,
+          title: `Transformation Applied: ${rule.name}`,
+          message: `Successfully applied transformation "${rule.name}" (ID: ${transformationId}). Result: ${transformResult.resultingRecords} records in ${transformResult.executionTime}ms`
         });
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : String(error);
         
-        if (!loadResult.success) {
-          throw new Error(`Load failed: ${loadResult.error}`);
-        }
-        
-        status.recordsLoaded += loadResult.recordsLoaded;
-        status.recordsFailed += loadResult.recordsFailed;
-        this.updateStatus(status, progressCallback);
+        alertService.createAlert({
+          type: AlertType.ERROR,
+          severity: AlertSeverity.HIGH,
+          category: AlertCategory.TRANSFORMATION,
+          title: `Transformation Error: ${rule.name}`,
+          message: `Error applying transformation "${rule.name}" (ID: ${transformationId}): ${errorMessage}`
+        });
       }
+    }
+    
+    // Check data quality
+    try {
+      const qualityResult = await dataQualityService.analyzeDataQuality(transformedData);
       
-      // Analyze data quality if there's data to analyze
-      if (transformedData.length > 0) {
-        const qualityResult = await dataQualityService.analyzeDataQuality(transformedData);
-        
-        if (qualityResult.issues.length > 0) {
-          alertService.createAlert({
-            type: AlertType.INFO,
-            severity: AlertSeverity.LOW,
-            category: AlertCategory.TRANSFORMATION,
-            title: `Data Quality Analysis: ${job.name}`,
-            message: `Data quality analysis for job "${job.name}" found ${qualityResult.issues.length} issue(s). Overall score: ${qualityResult.overallScore.toFixed(1)}`
-          });
-        }
+      if (qualityResult.issues.length > 0) {
+        alertService.createAlert({
+          type: AlertType.WARNING,
+          severity: AlertSeverity.MEDIUM,
+          category: AlertCategory.DATA_QUALITY,
+          title: `Data Quality Issues Detected`,
+          message: `Detected ${qualityResult.issues.length} data quality issues. Overall score: ${qualityResult.overallScore.toFixed(1)}/100`
+        });
+      } else {
+        alertService.createAlert({
+          type: AlertType.SUCCESS,
+          severity: AlertSeverity.LOW,
+          category: AlertCategory.DATA_QUALITY,
+          title: `Data Quality Check Passed`,
+          message: `No data quality issues detected. Overall score: ${qualityResult.overallScore.toFixed(1)}/100`
+        });
       }
-      
-      // Complete job
-      status.status = JobStatus.SUCCEEDED;
-      status.endTime = new Date();
-      status.executionTime = status.endTime.getTime() - status.startTime.getTime();
-      this.updateStatus(status, progressCallback);
-      
-      alertService.createAlert({
-        type: AlertType.SUCCESS,
-        severity: AlertSeverity.LOW,
-        category: AlertCategory.TRANSFORMATION,
-        title: `ETL Job Completed: ${job.name}`,
-        message: `ETL job "${job.name}" (ID: ${job.id}) completed successfully. ${status.recordsExtracted} extracted, ${status.recordsTransformed} transformed, ${status.recordsLoaded} loaded, ${status.recordsFailed} failed`
-      });
-      
-      return status;
     } catch (error) {
-      // Handle error
-      status.status = JobStatus.FAILED;
-      status.error = error instanceof Error ? error.message : String(error);
-      status.endTime = new Date();
-      status.executionTime = status.endTime.getTime() - status.startTime.getTime();
-      this.updateStatus(status, progressCallback);
+      const errorMessage = error instanceof Error ? error.message : String(error);
       
       alertService.createAlert({
         type: AlertType.ERROR,
-        severity: AlertSeverity.HIGH,
-        category: AlertCategory.TRANSFORMATION,
-        title: `ETL Job Failed: ${job.name}`,
-        message: `ETL job "${job.name}" (ID: ${job.id}) failed: ${status.error}`
+        severity: AlertSeverity.MEDIUM,
+        category: AlertCategory.DATA_QUALITY,
+        title: `Data Quality Check Error`,
+        message: `Error checking data quality: ${errorMessage}`
       });
+    }
+    
+    return transformedData;
+  }
+  
+  /**
+   * Load data into destinations
+   */
+  private async loadData(
+    destinationIds: number[],
+    data: any[],
+    dataSources: Map<number, DataSource>,
+    recordCounts: RecordCounts
+  ): Promise<void> {
+    if (data.length === 0) {
+      return;
+    }
+    
+    for (const destinationId of destinationIds) {
+      const dataSource = dataSources.get(destinationId);
       
-      return status;
-    }
-  }
-  
-  /**
-   * Update pipeline status and notify callback
-   */
-  private updateStatus(status: ETLPipelineStatus, callback?: (status: ETLPipelineStatus) => void): void {
-    if (callback) {
-      callback({ ...status });
-    }
-  }
-  
-  /**
-   * Get mock transformation rules for the specified rule IDs
-   */
-  private getMockTransformationRules(ruleIds: number[]): TransformationRule[] {
-    // In a real implementation, this would fetch from a repository
-    // Here we create some mock rules
-    
-    const mockRules: Record<number, TransformationRule> = {
-      1: {
-        id: 1,
-        name: 'Filter out properties below $100,000',
-        description: 'Removes low-value properties from the dataset',
-        type: TransformationType.FILTER,
-        config: {
-          logic: 'AND',
-          conditions: [
-            {
-              field: 'price',
-              operator: 'GREATER_THAN',
-              value: 100000
-            }
-          ]
-        },
-        enabled: true,
-        order: 1,
-        createdAt: new Date(),
-        updatedAt: new Date()
-      },
-      2: {
-        id: 2,
-        name: 'Rename property fields',
-        description: 'Standardizes property field names',
-        type: TransformationType.MAP,
-        config: {
-          mappings: [
-            { source: 'addr', target: 'address' },
-            { source: 'latitude', target: 'lat' },
-            { source: 'longitude', target: 'lng' },
-            { source: 'sqft', target: 'squareFootage' }
-          ],
-          includeOriginal: false
-        },
-        enabled: true,
-        order: 2,
-        createdAt: new Date(),
-        updatedAt: new Date()
-      },
-      3: {
-        id: 3,
-        name: 'Filter residential properties',
-        description: 'Keeps only residential properties',
-        type: TransformationType.FILTER,
-        config: {
-          logic: 'OR',
-          conditions: [
-            {
-              field: 'type',
-              operator: 'EQUALS',
-              value: 'residential'
-            },
-            {
-              field: 'type',
-              operator: 'EQUALS',
-              value: 'single-family'
-            }
-          ]
-        },
-        enabled: true,
-        order: 3,
-        createdAt: new Date(),
-        updatedAt: new Date()
+      if (!dataSource) {
+        alertService.createAlert({
+          type: AlertType.WARNING,
+          severity: AlertSeverity.MEDIUM,
+          category: AlertCategory.DATA_SOURCE,
+          title: `Destination Not Found`,
+          message: `Destination data source with ID ${destinationId} not found`
+        });
+        continue;
       }
-    };
-    
-    return ruleIds.map(id => mockRules[id]).filter(rule => rule !== undefined);
+      
+      if (!dataSource.enabled) {
+        alertService.createAlert({
+          type: AlertType.WARNING,
+          severity: AlertSeverity.MEDIUM,
+          category: AlertCategory.DATA_SOURCE,
+          title: `Destination Disabled`,
+          message: `Destination data source "${dataSource.name}" (ID: ${destinationId}) is disabled`
+        });
+        continue;
+      }
+      
+      try {
+        const loadResult: LoadResult = await dataConnector.load(
+          destinationId,
+          data,
+          {
+            mode: dataSource.config.options?.loadMode || 'INSERT',
+            target: dataSource.config.options?.target || 'default'
+          }
+        );
+        
+        if (!loadResult.success) {
+          alertService.createAlert({
+            type: AlertType.ERROR,
+            severity: AlertSeverity.HIGH,
+            category: AlertCategory.DATA_SOURCE,
+            title: `Data Load Failed: ${dataSource.name}`,
+            message: `Failed to load data into "${dataSource.name}" (ID: ${destinationId}): ${loadResult.error}`
+          });
+          
+          recordCounts.failed += loadResult.recordsFailed;
+          continue;
+        }
+        
+        recordCounts.loaded += loadResult.recordsLoaded;
+        
+        alertService.createAlert({
+          type: AlertType.SUCCESS,
+          severity: AlertSeverity.LOW,
+          category: AlertCategory.DATA_SOURCE,
+          title: `Data Loaded: ${dataSource.name}`,
+          message: `Successfully loaded ${loadResult.recordsLoaded} records into "${dataSource.name}" (ID: ${destinationId}) in ${loadResult.executionTime}ms`
+        });
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        
+        alertService.createAlert({
+          type: AlertType.ERROR,
+          severity: AlertSeverity.HIGH,
+          category: AlertCategory.DATA_SOURCE,
+          title: `Data Load Error: ${dataSource.name}`,
+          message: `Error loading data into "${dataSource.name}" (ID: ${destinationId}): ${errorMessage}`
+        });
+        
+        recordCounts.failed += data.length;
+      }
+    }
   }
 }
 
+// Export singleton instance
 export const etlPipeline = new ETLPipeline();

@@ -1,121 +1,94 @@
-import { DataSourceType, ConnectionMode, ConnectionType, AuthenticationType, LoadMode } from './ETLTypes';
+import { DataSource, DataSourceType, LoadMode } from './ETLTypes';
 import { alertService, AlertType, AlertCategory, AlertSeverity } from './AlertService';
 
 /**
  * Connection result
  */
 export interface ConnectionResult {
-  /** Whether the connection was successful */
+  /** Whether connection was successful */
   success: boolean;
   
-  /** Error message if the connection failed */
+  /** Error message if unsuccessful */
   error?: string;
   
-  /** Connection metadata */
-  metadata?: Record<string, any>;
-  
-  /** Execution time in milliseconds */
-  executionTime?: number;
+  /** Connection details */
+  details?: any;
 }
 
 /**
  * Extract options
  */
 export interface ExtractOptions {
-  /** Fields to extract */
-  fields?: string[];
+  /** Query for API or database sources */
+  query?: string;
   
-  /** Filter conditions */
+  /** Parameters for the query */
+  params?: any;
+  
+  /** Filter to apply during extraction */
   filter?: any;
-  
-  /** Sort options */
-  sort?: Array<{
-    field: string;
-    direction: 'asc' | 'desc';
-  }>;
-  
-  /** Pagination options */
-  pagination?: {
-    page: number;
-    pageSize: number;
-  };
   
   /** Maximum number of records to extract */
   limit?: number;
   
-  /** Offset for record extraction */
+  /** Number of records to skip */
   offset?: number;
+  
+  /** Sorting options */
+  sort?: { field: string; direction: 'asc' | 'desc' }[];
 }
 
 /**
  * Extract result
  */
 export interface ExtractResult {
-  /** Whether the extraction was successful */
+  /** Whether extraction was successful */
   success: boolean;
   
-  /** Data records */
+  /** Extracted data */
   data: any[];
   
-  /** Error message if the extraction failed */
+  /** Error message if unsuccessful */
   error?: string;
   
-  /** Total number of records (if known) */
-  totalRecords?: number;
-  
   /** Number of records extracted */
-  recordCount: number;
+  count: number;
   
-  /** Whether there are more records available */
-  hasMore: boolean;
+  /** Total records available (may be more than extracted) */
+  totalCount?: number;
   
-  /** Execution time in milliseconds */
+  /** Time taken to extract data (ms) */
   executionTime: number;
-  
-  /** Source metadata */
-  metadata?: Record<string, any>;
 }
 
 /**
  * Load options
  */
 export interface LoadOptions {
-  /** Load mode */
+  /** Load mode (INSERT, UPDATE, etc.) */
   mode: LoadMode;
   
-  /** Target table or collection */
+  /** Target table or collection name */
   target: string;
   
-  /** Field mappings */
-  mappings?: Array<{
-    source: string;
-    target: string;
-  }>;
+  /** Mapping of source to target fields */
+  mapping?: { source: string; target: string }[];
   
-  /** Key fields for update/upsert operations */
-  keyFields?: string[];
-  
-  /** Batch size */
+  /** Batch size for bulk operations */
   batchSize?: number;
   
   /** Whether to continue on error */
   continueOnError?: boolean;
-  
-  /** Whether to validate before loading */
-  validateBeforeLoad?: boolean;
-  
-  /** Whether to skip null values */
-  skipNulls?: boolean;
 }
 
 /**
  * Load result
  */
 export interface LoadResult {
-  /** Whether the load was successful */
+  /** Whether load was successful */
   success: boolean;
   
-  /** Error message if the load failed */
+  /** Error message if unsuccessful */
   error?: string;
   
   /** Number of records loaded */
@@ -124,36 +97,21 @@ export interface LoadResult {
   /** Number of records failed */
   recordsFailed: number;
   
-  /** Number of records updated */
-  recordsUpdated: number;
-  
-  /** Number of records inserted */
-  recordsInserted: number;
-  
-  /** Number of records deleted */
-  recordsDeleted: number;
-  
-  /** Error details for failed records */
-  errors?: Array<{
-    record: any;
-    error: string;
-    index: number;
-  }>;
-  
-  /** Execution time in milliseconds */
+  /** Time taken to load data (ms) */
   executionTime: number;
 }
 
 /**
- * Data connector for connecting to various data sources
+ * Data connector class for handling data source connections,
+ * extractions, and loads.
  */
 class DataConnector {
-  private dataSources: Map<number, any> = new Map();
+  private dataSources: Map<number, DataSource> = new Map();
   
   /**
    * Register a data source
    */
-  registerDataSource(dataSource: any): void {
+  registerDataSource(dataSource: DataSource): void {
     this.dataSources.set(dataSource.id, dataSource);
     
     alertService.createAlert({
@@ -161,15 +119,355 @@ class DataConnector {
       severity: AlertSeverity.LOW,
       category: AlertCategory.DATA_SOURCE,
       title: `Data Source Registered: ${dataSource.name}`,
-      message: `Data source "${dataSource.name}" (ID: ${dataSource.id}, Type: ${dataSource.type}) has been registered.`
+      message: `Data source "${dataSource.name}" (ID: ${dataSource.id}, Type: ${dataSource.type}) has been registered`
     });
   }
   
   /**
-   * Unregister a data source
+   * Get a data source by ID
    */
-  unregisterDataSource(id: number): boolean {
-    const dataSource = this.dataSources.get(id);
+  getDataSource(id: number): DataSource | undefined {
+    return this.dataSources.get(id);
+  }
+  
+  /**
+   * Get all data sources
+   */
+  getAllDataSources(): DataSource[] {
+    return Array.from(this.dataSources.values());
+  }
+  
+  /**
+   * Test connection to a data source
+   */
+  async testConnection(dataSource: DataSource): Promise<ConnectionResult> {
+    try {
+      // Simulate connection test based on data source type
+      switch (dataSource.type) {
+        case DataSourceType.POSTGRESQL:
+        case DataSourceType.MYSQL:
+        case DataSourceType.MONGODB:
+          // Database connection test would go here
+          // For mock purposes, just return success
+          return {
+            success: true,
+            details: {
+              server: dataSource.config.host,
+              database: dataSource.config.database,
+              user: dataSource.config.user,
+              connected: true
+            }
+          };
+          
+        case DataSourceType.REST_API:
+          // API connection test would go here
+          // For mock purposes, just return success
+          return {
+            success: true,
+            details: {
+              url: dataSource.config.url,
+              method: dataSource.config.method,
+              status: 200,
+              response: { message: 'Connection successful' }
+            }
+          };
+          
+        case DataSourceType.FILE:
+          // File connection test would go here
+          // For mock purposes, just return success
+          return {
+            success: true,
+            details: {
+              path: dataSource.config.path,
+              exists: true,
+              size: '2.5 MB',
+              lastModified: new Date()
+            }
+          };
+          
+        case DataSourceType.MEMORY:
+          // In-memory data source, always successful
+          return {
+            success: true,
+            details: {
+              recordCount: dataSource.config.data?.length || 0
+            }
+          };
+          
+        default:
+          // Unknown data source type
+          return {
+            success: false,
+            error: `Unsupported data source type: ${dataSource.type}`
+          };
+      }
+    } catch (error) {
+      // Handle connection error
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      
+      return {
+        success: false,
+        error: errorMessage
+      };
+    }
+  }
+  
+  /**
+   * Extract data from a data source
+   */
+  async extract(sourceId: number, options: ExtractOptions = {}): Promise<ExtractResult> {
+    const startTime = Date.now();
+    
+    try {
+      // Get data source
+      const dataSource = this.getDataSource(sourceId);
+      
+      if (!dataSource) {
+        return {
+          success: false,
+          data: [],
+          error: `Data source not found: ${sourceId}`,
+          count: 0,
+          executionTime: Date.now() - startTime
+        };
+      }
+      
+      if (!dataSource.enabled) {
+        return {
+          success: false,
+          data: [],
+          error: `Data source is disabled: ${dataSource.name}`,
+          count: 0,
+          executionTime: Date.now() - startTime
+        };
+      }
+      
+      // Simulate extraction based on data source type
+      switch (dataSource.type) {
+        case DataSourceType.POSTGRESQL:
+        case DataSourceType.MYSQL:
+        case DataSourceType.MONGODB:
+          // Database extraction would go here
+          // For mock purposes, we'll just return some mock data from the source config
+          {
+            const mockData = dataSource.config.data || [];
+            return {
+              success: true,
+              data: mockData,
+              count: mockData.length,
+              totalCount: mockData.length,
+              executionTime: Date.now() - startTime
+            };
+          }
+          
+        case DataSourceType.REST_API:
+          // API extraction would go here
+          // For mock purposes, we'll just return mock data from the source config
+          {
+            const mockData = dataSource.config.data || [];
+            return {
+              success: true,
+              data: mockData,
+              count: mockData.length,
+              totalCount: mockData.length,
+              executionTime: Date.now() - startTime
+            };
+          }
+          
+        case DataSourceType.FILE:
+          // File extraction would go here
+          // For mock purposes, we'll just return mock data from the source config
+          {
+            const mockData = dataSource.config.data || [];
+            return {
+              success: true,
+              data: mockData,
+              count: mockData.length,
+              totalCount: mockData.length,
+              executionTime: Date.now() - startTime
+            };
+          }
+          
+        case DataSourceType.MEMORY:
+          // In-memory data extraction
+          {
+            const data = dataSource.config.data || [];
+            return {
+              success: true,
+              data: data.slice(), // Return a copy of the data
+              count: data.length,
+              totalCount: data.length,
+              executionTime: Date.now() - startTime
+            };
+          }
+          
+        default:
+          // Unknown data source type
+          return {
+            success: false,
+            data: [],
+            error: `Unsupported data source type: ${dataSource.type}`,
+            count: 0,
+            executionTime: Date.now() - startTime
+          };
+      }
+    } catch (error) {
+      // Handle extraction error
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      
+      return {
+        success: false,
+        data: [],
+        error: errorMessage,
+        count: 0,
+        executionTime: Date.now() - startTime
+      };
+    }
+  }
+  
+  /**
+   * Load data into a data source
+   */
+  async load(destinationId: number, data: any[], options: LoadOptions): Promise<LoadResult> {
+    const startTime = Date.now();
+    
+    try {
+      // Get data source
+      const dataSource = this.getDataSource(destinationId);
+      
+      if (!dataSource) {
+        return {
+          success: false,
+          error: `Data source not found: ${destinationId}`,
+          recordsLoaded: 0,
+          recordsFailed: data.length,
+          executionTime: Date.now() - startTime
+        };
+      }
+      
+      if (!dataSource.enabled) {
+        return {
+          success: false,
+          error: `Data source is disabled: ${dataSource.name}`,
+          recordsLoaded: 0,
+          recordsFailed: data.length,
+          executionTime: Date.now() - startTime
+        };
+      }
+      
+      // Simulate load based on data source type
+      switch (dataSource.type) {
+        case DataSourceType.POSTGRESQL:
+        case DataSourceType.MYSQL:
+        case DataSourceType.MONGODB:
+          // Database load would go here
+          // For mock purposes, just update the data source config
+          {
+            const existingData = dataSource.config.data || [];
+            
+            // Apply load mode
+            switch (options.mode) {
+              case LoadMode.INSERT:
+                // Simply append data
+                dataSource.config.data = [...existingData, ...data];
+                break;
+                
+              case LoadMode.UPDATE:
+                // Update existing records (mock implementation)
+                // In real implementation this would use primary keys/unique fields
+                if (existingData.length >= data.length) {
+                  dataSource.config.data = [
+                    ...data,
+                    ...existingData.slice(data.length)
+                  ];
+                } else {
+                  dataSource.config.data = data.slice(0, existingData.length);
+                }
+                break;
+                
+              case LoadMode.UPSERT:
+                // For mock purposes, just replace data
+                dataSource.config.data = data;
+                break;
+                
+              case LoadMode.DELETE:
+                // For mock purposes, remove some records
+                if (existingData.length > 0) {
+                  dataSource.config.data = existingData.slice(0, Math.max(0, existingData.length - data.length));
+                }
+                break;
+                
+              case LoadMode.TRUNCATE:
+                // Clear data and insert new
+                dataSource.config.data = data;
+                break;
+                
+              default:
+                // Default to insert
+                dataSource.config.data = [...existingData, ...data];
+                break;
+            }
+            
+            return {
+              success: true,
+              recordsLoaded: data.length,
+              recordsFailed: 0,
+              executionTime: Date.now() - startTime
+            };
+          }
+          
+        case DataSourceType.FILE:
+          // File load would go here
+          // For mock purposes, just update the data source config
+          dataSource.config.data = data;
+          
+          return {
+            success: true,
+            recordsLoaded: data.length,
+            recordsFailed: 0,
+            executionTime: Date.now() - startTime
+          };
+          
+        case DataSourceType.MEMORY:
+          // In-memory data load
+          dataSource.config.data = data;
+          
+          return {
+            success: true,
+            recordsLoaded: data.length,
+            recordsFailed: 0,
+            executionTime: Date.now() - startTime
+          };
+          
+        default:
+          // Unsupported data source type for loading
+          return {
+            success: false,
+            error: `Unsupported data source type for loading: ${dataSource.type}`,
+            recordsLoaded: 0,
+            recordsFailed: data.length,
+            executionTime: Date.now() - startTime
+          };
+      }
+    } catch (error) {
+      // Handle load error
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      
+      return {
+        success: false,
+        error: errorMessage,
+        recordsLoaded: 0,
+        recordsFailed: data.length,
+        executionTime: Date.now() - startTime
+      };
+    }
+  }
+  
+  /**
+   * Delete a data source
+   */
+  deleteDataSource(id: number): boolean {
+    const dataSource = this.getDataSource(id);
     
     if (!dataSource) {
       return false;
@@ -179,296 +477,42 @@ class DataConnector {
     
     alertService.createAlert({
       type: AlertType.INFO,
-      severity: AlertSeverity.LOW,
+      severity: AlertSeverity.MEDIUM,
       category: AlertCategory.DATA_SOURCE,
-      title: `Data Source Unregistered: ${dataSource.name}`,
-      message: `Data source "${dataSource.name}" (ID: ${dataSource.id}) has been unregistered.`
+      title: `Data Source Deleted: ${dataSource.name}`,
+      message: `Data source "${dataSource.name}" (ID: ${id}, Type: ${dataSource.type}) has been deleted`
     });
     
     return true;
   }
   
   /**
-   * Get a data source by ID
+   * Update a data source
    */
-  getDataSource(id: number): any {
-    return this.dataSources.get(id);
-  }
-  
-  /**
-   * Get all data sources
-   */
-  getAllDataSources(): any[] {
-    return Array.from(this.dataSources.values());
-  }
-  
-  /**
-   * Test a connection to a data source
-   */
-  async testConnection(dataSource: any): Promise<ConnectionResult> {
-    // This is a mock implementation
-    try {
-      const startTime = Date.now();
-      
-      // For demonstration purposes, simulate a delay
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
-      // For demo purposes, all connections succeed except for specific error cases
-      if (dataSource.type === DataSourceType.CUSTOM && dataSource.config.simulateError) {
-        return {
-          success: false,
-          error: 'Simulated connection error',
-          executionTime: Date.now() - startTime
-        };
-      }
-      
-      return {
-        success: true,
-        metadata: {
-          connectedAt: new Date(),
-          serverVersion: '1.0.0',
-          serverType: dataSource.type,
-          features: ['read', 'write']
-        },
-        executionTime: Date.now() - startTime
-      };
-    } catch (error) {
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : String(error)
-      };
-    }
-  }
-  
-  /**
-   * Extract data from a data source
-   */
-  async extract(dataSourceId: number, options: ExtractOptions = {}): Promise<ExtractResult> {
-    const dataSource = this.dataSources.get(dataSourceId);
+  updateDataSource(id: number, updates: Partial<Omit<DataSource, 'id'>>): DataSource | undefined {
+    const dataSource = this.getDataSource(id);
     
     if (!dataSource) {
-      return {
-        success: false,
-        data: [],
-        error: `Data source with ID ${dataSourceId} not found`,
-        recordCount: 0,
-        hasMore: false,
-        executionTime: 0
-      };
+      return undefined;
     }
     
-    try {
-      const startTime = Date.now();
-      
-      // For demonstration purposes, simulate a delay
-      await new Promise(resolve => setTimeout(resolve, 300));
-      
-      // Mock implementation - in a real application, this would connect to a data source
-      let data = dataSource.config.data || [];
-      
-      // Apply field selection
-      if (options.fields && options.fields.length > 0) {
-        data = data.map((item: any) => {
-          const result: Record<string, any> = {};
-          options.fields!.forEach(field => {
-            if (field in item) {
-              result[field] = item[field];
-            }
-          });
-          return result;
-        });
-      }
-      
-      // Apply pagination
-      let hasMore = false;
-      let totalRecords = data.length;
-      
-      if (options.pagination) {
-        const { page, pageSize } = options.pagination;
-        const startIndex = (page - 1) * pageSize;
-        const endIndex = startIndex + pageSize;
-        
-        hasMore = endIndex < data.length;
-        data = data.slice(startIndex, endIndex);
-      } else if (options.limit) {
-        hasMore = options.limit < data.length;
-        const startIndex = options.offset || 0;
-        data = data.slice(startIndex, startIndex + options.limit);
-      }
-      
-      return {
-        success: true,
-        data,
-        recordCount: data.length,
-        totalRecords,
-        hasMore,
-        executionTime: Date.now() - startTime,
-        metadata: {
-          sourceType: dataSource.type,
-          extractedAt: new Date()
-        }
-      };
-    } catch (error) {
-      return {
-        success: false,
-        data: [],
-        error: error instanceof Error ? error.message : String(error),
-        recordCount: 0,
-        hasMore: false,
-        executionTime: 0
-      };
-    }
-  }
-  
-  /**
-   * Load data into a data source
-   */
-  async load(dataSourceId: number, data: any[], options: LoadOptions): Promise<LoadResult> {
-    const dataSource = this.dataSources.get(dataSourceId);
-    
-    if (!dataSource) {
-      return {
-        success: false,
-        error: `Data source with ID ${dataSourceId} not found`,
-        recordsLoaded: 0,
-        recordsFailed: data.length,
-        recordsUpdated: 0,
-        recordsInserted: 0,
-        recordsDeleted: 0,
-        executionTime: 0
-      };
-    }
-    
-    try {
-      const startTime = Date.now();
-      
-      // For demonstration purposes, simulate a delay
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
-      // Mock implementation - in a real application, this would connect to a data source
-      
-      // Apply field mappings if specified
-      let transformedData = data;
-      if (options.mappings && options.mappings.length > 0) {
-        transformedData = data.map(item => {
-          const result: Record<string, any> = {};
-          options.mappings!.forEach(mapping => {
-            if (mapping.source in item) {
-              result[mapping.target] = item[mapping.source];
-            }
-          });
-          return result;
-        });
-      }
-      
-      // In this mock implementation, just store the data in the data source's config
-      if (!dataSource.config.data) {
-        dataSource.config.data = [];
-      }
-      
-      let recordsInserted = 0;
-      let recordsUpdated = 0;
-      let recordsDeleted = 0;
-      
-      switch (options.mode) {
-        case LoadMode.INSERT:
-          dataSource.config.data.push(...transformedData);
-          recordsInserted = transformedData.length;
-          break;
-          
-        case LoadMode.TRUNCATE_INSERT:
-          dataSource.config.data = [...transformedData];
-          recordsInserted = transformedData.length;
-          break;
-          
-        case LoadMode.UPDATE:
-        case LoadMode.UPSERT:
-          // Simple implementation of update/upsert based on key fields
-          if (options.keyFields && options.keyFields.length > 0) {
-            transformedData.forEach(newItem => {
-              const index = dataSource.config.data.findIndex((existingItem: any) => 
-                options.keyFields!.every(field => existingItem[field] === newItem[field])
-              );
-              
-              if (index >= 0) {
-                // Update existing item
-                dataSource.config.data[index] = {
-                  ...dataSource.config.data[index],
-                  ...newItem
-                };
-                recordsUpdated++;
-              } else if (options.mode === LoadMode.UPSERT) {
-                // Insert new item
-                dataSource.config.data.push(newItem);
-                recordsInserted++;
-              }
-            });
-          }
-          break;
-          
-        case LoadMode.DELETE:
-          // Delete records matching key fields
-          if (options.keyFields && options.keyFields.length > 0) {
-            const initialLength = dataSource.config.data.length;
-            dataSource.config.data = dataSource.config.data.filter((item: any) => 
-              !transformedData.some(deleteItem => 
-                options.keyFields!.every(field => item[field] === deleteItem[field])
-              )
-            );
-            recordsDeleted = initialLength - dataSource.config.data.length;
-          }
-          break;
-      }
-      
-      return {
-        success: true,
-        recordsLoaded: transformedData.length,
-        recordsFailed: 0,
-        recordsUpdated,
-        recordsInserted,
-        recordsDeleted,
-        executionTime: Date.now() - startTime
-      };
-    } catch (error) {
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : String(error),
-        recordsLoaded: 0,
-        recordsFailed: data.length,
-        recordsUpdated: 0,
-        recordsInserted: 0,
-        recordsDeleted: 0,
-        executionTime: 0
-      };
-    }
-  }
-  
-  /**
-   * Get metadata for a data source
-   */
-  async getMetadata(dataSourceId: number): Promise<any> {
-    const dataSource = this.dataSources.get(dataSourceId);
-    
-    if (!dataSource) {
-      throw new Error(`Data source with ID ${dataSourceId} not found`);
-    }
-    
-    // This is a mock implementation
-    return {
-      fields: [
-        { name: 'id', type: 'number', nullable: false },
-        { name: 'name', type: 'string', nullable: false },
-        { name: 'description', type: 'string', nullable: true },
-        { name: 'price', type: 'number', nullable: true },
-        { name: 'createdAt', type: 'date', nullable: false }
-      ],
-      recordCount: dataSource.config.data ? dataSource.config.data.length : 0,
-      structure: {
-        type: dataSource.type,
-        name: dataSource.name,
-        tables: ['properties', 'users', 'transactions']
-      }
+    const updatedDataSource: DataSource = {
+      ...dataSource,
+      ...updates,
+      updatedAt: new Date()
     };
+    
+    this.dataSources.set(id, updatedDataSource);
+    
+    alertService.createAlert({
+      type: AlertType.INFO,
+      severity: AlertSeverity.LOW,
+      category: AlertCategory.DATA_SOURCE,
+      title: `Data Source Updated: ${updatedDataSource.name}`,
+      message: `Data source "${updatedDataSource.name}" (ID: ${id}, Type: ${updatedDataSource.type}) has been updated`
+    });
+    
+    return updatedDataSource;
   }
 }
 

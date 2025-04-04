@@ -1,47 +1,65 @@
 /**
- * ETL Services
+ * ETL System
  * 
- * This is the main entry point for ETL services. It exports all the ETL-related
- * services, interfaces, and enums in a single module for easier imports.
+ * This file exports all components of the ETL system.
  */
 
-// Export ETL types and enums
+// Re-export types
 export * from './ETLTypes';
 
-// Export ETL services
-export { etlPipeline } from './ETLPipeline';
-export { etlPipelineManager } from './ETLPipelineManager';
-export { dataConnector } from './DataConnector';
-export { transformationService } from './TransformationService';
-export { dataQualityService } from './DataQualityService';
-export { alertService } from './AlertService';
-export { scheduler } from './Scheduler';
-
-// Export ETL service types
-export type { ETLPipelineStatus } from './ETLPipeline';
-export type { JobRun } from './ETLPipelineManager';
-export type { TransformationResult, ErrorMessage } from './TransformationService';
-export type { 
-  DataQualityAnalysisOptions,
-  DataQualityAnalysisResult,
-  FieldStatistics
-} from './DataQualityService';
-export type { 
-  Alert, 
-  CreateAlertOptions, 
-  UpdateAlertOptions, 
-  AlertFilterOptions, 
-  AlertListenerCallback 
+// Re-export AlertService
+export {
+  alertService,
+  AlertType,
+  AlertSeverity,
+  AlertCategory,
+  type Alert,
+  type AlertPayload,
+  type AlertFilterOptions,
+  type AlertStats
 } from './AlertService';
-export type { 
-  ScheduleConfig, 
-  ScheduledJob, 
-  JobExecutionResult 
-} from './Scheduler';
-export type { 
-  ConnectionResult, 
-  ExtractOptions, 
-  ExtractResult, 
-  LoadOptions, 
-  LoadResult 
+
+// Re-export TransformationService
+export {
+  transformationService,
+  type TransformationResult,
+  type ErrorMessage
+} from './TransformationService';
+
+// Re-export DataQualityService
+export {
+  dataQualityService,
+  DataQualityIssueSeverity,
+  type DataQualityIssue,
+  type FieldStatistics,
+  type DataQualityAnalysisOptions,
+  type DataQualityAnalysisResult
+} from './DataQualityService';
+
+// Re-export DataConnector
+export {
+  dataConnector,
+  type ConnectionResult,
+  type ExtractOptions,
+  type ExtractResult,
+  type LoadOptions,
+  type LoadResult
 } from './DataConnector';
+
+// Re-export Scheduler
+export {
+  scheduler,
+  type JobCallback,
+  type ScheduledJob
+} from './Scheduler';
+
+// Re-export ETLPipeline
+export {
+  etlPipeline,
+  type JobRun
+} from './ETLPipeline';
+
+// Re-export ETLPipelineManager
+export {
+  etlPipelineManager
+} from './ETLPipelineManager';

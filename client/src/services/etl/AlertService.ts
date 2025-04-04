@@ -1,27 +1,40 @@
 /**
  * Alert service
  * 
- * This service handles the creation, management, and notification of alerts
- * throughout the ETL pipeline.
+ * This service manages alerts and notifications for the ETL system.
  */
 
 /**
- * Alert type
+ * Alert type enum
  */
 export enum AlertType {
+  /** General information */
   INFO = 'INFO',
+  
+  /** Success message */
   SUCCESS = 'SUCCESS',
+  
+  /** Warning message */
   WARNING = 'WARNING',
+  
+  /** Error message */
   ERROR = 'ERROR'
 }
 
 /**
- * Alert severity
+ * Alert severity level
  */
 export enum AlertSeverity {
+  /** Low severity (informational) */
   LOW = 'LOW',
+  
+  /** Medium severity (may require attention) */
   MEDIUM = 'MEDIUM',
+  
+  /** High severity (requires attention) */
   HIGH = 'HIGH',
+  
+  /** Critical severity (requires immediate action) */
   CRITICAL = 'CRITICAL'
 }
 
@@ -29,109 +42,156 @@ export enum AlertSeverity {
  * Alert category
  */
 export enum AlertCategory {
+  /** System-related alerts */
   SYSTEM = 'SYSTEM',
+  
+  /** Data source-related alerts */
   DATA_SOURCE = 'DATA_SOURCE',
+  
+  /** Job-related alerts */
+  JOB = 'JOB',
+  
+  /** Transformation-related alerts */
   TRANSFORMATION = 'TRANSFORMATION',
-  SCHEDULING = 'SCHEDULING',
+  
+  /** Data quality-related alerts */
+  DATA_QUALITY = 'DATA_QUALITY',
+  
+  /** Authentication-related alerts */
+  AUTHENTICATION = 'AUTHENTICATION',
+  
+  /** Security-related alerts */
   SECURITY = 'SECURITY',
-  PERFORMANCE = 'PERFORMANCE',
-  USER = 'USER'
+  
+  /** Performance-related alerts */
+  PERFORMANCE = 'PERFORMANCE'
 }
 
 /**
- * Alert status
+ * Alert payload
  */
-export enum AlertStatus {
-  NEW = 'NEW',
-  ACKNOWLEDGED = 'ACKNOWLEDGED',
-  RESOLVED = 'RESOLVED',
-  CLOSED = 'CLOSED'
+export interface AlertPayload {
+  /** Alert type */
+  type: AlertType;
+  
+  /** Alert severity */
+  severity: AlertSeverity;
+  
+  /** Alert category */
+  category: AlertCategory;
+  
+  /** Alert title */
+  title: string;
+  
+  /** Alert message */
+  message: string;
+  
+  /** Alert metadata (optional) */
+  metadata?: Record<string, any>;
+  
+  /** Context (e.g., job ID, data source ID) */
+  context?: Record<string, any>;
 }
 
 /**
  * Alert interface
  */
-export interface Alert {
+export interface Alert extends AlertPayload {
+  /** Alert ID */
   id: string;
-  type: AlertType;
-  title: string;
-  message: string;
-  severity: AlertSeverity;
-  category: AlertCategory;
-  status: AlertStatus;
-  metadata?: Record<string, any>;
+  
+  /** Creation timestamp */
   createdAt: Date;
-  updatedAt: Date;
+  
+  /** Whether the alert has been read */
+  read: boolean;
+  
+  /** Whether the alert has been acknowledged */
+  acknowledged: boolean;
+  
+  /** Acknowledgement timestamp */
   acknowledgedAt?: Date;
+  
+  /** Resolution timestamp */
   resolvedAt?: Date;
-  closedAt?: Date;
-}
-
-/**
- * Create alert options
- */
-export interface CreateAlertOptions {
-  type: AlertType;
-  title: string;
-  message: string;
-  severity: AlertSeverity;
-  category: AlertCategory;
-  metadata?: Record<string, any>;
-}
-
-/**
- * Update alert options
- */
-export interface UpdateAlertOptions {
-  status?: AlertStatus;
-  metadata?: Record<string, any>;
 }
 
 /**
  * Alert filter options
  */
 export interface AlertFilterOptions {
-  types?: AlertType[];
-  severities?: AlertSeverity[];
-  categories?: AlertCategory[];
-  statuses?: AlertStatus[];
-  startDate?: Date;
-  endDate?: Date;
-  search?: string;
+  /** Filter by alert type */
+  type?: AlertType;
+  
+  /** Filter by alert severity */
+  severity?: AlertSeverity;
+  
+  /** Filter by alert category */
+  category?: AlertCategory;
+  
+  /** Filter by read status */
+  read?: boolean;
+  
+  /** Filter by acknowledged status */
+  acknowledged?: boolean;
+  
+  /** Filter by created after date */
+  createdAfter?: Date;
+  
+  /** Filter by created before date */
+  createdBefore?: Date;
+  
+  /** Filter by search text (in title and message) */
+  searchText?: string;
 }
 
 /**
- * Alert listener callback
+ * Alert stats
  */
-export type AlertListenerCallback = (alert: Alert) => void;
+export interface AlertStats {
+  /** Total number of alerts */
+  total: number;
+  
+  /** Number of unread alerts */
+  unread: number;
+  
+  /** Number of acknowledged alerts */
+  acknowledged: number;
+  
+  /** Number of alerts by type */
+  byType: Record<AlertType, number>;
+  
+  /** Number of alerts by severity */
+  bySeverity: Record<AlertSeverity, number>;
+  
+  /** Number of alerts by category */
+  byCategory: Record<AlertCategory, number>;
+}
 
 /**
  * Alert service class
  */
 class AlertService {
   private alerts: Map<string, Alert> = new Map();
-  private listeners: Map<string, AlertListenerCallback[]> = new Map();
   private nextId = 1;
   
   /**
    * Create a new alert
    */
-  createAlert(options: CreateAlertOptions): Alert {
+  createAlert(payload: AlertPayload): Alert {
     const id = `alert-${this.nextId++}`;
-    const now = new Date();
-    
     const alert: Alert = {
       id,
-      status: AlertStatus.NEW,
-      createdAt: now,
-      updatedAt: now,
-      ...options
+      ...payload,
+      createdAt: new Date(),
+      read: false,
+      acknowledged: false
     };
     
     this.alerts.set(id, alert);
     
-    // Notify listeners
-    this.notifyListeners('create', alert);
+    // In a real implementation, this would dispatch the alert via websocket, etc.
+    console.log(`Alert created: ${alert.title} (${alert.type}, ${alert.severity})`);
     
     return alert;
   }
@@ -147,197 +207,144 @@ class AlertService {
    * Get all alerts
    */
   getAllAlerts(): Alert[] {
-    return Array.from(this.alerts.values());
+    return Array.from(this.alerts.values()).sort((a, b) => 
+      b.createdAt.getTime() - a.createdAt.getTime()
+    );
   }
   
   /**
    * Get filtered alerts
    */
   getFilteredAlerts(options: AlertFilterOptions): Alert[] {
-    let alerts = this.getAllAlerts();
-    
-    // Apply filters
-    if (options.types && options.types.length > 0) {
-      alerts = alerts.filter(alert => options.types!.includes(alert.type));
-    }
-    
-    if (options.severities && options.severities.length > 0) {
-      alerts = alerts.filter(alert => options.severities!.includes(alert.severity));
-    }
-    
-    if (options.categories && options.categories.length > 0) {
-      alerts = alerts.filter(alert => options.categories!.includes(alert.category));
-    }
-    
-    if (options.statuses && options.statuses.length > 0) {
-      alerts = alerts.filter(alert => options.statuses!.includes(alert.status));
-    }
-    
-    if (options.startDate) {
-      alerts = alerts.filter(alert => alert.createdAt >= options.startDate!);
-    }
-    
-    if (options.endDate) {
-      alerts = alerts.filter(alert => alert.createdAt <= options.endDate!);
-    }
-    
-    if (options.search) {
-      const search = options.search.toLowerCase();
-      alerts = alerts.filter(
-        alert =>
-          alert.title.toLowerCase().includes(search) ||
-          alert.message.toLowerCase().includes(search)
-      );
-    }
-    
-    return alerts;
+    return this.getAllAlerts().filter(alert => {
+      // Apply filters
+      if (options.type && alert.type !== options.type) {
+        return false;
+      }
+      
+      if (options.severity && alert.severity !== options.severity) {
+        return false;
+      }
+      
+      if (options.category && alert.category !== options.category) {
+        return false;
+      }
+      
+      if (options.read !== undefined && alert.read !== options.read) {
+        return false;
+      }
+      
+      if (options.acknowledged !== undefined && alert.acknowledged !== options.acknowledged) {
+        return false;
+      }
+      
+      if (options.createdAfter && alert.createdAt < options.createdAfter) {
+        return false;
+      }
+      
+      if (options.createdBefore && alert.createdAt > options.createdBefore) {
+        return false;
+      }
+      
+      if (options.searchText) {
+        const searchTextLower = options.searchText.toLowerCase();
+        const titleLower = alert.title.toLowerCase();
+        const messageLower = alert.message.toLowerCase();
+        
+        if (!titleLower.includes(searchTextLower) && !messageLower.includes(searchTextLower)) {
+          return false;
+        }
+      }
+      
+      return true;
+    });
   }
   
   /**
-   * Update an alert
+   * Mark an alert as read
    */
-  updateAlert(id: string, options: UpdateAlertOptions): Alert | undefined {
-    const alert = this.alerts.get(id);
+  markAsRead(id: string): boolean {
+    const alert = this.getAlert(id);
     
     if (!alert) {
-      return undefined;
+      return false;
     }
     
-    const now = new Date();
-    const updatedAlert: Alert = {
-      ...alert,
-      ...options,
-      updatedAt: now
-    };
+    alert.read = true;
+    return true;
+  }
+  
+  /**
+   * Mark an alert as unread
+   */
+  markAsUnread(id: string): boolean {
+    const alert = this.getAlert(id);
     
-    // Set additional timestamps based on status
-    if (options.status) {
-      switch (options.status) {
-        case AlertStatus.ACKNOWLEDGED:
-          updatedAlert.acknowledgedAt = now;
-          break;
-          
-        case AlertStatus.RESOLVED:
-          updatedAlert.resolvedAt = now;
-          break;
-          
-        case AlertStatus.CLOSED:
-          updatedAlert.closedAt = now;
-          break;
+    if (!alert) {
+      return false;
+    }
+    
+    alert.read = false;
+    return true;
+  }
+  
+  /**
+   * Mark all alerts as read
+   */
+  markAllAsRead(): number {
+    let count = 0;
+    
+    for (const alert of this.alerts.values()) {
+      if (!alert.read) {
+        alert.read = true;
+        count++;
       }
     }
     
-    this.alerts.set(id, updatedAlert);
+    return count;
+  }
+  
+  /**
+   * Acknowledge an alert
+   */
+  acknowledgeAlert(id: string): boolean {
+    const alert = this.getAlert(id);
     
-    // Notify listeners
-    this.notifyListeners('update', updatedAlert);
+    if (!alert) {
+      return false;
+    }
     
-    return updatedAlert;
+    alert.acknowledged = true;
+    alert.acknowledgedAt = new Date();
+    alert.read = true; // Also mark as read
+    
+    return true;
   }
   
   /**
    * Delete an alert
    */
   deleteAlert(id: string): boolean {
-    const alert = this.alerts.get(id);
-    
-    if (!alert) {
-      return false;
-    }
-    
-    this.alerts.delete(id);
-    
-    // Notify listeners
-    this.notifyListeners('delete', alert);
-    
-    return true;
+    return this.alerts.delete(id);
   }
   
   /**
-   * Acknowledge an alert
+   * Delete all alerts
    */
-  acknowledgeAlert(id: string): Alert | undefined {
-    return this.updateAlert(id, { status: AlertStatus.ACKNOWLEDGED });
-  }
-  
-  /**
-   * Resolve an alert
-   */
-  resolveAlert(id: string): Alert | undefined {
-    return this.updateAlert(id, { status: AlertStatus.RESOLVED });
-  }
-  
-  /**
-   * Close an alert
-   */
-  closeAlert(id: string): Alert | undefined {
-    return this.updateAlert(id, { status: AlertStatus.CLOSED });
-  }
-  
-  /**
-   * Add an alert listener
-   */
-  addListener(event: 'create' | 'update' | 'delete', callback: AlertListenerCallback): void {
-    if (!this.listeners.has(event)) {
-      this.listeners.set(event, []);
-    }
-    
-    this.listeners.get(event)!.push(callback);
-  }
-  
-  /**
-   * Remove an alert listener
-   */
-  removeListener(event: 'create' | 'update' | 'delete', callback: AlertListenerCallback): void {
-    if (!this.listeners.has(event)) {
-      return;
-    }
-    
-    const callbacks = this.listeners.get(event)!;
-    const index = callbacks.indexOf(callback);
-    
-    if (index !== -1) {
-      callbacks.splice(index, 1);
-    }
-  }
-  
-  /**
-   * Notify listeners of an event
-   */
-  private notifyListeners(event: 'create' | 'update' | 'delete', alert: Alert): void {
-    if (!this.listeners.has(event)) {
-      return;
-    }
-    
-    for (const callback of this.listeners.get(event)!) {
-      try {
-        callback(alert);
-      } catch (error) {
-        console.error(`Error in alert listener for event '${event}':`, error);
-      }
-    }
+  deleteAllAlerts(): number {
+    const count = this.alerts.size;
+    this.alerts.clear();
+    return count;
   }
   
   /**
    * Get alert statistics
    */
-  getAlertStatistics(): {
-    total: number;
-    byStatus: Record<AlertStatus, number>;
-    byType: Record<AlertType, number>;
-    bySeverity: Record<AlertSeverity, number>;
-    byCategory: Record<AlertCategory, number>;
-  } {
-    const alerts = this.getAllAlerts();
-    
-    const stats = {
-      total: alerts.length,
-      byStatus: {
-        [AlertStatus.NEW]: 0,
-        [AlertStatus.ACKNOWLEDGED]: 0,
-        [AlertStatus.RESOLVED]: 0,
-        [AlertStatus.CLOSED]: 0
-      },
+  getAlertStats(): AlertStats {
+    const stats: AlertStats = {
+      total: 0,
+      unread: 0,
+      acknowledged: 0,
       byType: {
         [AlertType.INFO]: 0,
         [AlertType.SUCCESS]: 0,
@@ -353,17 +360,27 @@ class AlertService {
       byCategory: {
         [AlertCategory.SYSTEM]: 0,
         [AlertCategory.DATA_SOURCE]: 0,
+        [AlertCategory.JOB]: 0,
         [AlertCategory.TRANSFORMATION]: 0,
-        [AlertCategory.SCHEDULING]: 0,
+        [AlertCategory.DATA_QUALITY]: 0,
+        [AlertCategory.AUTHENTICATION]: 0,
         [AlertCategory.SECURITY]: 0,
-        [AlertCategory.PERFORMANCE]: 0,
-        [AlertCategory.USER]: 0
+        [AlertCategory.PERFORMANCE]: 0
       }
     };
     
-    // Count alerts by status, type, severity, and category
-    for (const alert of alerts) {
-      stats.byStatus[alert.status]++;
+    // Calculate stats
+    for (const alert of this.alerts.values()) {
+      stats.total++;
+      
+      if (!alert.read) {
+        stats.unread++;
+      }
+      
+      if (alert.acknowledged) {
+        stats.acknowledged++;
+      }
+      
       stats.byType[alert.type]++;
       stats.bySeverity[alert.severity]++;
       stats.byCategory[alert.category]++;
@@ -373,5 +390,5 @@ class AlertService {
   }
 }
 
-// Export a singleton instance
+// Export singleton instance
 export const alertService = new AlertService();
