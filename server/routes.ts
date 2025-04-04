@@ -1096,6 +1096,290 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ETL Data Sources endpoints
+  app.get('/api/etl/data-sources', async (req, res) => {
+    try {
+      const dataSources = await storage.getEtlDataSources();
+      res.json(dataSources);
+    } catch (error: any) {
+      console.error('Error fetching ETL data sources:', error);
+      res.status(500).json({ error: error.message || 'Failed to fetch ETL data sources' });
+    }
+  });
+
+  app.get('/api/etl/data-sources/:id', async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ error: 'Invalid data source ID' });
+      }
+      
+      const dataSource = await storage.getEtlDataSourceById(id);
+      if (!dataSource) {
+        return res.status(404).json({ error: 'Data source not found' });
+      }
+      
+      res.json(dataSource);
+    } catch (error: any) {
+      console.error('Error fetching ETL data source:', error);
+      res.status(500).json({ error: error.message || 'Failed to fetch ETL data source' });
+    }
+  });
+
+  app.post('/api/etl/data-sources', async (req, res) => {
+    try {
+      const dataSource = req.body;
+      const newDataSource = await storage.createEtlDataSource(dataSource);
+      res.status(201).json(newDataSource);
+    } catch (error: any) {
+      console.error('Error creating ETL data source:', error);
+      res.status(500).json({ error: error.message || 'Failed to create ETL data source' });
+    }
+  });
+
+  app.put('/api/etl/data-sources/:id', async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ error: 'Invalid data source ID' });
+      }
+      
+      const dataSource = req.body;
+      const updatedDataSource = await storage.updateEtlDataSource(id, dataSource);
+      
+      if (!updatedDataSource) {
+        return res.status(404).json({ error: 'Data source not found' });
+      }
+      
+      res.json(updatedDataSource);
+    } catch (error: any) {
+      console.error('Error updating ETL data source:', error);
+      res.status(500).json({ error: error.message || 'Failed to update ETL data source' });
+    }
+  });
+
+  app.delete('/api/etl/data-sources/:id', async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ error: 'Invalid data source ID' });
+      }
+      
+      const success = await storage.deleteEtlDataSource(id);
+      
+      if (!success) {
+        return res.status(404).json({ error: 'Data source not found' });
+      }
+      
+      res.status(204).send();
+    } catch (error: any) {
+      console.error('Error deleting ETL data source:', error);
+      res.status(500).json({ error: error.message || 'Failed to delete ETL data source' });
+    }
+  });
+
+  // ETL Transformation Rules endpoints
+  app.get('/api/etl/transformation-rules', async (req, res) => {
+    try {
+      const rules = await storage.getEtlTransformationRules();
+      res.json(rules);
+    } catch (error: any) {
+      console.error('Error fetching ETL transformation rules:', error);
+      res.status(500).json({ error: error.message || 'Failed to fetch ETL transformation rules' });
+    }
+  });
+
+  app.get('/api/etl/transformation-rules/:id', async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ error: 'Invalid transformation rule ID' });
+      }
+      
+      const rule = await storage.getEtlTransformationRuleById(id);
+      if (!rule) {
+        return res.status(404).json({ error: 'Transformation rule not found' });
+      }
+      
+      res.json(rule);
+    } catch (error: any) {
+      console.error('Error fetching ETL transformation rule:', error);
+      res.status(500).json({ error: error.message || 'Failed to fetch ETL transformation rule' });
+    }
+  });
+
+  app.post('/api/etl/transformation-rules', async (req, res) => {
+    try {
+      const rule = req.body;
+      const newRule = await storage.createEtlTransformationRule(rule);
+      res.status(201).json(newRule);
+    } catch (error: any) {
+      console.error('Error creating ETL transformation rule:', error);
+      res.status(500).json({ error: error.message || 'Failed to create ETL transformation rule' });
+    }
+  });
+
+  app.put('/api/etl/transformation-rules/:id', async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ error: 'Invalid transformation rule ID' });
+      }
+      
+      const rule = req.body;
+      const updatedRule = await storage.updateEtlTransformationRule(id, rule);
+      
+      if (!updatedRule) {
+        return res.status(404).json({ error: 'Transformation rule not found' });
+      }
+      
+      res.json(updatedRule);
+    } catch (error: any) {
+      console.error('Error updating ETL transformation rule:', error);
+      res.status(500).json({ error: error.message || 'Failed to update ETL transformation rule' });
+    }
+  });
+
+  app.delete('/api/etl/transformation-rules/:id', async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ error: 'Invalid transformation rule ID' });
+      }
+      
+      const success = await storage.deleteEtlTransformationRule(id);
+      
+      if (!success) {
+        return res.status(404).json({ error: 'Transformation rule not found' });
+      }
+      
+      res.status(204).send();
+    } catch (error: any) {
+      console.error('Error deleting ETL transformation rule:', error);
+      res.status(500).json({ error: error.message || 'Failed to delete ETL transformation rule' });
+    }
+  });
+
+  // ETL Jobs endpoints
+  app.get('/api/etl/jobs', async (req, res) => {
+    try {
+      const jobs = await storage.getEtlJobs();
+      res.json(jobs);
+    } catch (error: any) {
+      console.error('Error fetching ETL jobs:', error);
+      res.status(500).json({ error: error.message || 'Failed to fetch ETL jobs' });
+    }
+  });
+
+  app.get('/api/etl/jobs/:id', async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ error: 'Invalid job ID' });
+      }
+      
+      const job = await storage.getEtlJobById(id);
+      if (!job) {
+        return res.status(404).json({ error: 'Job not found' });
+      }
+      
+      res.json(job);
+    } catch (error: any) {
+      console.error('Error fetching ETL job:', error);
+      res.status(500).json({ error: error.message || 'Failed to fetch ETL job' });
+    }
+  });
+
+  app.post('/api/etl/jobs', async (req, res) => {
+    try {
+      const job = req.body;
+      const newJob = await storage.createEtlJob(job);
+      res.status(201).json(newJob);
+    } catch (error: any) {
+      console.error('Error creating ETL job:', error);
+      res.status(500).json({ error: error.message || 'Failed to create ETL job' });
+    }
+  });
+
+  app.put('/api/etl/jobs/:id', async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ error: 'Invalid job ID' });
+      }
+      
+      const job = req.body;
+      const updatedJob = await storage.updateEtlJob(id, job);
+      
+      if (!updatedJob) {
+        return res.status(404).json({ error: 'Job not found' });
+      }
+      
+      res.json(updatedJob);
+    } catch (error: any) {
+      console.error('Error updating ETL job:', error);
+      res.status(500).json({ error: error.message || 'Failed to update ETL job' });
+    }
+  });
+
+  app.delete('/api/etl/jobs/:id', async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ error: 'Invalid job ID' });
+      }
+      
+      const success = await storage.deleteEtlJob(id);
+      
+      if (!success) {
+        return res.status(404).json({ error: 'Job not found' });
+      }
+      
+      res.status(204).send();
+    } catch (error: any) {
+      console.error('Error deleting ETL job:', error);
+      res.status(500).json({ error: error.message || 'Failed to delete ETL job' });
+    }
+  });
+
+  // ETL Job Execution endpoint
+  app.post('/api/etl/jobs/:id/execute', async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ error: 'Invalid job ID' });
+      }
+      
+      const job = await storage.getEtlJobById(id);
+      if (!job) {
+        return res.status(404).json({ error: 'Job not found' });
+      }
+      
+      // Update job status to running
+      await storage.updateEtlJob(id, { status: 'running' });
+      
+      // Execute the job (placeholder for actual execution logic)
+      // In a real implementation, this would dispatch a background task or worker
+      
+      // For demo purposes, update job to success after a delay
+      setTimeout(async () => {
+        try {
+          await storage.updateEtlJob(id, { 
+            status: 'success',
+            lastRunAt: new Date()
+          });
+        } catch (error) {
+          console.error('Error updating job status:', error);
+        }
+      }, 5000);
+      
+      res.json({ message: 'Job execution started', jobId: id });
+    } catch (error: any) {
+      console.error('Error executing ETL job:', error);
+      res.status(500).json({ error: error.message || 'Failed to execute ETL job' });
+    }
+  });
+
   const httpServer = createServer(app);
 
   return httpServer;
