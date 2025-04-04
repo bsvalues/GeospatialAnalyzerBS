@@ -578,6 +578,44 @@ export function ProjectTracker() {
     setEditingTask(null);
   };
   
+  // Handle deleting a task
+  const deleteTask = (taskId: string) => {
+    setMilestones(currentMilestones => 
+      currentMilestones.map(milestone => {
+        // Check if this milestone contains the task
+        const taskIndex = milestone.tasks.findIndex(t => t.id === taskId);
+        
+        if (taskIndex === -1) {
+          // Task not in this milestone
+          return milestone;
+        }
+        
+        // Remove the task
+        const updatedTasks = [...milestone.tasks];
+        updatedTasks.splice(taskIndex, 1);
+        
+        // Recalculate milestone progress
+        const completedCount = updatedTasks.filter(t => t.status === 'completed').length;
+        const newProgress = updatedTasks.length > 0 
+          ? Math.round((completedCount / updatedTasks.length) * 100)
+          : 0;
+        
+        return {
+          ...milestone,
+          tasks: updatedTasks,
+          progress: newProgress
+        };
+      })
+    );
+  };
+  
+  // Handle deleting a milestone
+  const deleteMilestone = (milestoneId: string) => {
+    setMilestones(currentMilestones => 
+      currentMilestones.filter(milestone => milestone.id !== milestoneId)
+    );
+  };
+  
   return (
     <Card className="shadow-lg">
       <CardHeader>
@@ -877,6 +915,14 @@ export function ProjectTracker() {
                           >
                             Edit
                           </Button>
+                          <Button 
+                            size="sm" 
+                            variant="ghost" 
+                            className="h-8 text-red-500 hover:text-red-700" 
+                            onClick={() => deleteTask(task.id)}
+                          >
+                            Delete
+                          </Button>
                         </div>
                       </div>
                     </Card>
@@ -898,9 +944,19 @@ export function ProjectTracker() {
                   <CardHeader className="pb-2">
                     <div className="flex justify-between items-center">
                       <CardTitle className="text-lg">{milestone.title}</CardTitle>
-                      <Badge variant="outline">
-                        {milestone.progress}% Complete
-                      </Badge>
+                      <div className="flex items-center gap-2">
+                        <Badge variant="outline">
+                          {milestone.progress}% Complete
+                        </Badge>
+                        <Button 
+                          size="sm" 
+                          variant="ghost" 
+                          className="h-7 px-2 text-red-500 hover:text-red-700" 
+                          onClick={() => deleteMilestone(milestone.id)}
+                        >
+                          Delete
+                        </Button>
+                      </div>
                     </div>
                     <CardDescription>{milestone.description}</CardDescription>
                   </CardHeader>
