@@ -809,8 +809,11 @@ export function ProjectTracker() {
         changes.push(`status from "${oldTask.status}" to "${updatedTask.status}"`);
       if (updatedTask.priority && updatedTask.priority !== oldTask.priority) 
         changes.push(`priority from "${oldTask.priority}" to "${updatedTask.priority}"`);
-      if (updatedTask.category && updatedTask.category !== oldTask.category) 
-        changes.push(`category from "${projectCategories.find(c => c.id === oldTask.category)?.name}" to "${projectCategories.find(c => c.id === updatedTask.category)?.name}"`);
+      if (updatedTask.category && updatedTask.category !== oldTask.category) {
+        const oldCategoryName = projectCategories.find(c => c.id === oldTask.category)?.name || 'Unknown';
+        const newCategoryName = projectCategories.find(c => c.id === updatedTask.category)?.name || 'Unknown';
+        changes.push(`category from "${oldCategoryName}" to "${newCategoryName}"`);
+      }
       
       if (changes.length > 0) {
         logActivity(
@@ -819,7 +822,7 @@ export function ProjectTracker() {
           taskId,
           'task',
           JSON.stringify(oldTask),
-          JSON.stringify({...oldTask, ...updatedTask}),
+          JSON.stringify({...oldTask, ...updatedTask as Partial<TaskItem>}),
           'Pencil'
         );
       }
