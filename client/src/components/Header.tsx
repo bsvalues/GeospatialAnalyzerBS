@@ -232,6 +232,15 @@ export const Header: React.FC<HeaderProps> = ({ taxYear, onTaxYearChange }) => {
               <span className="text-sm font-medium">Data Sources</span>
             </div>
           </Link>
+          <Link href="/property-bulk-import">
+            <div className={cn(
+              "flex items-center px-3 py-1.5 rounded-md hover:bg-gray-200/50 transition-all duration-200 cursor-pointer",
+              currentLocation === "/property-bulk-import" ? "bg-primary/10 text-primary" : ""
+            )}>
+              <FileText className="h-4 w-4 mr-1.5" />
+              <span className="text-sm font-medium">Bulk Import</span>
+            </div>
+          </Link>
           <Link href="/prediction">
             <div className={cn(
               "flex items-center px-3 py-1.5 rounded-md hover:bg-gray-200/50 transition-all duration-200 cursor-pointer",
@@ -516,6 +525,19 @@ export const Header: React.FC<HeaderProps> = ({ taxYear, onTaxYearChange }) => {
                 >
                   <Database className="h-5 w-5 mr-3" />
                   <span className="font-medium">Data Sources</span>
+                </div>
+              </Link>
+              
+              <Link href="/property-bulk-import">
+                <div 
+                  className={cn(
+                    "flex items-center rounded-md py-3 px-3 transition-colors",
+                    currentLocation === "/property-bulk-import" ? "bg-primary/10 text-primary" : "hover:bg-gray-100 text-gray-700"
+                  )}
+                  onClick={() => setIsMobileMenuOpen(false)}
+                >
+                  <FileText className="h-5 w-5 mr-3" />
+                  <span className="font-medium">Bulk Property Import</span>
                 </div>
               </Link>
               

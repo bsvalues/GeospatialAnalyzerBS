@@ -316,17 +316,26 @@ export class MemStorage implements IStorage {
     return property;
   }
   
-  async bulkImportProperties(properties: InsertProperty[]): Promise<{ success: boolean; count: number; errors?: any[] }> {
+  async bulkImportProperties(properties: (InsertProperty & { _importOptions?: { allowDuplicates?: boolean; updateExisting?: boolean } })[]): Promise<{ success: boolean; count: number; updated?: number; errors?: any[] }> {
     try {
       const errors: any[] = [];
       let successCount = 0;
+      let updatedCount = 0;
       
       // Check for duplicate parcel IDs
       const existingParcelIds = new Set(Object.values(this.properties).map(p => p.parcelId));
       const newParcelIds = new Set();
       
-      for (const property of properties) {
+      for (const propertyWithOptions of properties) {
         try {
+          // Extract import options
+          const importOptions = propertyWithOptions._importOptions || {};
+          const allowDuplicates = importOptions.allowDuplicates || false;
+          const updateExisting = importOptions.updateExisting || false;
+          
+          // Create a clean property object without the _importOptions
+          const { _importOptions, ...property } = propertyWithOptions;
+          
           // Validate required fields
           if (!property.parcelId || !property.address || property.squareFeet === undefined) {
             errors.push({
@@ -337,16 +346,41 @@ export class MemStorage implements IStorage {
           }
           
           // Check for duplicate parcel IDs within existing properties
+          const existingPropertyId = Object.keys(this.properties).find(
+            id => this.properties[Number(id)].parcelId === property.parcelId
+          );
+          
           if (existingParcelIds.has(property.parcelId)) {
-            errors.push({
-              property,
-              error: `Duplicate parcel ID: ${property.parcelId}`
-            });
-            continue;
+            // Handle existing property based on options
+            if (updateExisting && existingPropertyId) {
+              // Update the existing property
+              const existingId = Number(existingPropertyId);
+              const existingProperty = this.properties[existingId];
+              
+              // Merge the properties, keeping the existing ID
+              const updatedProperty: Property = {
+                ...existingProperty,
+                ...property,
+                id: existingId,
+                updatedAt: new Date().toISOString()
+              };
+              
+              this.properties[existingId] = updatedProperty;
+              updatedCount++;
+              continue;
+            } else if (!allowDuplicates) {
+              // Reject duplicate if not allowed
+              errors.push({
+                property,
+                error: `Duplicate parcel ID: ${property.parcelId}`
+              });
+              continue;
+            }
+            // If duplicates are allowed and we're not updating, we'll create a new property below
           }
           
           // Check for duplicate parcel IDs within the import batch
-          if (newParcelIds.has(property.parcelId)) {
+          if (newParcelIds.has(property.parcelId) && !allowDuplicates) {
             errors.push({
               property,
               error: `Duplicate parcel ID within import batch: ${property.parcelId}`
@@ -360,21 +394,23 @@ export class MemStorage implements IStorage {
           successCount++;
         } catch (err) {
           errors.push({
-            property,
+            property: propertyWithOptions,
             error: err instanceof Error ? err.message : String(err)
           });
         }
       }
       
       return {
-        success: successCount > 0,
+        success: successCount > 0 || updatedCount > 0,
         count: successCount,
+        updated: updatedCount,
         errors: errors.length > 0 ? errors : undefined
       };
     } catch (error) {
       return {
         success: false,
         count: 0,
+        updated: 0,
         errors: [error instanceof Error ? error.message : String(error)]
       };
     }
