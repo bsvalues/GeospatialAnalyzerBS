@@ -22,34 +22,114 @@ class TransformationService {
     
     // Apply transformation based on type
     switch (transformation.type) {
+      // Column operations
+      case TransformationType.RENAME_COLUMN:
+        return this.applyRenameColumn(transformation, data);
+      
+      case TransformationType.DROP_COLUMN:
+        return this.applyDropColumn(transformation, data);
+      
+      case TransformationType.REORDER_COLUMNS:
+        return this.applyReorderColumns(transformation, data);
+      
+      // Type conversions
+      case TransformationType.CAST_TYPE:
+        return this.applyCastType(transformation, data);
+      
+      case TransformationType.PARSE_DATE:
+        return this.applyParseDate(transformation, data);
+      
+      case TransformationType.PARSE_NUMBER:
+        return this.applyParseNumber(transformation, data);
+      
+      // Value operations
+      case TransformationType.REPLACE_VALUE:
+        return this.applyReplaceValue(transformation, data);
+      
+      case TransformationType.FILL_NULL:
+        return this.applyFillNull(transformation, data);
+      
+      case TransformationType.MAP_VALUES:
+        return this.applyMapValues(transformation, data);
+      
+      // String operations
+      case TransformationType.TO_UPPERCASE:
+        return this.applyToUppercase(transformation, data);
+      
+      case TransformationType.TO_LOWERCASE:
+        return this.applyToLowercase(transformation, data);
+      
+      case TransformationType.TRIM:
+        return this.applyTrim(transformation, data);
+      
+      case TransformationType.SUBSTRING:
+        return this.applySubstring(transformation, data);
+      
+      case TransformationType.CONCAT:
+        return this.applyConcat(transformation, data);
+      
+      case TransformationType.SPLIT:
+        return this.applySplit(transformation, data);
+      
+      // Numeric operations
+      case TransformationType.ROUND:
+        return this.applyRound(transformation, data);
+      
+      case TransformationType.ADD:
+        return this.applyAdd(transformation, data);
+      
+      case TransformationType.SUBTRACT:
+        return this.applySubtract(transformation, data);
+      
+      case TransformationType.MULTIPLY:
+        return this.applyMultiply(transformation, data);
+      
+      case TransformationType.DIVIDE:
+        return this.applyDivide(transformation, data);
+      
+      // Data operations
       case TransformationType.FILTER:
         return this.applyFilter(transformation, data);
       
-      case TransformationType.MAP:
-        return this.applyMap(transformation, data);
+      case TransformationType.SORT:
+        return this.applySort(transformation, data);
+      
+      case TransformationType.GROUP_BY:
+      case TransformationType.GROUP:
+        return this.applyGroup(transformation, data);
       
       case TransformationType.AGGREGATE:
         return this.applyAggregate(transformation, data);
       
       case TransformationType.JOIN:
-        // Join requires a second data source, not implemented in this example
-        console.warn('Join transformation not fully implemented');
-        return data;
+        return this.applyJoin(transformation, data);
       
-      case TransformationType.SORT:
-        return this.applySort(transformation, data);
+      case TransformationType.UNION:
+        return this.applyUnion(transformation, data);
       
-      case TransformationType.GROUP:
-        return this.applyGroup(transformation, data);
+      // Quality operations
+      case TransformationType.REMOVE_DUPLICATES:
+      case TransformationType.DEDUPLICATE:
+        return this.applyDeduplicate(transformation, data);
       
       case TransformationType.VALIDATE:
         return this.applyValidate(transformation, data);
       
-      case TransformationType.DEDUPLICATE:
-        return this.applyDeduplicate(transformation, data);
-      
+      // Advanced operations
+      case TransformationType.CUSTOM_FUNCTION:
+      case TransformationType.JAVASCRIPT:
       case TransformationType.CUSTOM:
         return this.applyCustom(transformation, data);
+      
+      case TransformationType.SQL:
+        return this.applySQL(transformation, data);
+      
+      case TransformationType.FORMULA:
+        return this.applyFormula(transformation, data);
+      
+      // Basic operations
+      case TransformationType.MAP:
+        return this.applyMap(transformation, data);
       
       default:
         console.warn(`Unknown transformation type: ${transformation.type}`);
@@ -613,6 +693,814 @@ class TransformationService {
       return customFn(data);
     } catch (error) {
       console.error(`Error applying custom function for ${transformation.name}:`, error);
+      return data;
+    }
+  }
+  
+  /**
+   * Apply a rename column transformation
+   */
+  private applyRenameColumn(transformation: TransformationRule, data: any[]): any[] {
+    const config = transformation.config;
+    
+    if (!config || !config.renameMappings) {
+      console.warn(`Invalid rename column configuration for ${transformation.name}`);
+      return data;
+    }
+    
+    return data.map(item => {
+      const result = { ...item };
+      
+      for (const [oldName, newName] of Object.entries(config.renameMappings)) {
+        if (oldName in result) {
+          result[newName as string] = result[oldName];
+          delete result[oldName];
+        }
+      }
+      
+      return result;
+    });
+  }
+  
+  /**
+   * Apply a drop column transformation
+   */
+  private applyDropColumn(transformation: TransformationRule, data: any[]): any[] {
+    const config = transformation.config;
+    
+    if (!config || !config.columns || !Array.isArray(config.columns)) {
+      console.warn(`Invalid drop column configuration for ${transformation.name}`);
+      return data;
+    }
+    
+    return data.map(item => {
+      const result = { ...item };
+      
+      for (const column of config.columns) {
+        delete result[column];
+      }
+      
+      return result;
+    });
+  }
+  
+  /**
+   * Apply a reorder columns transformation
+   */
+  private applyReorderColumns(transformation: TransformationRule, data: any[]): any[] {
+    const config = transformation.config;
+    
+    if (!config || !config.columnOrder || !Array.isArray(config.columnOrder)) {
+      console.warn(`Invalid reorder columns configuration for ${transformation.name}`);
+      return data;
+    }
+    
+    return data.map(item => {
+      const result: any = {};
+      
+      // Add columns in specified order
+      for (const column of config.columnOrder) {
+        if (column in item) {
+          result[column] = item[column];
+        }
+      }
+      
+      // Add remaining columns if specified
+      if (config.includeUnspecifiedColumns !== false) {
+        for (const key in item) {
+          if (!(key in result)) {
+            result[key] = item[key];
+          }
+        }
+      }
+      
+      return result;
+    });
+  }
+  
+  /**
+   * Apply a cast type transformation
+   */
+  private applyCastType(transformation: TransformationRule, data: any[]): any[] {
+    const config = transformation.config;
+    
+    if (!config || !config.typeCasts || !Array.isArray(config.typeCasts)) {
+      console.warn(`Invalid cast type configuration for ${transformation.name}`);
+      return data;
+    }
+    
+    return data.map(item => {
+      const result = { ...item };
+      
+      for (const typeCast of config.typeCasts) {
+        const { column, targetType } = typeCast;
+        
+        if (!column || !targetType || !(column in result)) {
+          continue;
+        }
+        
+        const value = result[column];
+        
+        switch (targetType.toLowerCase()) {
+          case 'string':
+            result[column] = String(value);
+            break;
+          
+          case 'number':
+            result[column] = Number(value);
+            break;
+          
+          case 'boolean':
+            result[column] = Boolean(value);
+            break;
+          
+          case 'date':
+            result[column] = new Date(value);
+            break;
+          
+          default:
+            console.warn(`Unknown target type: ${targetType}`);
+        }
+      }
+      
+      return result;
+    });
+  }
+  
+  /**
+   * Apply a parse date transformation
+   */
+  private applyParseDate(transformation: TransformationRule, data: any[]): any[] {
+    const config = transformation.config;
+    
+    if (!config || !config.column) {
+      console.warn(`Invalid parse date configuration for ${transformation.name}`);
+      return data;
+    }
+    
+    const { column, format, targetColumn = column } = config;
+    
+    return data.map(item => {
+      const result = { ...item };
+      
+      if (column in result) {
+        try {
+          result[targetColumn] = new Date(result[column]);
+        } catch (error) {
+          console.error(`Error parsing date for ${column}:`, error);
+        }
+      }
+      
+      return result;
+    });
+  }
+  
+  /**
+   * Apply a parse number transformation
+   */
+  private applyParseNumber(transformation: TransformationRule, data: any[]): any[] {
+    const config = transformation.config;
+    
+    if (!config || !config.column) {
+      console.warn(`Invalid parse number configuration for ${transformation.name}`);
+      return data;
+    }
+    
+    const { column, targetColumn = column, decimalSeparator = '.', thousandsSeparator = ',', locale } = config;
+    
+    return data.map(item => {
+      const result = { ...item };
+      
+      if (column in result) {
+        const value = result[column];
+        
+        if (typeof value === 'string') {
+          try {
+            // Remove thousands separators and replace decimal separator with '.'
+            let normalizedValue = value;
+            
+            if (thousandsSeparator) {
+              normalizedValue = normalizedValue.replace(new RegExp('\\' + thousandsSeparator, 'g'), '');
+            }
+            
+            if (decimalSeparator && decimalSeparator !== '.') {
+              normalizedValue = normalizedValue.replace(new RegExp('\\' + decimalSeparator, 'g'), '.');
+            }
+            
+            result[targetColumn] = parseFloat(normalizedValue);
+          } catch (error) {
+            console.error(`Error parsing number for ${column}:`, error);
+          }
+        } else if (typeof value === 'number') {
+          result[targetColumn] = value;
+        }
+      }
+      
+      return result;
+    });
+  }
+  
+  /**
+   * Apply a replace value transformation
+   */
+  private applyReplaceValue(transformation: TransformationRule, data: any[]): any[] {
+    const config = transformation.config;
+    
+    if (!config || !config.replacements || !Array.isArray(config.replacements)) {
+      console.warn(`Invalid replace value configuration for ${transformation.name}`);
+      return data;
+    }
+    
+    return data.map(item => {
+      const result = { ...item };
+      
+      for (const replacement of config.replacements) {
+        const { column, oldValue, newValue, regex } = replacement;
+        
+        if (!column || !(column in result)) {
+          continue;
+        }
+        
+        const value = result[column];
+        
+        if (regex && typeof value === 'string') {
+          try {
+            const regexObj = new RegExp(regex);
+            result[column] = value.replace(regexObj, newValue || '');
+          } catch (error) {
+            console.error(`Error applying regex replacement for ${column}:`, error);
+          }
+        } else if (value === oldValue) {
+          result[column] = newValue;
+        }
+      }
+      
+      return result;
+    });
+  }
+  
+  /**
+   * Apply a fill null transformation
+   */
+  private applyFillNull(transformation: TransformationRule, data: any[]): any[] {
+    const config = transformation.config;
+    
+    if (!config || !config.columns || !Array.isArray(config.columns)) {
+      console.warn(`Invalid fill null configuration for ${transformation.name}`);
+      return data;
+    }
+    
+    return data.map(item => {
+      const result = { ...item };
+      
+      for (const column of config.columns) {
+        const { name, defaultValue, strategy } = typeof column === 'string' ? { name: column, defaultValue: null, strategy: 'constant' } : column;
+        
+        if (!name || !(name in result) || (result[name] !== null && result[name] !== undefined)) {
+          continue;
+        }
+        
+        switch (strategy) {
+          case 'constant':
+            result[name] = defaultValue;
+            break;
+          
+          // For more complex strategies like 'mean', 'median', etc.,
+          // we would need to calculate these values from the entire dataset,
+          // which is not implemented in this example.
+          
+          default:
+            result[name] = defaultValue;
+        }
+      }
+      
+      return result;
+    });
+  }
+  
+  /**
+   * Apply a map values transformation
+   */
+  private applyMapValues(transformation: TransformationRule, data: any[]): any[] {
+    const config = transformation.config;
+    
+    if (!config || !config.column || !config.mappings) {
+      console.warn(`Invalid map values configuration for ${transformation.name}`);
+      return data;
+    }
+    
+    const { column, mappings, targetColumn = column, defaultValue } = config;
+    
+    return data.map(item => {
+      const result = { ...item };
+      
+      if (column in result) {
+        const value = result[column];
+        
+        if (value in mappings) {
+          result[targetColumn] = mappings[value];
+        } else if (defaultValue !== undefined) {
+          result[targetColumn] = defaultValue;
+        }
+      }
+      
+      return result;
+    });
+  }
+  
+  /**
+   * Apply a to uppercase transformation
+   */
+  private applyToUppercase(transformation: TransformationRule, data: any[]): any[] {
+    const config = transformation.config;
+    
+    if (!config || !config.columns || !Array.isArray(config.columns)) {
+      console.warn(`Invalid to uppercase configuration for ${transformation.name}`);
+      return data;
+    }
+    
+    return data.map(item => {
+      const result = { ...item };
+      
+      for (const column of config.columns) {
+        const { name, targetColumn = name } = typeof column === 'string' ? { name: column } : column;
+        
+        if (name in result && typeof result[name] === 'string') {
+          result[targetColumn] = result[name].toUpperCase();
+        }
+      }
+      
+      return result;
+    });
+  }
+  
+  /**
+   * Apply a to lowercase transformation
+   */
+  private applyToLowercase(transformation: TransformationRule, data: any[]): any[] {
+    const config = transformation.config;
+    
+    if (!config || !config.columns || !Array.isArray(config.columns)) {
+      console.warn(`Invalid to lowercase configuration for ${transformation.name}`);
+      return data;
+    }
+    
+    return data.map(item => {
+      const result = { ...item };
+      
+      for (const column of config.columns) {
+        const { name, targetColumn = name } = typeof column === 'string' ? { name: column } : column;
+        
+        if (name in result && typeof result[name] === 'string') {
+          result[targetColumn] = result[name].toLowerCase();
+        }
+      }
+      
+      return result;
+    });
+  }
+  
+  /**
+   * Apply a trim transformation
+   */
+  private applyTrim(transformation: TransformationRule, data: any[]): any[] {
+    const config = transformation.config;
+    
+    if (!config || !config.columns || !Array.isArray(config.columns)) {
+      console.warn(`Invalid trim configuration for ${transformation.name}`);
+      return data;
+    }
+    
+    return data.map(item => {
+      const result = { ...item };
+      
+      for (const column of config.columns) {
+        const { name, targetColumn = name, trimType = 'both' } = typeof column === 'string' ? { name: column } : column;
+        
+        if (name in result && typeof result[name] === 'string') {
+          const value = result[name];
+          
+          switch (trimType) {
+            case 'left':
+              result[targetColumn] = value.trimStart();
+              break;
+            
+            case 'right':
+              result[targetColumn] = value.trimEnd();
+              break;
+            
+            case 'both':
+            default:
+              result[targetColumn] = value.trim();
+              break;
+          }
+        }
+      }
+      
+      return result;
+    });
+  }
+  
+  /**
+   * Apply a substring transformation
+   */
+  private applySubstring(transformation: TransformationRule, data: any[]): any[] {
+    const config = transformation.config;
+    
+    if (!config || !config.column) {
+      console.warn(`Invalid substring configuration for ${transformation.name}`);
+      return data;
+    }
+    
+    const { column, start = 0, end, length, targetColumn = column } = config;
+    
+    return data.map(item => {
+      const result = { ...item };
+      
+      if (column in result && typeof result[column] === 'string') {
+        const value = result[column];
+        
+        if (end !== undefined) {
+          result[targetColumn] = value.substring(start, end);
+        } else if (length !== undefined) {
+          result[targetColumn] = value.substr(start, length);
+        } else {
+          result[targetColumn] = value.substring(start);
+        }
+      }
+      
+      return result;
+    });
+  }
+  
+  /**
+   * Apply a concat transformation
+   */
+  private applyConcat(transformation: TransformationRule, data: any[]): any[] {
+    const config = transformation.config;
+    
+    if (!config || !config.columns || !Array.isArray(config.columns) || !config.targetColumn) {
+      console.warn(`Invalid concat configuration for ${transformation.name}`);
+      return data;
+    }
+    
+    const { columns, separator = '', targetColumn } = config;
+    
+    return data.map(item => {
+      const result = { ...item };
+      
+      const values = columns.map(column => {
+        if (column in item) {
+          return item[column] !== null && item[column] !== undefined ? String(item[column]) : '';
+        }
+        
+        return column; // Treat as literal if not a column name
+      });
+      
+      result[targetColumn] = values.join(separator);
+      
+      return result;
+    });
+  }
+  
+  /**
+   * Apply a split transformation
+   */
+  private applySplit(transformation: TransformationRule, data: any[]): any[] {
+    const config = transformation.config;
+    
+    if (!config || !config.column || !config.separator) {
+      console.warn(`Invalid split configuration for ${transformation.name}`);
+      return data;
+    }
+    
+    const { column, separator, targetColumns, limit, keepSource = true } = config;
+    
+    return data.map(item => {
+      const result = { ...item };
+      
+      if (column in result && typeof result[column] === 'string') {
+        const value = result[column];
+        const parts = value.split(separator, limit);
+        
+        if (targetColumns && Array.isArray(targetColumns)) {
+          for (let i = 0; i < targetColumns.length && i < parts.length; i++) {
+            result[targetColumns[i]] = parts[i];
+          }
+        } else if (targetColumns && typeof targetColumns === 'string') {
+          result[targetColumns] = parts;
+        }
+        
+        if (!keepSource) {
+          delete result[column];
+        }
+      }
+      
+      return result;
+    });
+  }
+  
+  /**
+   * Apply a round transformation
+   */
+  private applyRound(transformation: TransformationRule, data: any[]): any[] {
+    const config = transformation.config;
+    
+    if (!config || !config.columns || !Array.isArray(config.columns)) {
+      console.warn(`Invalid round configuration for ${transformation.name}`);
+      return data;
+    }
+    
+    return data.map(item => {
+      const result = { ...item };
+      
+      for (const column of config.columns) {
+        const { name, precision = 0, targetColumn = name, method = 'round' } = typeof column === 'string' ? { name: column } : column;
+        
+        if (name in result && typeof result[name] === 'number') {
+          const value = result[name];
+          
+          if (method === 'ceil') {
+            if (precision === 0) {
+              result[targetColumn] = Math.ceil(value);
+            } else {
+              const factor = Math.pow(10, precision);
+              result[targetColumn] = Math.ceil(value * factor) / factor;
+            }
+          } else if (method === 'floor') {
+            if (precision === 0) {
+              result[targetColumn] = Math.floor(value);
+            } else {
+              const factor = Math.pow(10, precision);
+              result[targetColumn] = Math.floor(value * factor) / factor;
+            }
+          } else {
+            // Default to 'round'
+            if (precision === 0) {
+              result[targetColumn] = Math.round(value);
+            } else {
+              const factor = Math.pow(10, precision);
+              result[targetColumn] = Math.round(value * factor) / factor;
+            }
+          }
+        }
+      }
+      
+      return result;
+    });
+  }
+  
+  /**
+   * Apply an add transformation
+   */
+  private applyAdd(transformation: TransformationRule, data: any[]): any[] {
+    const config = transformation.config;
+    
+    if (!config || (!config.columns && !config.value) || !config.targetColumn) {
+      console.warn(`Invalid add configuration for ${transformation.name}`);
+      return data;
+    }
+    
+    return data.map(item => {
+      const result = { ...item };
+      
+      if (config.columns && Array.isArray(config.columns)) {
+        let sum = 0;
+        
+        for (const column of config.columns) {
+          if (column in item && typeof item[column] === 'number') {
+            sum += item[column];
+          }
+        }
+        
+        if (config.value && typeof config.value === 'number') {
+          sum += config.value;
+        }
+        
+        result[config.targetColumn] = sum;
+      } else if (config.column && config.value !== undefined) {
+        const { column, value, targetColumn = column } = config;
+        
+        if (column in item && typeof item[column] === 'number') {
+          result[targetColumn] = item[column] + value;
+        }
+      }
+      
+      return result;
+    });
+  }
+  
+  /**
+   * Apply a subtract transformation
+   */
+  private applySubtract(transformation: TransformationRule, data: any[]): any[] {
+    const config = transformation.config;
+    
+    if (!config || (!config.columns && !config.value && !config.minuend && !config.subtrahend) || !config.targetColumn) {
+      console.warn(`Invalid subtract configuration for ${transformation.name}`);
+      return data;
+    }
+    
+    return data.map(item => {
+      const result = { ...item };
+      
+      if (config.minuend && config.subtrahend) {
+        // Explicit minuend and subtrahend
+        const minuendValue = config.minuend in item ? item[config.minuend] : config.minuend;
+        const subtrahendValue = config.subtrahend in item ? item[config.subtrahend] : config.subtrahend;
+        
+        if (typeof minuendValue === 'number' && typeof subtrahendValue === 'number') {
+          result[config.targetColumn] = minuendValue - subtrahendValue;
+        }
+      } else if (config.columns && Array.isArray(config.columns) && config.columns.length >= 2) {
+        // First column minus all others
+        const first = item[config.columns[0]];
+        
+        if (typeof first === 'number') {
+          let difference = first;
+          
+          for (let i = 1; i < config.columns.length; i++) {
+            const column = config.columns[i];
+            
+            if (column in item && typeof item[column] === 'number') {
+              difference -= item[column];
+            }
+          }
+          
+          result[config.targetColumn] = difference;
+        }
+      } else if (config.column && config.value !== undefined) {
+        // Single column minus value
+        const { column, value, targetColumn = column } = config;
+        
+        if (column in item && typeof item[column] === 'number') {
+          result[targetColumn] = item[column] - value;
+        }
+      }
+      
+      return result;
+    });
+  }
+  
+  /**
+   * Apply a multiply transformation
+   */
+  private applyMultiply(transformation: TransformationRule, data: any[]): any[] {
+    const config = transformation.config;
+    
+    if (!config || (!config.columns && !config.value) || !config.targetColumn) {
+      console.warn(`Invalid multiply configuration for ${transformation.name}`);
+      return data;
+    }
+    
+    return data.map(item => {
+      const result = { ...item };
+      
+      if (config.columns && Array.isArray(config.columns)) {
+        let product = 1;
+        
+        for (const column of config.columns) {
+          if (column in item && typeof item[column] === 'number') {
+            product *= item[column];
+          }
+        }
+        
+        if (config.value && typeof config.value === 'number') {
+          product *= config.value;
+        }
+        
+        result[config.targetColumn] = product;
+      } else if (config.column && config.value !== undefined) {
+        const { column, value, targetColumn = column } = config;
+        
+        if (column in item && typeof item[column] === 'number') {
+          result[targetColumn] = item[column] * value;
+        }
+      }
+      
+      return result;
+    });
+  }
+  
+  /**
+   * Apply a divide transformation
+   */
+  private applyDivide(transformation: TransformationRule, data: any[]): any[] {
+    const config = transformation.config;
+    
+    if (!config || (!config.numerator && !config.denominator && !config.columns) || !config.targetColumn) {
+      console.warn(`Invalid divide configuration for ${transformation.name}`);
+      return data;
+    }
+    
+    return data.map(item => {
+      const result = { ...item };
+      
+      if (config.numerator && config.denominator) {
+        // Explicit numerator and denominator
+        const numeratorValue = config.numerator in item ? item[config.numerator] : parseFloat(config.numerator);
+        const denominatorValue = config.denominator in item ? item[config.denominator] : parseFloat(config.denominator);
+        
+        if (typeof numeratorValue === 'number' && typeof denominatorValue === 'number' && denominatorValue !== 0) {
+          result[config.targetColumn] = numeratorValue / denominatorValue;
+        }
+      } else if (config.columns && Array.isArray(config.columns) && config.columns.length >= 2) {
+        // First column divided by all others
+        const first = item[config.columns[0]];
+        
+        if (typeof first === 'number') {
+          let quotient = first;
+          
+          for (let i = 1; i < config.columns.length; i++) {
+            const column = config.columns[i];
+            
+            if (column in item && typeof item[column] === 'number' && item[column] !== 0) {
+              quotient /= item[column];
+            }
+          }
+          
+          result[config.targetColumn] = quotient;
+        }
+      } else if (config.column && config.value !== undefined) {
+        // Single column divided by value
+        const { column, value, targetColumn = column } = config;
+        
+        if (column in item && typeof item[column] === 'number' && value !== 0) {
+          result[targetColumn] = item[column] / value;
+        }
+      }
+      
+      return result;
+    });
+  }
+  
+  /**
+   * Apply a join transformation
+   */
+  private applyJoin(transformation: TransformationRule, data: any[]): any[] {
+    console.warn('Join transformation requires a second data source and is not fully implemented');
+    return data;
+  }
+  
+  /**
+   * Apply a union transformation
+   */
+  private applyUnion(transformation: TransformationRule, data: any[]): any[] {
+    console.warn('Union transformation requires a second data source and is not fully implemented');
+    return data;
+  }
+  
+  /**
+   * Apply an SQL transformation
+   */
+  private applySQL(transformation: TransformationRule, data: any[]): any[] {
+    console.warn('SQL transformation not fully implemented');
+    return data;
+  }
+  
+  /**
+   * Apply a formula transformation
+   */
+  private applyFormula(transformation: TransformationRule, data: any[]): any[] {
+    const config = transformation.config;
+    
+    if (!config || !config.formula || !config.targetColumn) {
+      console.warn(`Invalid formula configuration for ${transformation.name}`);
+      return data;
+    }
+    
+    const { formula, targetColumn } = config;
+    
+    try {
+      return data.map(item => {
+        const result = { ...item };
+        
+        // Replace column references with values from item
+        let evaluatedFormula = formula;
+        
+        // Replace all occurrences of [columnName] with the actual value
+        const columnRefs = formula.match(/\[(.*?)\]/g) || [];
+        
+        for (const ref of columnRefs) {
+          const columnName = ref.slice(1, -1);
+          
+          if (columnName in item) {
+            const value = typeof item[columnName] === 'string'
+              ? `"${item[columnName]}"`
+              : item[columnName];
+            
+            evaluatedFormula = evaluatedFormula.replace(ref, String(value));
+          }
+        }
+        
+        // Evaluate the formula (security risk)
+        const evaluatedValue = Function(`"use strict"; return (${evaluatedFormula})`)();
+        result[targetColumn] = evaluatedValue;
+        
+        return result;
+      });
+    } catch (error) {
+      console.error(`Error evaluating formula for ${transformation.name}:`, error);
       return data;
     }
   }
