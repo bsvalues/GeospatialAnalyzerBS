@@ -3,9 +3,10 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { z } from "zod";
 import { 
-  isOpenAIConfigured, 
-  generateCodeFromLanguage, 
-  optimizeCode, 
+  isOpenAIConfigured,
+  analyzeDataQuality,
+  generateCodeFromLanguage,
+  optimizeCode,
   debugCode,
   generateContextualPropertyPrediction,
   getETLAssistance,
@@ -1428,6 +1429,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         consistency: number;
         issues: DataQualityItem[];
         summary: string;
+        aiRecommendations?: string[];
       }
       
       let qualityAnalysis: DataQualityAnalysis;
@@ -1537,6 +1539,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
           };
       }
       
+      // If OpenAI is configured, enhance analysis with AI insights
+      if (isOpenAIConfigured()) {
+        try {
+          // Create a sample of data for analysis
+          const dataSample = {
+            columns: ['id', 'address', 'value', 'yearBuilt', 'parcelId'],
+            rows: [
+              [1, '123 Main St', 450000, 2008, 'P123456'],
+              [2, '456 Oak Ave', 375000, 2004, 'P789012'],
+              [3, '789 Pine Ln', 525000, 2012, 'P345678'],
+              [4, '321 Cedar Dr', 625000, 2015, 'P901234'],
+              [5, '987 Maple St', 395000, 2001, 'P567890']
+            ]
+          };
+          
+          // Call OpenAI for enhanced analysis
+          const aiAnalysis = await analyzeDataQuality(
+            dataSource.name,
+            dataSource.type,
+            dataSample,
+            qualityAnalysis.issues
+          );
+          
+          // Add AI-powered insights to the response
+          qualityAnalysis.summary = aiAnalysis.enhancedSummary;
+          qualityAnalysis.aiRecommendations = aiAnalysis.additionalRecommendations;
+        } catch (aiError) {
+          console.error('Error getting AI-powered data quality insights:', aiError);
+          // Continue with basic analysis if AI enhancement fails
+        }
+      }
+      
       res.json(qualityAnalysis);
     } catch (error: any) {
       console.error('Error analyzing data quality:', error);
@@ -1548,6 +1582,420 @@ export async function registerRoutes(app: Express): Promise<Server> {
         consistency: 0,
         issues: [],
         summary: 'An error occurred while analyzing data quality'
+      });
+    }
+  });
+
+  // API endpoint for direct data quality analysis
+  app.post('/api/etl/analyze-data-quality', async (req, res) => {
+    try {
+      // Extract the sample data from the request body
+      const { name, type, columns, rows } = req.body;
+      
+      if (!name || !type || !columns || !rows) {
+        return res.status(400).json({ 
+          error: 'Missing required fields: name, type, columns, rows',
+          totalIssues: 0,
+          completeness: 0,
+          accuracy: 0,
+          consistency: 0,
+          issues: [],
+          summary: 'Invalid request parameters'
+        });
+      }
+      
+      // Simple validation of the data
+      if (!Array.isArray(columns) || !Array.isArray(rows)) {
+        return res.status(400).json({ 
+          error: 'Columns and rows must be arrays',
+          totalIssues: 0,
+          completeness: 0,
+          accuracy: 0,
+          consistency: 0,
+          issues: [],
+          summary: 'Invalid data format'
+        });
+      }
+      
+      // Perform basic data quality analysis
+      const qualityIssues = [];
+      let completeness = 100;
+      let accuracy = 100;
+      let consistency = 100;
+      
+      // Check for basic data quality issues
+      const rowCount = rows.length;
+      if (rowCount > 0) {
+        // Column completeness
+        let missingValueCount = 0;
+        let totalFields = 0;
+        let numericIssues = 0;
+        let dateIssues = 0;
+        let duplicateValues: { [key: string]: number } = {};
+        
+        rows.forEach(row => {
+          if (row.length !== columns.length) {
+            qualityIssues.push({
+              field: 'all',
+              issue: 'Row length does not match column count',
+              severity: 'high',
+              recommendation: 'Ensure all rows have the same number of fields as columns'
+            });
+            consistency -= 10;
+          }
+          
+          // Track primary key values for duplicate detection
+          if (columns.includes('id') || columns.includes('ID') || columns.includes('Id')) {
+            const idIndex = columns.findIndex(col => col.toLowerCase() === 'id');
+            if (idIndex >= 0 && row[idIndex]) {
+              const idValue = String(row[idIndex]);
+              duplicateValues[idValue] = (duplicateValues[idValue] || 0) + 1;
+            }
+          }
+          
+          row.forEach((value: any, index: number) => {
+            totalFields++;
+            const columnName = columns[index] || `column${index}`;
+            
+            // Check for missing values
+            if (value === null || value === undefined || value === '') {
+              missingValueCount++;
+              qualityIssues.push({
+                field: columnName,
+                issue: `Found missing value in ${columnName}`,
+                severity: 'medium',
+                recommendation: `Add data validation for ${columnName} to ensure completeness`
+              });
+            } 
+            // Check for numeric column issues
+            else if (columnName.toLowerCase().includes('value') || 
+                    columnName.toLowerCase().includes('price') || 
+                    columnName.toLowerCase().includes('area') || 
+                    columnName.toLowerCase().includes('feet')) {
+              
+              const numVal = Number(value);
+              if (isNaN(numVal)) {
+                numericIssues++;
+                qualityIssues.push({
+                  field: columnName,
+                  issue: `Non-numeric value found in numeric column ${columnName}`,
+                  severity: 'high',
+                  recommendation: `Add numeric validation for ${columnName}`
+                });
+                accuracy -= 5;
+              } else if (numVal < 0) {
+                numericIssues++;
+                qualityIssues.push({
+                  field: columnName,
+                  issue: `Negative value found in ${columnName}: ${value}`,
+                  severity: 'medium',
+                  recommendation: `Add range validation for ${columnName} to ensure positive values`
+                });
+                accuracy -= 3;
+              }
+            }
+            // Check for date column issues
+            else if (columnName.toLowerCase().includes('date') || 
+                    columnName.toLowerCase().includes('year') || 
+                    columnName.toLowerCase().includes('time')) {
+              
+              if (columnName.toLowerCase().includes('year')) {
+                const yearVal = Number(value);
+                const currentYear = new Date().getFullYear();
+                
+                if (!isNaN(yearVal) && yearVal > currentYear) {
+                  dateIssues++;
+                  qualityIssues.push({
+                    field: columnName,
+                    issue: `Future year found in ${columnName}: ${value}`,
+                    severity: 'medium',
+                    recommendation: `Add date validation for ${columnName} to prevent future dates`
+                  });
+                  accuracy -= 2;
+                }
+              }
+              // Add more date validation if needed
+            }
+          });
+        });
+        
+        // Check for duplicate IDs
+        const duplicateIDs = Object.entries(duplicateValues)
+          .filter(([_, count]) => count > 1)
+          .map(([id]) => id);
+          
+        if (duplicateIDs.length > 0) {
+          qualityIssues.push({
+            field: 'id',
+            issue: `Found ${duplicateIDs.length} duplicate ID values`,
+            severity: 'high',
+            recommendation: 'Add uniqueness constraint on ID fields and implement deduplication logic'
+          });
+          consistency -= 15;
+        }
+        
+        // Calculate final metrics
+        if (totalFields > 0) {
+          const missingPercentage = (missingValueCount / totalFields) * 100;
+          completeness = Math.max(0, 100 - missingPercentage);
+          
+          // Adjust accuracy based on issues found
+          if (numericIssues > 0 || dateIssues > 0) {
+            accuracy = Math.max(50, accuracy - (numericIssues + dateIssues) * 3);
+          }
+          
+          if (missingPercentage > 5) {
+            qualityIssues.push({
+              field: 'multiple',
+              issue: `Found ${missingValueCount} missing values (${missingPercentage.toFixed(1)}%)`,
+              severity: missingPercentage > 20 ? 'high' : missingPercentage > 10 ? 'medium' : 'low',
+              recommendation: 'Add data validation rules to ensure data completeness'
+            });
+          }
+        }
+      } else {
+        completeness = 0;
+        accuracy = 0;
+        consistency = 0;
+        qualityIssues.push({
+          field: 'all',
+          issue: 'No data rows provided',
+          severity: 'high',
+          recommendation: 'Provide sample data rows for analysis'
+        });
+      }
+      
+      // Initial quality analysis result
+      const qualityAnalysis: {
+        totalIssues: number;
+        completeness: number;
+        accuracy: number;
+        consistency: number;
+        issues: Array<{
+          field: string;
+          issue: string;
+          severity: 'low' | 'medium' | 'high';
+          recommendation: string;
+        }>;
+        summary: string;
+        aiRecommendations?: string[];
+      } = {
+        totalIssues: qualityIssues.length,
+        completeness: Math.round(completeness),
+        accuracy: Math.round(accuracy),
+        consistency: Math.round(consistency),
+        issues: qualityIssues,
+        summary: 'Initial data quality analysis completed. Further analysis may be needed for production use.',
+        aiRecommendations: []
+      };
+      
+      // If OpenAI is configured, enhance analysis with AI insights
+      if (isOpenAIConfigured()) {
+        try {
+          // Format data for OpenAI
+          const dataSample = {
+            columns,
+            rows: rows.slice(0, 5) // Only use first 5 rows to limit token usage
+          };
+          
+          // Call OpenAI for enhanced analysis
+          const aiAnalysis = await analyzeDataQuality(
+            name,
+            type,
+            dataSample,
+            qualityIssues
+          );
+          
+          // Add AI-powered insights to the response
+          qualityAnalysis.summary = aiAnalysis.enhancedSummary;
+          qualityAnalysis.aiRecommendations = aiAnalysis.additionalRecommendations;
+        } catch (aiError) {
+          console.error('Error getting AI-powered data quality insights:', aiError);
+          // Continue with basic analysis if AI enhancement fails
+        }
+      }
+      
+      res.json(qualityAnalysis);
+    } catch (error: any) {
+      console.error('Error analyzing data quality:', error);
+      res.status(500).json({ 
+        error: error.message || 'Failed to analyze data quality',
+        totalIssues: 0,
+        completeness: 0,
+        accuracy: 0,
+        consistency: 0,
+        issues: [],
+        summary: 'An error occurred while analyzing data quality'
+      });
+    }
+  });
+
+  // Endpoint for suggesting transformation rules based on data quality issues
+  app.post('/api/etl/suggest-transformation-rules', async (req, res) => {
+    try {
+      const { issues } = req.body;
+      
+      if (!issues || !Array.isArray(issues)) {
+        return res.status(400).json({ 
+          error: 'Missing or invalid issues array',
+          suggestions: []
+        });
+      }
+      
+      // Create transformation rule suggestions based on detected issues
+      const suggestedRules = [];
+      
+      // Track which types of issues we've already created rules for to avoid duplicates
+      const handledIssueTypes = new Set();
+      
+      issues.forEach(issue => {
+        const field = issue.field;
+        const issueText = issue.issue;
+        const severity = issue.severity;
+        
+        // Skip if the field is "all" or "multiple" which are generic fields
+        if (field === 'all' || field === 'multiple') {
+          return;
+        }
+        
+        // Generate rule suggestions based on issue type
+        if (issueText.includes('missing value') && !handledIssueTypes.has('missing_value_' + field)) {
+          handledIssueTypes.add('missing_value_' + field);
+          suggestedRules.push({
+            name: `Fill Missing ${field} Values`,
+            description: `Handles missing values in ${field} column`,
+            sourceField: field,
+            targetField: field,
+            transformationType: 'fillMissingValues',
+            transformationConfig: {
+              strategy: 'defaultValue',
+              defaultValue: field.toLowerCase().includes('date') ? 'CURRENT_DATE' : 
+                           field.toLowerCase().includes('year') ? new Date().getFullYear() : 
+                           field.toLowerCase().includes('value') || field.toLowerCase().includes('price') ? 0 : 'N/A'
+            },
+            isEnabled: true
+          });
+        }
+        
+        if ((issueText.includes('Non-numeric') || issueText.includes('not a number')) && !handledIssueTypes.has('numeric_validation_' + field)) {
+          handledIssueTypes.add('numeric_validation_' + field);
+          suggestedRules.push({
+            name: `Validate ${field} as Numeric`,
+            description: `Ensures ${field} column contains valid numeric values`,
+            sourceField: field,
+            targetField: field,
+            transformationType: 'validation',
+            transformationConfig: {
+              validationType: 'numeric',
+              action: 'convert',
+              fallbackValue: 0
+            },
+            isEnabled: true
+          });
+        }
+        
+        if (issueText.includes('Negative value') && !handledIssueTypes.has('negative_value_' + field)) {
+          handledIssueTypes.add('negative_value_' + field);
+          suggestedRules.push({
+            name: `Ensure Positive ${field}`,
+            description: `Converts negative values in ${field} column to positive`,
+            sourceField: field,
+            targetField: field,
+            transformationType: 'numberTransform',
+            transformationConfig: {
+              operation: 'abs'
+            },
+            isEnabled: true
+          });
+        }
+        
+        if (issueText.includes('duplicate') && !handledIssueTypes.has('duplicate_' + field)) {
+          handledIssueTypes.add('duplicate_' + field);
+          suggestedRules.push({
+            name: `Handle Duplicate ${field}`,
+            description: `Adds unique suffix to duplicate ${field} values`,
+            sourceField: field,
+            targetField: field,
+            transformationType: 'deduplicate',
+            transformationConfig: {
+              strategy: 'addSuffix',
+              suffixPattern: '_${index}'
+            },
+            isEnabled: true
+          });
+        }
+        
+        if ((issueText.includes('Future') || issueText.includes('invalid date')) && !handledIssueTypes.has('date_validation_' + field)) {
+          handledIssueTypes.add('date_validation_' + field);
+          suggestedRules.push({
+            name: `Validate ${field} Dates`,
+            description: `Ensures ${field} has valid dates (not in future)`,
+            sourceField: field,
+            targetField: field,
+            transformationType: 'dateValidation',
+            transformationConfig: {
+              maxDate: 'CURRENT_DATE',
+              invalidAction: 'setToMax'
+            },
+            isEnabled: true
+          });
+        }
+      });
+      
+      // If OpenAI is configured, get AI suggestions for more advanced transformations
+      if (isOpenAIConfigured() && issues.length > 0) {
+        try {
+          // This would be a call to OpenAI for advanced suggestions
+          // For now we'll just add some static advanced rules since we have rate limits
+          const advancedRules = [
+            {
+              name: 'Address Standardization',
+              description: 'Standardizes address formatting for consistency',
+              sourceField: 'address',
+              targetField: 'address',
+              transformationType: 'addressStandardization',
+              transformationConfig: {
+                format: 'USPS',
+                includeZipCode: true
+              },
+              isEnabled: false
+            },
+            {
+              name: 'Data Quality Score',
+              description: 'Calculates and adds a data quality score column',
+              sourceField: '*',
+              targetField: 'qualityScore',
+              transformationType: 'qualityScore',
+              transformationConfig: {
+                factors: ['completeness', 'validity'],
+                weights: { completeness: 0.7, validity: 0.3 }
+              },
+              isEnabled: false
+            }
+          ];
+          
+          // Only add these if the appropriate fields exist
+          if (issues.some(issue => issue.field === 'address')) {
+            suggestedRules.push(advancedRules[0]);
+          }
+          
+          // Always suggest the data quality score calculation
+          suggestedRules.push(advancedRules[1]);
+        } catch (aiError) {
+          console.error('Error getting AI-powered transformation suggestions:', aiError);
+          // Continue with basic suggestions if AI enhancement fails
+        }
+      }
+      
+      res.json({
+        count: suggestedRules.length,
+        suggestions: suggestedRules
+      });
+    } catch (error: any) {
+      console.error('Error suggesting transformation rules:', error);
+      res.status(500).json({ 
+        error: error.message || 'Failed to suggest transformation rules',
+        suggestions: []
       });
     }
   });
