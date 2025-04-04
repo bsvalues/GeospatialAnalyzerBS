@@ -1,359 +1,500 @@
-// No imports needed
+/**
+ * TransformationService
+ * 
+ * This service provides functionality for applying data transformations in ETL pipelines.
+ * It supports a variety of transformation types including mapping, filtering, joining,
+ * enrichment, and validation operations.
+ */
 
-export interface TransformationContext {
-  sourceColumns: string[];
-  sourceRows: any[][];
-  transformedColumns: string[];
-  transformedRows: any[][];
-  logs: string[];
-  metrics: {
-    startTime: number;
-    endTime?: number;
-    totalRowsProcessed: number;
-    successfulTransformations: number;
-    failedTransformations: number;
-    processingTimeMs?: number;
-  };
-}
+import { TransformationRule } from './ETLTypes';
 
+// Transformation result interface
 export interface TransformationResult {
   success: boolean;
-  data?: {
-    columns: string[];
-    rows: any[][];
-    totalRows: number;
-  };
-  metrics?: {
-    processingTimeMs: number;
-    successRate: number;
-    errorRate: number;
-  };
-  error?: string;
-  logs: string[];
+  data: any[];
+  totalRecords: number;
+  transformedRecords: number;
+  skippedRecords: number;
+  errors: TransformationError[];
+  warnings: TransformationWarning[];
+  executionTimeMs: number;
 }
 
-export interface TransformationRule {
-  id: number;
-  name: string;
-  description?: string;
-  dataType: string;
-  transformationCode: string;
-  isActive: boolean;
+// Transformation error interface
+export interface TransformationError {
+  rule: string;
+  recordIndex?: number;
+  field?: string;
+  message: string;
+  code?: string;
 }
 
+// Transformation warning interface
+export interface TransformationWarning {
+  rule: string;
+  recordIndex?: number;
+  field?: string;
+  message: string;
+  code?: string;
+}
+
+// Available transformation types
+export type TransformationType = 
+  'map' | 
+  'filter' | 
+  'join' | 
+  'enrich' | 
+  'validate' | 
+  'aggregate' | 
+  'split' | 
+  'format' | 
+  'deduplicate' | 
+  'normalize' | 
+  'custom';
+
+/**
+ * TransformationService class for applying data transformations
+ */
 export class TransformationService {
+  private static instance: TransformationService;
+  
+  private constructor() {}
+  
   /**
-   * Apply transformations to the provided data
+   * Get singleton instance
    */
-  public static async transformData(
-    data: { columns: string[]; rows: any[][] },
-    transformationRuleIds: number[],
-    options: { validateResults?: boolean } = {}
-  ): Promise<TransformationResult> {
-    try {
-      const response = await fetch('/api/etl/transform', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          data,
-          transformationRuleIds,
-          options
-        }),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to transform data');
-      }
-
-      return await response.json();
-    } catch (error) {
-      console.error('Error transforming data:', error);
-      
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : 'Unknown transformation error',
-        logs: ['Transformation failed', error instanceof Error ? error.message : 'Unknown error']
-      };
+  public static getInstance(): TransformationService {
+    if (!TransformationService.instance) {
+      TransformationService.instance = new TransformationService();
     }
+    return TransformationService.instance;
   }
-
+  
+  /**
+   * Apply a transformation rule to a dataset
+   * @param data The input data array
+   * @param rule The transformation rule to apply
+   * @returns Transformation result with transformed data
+   */
+  public async applyTransformation(
+    data: any[], 
+    rule: TransformationRule
+  ): Promise<TransformationResult> {
+    const startTime = Date.now();
+    
+    const result: TransformationResult = {
+      success: false,
+      data: [],
+      totalRecords: data.length,
+      transformedRecords: 0,
+      skippedRecords: 0,
+      errors: [],
+      warnings: [],
+      executionTimeMs: 0
+    };
+    
+    try {
+      // Validate inputs
+      if (!data || !Array.isArray(data)) {
+        throw new Error('Input data must be an array');
+      }
+      
+      if (!rule || !rule.transformationCode) {
+        throw new Error('Invalid transformation rule');
+      }
+      
+      // Apply the transformation
+      const transformedData = await this.executeTransformation(data, rule);
+      
+      // Count transformed and skipped records
+      result.transformedRecords = transformedData.length;
+      result.skippedRecords = data.length - transformedData.length;
+      result.data = transformedData;
+      result.success = true;
+      
+    } catch (error: any) {
+      console.error('Transformation error:', error);
+      result.success = false;
+      result.errors.push({
+        rule: rule.name,
+        message: error.message || 'Transformation failed'
+      });
+    } finally {
+      // Calculate execution time
+      result.executionTimeMs = Date.now() - startTime;
+    }
+    
+    return result;
+  }
+  
+  /**
+   * Apply multiple transformation rules to a dataset
+   * @param data The input data array
+   * @param rules The transformation rules to apply
+   * @returns Transformation result with transformed data
+   */
+  public async applyTransformations(
+    data: any[], 
+    rules: TransformationRule[]
+  ): Promise<TransformationResult> {
+    const startTime = Date.now();
+    
+    const result: TransformationResult = {
+      success: false,
+      data: [...data], // Start with a copy of the original data
+      totalRecords: data.length,
+      transformedRecords: 0,
+      skippedRecords: 0,
+      errors: [],
+      warnings: [],
+      executionTimeMs: 0
+    };
+    
+    try {
+      // Validate inputs
+      if (!data || !Array.isArray(data)) {
+        throw new Error('Input data must be an array');
+      }
+      
+      if (!rules || !Array.isArray(rules) || rules.length === 0) {
+        throw new Error('At least one transformation rule is required');
+      }
+      
+      // Apply each rule in sequence
+      let currentData = [...data];
+      let totalTransformed = 0;
+      
+      for (const rule of rules) {
+        try {
+          const ruleResult = await this.applyTransformation(currentData, rule);
+          
+          // Update data for the next transformation
+          currentData = ruleResult.data;
+          
+          // Accumulate metrics
+          totalTransformed += ruleResult.transformedRecords;
+          
+          // Add any errors or warnings
+          result.errors.push(...ruleResult.errors);
+          result.warnings.push(...ruleResult.warnings);
+          
+        } catch (ruleError: any) {
+          // Log error but continue with other rules
+          console.error(`Error applying rule ${rule.name}:`, ruleError);
+          result.errors.push({
+            rule: rule.name,
+            message: ruleError.message || 'Transformation rule failed'
+          });
+        }
+      }
+      
+      // Update final result
+      result.data = currentData;
+      result.transformedRecords = totalTransformed;
+      result.skippedRecords = data.length - currentData.length;
+      result.success = result.errors.length === 0;
+      
+    } catch (error: any) {
+      console.error('Transformation chain error:', error);
+      result.success = false;
+      result.errors.push({
+        rule: 'multiple',
+        message: error.message || 'Transformation chain failed'
+      });
+    } finally {
+      // Calculate execution time
+      result.executionTimeMs = Date.now() - startTime;
+    }
+    
+    return result;
+  }
+  
   /**
    * Test a transformation rule with sample data
+   * @param sampleData Sample data to test with
+   * @param rule The transformation rule to test
+   * @returns Test result with transformed sample data
    */
-  public static async testTransformationRule(
-    rule: Pick<TransformationRule, 'dataType' | 'transformationCode'>,
-    sampleData: any[]
-  ): Promise<{ success: boolean; results: any[]; errors: string[] }> {
-    try {
-      const response = await fetch('/api/etl/transformation-rules/test', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          rule,
-          sampleData
-        }),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to test transformation rule');
-      }
-
-      return await response.json();
-    } catch (error) {
-      console.error('Error testing transformation rule:', error);
-      
-      return {
-        success: false,
-        results: [],
-        errors: [error instanceof Error ? error.message : 'Unknown error during transformation test']
-      };
-    }
-  }
-
-  /**
-   * Generate a transformation rule suggestion based on data quality issues
-   */
-  public static async suggestTransformationRules(
-    dataQualityIssues: { field: string; issue: string; severity: string }[],
-    sampleData: { columns: string[]; rows: any[][] }
-  ): Promise<{
-    success: boolean;
-    suggestions: {
-      name: string;
-      description: string;
-      dataType: string;
-      transformationCode: string;
-      targetIssue: { field: string; issue: string };
-    }[];
-  }> {
-    try {
-      const response = await fetch('/api/etl/suggest-transformations', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          issues: dataQualityIssues,
-          sampleData
-        }),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to generate transformation suggestions');
-      }
-
-      return await response.json();
-    } catch (error) {
-      console.error('Error suggesting transformations:', error);
-      
-      return {
-        success: false,
-        suggestions: []
-      };
-    }
-  }
-
-  /**
-   * Apply a specific data transformation operation to rows
-   */
-  public static applyTransformation(
-    operation: string,
-    rows: any[][],
-    sourceIndex: number,
-    targetIndex: number = -1,
-    options: any = {}
-  ): { rows: any[][]; transformedCount: number; errors: string[] } {
-    let transformedCount = 0;
-    const errors: string[] = [];
-    const newRows = [...rows]; // Create a copy to avoid modifying the original
-
-    try {
-      switch (operation) {
-        case 'fill_missing_values':
-          // Fill missing values in targetIndex with values from sourceIndex or a default value
-          targetIndex = targetIndex === -1 ? sourceIndex : targetIndex;
-          const defaultValue = options.defaultValue;
-          
-          newRows.forEach((row, rowIndex) => {
-            if (row[targetIndex] === null || row[targetIndex] === undefined || row[targetIndex] === '') {
-              if (sourceIndex !== targetIndex) {
-                // Use value from another column
-                row[targetIndex] = row[sourceIndex];
-              } else {
-                // Use default value
-                row[targetIndex] = defaultValue;
-              }
-              transformedCount++;
-            }
-          });
-          break;
-          
-        case 'format_date':
-          // Convert date strings to a consistent format
-          const format = options.format || 'YYYY-MM-DD';
-          
-          newRows.forEach((row, rowIndex) => {
-            try {
-              const dateValue = row[sourceIndex];
-              if (dateValue) {
-                const date = new Date(dateValue);
-                if (!isNaN(date.getTime())) {
-                  const formattedDate = this.formatDate(date, format);
-                  
-                  if (targetIndex === -1) {
-                    row[sourceIndex] = formattedDate;
-                  } else {
-                    row[targetIndex] = formattedDate;
-                  }
-                  
-                  transformedCount++;
-                }
-              }
-            } catch (e) {
-              errors.push(`Error formatting date at row ${rowIndex}: ${e instanceof Error ? e.message : String(e)}`);
-            }
-          });
-          break;
-          
-        case 'number_format':
-          // Format numbers (rounding, precision, etc.)
-          const precision = options.precision !== undefined ? options.precision : 2;
-          
-          newRows.forEach((row, rowIndex) => {
-            try {
-              const value = row[sourceIndex];
-              if (value !== null && value !== undefined && value !== '') {
-                const number = Number(value);
-                if (!isNaN(number)) {
-                  const formatted = number.toFixed(precision);
-                  
-                  if (targetIndex === -1) {
-                    row[sourceIndex] = formatted;
-                  } else {
-                    row[targetIndex] = formatted;
-                  }
-                  
-                  transformedCount++;
-                }
-              }
-            } catch (e) {
-              errors.push(`Error formatting number at row ${rowIndex}: ${e instanceof Error ? e.message : String(e)}`);
-            }
-          });
-          break;
-          
-        case 'text_case':
-          // Change text case (uppercase, lowercase, title case)
-          const caseType = options.caseType || 'upper';
-          
-          newRows.forEach((row, rowIndex) => {
-            try {
-              const value = row[sourceIndex];
-              if (typeof value === 'string') {
-                let transformed: string;
-                
-                switch (caseType) {
-                  case 'upper':
-                    transformed = value.toUpperCase();
-                    break;
-                  case 'lower':
-                    transformed = value.toLowerCase();
-                    break;
-                  case 'title':
-                    transformed = value
-                      .toLowerCase()
-                      .split(' ')
-                      .map(word => word.charAt(0).toUpperCase() + word.slice(1))
-                      .join(' ');
-                    break;
-                  default:
-                    transformed = value;
-                }
-                
-                if (targetIndex === -1) {
-                  row[sourceIndex] = transformed;
-                } else {
-                  row[targetIndex] = transformed;
-                }
-                
-                transformedCount++;
-              }
-            } catch (e) {
-              errors.push(`Error transforming text case at row ${rowIndex}: ${e instanceof Error ? e.message : String(e)}`);
-            }
-          });
-          break;
-          
-        case 'regex_replace':
-          // Replace text based on regex pattern
-          const pattern = options.pattern;
-          const replacement = options.replacement || '';
-          
-          if (!pattern) {
-            errors.push('Missing regex pattern for text replacement');
-            break;
-          }
-          
-          const regex = new RegExp(pattern, options.flags || 'g');
-          
-          newRows.forEach((row, rowIndex) => {
-            try {
-              const value = row[sourceIndex];
-              if (typeof value === 'string') {
-                const transformed = value.replace(regex, replacement);
-                
-                if (targetIndex === -1) {
-                  row[sourceIndex] = transformed;
-                } else {
-                  row[targetIndex] = transformed;
-                }
-                
-                transformedCount++;
-              }
-            } catch (e) {
-              errors.push(`Error applying regex replacement at row ${rowIndex}: ${e instanceof Error ? e.message : String(e)}`);
-            }
-          });
-          break;
-          
-        default:
-          errors.push(`Unknown transformation operation: ${operation}`);
-      }
-    } catch (e) {
-      errors.push(`Transformation error: ${e instanceof Error ? e.message : String(e)}`);
-    }
-
-    return {
-      rows: newRows,
-      transformedCount,
-      errors
-    };
-  }
-
-  /**
-   * Format a date according to the specified format string
-   */
-  private static formatDate(date: Date, format: string): string {
-    const year = date.getFullYear();
-    const month = (date.getMonth() + 1).toString().padStart(2, '0');
-    const day = date.getDate().toString().padStart(2, '0');
-    const hours = date.getHours().toString().padStart(2, '0');
-    const minutes = date.getMinutes().toString().padStart(2, '0');
-    const seconds = date.getSeconds().toString().padStart(2, '0');
+  public async testTransformation(
+    sampleData: any[], 
+    rule: TransformationRule
+  ): Promise<TransformationResult> {
+    // Limit sample size for testing
+    const limitedSample = sampleData.slice(0, 100);
     
-    return format
-      .replace('YYYY', year.toString())
-      .replace('MM', month)
-      .replace('DD', day)
-      .replace('HH', hours)
-      .replace('mm', minutes)
-      .replace('ss', seconds);
+    // Apply the transformation
+    return this.applyTransformation(limitedSample, rule);
+  }
+  
+  /**
+   * Execute a transformation using the rule's code
+   * @param data The input data
+   * @param rule The transformation rule to execute
+   * @returns Transformed data
+   */
+  private async executeTransformation(
+    data: any[], 
+    rule: TransformationRule
+  ): Promise<any[]> {
+    try {
+      // For security reasons, we should validate transformation code
+      // In a production environment, consider using a sandbox or worker thread
+      
+      // Define safe transformation functions
+      const transformFunctions = {
+        // Map a field
+        mapField: (rows: any[], sourceField: string, targetField: string, transformer: (val: any) => any) => {
+          return rows.map(row => ({
+            ...row,
+            [targetField]: transformer(row[sourceField])
+          }));
+        },
+        
+        // Filter rows
+        filterRows: (rows: any[], predicate: (row: any) => boolean) => {
+          return rows.filter(predicate);
+        },
+        
+        // Format a field
+        formatField: (rows: any[], field: string, formatter: (val: any) => any) => {
+          return rows.map(row => ({
+            ...row,
+            [field]: formatter(row[field])
+          }));
+        },
+        
+        // Add a constant field
+        addConstantField: (rows: any[], fieldName: string, value: any) => {
+          return rows.map(row => ({
+            ...row,
+            [fieldName]: value
+          }));
+        },
+        
+        // Combine fields
+        combineFields: (rows: any[], sourceFields: string[], targetField: string, combiner: (...values: any[]) => any) => {
+          return rows.map(row => ({
+            ...row,
+            [targetField]: combiner(...sourceFields.map(field => row[field]))
+          }));
+        },
+        
+        // Extract part of a field
+        extractFromField: (rows: any[], sourceField: string, targetField: string, extractor: (val: any) => any) => {
+          return rows.map(row => ({
+            ...row,
+            [targetField]: extractor(row[sourceField])
+          }));
+        },
+        
+        // Remove duplicates
+        removeDuplicates: (rows: any[], keyFields: string[]) => {
+          const seen = new Set();
+          return rows.filter(row => {
+            const key = keyFields.map(field => row[field]).join('|');
+            if (seen.has(key)) return false;
+            seen.add(key);
+            return true;
+          });
+        },
+        
+        // Fill missing values
+        fillMissingValues: (rows: any[], field: string, defaultValue: any) => {
+          return rows.map(row => ({
+            ...row,
+            [field]: row[field] === undefined || row[field] === null || row[field] === '' 
+              ? defaultValue 
+              : row[field]
+          }));
+        },
+        
+        // Convert data type
+        convertType: (rows: any[], field: string, type: 'string' | 'number' | 'boolean' | 'date') => {
+          return rows.map(row => {
+            const value = row[field];
+            let convertedValue: any = value;
+            
+            if (value !== undefined && value !== null) {
+              switch (type) {
+                case 'string':
+                  convertedValue = String(value);
+                  break;
+                case 'number':
+                  convertedValue = Number(value);
+                  if (isNaN(convertedValue)) convertedValue = 0;
+                  break;
+                case 'boolean':
+                  convertedValue = Boolean(value);
+                  break;
+                case 'date':
+                  convertedValue = new Date(value);
+                  if (isNaN(convertedValue.getTime())) convertedValue = null;
+                  break;
+              }
+            }
+            
+            return {
+              ...row,
+              [field]: convertedValue
+            };
+          });
+        },
+        
+        // Rename a field
+        renameField: (rows: any[], oldField: string, newField: string) => {
+          return rows.map(row => {
+            const { [oldField]: value, ...rest } = row;
+            return {
+              ...rest,
+              [newField]: value
+            };
+          });
+        },
+        
+        // Remove fields
+        removeFields: (rows: any[], fields: string[]) => {
+          return rows.map(row => {
+            const newRow = { ...row };
+            fields.forEach(field => delete newRow[field]);
+            return newRow;
+          });
+        }
+      };
+      
+      // Try to load the transformation code
+      // In a real implementation, we should use a more secure approach
+      try {
+        // Attempt to parse the transformation code and execute it
+        const transformationLogic = new Function(
+          'data', 
+          'helpers', 
+          `try { 
+            ${rule.transformationCode} 
+          } catch (error) { 
+            console.error("Transformation execution error:", error); 
+            throw error; 
+          }`
+        );
+        
+        // Execute the transformation
+        return transformationLogic(data, transformFunctions);
+      } catch (codeError: any) {
+        console.error('Error executing transformation code:', codeError);
+        throw new Error(`Transformation code execution failed: ${codeError.message}`);
+      }
+    } catch (error: any) {
+      console.error('Transformation execution error:', error);
+      throw error;
+    }
+  }
+  
+  /**
+   * Generate suggestions for transformation rules
+   * @param data Sample data to analyze
+   * @returns Suggested transformation rules
+   */
+  public async suggestTransformations(data: any[]): Promise<TransformationRule[]> {
+    if (!data || data.length === 0) {
+      return [];
+    }
+    
+    const suggestions: TransformationRule[] = [];
+    const sampleRow = data[0];
+    const fields = Object.keys(sampleRow);
+    
+    // Analyze each field for potential transformations
+    for (const field of fields) {
+      const values = data.map(row => row[field]);
+      const nonNullValues = values.filter(val => val !== null && val !== undefined && val !== '');
+      
+      if (nonNullValues.length === 0) continue;
+      
+      // Check for missing values
+      const missingCount = values.length - nonNullValues.length;
+      if (missingCount > 0) {
+        suggestions.push({
+          id: `suggest-fill-${field}`,
+          name: `Fill Missing ${field}`,
+          description: `Add default values for missing ${field}`,
+          dataType: 'text',
+          transformationCode: `return helpers.fillMissingValues(data, "${field}", "");`,
+          isActive: true,
+          createdAt: new Date(),
+          updatedAt: new Date()
+        });
+      }
+      
+      // Check for inconsistent types
+      const types = new Set(nonNullValues.map(val => typeof val));
+      if (types.size > 1) {
+        // Determine the most common type
+        const typeCounts: Record<string, number> = {};
+        nonNullValues.forEach(val => {
+          const type = typeof val;
+          typeCounts[type] = (typeCounts[type] || 0) + 1;
+        });
+        
+        const dominantType = Object.entries(typeCounts)
+          .reduce((max, [type, count]) => count > max[1] ? [type, count] : max, ['', 0])[0];
+        
+        if (dominantType) {
+          suggestions.push({
+            id: `suggest-type-${field}`,
+            name: `Standardize ${field} Type`,
+            description: `Convert ${field} to ${dominantType}`,
+            dataType: dominantType as any,
+            transformationCode: `return helpers.convertType(data, "${field}", "${dominantType}");`,
+            isActive: true,
+            createdAt: new Date(),
+            updatedAt: new Date()
+          });
+        }
+      }
+      
+      // Analyze string fields
+      if (nonNullValues.every(val => typeof val === 'string')) {
+        // Check for potential case normalization needs
+        const caseVariations = new Set(nonNullValues.map(val => {
+          const str = String(val);
+          if (str === str.toUpperCase()) return 'upper';
+          if (str === str.toLowerCase()) return 'lower';
+          if (str[0] === str[0].toUpperCase()) return 'title';
+          return 'mixed';
+        }));
+        
+        if (caseVariations.size > 1) {
+          suggestions.push({
+            id: `suggest-case-${field}`,
+            name: `Normalize ${field} Case`,
+            description: `Standardize case for ${field}`,
+            dataType: 'text',
+            transformationCode: 
+              `return helpers.mapField(data, "${field}", "${field}", val => String(val).toLowerCase());`,
+            isActive: true,
+            createdAt: new Date(),
+            updatedAt: new Date()
+          });
+        }
+      }
+    }
+    
+    // Check for potential duplicate records
+    if (data.length > 1) {
+      suggestions.push({
+        id: `suggest-dedup-all`,
+        name: `Remove Duplicate Records`,
+        description: `Eliminate duplicate records based on all fields`,
+        dataType: 'object',
+        transformationCode: `return helpers.removeDuplicates(data, ${JSON.stringify(fields)});`,
+        isActive: true,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      });
+    }
+    
+    return suggestions;
   }
 }
+
+// Export singleton instance
+export default TransformationService.getInstance();
