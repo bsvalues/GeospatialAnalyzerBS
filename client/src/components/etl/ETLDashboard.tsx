@@ -34,13 +34,13 @@ import {
   DataSourceType,
   DatabaseType,
   ApiType,
-  AuthType
+  AuthType,
+  TransformationType,
+  JobStatus
 } from '../../services/etl/ETLTypes';
-import { etlPipelineManager, JobRun } from '@/services/etl/ETLPipelineManager';
-import { alertService, Alert as ETLAlert, AlertType, AlertSeverity, AlertState } from '@/services/etl/AlertService';
-import { optimizationService, OptimizationSuggestion, SuggestionSeverity, SuggestionCategory } from '@/services/etl/OptimizationService';
-import { TransformationType } from '@/services/etl/ETLTypes';
-import { JobStatus } from '@/services/etl/ETLTypes';
+import { etlPipelineManager, JobRun } from '../../services/etl/ETLPipelineManager';
+import { alertService, Alert as ETLAlert, AlertType, AlertSeverity, AlertState } from '../../services/etl/AlertService';
+import { optimizationService, OptimizationSuggestion, SuggestionSeverity, SuggestionCategory } from '../../services/etl/OptimizationService';
 
 import { 
   CheckCircle, 
@@ -257,7 +257,7 @@ const ETLDashboard: React.FC<ETLDashboardProps> = (props) => {
         sources: [1, 2],
         transformations: [1, 2, 3],
         destinations: [3],
-        schedule: { type: 'cron', expression: '0 0 * * *' },
+        schedule: { expression: '0 0 * * *' },
         enabled: true,
         continueOnError: false
       }
@@ -316,7 +316,7 @@ const ETLDashboard: React.FC<ETLDashboardProps> = (props) => {
         title: 'Add validation step',
         description: 'This ETL pipeline does not include a validation step to ensure data quality.',
         severity: SuggestionSeverity.Warning,
-        category: 'dataQuality',
+        category: SuggestionCategory.DataQuality,
         actionable: true,
         recommendation: 'Add a validation transformation to check for data integrity and completeness.',
         createdAt: yesterday
@@ -345,9 +345,9 @@ const ETLDashboard: React.FC<ETLDashboardProps> = (props) => {
   const calculateMetrics = (jobs: ETLJob[], runs: JobRun[], alerts: ETLAlert[]) => {
     const activeJobs = jobs.filter(job => job.enabled).length;
     const scheduledJobs = jobs.filter(job => job.schedule).length;
-    const completedRuns = runs.filter(run => run.status === 'completed').length;
-    const failedRuns = runs.filter(run => run.status === 'failed').length;
-    const activeAlerts = alerts.filter(alert => alert.state === 'active').length;
+    const completedRuns = runs.filter(run => run.status === JobStatus.COMPLETED).length;
+    const failedRuns = runs.filter(run => run.status === JobStatus.FAILED).length;
+    const activeAlerts = alerts.filter(alert => alert.state === AlertState.ACTIVE).length;
     
     // Calculate average duration
     let totalDuration = 0;
@@ -451,13 +451,13 @@ const ETLDashboard: React.FC<ETLDashboardProps> = (props) => {
         jobId: id,
         startTime: new Date(Date.now() - 5 * 60 * 1000), // Started 5 minutes ago
         endTime: new Date(),
-        status: Math.random() > 0.2 ? 'completed' : 'failed', // 80% chance of success
+        status: Math.random() > 0.2 ? JobStatus.COMPLETED : JobStatus.FAILED, // 80% chance of success
         recordsProcessed: Math.floor(Math.random() * 2000) + 500,
         errors: []
       };
       
       // If failed, add an error
-      if (newRun.status === 'failed') {
+      if (newRun.status === JobStatus.FAILED) {
         newRun.errors = ['Simulated error for demonstration purposes'];
         
         // Create an alert
@@ -481,7 +481,7 @@ const ETLDashboard: React.FC<ETLDashboardProps> = (props) => {
       }
       
       // Add records loaded if completed
-      if (newRun.status === 'completed') {
+      if (newRun.status === JobStatus.COMPLETED) {
         newRun.recordsLoaded = newRun.recordsProcessed;
       }
       
@@ -513,7 +513,7 @@ const ETLDashboard: React.FC<ETLDashboardProps> = (props) => {
         jobId: id,
         startTime: new Date(Date.now() - 2 * 60 * 1000), // Started 2 minutes ago
         endTime: new Date(),
-        status: 'cancelled',
+        status: JobStatus.CANCELLED,
         recordsProcessed: Math.floor(Math.random() * 100),
         errors: ['Job cancelled by user']
       };
@@ -597,7 +597,7 @@ const ETLDashboard: React.FC<ETLDashboardProps> = (props) => {
       if (alert.id === alertId) {
         return {
           ...alert,
-          state: 'acknowledged',
+          state: AlertState.ACKNOWLEDGED,
           acknowledgedAt: new Date(),
           updatedAt: new Date()
         };
@@ -614,7 +614,7 @@ const ETLDashboard: React.FC<ETLDashboardProps> = (props) => {
       if (alert.id === alertId) {
         return {
           ...alert,
-          state: 'resolved',
+          state: AlertState.RESOLVED,
           resolvedAt: new Date(),
           updatedAt: new Date()
         };
@@ -815,7 +815,7 @@ const ETLDashboard: React.FC<ETLDashboardProps> = (props) => {
                 ) : (
                   <div className="space-y-4">
                     {alerts
-                      .filter(alert => alert.state === 'active')
+                      .filter(alert => alert.state === AlertState.ACTIVE)
                       .slice(0, 5)
                       .map(alert => (
                         <Alert key={alert.id} variant="outline" className="cursor-pointer hover:bg-gray-50"
@@ -843,7 +843,7 @@ const ETLDashboard: React.FC<ETLDashboardProps> = (props) => {
                   </div>
                 )}
               </CardContent>
-              {alerts.filter(alert => alert.state === 'active').length > 0 && (
+              {alerts.filter(alert => alert.state === AlertState.ACTIVE).length > 0 && (
                 <CardFooter>
                   <Button variant="outline" className="w-full" onClick={() => setActiveTab('jobs')}>
                     View All Alerts
@@ -920,11 +920,11 @@ const ETLDashboard: React.FC<ETLDashboardProps> = (props) => {
                       return (
                         <div key={run.id} className="p-3 border rounded-md flex items-center justify-between">
                           <div className="flex items-center">
-                            {run.status === 'completed' ? (
+                            {run.status === JobStatus.COMPLETED ? (
                               <CheckCircle className="w-5 h-5 text-green-500 mr-3" />
-                            ) : run.status === 'failed' ? (
+                            ) : run.status === JobStatus.FAILED ? (
                               <XCircle className="w-5 h-5 text-red-500 mr-3" />
-                            ) : run.status === 'running' ? (
+                            ) : run.status === JobStatus.RUNNING ? (
                               <RefreshCw className="w-5 h-5 text-blue-500 mr-3 animate-spin" />
                             ) : (
                               <AlertCircle className="w-5 h-5 text-yellow-500 mr-3" />
@@ -933,7 +933,7 @@ const ETLDashboard: React.FC<ETLDashboardProps> = (props) => {
                               <p className="font-medium">{job?.name || `Job ${run.jobId}`}</p>
                               <p className="text-xs text-gray-500">
                                 {new Date(run.startTime).toLocaleString()} • 
-                                {run.status === 'running' ? ' In progress' : ` ${formatDuration(new Date(run.endTime!).getTime() - new Date(run.startTime).getTime())}`}
+                                {run.status === JobStatus.RUNNING ? ' In progress' : ` ${formatDuration(new Date(run.endTime!).getTime() - new Date(run.startTime).getTime())}`}
                               </p>
                             </div>
                           </div>
@@ -945,9 +945,9 @@ const ETLDashboard: React.FC<ETLDashboardProps> = (props) => {
                             <Badge 
                               variant="outline" 
                               className={
-                                run.status === 'completed' ? 'bg-green-50 text-green-700' :
-                                run.status === 'failed' ? 'bg-red-50 text-red-700' :
-                                run.status === 'running' ? 'bg-blue-50 text-blue-700' :
+                                run.status === JobStatus.COMPLETED ? 'bg-green-50 text-green-700' :
+                                run.status === JobStatus.FAILED ? 'bg-red-50 text-red-700' :
+                                run.status === JobStatus.RUNNING ? 'bg-blue-50 text-blue-700' :
                                 'bg-yellow-50 text-yellow-700'
                               }
                             >
@@ -1052,9 +1052,9 @@ const ETLDashboard: React.FC<ETLDashboardProps> = (props) => {
                   <p className="text-sm text-gray-500">
                     {typeof selectedAlert.details === 'object' ? 
                       Object.entries(selectedAlert.details).map(([key, value]) => 
-                        <div key={key}>{key}: {value}</div>
+                        <div key={key}>{key}: {String(value)}</div>
                       ) : 
-                      selectedAlert.details
+                      String(selectedAlert.details)
                     }
                   </p>
                 </div>

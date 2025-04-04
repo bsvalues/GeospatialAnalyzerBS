@@ -3,10 +3,57 @@
  * 
  * Service for executing ETL (Extract, Transform, Load) pipelines
  */
-import { EventEmitter } from 'events';
 import { DataSource, ETLJob, JobStatus, TransformationRule } from './ETLTypes';
 import { dataConnector } from './DataConnector';
 import { transformationService } from './TransformationService';
+
+/**
+ * Simple EventEmitter implementation that's browser compatible
+ */
+class EventEmitter {
+  private events: Record<string, Array<(...args: any[]) => void>> = {};
+
+  on(event: string, listener: (...args: any[]) => void): this {
+    if (!this.events[event]) {
+      this.events[event] = [];
+    }
+    this.events[event].push(listener);
+    return this;
+  }
+
+  emit(event: string, ...args: any[]): boolean {
+    const listeners = this.events[event];
+    if (!listeners || listeners.length === 0) {
+      return false;
+    }
+    
+    listeners.forEach(listener => {
+      listener(...args);
+    });
+    return true;
+  }
+
+  removeListener(event: string, listener: (...args: any[]) => void): this {
+    if (!this.events[event]) {
+      return this;
+    }
+    
+    const index = this.events[event].indexOf(listener);
+    if (index !== -1) {
+      this.events[event].splice(index, 1);
+    }
+    return this;
+  }
+
+  removeAllListeners(event?: string): this {
+    if (event) {
+      delete this.events[event];
+    } else {
+      this.events = {};
+    }
+    return this;
+  }
+}
 
 /**
  * ETL pipeline progress event
@@ -345,3 +392,9 @@ export async function executeETLPipeline(
   const pipeline = new ETLPipeline(job, sources, transformations, destinations);
   return await pipeline.execute();
 }
+
+// Create a singleton instance for use across the application
+export const etlPipeline = {
+  execute: executeETLPipeline,
+  ETLPipeline
+};
