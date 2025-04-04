@@ -3,8 +3,10 @@ import OpenAI from "openai";
 // Environment validation
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 
-// Create OpenAI instance
-const openai = new OpenAI({ apiKey: OPENAI_API_KEY });
+// Lazy initialization of the OpenAI client
+const getOpenAIClient = () => {
+  return new OpenAI({ apiKey: OPENAI_API_KEY });
+};
 
 /**
  * Analyzes ETL data quality using AI
@@ -42,6 +44,7 @@ ${existingIssues.map(issue => `- ${issue.field}: ${issue.issue} (${issue.severit
 `;
 
     // Make OpenAI API request
+    const openai = getOpenAIClient();
     const response = await openai.chat.completions.create({
       model: "gpt-4o", // the newest OpenAI model is "gpt-4o" which was released May 13, 2024. do not change this unless explicitly requested by the user
       messages: [
@@ -123,6 +126,7 @@ export function isOpenAIConfigured(): boolean {
  * Placeholder for code generation functionality
  */
 export async function generateCodeFromLanguage() {
+  // Only initialize OpenAI client if the function is actually called with parameters that require it
   return { code: "", message: "Function not implemented" };
 }
 
@@ -130,6 +134,7 @@ export async function generateCodeFromLanguage() {
  * Placeholder for code optimization functionality
  */
 export async function optimizeCode() {
+  // Only initialize OpenAI client if the function is actually called with parameters that require it
   return { optimizedCode: "", message: "Function not implemented" };
 }
 
@@ -137,6 +142,7 @@ export async function optimizeCode() {
  * Placeholder for code debugging functionality
  */
 export async function debugCode() {
+  // Only initialize OpenAI client if the function is actually called with parameters that require it
   return { debugInfo: "", message: "Function not implemented" };
 }
 
@@ -144,6 +150,7 @@ export async function debugCode() {
  * Placeholder for property prediction functionality
  */
 export async function generateContextualPropertyPrediction() {
+  // Only initialize OpenAI client if the function is actually called with parameters that require it
   return { prediction: "", message: "Function not implemented" };
 }
 
@@ -151,6 +158,7 @@ export async function generateContextualPropertyPrediction() {
  * Placeholder for ETL assistance functionality
  */
 export async function getETLAssistance() {
+  // Only initialize OpenAI client if the function is actually called with parameters that require it
   return { message: "ETL Assistant functionality not implemented" };
 }
 
@@ -158,6 +166,7 @@ export async function getETLAssistance() {
  * Placeholder for ETL onboarding tips functionality
  */
 export async function getETLOnboardingTips() {
+  // Only initialize OpenAI client if the function is actually called with parameters that require it
   return { tips: [], message: "Function not implemented" };
 }
 
@@ -165,5 +174,6 @@ export async function getETLOnboardingTips() {
  * Placeholder for connection troubleshooting functionality
  */
 export async function generateConnectionTroubleshooting() {
+  // Only initialize OpenAI client if the function is actually called with parameters that require it
   return { troubleshooting: "", message: "Function not implemented" };
 }

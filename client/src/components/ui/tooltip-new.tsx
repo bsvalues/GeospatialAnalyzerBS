@@ -49,4 +49,12 @@ const Tooltip: React.FC<TooltipProps> = ({
   );
 };
 
+export {
+  Tooltip,
+  TooltipProvider,
+  TooltipRoot as Root,
+  TooltipContent,
+  TooltipTrigger,
+};
+
 export default Tooltip;

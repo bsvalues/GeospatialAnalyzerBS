@@ -2164,6 +2164,423 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ETL Transformation Rule Execution endpoint
+  app.post('/api/etl/execute-transformation-rules', async (req, res) => {
+    try {
+      const { data, rules } = req.body;
+      
+      if (!data || !Array.isArray(data.rows) || !Array.isArray(data.columns)) {
+        return res.status(400).json({ 
+          error: 'Invalid data format. Expected {columns: string[], rows: any[][]}' 
+        });
+      }
+      
+      if (!rules || !Array.isArray(rules)) {
+        return res.status(400).json({ 
+          error: 'Invalid rules format. Expected an array of transformation rules' 
+        });
+      }
+
+      // Create a copy of the data to avoid modifying the original
+      const transformedData = {
+        name: data.name || 'Transformed Data',
+        type: data.type || 'csv',
+        columns: [...data.columns],
+        rows: data.rows.map(row => [...row])
+      };
+      
+      // Apply each transformation rule in sequence
+      const executionLog = [];
+      const transformationStats = {
+        totalTransformations: 0,
+        byRule: {}
+      };
+      
+      for (const rule of rules) {
+        if (!rule.isEnabled) {
+          executionLog.push({
+            rule: rule.name,
+            status: 'skipped',
+            message: 'Rule is disabled'
+          });
+          continue;
+        }
+        
+        try {
+          // Initialize stats for this rule
+          transformationStats.byRule[rule.name] = {
+            cellsTransformed: 0,
+            fieldsAffected: []
+          };
+          
+          // Get column indexes
+          const sourceColumnIndex = rule.sourceField === '*' 
+            ? -1
+            : transformedData.columns.indexOf(rule.sourceField);
+            
+          const targetColumnIndex = transformedData.columns.indexOf(rule.targetField);
+          
+          // Add target column if it doesn't exist (for new columns)
+          if (targetColumnIndex === -1 && rule.targetField !== rule.sourceField) {
+            transformedData.columns.push(rule.targetField);
+            // Add empty values for the new column in all rows
+            transformedData.rows.forEach(row => row.push(null));
+          }
+          
+          // Re-fetch the target index in case we just added it
+          const newTargetIndex = transformedData.columns.indexOf(rule.targetField);
+          
+          // Apply the transformation based on the rule type
+          switch (rule.transformationType) {
+            case 'fillMissingValues': {
+              const defaultValue = rule.transformationConfig.defaultValue;
+              const transformedCount = applyFillMissingValues(
+                transformedData.rows, 
+                sourceColumnIndex, 
+                newTargetIndex, 
+                defaultValue
+              );
+              transformationStats.byRule[rule.name].cellsTransformed = transformedCount;
+              transformationStats.totalTransformations += transformedCount;
+              break;
+            }
+            
+            case 'validation': {
+              const { validationType, action, fallbackValue } = rule.transformationConfig;
+              const transformedCount = applyValidation(
+                transformedData.rows, 
+                sourceColumnIndex, 
+                newTargetIndex, 
+                validationType, 
+                action, 
+                fallbackValue
+              );
+              transformationStats.byRule[rule.name].cellsTransformed = transformedCount;
+              transformationStats.totalTransformations += transformedCount;
+              break;
+            }
+            
+            case 'numberTransform': {
+              const { operation } = rule.transformationConfig;
+              const transformedCount = applyNumberTransform(
+                transformedData.rows, 
+                sourceColumnIndex, 
+                newTargetIndex, 
+                operation
+              );
+              transformationStats.byRule[rule.name].cellsTransformed = transformedCount;
+              transformationStats.totalTransformations += transformedCount;
+              break;
+            }
+            
+            case 'deduplicate': {
+              const { strategy, suffixPattern } = rule.transformationConfig;
+              const transformedCount = applyDeduplication(
+                transformedData.rows, 
+                sourceColumnIndex, 
+                newTargetIndex, 
+                strategy, 
+                suffixPattern
+              );
+              transformationStats.byRule[rule.name].cellsTransformed = transformedCount;
+              transformationStats.totalTransformations += transformedCount;
+              break;
+            }
+            
+            case 'dateValidation': {
+              const { maxDate, invalidAction } = rule.transformationConfig;
+              const transformedCount = applyDateValidation(
+                transformedData.rows, 
+                sourceColumnIndex, 
+                newTargetIndex, 
+                maxDate, 
+                invalidAction
+              );
+              transformationStats.byRule[rule.name].cellsTransformed = transformedCount;
+              transformationStats.totalTransformations += transformedCount;
+              break;
+            }
+
+            case 'qualityScore': {
+              // Add a quality score column if it does not exist
+              if (newTargetIndex === -1) {
+                transformedData.columns.push(rule.targetField);
+                // Add empty values for the new column in all rows
+                transformedData.rows.forEach(row => row.push(null));
+              }
+              
+              const qualityScoreIndex = transformedData.columns.indexOf(rule.targetField);
+              const { factors, weights } = rule.transformationConfig;
+              
+              // Calculate quality score for each row
+              let transformedCount = 0;
+              transformedData.rows.forEach((row, rowIndex) => {
+                let score = 100; // Start with perfect score
+                
+                // Check for completeness
+                if (factors.includes('completeness')) {
+                  const completenessWeight = weights.completeness || 0.5;
+                  let missingCount = 0;
+                  row.forEach(cell => {
+                    if (cell === null || cell === undefined || cell === '') {
+                      missingCount++;
+                    }
+                  });
+                  
+                  const completeness = 1 - (missingCount / row.length);
+                  score -= (1 - completeness) * 100 * completenessWeight;
+                }
+                
+                // Check for validity
+                if (factors.includes('validity')) {
+                  const validityWeight = weights.validity || 0.5;
+                  let invalidCount = 0;
+                  
+                  transformedData.columns.forEach((column, colIndex) => {
+                    const value = row[colIndex];
+                    if (value !== null && value !== undefined && value !== '') {
+                      // Check numeric fields
+                      if (column.toLowerCase().includes('value') || 
+                          column.toLowerCase().includes('price') || 
+                          column.toLowerCase().includes('cost') || 
+                          column.toLowerCase().includes('fee')) {
+                        if (isNaN(Number(value)) || Number(value) < 0) {
+                          invalidCount++;
+                        }
+                      }
+                      
+                      // Check date/year fields
+                      if (column.toLowerCase().includes('date') || 
+                          column.toLowerCase().includes('year')) {
+                        const currentYear = new Date().getFullYear();
+                        if (isNaN(Number(value)) || Number(value) > currentYear) {
+                          invalidCount++;
+                        }
+                      }
+                    }
+                  });
+                  
+                  const validity = 1 - (invalidCount / row.length);
+                  score -= (1 - validity) * 100 * validityWeight;
+                }
+                
+                // Ensure score is between 0 and 100
+                score = Math.max(0, Math.min(100, Math.round(score)));
+                
+                // Update the quality score
+                row[qualityScoreIndex] = score;
+                transformedCount++;
+              });
+              
+              transformationStats.byRule[rule.name].cellsTransformed = transformedCount;
+              transformationStats.totalTransformations += transformedCount;
+              break;
+            }
+            
+            default:
+              executionLog.push({
+                rule: rule.name,
+                status: 'skipped',
+                message: `Unsupported transformation type: ${rule.transformationType}`
+              });
+              continue;
+          }
+          
+          // Add to execution log
+          executionLog.push({
+            rule: rule.name,
+            status: 'success',
+            message: `Applied ${rule.transformationType} transformation successfully`,
+            transformedCount: transformationStats.byRule[rule.name].cellsTransformed
+          });
+          
+          // Add to affected fields
+          if (!transformationStats.byRule[rule.name].fieldsAffected.includes(rule.targetField)) {
+            transformationStats.byRule[rule.name].fieldsAffected.push(rule.targetField);
+          }
+          
+        } catch (ruleError) {
+          console.error(`Error applying rule ${rule.name}:`, ruleError);
+          executionLog.push({
+            rule: rule.name,
+            status: 'error',
+            message: ruleError.message || `Error applying ${rule.name}`
+          });
+        }
+      }
+      
+      // Return the transformed data with execution log
+      res.json({
+        transformedData,
+        executionLog,
+        transformationStats
+      });
+    } catch (error: any) {
+      console.error('Error executing transformation rules:', error);
+      res.status(500).json({ 
+        error: error.message || 'Failed to execute transformation rules' 
+      });
+    }
+  });
+
+  // Helper functions for transformations
+  function applyFillMissingValues(rows: any[][], sourceIndex: number, targetIndex: number, defaultValue: any): number {
+    let transformedCount = 0;
+    
+    rows.forEach(row => {
+      const sourceValue = row[sourceIndex];
+      if (sourceValue === null || sourceValue === undefined || sourceValue === '') {
+        row[targetIndex] = defaultValue === 'CURRENT_DATE' ? new Date().toISOString().split('T')[0] : defaultValue;
+        transformedCount++;
+      } else if (sourceIndex !== targetIndex) {
+        // Only copy if source and target are different
+        row[targetIndex] = sourceValue;
+      }
+    });
+    
+    return transformedCount;
+  }
+  
+  function applyValidation(
+    rows: any[][], 
+    sourceIndex: number, 
+    targetIndex: number, 
+    validationType: string, 
+    action: string, 
+    fallbackValue: any
+  ): number {
+    let transformedCount = 0;
+    
+    rows.forEach(row => {
+      const sourceValue = row[sourceIndex];
+      let targetValue = sourceValue;
+      
+      if (validationType === 'numeric') {
+        if (sourceValue === null || sourceValue === undefined || sourceValue === '' || isNaN(Number(sourceValue))) {
+          if (action === 'convert') {
+            targetValue = fallbackValue;
+            transformedCount++;
+          }
+        } else {
+          targetValue = Number(sourceValue);
+        }
+      }
+      
+      row[targetIndex] = targetValue;
+    });
+    
+    return transformedCount;
+  }
+  
+  function applyNumberTransform(
+    rows: any[][], 
+    sourceIndex: number, 
+    targetIndex: number, 
+    operation: string
+  ): number {
+    let transformedCount = 0;
+    
+    rows.forEach(row => {
+      const sourceValue = row[sourceIndex];
+      let targetValue = sourceValue;
+      
+      if (sourceValue !== null && sourceValue !== undefined && sourceValue !== '') {
+        const numValue = Number(sourceValue);
+        
+        if (!isNaN(numValue)) {
+          if (operation === 'abs') {
+            targetValue = Math.abs(numValue);
+            if (numValue !== targetValue) {
+              transformedCount++;
+            }
+          }
+        }
+      }
+      
+      row[targetIndex] = targetValue;
+    });
+    
+    return transformedCount;
+  }
+  
+  function applyDeduplication(
+    rows: any[][], 
+    sourceIndex: number, 
+    targetIndex: number, 
+    strategy: string, 
+    suffixPattern: string
+  ): number {
+    let transformedCount = 0;
+    const valueOccurrences: Record<string, number> = {};
+    
+    // First pass: count occurrences
+    rows.forEach(row => {
+      const sourceValue = String(row[sourceIndex]);
+      valueOccurrences[sourceValue] = (valueOccurrences[sourceValue] || 0) + 1;
+    });
+    
+    // Second pass: apply deduplication
+    const processedValues: Record<string, number> = {};
+    
+    rows.forEach(row => {
+      const sourceValue = String(row[sourceIndex]);
+      let targetValue = sourceValue;
+      
+      if (valueOccurrences[sourceValue] > 1) {
+        // Track how many times we've seen this value
+        processedValues[sourceValue] = (processedValues[sourceValue] || 0) + 1;
+        
+        if (processedValues[sourceValue] > 1) { // First occurrence keeps original value
+          if (strategy === 'addSuffix') {
+            const suffix = suffixPattern.replace('${index}', processedValues[sourceValue].toString());
+            targetValue = sourceValue + suffix;
+            transformedCount++;
+          }
+        }
+      }
+      
+      row[targetIndex] = targetValue;
+    });
+    
+    return transformedCount;
+  }
+  
+  function applyDateValidation(
+    rows: any[][], 
+    sourceIndex: number, 
+    targetIndex: number, 
+    maxDate: string, 
+    invalidAction: string
+  ): number {
+    let transformedCount = 0;
+    const currentDate = new Date();
+    const currentYear = currentDate.getFullYear();
+    
+    rows.forEach(row => {
+      const sourceValue = row[sourceIndex];
+      let targetValue = sourceValue;
+      
+      // Handle year values (e.g., 2050) or date values
+      if (sourceValue !== null && sourceValue !== undefined && sourceValue !== '') {
+        const numValue = Number(sourceValue);
+        
+        if (!isNaN(numValue)) {
+          // Check if it's a year and it's in the future
+          if (numValue > 1000 && numValue <= 9999 && numValue > currentYear) {
+            if (invalidAction === 'setToMax') {
+              targetValue = currentYear;
+              transformedCount++;
+            }
+          }
+        }
+      }
+      
+      row[targetIndex] = targetValue;
+    });
+    
+    return transformedCount;
+  }
+
   // ETL Job Execution endpoint
   app.post('/api/etl/jobs/:id/execute', async (req, res) => {
     try {
