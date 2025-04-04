@@ -3,7 +3,7 @@
  * 
  * Service for executing ETL (Extract, Transform, Load) pipelines
  */
-import { DataSource, ETLJob, JobStatus, TransformationRule } from './ETLTypes';
+import { DataSource, ETLJob, JobStatus, TransformationRule, TransformationType } from './ETLTypes';
 import { dataConnector } from './DataConnector';
 import { transformationService } from './TransformationService';
 
@@ -116,7 +116,7 @@ export class ETLPipeline extends EventEmitter {
    */
   public async execute(): Promise<ETLPipelineResult> {
     const startTime = new Date();
-    let status: JobStatus = 'running';
+    let status: JobStatus = JobStatus.RUNNING;
     let recordsExtracted = 0;
     let recordsLoaded = 0;
     
@@ -142,11 +142,11 @@ export class ETLPipeline extends EventEmitter {
       this.log(`Loaded ${recordsLoaded} records to ${this.destinations.length} destinations`);
       this.emitProgress('load', 100, `Loaded ${recordsLoaded} records`);
       
-      status = 'completed';
+      status = JobStatus.COMPLETED;
     } catch (error) {
       console.error(`Error executing ETL job ${this.job.id}:`, error);
       this.logError(`ETL job failed: ${error instanceof Error ? error.message : String(error)}`);
-      status = 'failed';
+      status = JobStatus.FAILED;
     }
     
     const endTime = new Date();
@@ -232,7 +232,7 @@ export class ETLPipeline extends EventEmitter {
       this.logWarning('No transformations defined for this job');
       
       // If no transformations are defined, return all extracted data merged
-      return extractedData.reduce((allData, source) => [...allData, ...source.data], []);
+      return extractedData.reduce<any[]>((allData, source) => [...allData, ...source.data], []);
     }
     
     // Get the transformation rules in the correct order
@@ -241,7 +241,7 @@ export class ETLPipeline extends EventEmitter {
       .sort((a, b) => a.order - b.order);
     
     // Start with all extracted data merged
-    let data = extractedData.reduce((allData, source) => [...allData, ...source.data], []);
+    let data = extractedData.reduce<any[]>((allData, source) => [...allData, ...source.data], []);
     
     // Apply each transformation
     for (let i = 0; i < jobTransformations.length; i++) {
@@ -254,7 +254,7 @@ export class ETLPipeline extends EventEmitter {
         this.log(`Applying transformation ${transformation.name} (ID: ${transformation.id})`);
         
         // If this is a join transformation, we need to get the right data source
-        if (transformation.type === 'join' && transformation.config?.rightSourceId) {
+        if (transformation.type === TransformationType.JOIN && transformation.config?.rightSourceId) {
           const rightSourceId = transformation.config.rightSourceId;
           const rightSourceData = extractedData.find(s => s.source.id === rightSourceId);
           
@@ -266,7 +266,7 @@ export class ETLPipeline extends EventEmitter {
         }
         
         // Apply the transformation
-        data = transformationService.applyTransformation(data, transformation);
+        data = await transformationService.applyTransformation(transformation, data);
         
         this.log(`Transformation ${transformation.name} applied successfully`);
       } catch (error) {
@@ -345,7 +345,7 @@ export class ETLPipeline extends EventEmitter {
       jobId: this.job.id,
       phase,
       progress,
-      status: 'running',
+      status: JobStatus.RUNNING,
       message,
       timestamp: new Date()
     };
