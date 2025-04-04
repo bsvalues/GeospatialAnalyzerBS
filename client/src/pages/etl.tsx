@@ -72,7 +72,7 @@ export default function ETLPage() {
               </TabsContent>
               
               <TabsContent value="datasources" className="mt-0">
-                <ETLDataSourceManager />
+                <ETLDataSourceManager dataSourceId="db-1" />
               </TabsContent>
               
               <TabsContent value="transformations" className="mt-0">

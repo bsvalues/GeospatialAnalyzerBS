@@ -15,6 +15,8 @@ import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Loader2, Play, Edit, Trash, Plus, RefreshCw } from 'lucide-react';
+// Import DataConnector for connection management
+import { dataConnector } from '../services/etl/DataConnector';
 
 // Data Source Form Schema
 const dataSourceFormSchema = z.object({
@@ -88,6 +90,7 @@ function DataSourcesTab() {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [selectedDataSource, setSelectedDataSource] = useState<any>(null);
+  const [isConnecting, setIsConnecting] = useState(false);
   
   const queryClient = useQueryClient();
   
@@ -154,6 +157,103 @@ function DataSourcesTab() {
     }
   });
   
+  // Handle testing data source connection
+  const handleTestDataConnection = async (id: string | number) => {
+    try {
+      setIsConnecting(true);
+      
+      // Convert id to string for API request if it's not already a string
+      const dataId = String(id);
+      
+      const result = await dataConnector.testConnection(dataId);
+      
+      toast({
+        title: result.success ? 'Connection successful' : 'Connection failed',
+        description: result.message,
+        variant: result.success ? 'default' : 'destructive'
+      });
+      
+      // If connection was successful, refresh data sources
+      if (result.success) {
+        queryClient.invalidateQueries({ queryKey: ['/api/etl/data-sources'] });
+      }
+    } catch (error) {
+      toast({
+        title: 'Connection error',
+        description: error instanceof Error ? error.message : 'An unknown error occurred',
+        variant: 'destructive'
+      });
+    } finally {
+      setIsConnecting(false);
+    }
+  };
+  
+  // Handle connecting to data source
+  const handleConnectDataSource = async (id: string | number) => {
+    try {
+      setIsConnecting(true);
+      
+      // Convert id to string for API request if it's not already a string
+      const dataId = String(id);
+      
+      const success = await dataConnector.connectToDataSource(dataId);
+      
+      // Get the data source info for the toast message
+      const dataSource = dataSources.find(ds => String(ds.id) === dataId);
+      const name = dataSource ? dataSource.name : 'data source';
+      
+      toast({
+        title: success ? 'Connection established' : 'Connection failed',
+        description: success 
+          ? `Successfully connected to ${name}`
+          : `Failed to connect to ${name}`,
+        variant: success ? 'default' : 'destructive'
+      });
+      
+      // Refresh data sources to update the UI
+      queryClient.invalidateQueries({ queryKey: ['/api/etl/data-sources'] });
+    } catch (error) {
+      toast({
+        title: 'Connection error',
+        description: error instanceof Error ? error.message : 'An unknown error occurred',
+        variant: 'destructive'
+      });
+    } finally {
+      setIsConnecting(false);
+    }
+  };
+  
+  // Handle disconnecting from data source
+  const handleDisconnectDataSource = (id: string | number) => {
+    try {
+      // Convert id to string for API request if it's not already a string
+      const dataId = String(id);
+      
+      const success = dataConnector.closeConnection(dataId);
+      
+      // Get the data source info for the toast message
+      const dataSource = dataSources.find(ds => String(ds.id) === dataId);
+      const name = dataSource ? dataSource.name : 'data source';
+      
+      toast({
+        title: success ? 'Disconnected' : 'Disconnect failed',
+        description: success 
+          ? `Successfully disconnected from ${name}`
+          : `Failed to disconnect from ${name}`,
+        variant: success ? 'default' : 'destructive'
+      });
+      
+      // Refresh data sources to update the UI
+      queryClient.invalidateQueries({ queryKey: ['/api/etl/data-sources'] });
+    } catch (error) {
+      toast({
+        title: 'Disconnect error',
+        description: error instanceof Error ? error.message : 'An unknown error occurred',
+        variant: 'destructive'
+      });
+    }
+  };
+  
   const handleEditDataSource = (dataSource: any) => {
     setSelectedDataSource(dataSource);
     setIsEditDialogOpen(true);
@@ -195,18 +295,43 @@ function DataSourcesTab() {
                 <div className="mb-2">
                   <span className="font-semibold">Type:</span> {dataSource.type}
                 </div>
-                <div className="mb-2">
+                <div className="mb-4">
                   <span className="font-semibold">Connection Details:</span>
                   <pre className="text-xs mt-1 p-2 bg-gray-100 dark:bg-gray-800 rounded overflow-auto max-h-32">
                     {JSON.stringify(dataSource.connectionDetails, null, 2)}
                   </pre>
                 </div>
                 {dataSource.lastConnected && (
-                  <div>
+                  <div className="mb-4">
                     <span className="font-semibold">Last Connected:</span>{' '}
                     {new Date(dataSource.lastConnected).toLocaleString()}
                   </div>
                 )}
+                
+                {/* Data Connection Manager */}
+                <div className="mt-4 border-t pt-4">
+                  <span className="font-semibold block mb-2">Connection Management:</span>
+                  <div className="flex items-center">
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      className="mr-2"
+                      onClick={() => handleTestDataConnection(dataSource.id)}
+                    >
+                      Test Connection
+                    </Button>
+                    <Button 
+                      variant={dataSource.isConnected ? "secondary" : "default"}
+                      size="sm"
+                      onClick={() => dataSource.isConnected 
+                        ? handleDisconnectDataSource(dataSource.id)
+                        : handleConnectDataSource(dataSource.id)
+                      }
+                    >
+                      {dataSource.isConnected ? "Disconnect" : "Connect"}
+                    </Button>
+                  </div>
+                </div>
               </CardContent>
               <CardFooter className="flex justify-end gap-2">
                 <Button size="sm" variant="outline" onClick={() => handleEditDataSource(dataSource)}>
