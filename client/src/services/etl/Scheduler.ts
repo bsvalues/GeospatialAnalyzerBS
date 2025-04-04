@@ -1,423 +1,488 @@
-import { JobFrequency } from './ETLTypes';
+import { ETLJob, JobStatus } from './ETLTypes';
 import { alertService, AlertType, AlertCategory, AlertSeverity } from './AlertService';
 
 /**
- * Type for scheduled job callback
+ * Schedule frequency enum
  */
-export type JobCallback = () => Promise<void> | void;
+export enum ScheduleFrequency {
+  ONCE = 'ONCE',
+  HOURLY = 'HOURLY',
+  DAILY = 'DAILY',
+  WEEKLY = 'WEEKLY',
+  MONTHLY = 'MONTHLY',
+  CUSTOM = 'CUSTOM'
+}
 
 /**
- * Interface for a scheduled job
+ * Schedule configuration interface
  */
-export interface ScheduledJob {
-  /** Job ID */
-  id: string;
+export interface ScheduleConfig {
+  /** Schedule frequency */
+  frequency: ScheduleFrequency;
   
-  /** Job schedule (cron expression) */
-  schedule: string;
+  /** Start date */
+  startDate?: Date;
   
-  /** Next run date */
-  nextRunAt?: Date;
+  /** End date */
+  endDate?: Date;
   
-  /** Job callback */
-  callback: JobCallback;
+  /** Hours for hourly schedule */
+  hours?: number;
   
-  /** Whether the job is enabled */
+  /** Time for daily schedule (HH:MM) */
+  time?: string;
+  
+  /** Day of week for weekly schedule (0-6, 0 = Sunday) */
+  dayOfWeek?: number;
+  
+  /** Day of month for monthly schedule (1-31) */
+  dayOfMonth?: number;
+  
+  /** Cron expression for custom schedule */
+  cronExpression?: string;
+  
+  /** Whether the schedule is enabled */
   enabled: boolean;
 }
 
 /**
- * Check if the current date and time matches the cron expression
- * 
- * Note: This is a simplified cron implementation and doesn't support all features
+ * Scheduled job interface
  */
-function matchesCron(date: Date, cronExpression: string): boolean {
-  // Parse cron expression
-  const [minute, hour, dayOfMonth, month, dayOfWeek] = cronExpression.split(' ');
+export interface ScheduledJob {
+  /** Job ID */
+  jobId: number;
   
-  const currentMinute = date.getMinutes();
-  const currentHour = date.getHours();
-  const currentDayOfMonth = date.getDate();
-  const currentMonth = date.getMonth() + 1; // 1-12
-  const currentDayOfWeek = date.getDay(); // 0-6, Sunday is 0
+  /** Schedule configuration */
+  schedule: ScheduleConfig;
   
-  // Helper function to check if a cron part matches
-  const matches = (value: number, cronPart: string) => {
-    if (cronPart === '*') {
-      return true;
-    }
-    
-    if (cronPart.includes(',')) {
-      return cronPart.split(',').some(part => matches(value, part));
-    }
-    
-    if (cronPart.includes('-')) {
-      const [start, end] = cronPart.split('-').map(Number);
-      return value >= start && value <= end;
-    }
-    
-    if (cronPart.includes('/')) {
-      const [range, step] = cronPart.split('/');
-      const stepVal = parseInt(step, 10);
-      
-      if (range === '*') {
-        return value % stepVal === 0;
-      }
-      
-      const [start, end] = range.split('-').map(Number);
-      if (value < start || value > end) {
-        return false;
-      }
-      
-      return (value - start) % stepVal === 0;
-    }
-    
-    return value === parseInt(cronPart, 10);
-  };
+  /** Next run timestamp */
+  nextRun?: Date;
   
-  // Check all cron parts
-  return (
-    matches(currentMinute, minute) &&
-    matches(currentHour, hour) &&
-    matches(currentDayOfMonth, dayOfMonth) &&
-    matches(currentMonth, month) &&
-    matches(currentDayOfWeek, dayOfWeek)
-  );
+  /** Last run timestamp */
+  lastRun?: Date;
+  
+  /** Current status */
+  status: JobStatus;
 }
 
 /**
- * Calculate the next run date for a cron expression
+ * Matches a time string (HH:MM) against the current time
  */
-function getNextRunDate(cronExpression: string): Date {
+function matchesTime(timeStr: string): boolean {
+  const [hours, minutes] = timeStr.split(':').map(Number);
   const now = new Date();
-  let next = new Date(now);
-  
-  // Add one minute to start checking from the next minute
-  next.setMinutes(next.getMinutes() + 1);
-  next.setSeconds(0);
-  next.setMilliseconds(0);
-  
-  // Look ahead up to 1 year
-  const maxDate = new Date(now);
-  maxDate.setFullYear(maxDate.getFullYear() + 1);
-  
-  // Find the next time that matches the cron
-  while (next < maxDate) {
-    if (matchesCron(next, cronExpression)) {
-      return next;
-    }
-    
-    // Move to the next minute
-    next.setMinutes(next.getMinutes() + 1);
+  return now.getHours() === hours && now.getMinutes() === minutes;
+}
+
+/**
+ * Calculates when a job should next run
+ */
+function calculateNextRun(schedule: ScheduleConfig): Date | undefined {
+  if (!schedule.enabled) {
+    return undefined;
   }
   
-  // If no match found, return a far future date
-  const futureDate = new Date();
-  futureDate.setFullYear(futureDate.getFullYear() + 10);
-  return futureDate;
+  const now = new Date();
+  
+  // Don't schedule if end date is in the past
+  if (schedule.endDate && schedule.endDate < now) {
+    return undefined;
+  }
+  
+  // Don't schedule if start date is in the future
+  if (schedule.startDate && schedule.startDate > now) {
+    return schedule.startDate;
+  }
+  
+  // Calculate next run based on frequency
+  switch (schedule.frequency) {
+    case ScheduleFrequency.ONCE:
+      return schedule.startDate && schedule.startDate > now ? schedule.startDate : undefined;
+      
+    case ScheduleFrequency.HOURLY: {
+      const nextRun = new Date(now);
+      nextRun.setHours(nextRun.getHours() + (schedule.hours || 1));
+      nextRun.setMinutes(0);
+      nextRun.setSeconds(0);
+      nextRun.setMilliseconds(0);
+      return nextRun;
+    }
+      
+    case ScheduleFrequency.DAILY: {
+      const nextRun = new Date(now);
+      const [hours, minutes] = (schedule.time || '00:00').split(':').map(Number);
+      
+      nextRun.setHours(hours);
+      nextRun.setMinutes(minutes);
+      nextRun.setSeconds(0);
+      nextRun.setMilliseconds(0);
+      
+      // If the time has already passed today, schedule for tomorrow
+      if (nextRun <= now) {
+        nextRun.setDate(nextRun.getDate() + 1);
+      }
+      
+      return nextRun;
+    }
+      
+    case ScheduleFrequency.WEEKLY: {
+      const nextRun = new Date(now);
+      const [hours, minutes] = (schedule.time || '00:00').split(':').map(Number);
+      const dayOfWeek = schedule.dayOfWeek !== undefined ? schedule.dayOfWeek : 0;
+      
+      nextRun.setHours(hours);
+      nextRun.setMinutes(minutes);
+      nextRun.setSeconds(0);
+      nextRun.setMilliseconds(0);
+      
+      // Calculate days until next occurrence of dayOfWeek
+      let daysUntil = dayOfWeek - nextRun.getDay();
+      if (daysUntil <= 0 || (daysUntil === 0 && nextRun <= now)) {
+        daysUntil += 7;
+      }
+      
+      nextRun.setDate(nextRun.getDate() + daysUntil);
+      
+      return nextRun;
+    }
+      
+    case ScheduleFrequency.MONTHLY: {
+      const nextRun = new Date(now);
+      const [hours, minutes] = (schedule.time || '00:00').split(':').map(Number);
+      const dayOfMonth = schedule.dayOfMonth !== undefined ? schedule.dayOfMonth : 1;
+      
+      nextRun.setHours(hours);
+      nextRun.setMinutes(minutes);
+      nextRun.setSeconds(0);
+      nextRun.setMilliseconds(0);
+      nextRun.setDate(dayOfMonth);
+      
+      // If the day has already passed this month, schedule for next month
+      if (nextRun <= now) {
+        nextRun.setMonth(nextRun.getMonth() + 1);
+      }
+      
+      return nextRun;
+    }
+      
+    case ScheduleFrequency.CUSTOM:
+      // In a real app, we would use a cron parser library
+      // For now, just schedule for the next day
+      const nextRun = new Date(now);
+      nextRun.setDate(nextRun.getDate() + 1);
+      nextRun.setHours(0);
+      nextRun.setMinutes(0);
+      nextRun.setSeconds(0);
+      nextRun.setMilliseconds(0);
+      return nextRun;
+      
+    default:
+      return undefined;
+  }
 }
 
 /**
- * Scheduler class
+ * Scheduler
  * 
- * This class is responsible for scheduling and executing jobs.
+ * This class is responsible for scheduling and running ETL jobs.
  */
 class Scheduler {
-  private jobs: Map<string, ScheduledJob> = new Map();
-  private timeouts: Map<string, number> = new Map();
-  private interval: number | null = null;
-  
-  constructor() {
-    // Start scheduler interval
-    this.interval = window.setInterval(() => this.checkSchedule(), 60000); // Check every minute
-  }
-  
-  /**
-   * Check scheduled jobs
-   */
-  private checkSchedule(): void {
-    const now = new Date();
-    
-    for (const [id, job] of this.jobs.entries()) {
-      if (!job.enabled) {
-        continue;
-      }
-      
-      if (matchesCron(now, job.schedule)) {
-        this.executeJob(id);
-      }
-      
-      // Update next run date
-      job.nextRunAt = getNextRunDate(job.schedule);
-    }
-  }
-  
-  /**
-   * Execute a job by ID
-   */
-  private async executeJob(id: string): Promise<void> {
-    const job = this.jobs.get(id);
-    
-    if (!job || !job.enabled) {
-      return;
-    }
-    
-    try {
-      alertService.createAlert({
-        type: AlertType.INFO,
-        severity: AlertSeverity.LOW,
-        category: AlertCategory.JOB,
-        title: `Scheduled Job Started: ${id}`,
-        message: `Scheduled job "${id}" has started execution`
-      });
-      
-      await job.callback();
-      
-      alertService.createAlert({
-        type: AlertType.SUCCESS,
-        severity: AlertSeverity.LOW,
-        category: AlertCategory.JOB,
-        title: `Scheduled Job Completed: ${id}`,
-        message: `Scheduled job "${id}" completed successfully`
-      });
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      
-      alertService.createAlert({
-        type: AlertType.ERROR,
-        severity: AlertSeverity.HIGH,
-        category: AlertCategory.JOB,
-        title: `Scheduled Job Failed: ${id}`,
-        message: `Scheduled job "${id}" failed: ${errorMessage}`
-      });
-    }
-  }
+  private scheduledJobs = new Map<number, ScheduledJob>();
+  private pollInterval = 60 * 1000; // 60 seconds
+  private pollIntervalId: number | null = null;
+  private isRunning = false;
+  private dueJobs: number[] = [];
+  private runningJobs = new Set<number>();
+  private jobRunner: ((jobId: number) => Promise<void>) | null = null;
   
   /**
    * Schedule a job
    */
-  scheduleJob(id: string, schedule: string, callback: JobCallback): ScheduledJob {
-    // Cancel existing job if it exists
-    this.cancelJob(id);
-    
-    // Create job
-    const job: ScheduledJob = {
-      id,
+  scheduleJob(jobId: number, schedule: ScheduleConfig): ScheduledJob {
+    // Create a scheduled job
+    const scheduledJob: ScheduledJob = {
+      jobId,
       schedule,
-      callback,
-      enabled: true,
-      nextRunAt: getNextRunDate(schedule)
+      status: JobStatus.IDLE
     };
     
-    // Store job
-    this.jobs.set(id, job);
+    // Calculate next run
+    if (schedule.enabled) {
+      scheduledJob.nextRun = calculateNextRun(schedule);
+    }
     
-    // Create timeout for next run
-    this.createTimeout(id);
+    // Add to scheduled jobs
+    this.scheduledJobs.set(jobId, scheduledJob);
     
-    // Log job creation
+    // Log job scheduled
     alertService.createAlert({
       type: AlertType.INFO,
       severity: AlertSeverity.LOW,
       category: AlertCategory.JOB,
-      title: `Job Scheduled: ${id}`,
-      message: `Job "${id}" scheduled with cron expression "${schedule}". Next run: ${job.nextRunAt?.toLocaleString()}`
+      title: 'Job Scheduled',
+      message: `Job ${jobId} scheduled for ${scheduledJob.nextRun?.toLocaleString() || 'manual execution only'}`
     });
     
-    return job;
+    return scheduledJob;
   }
   
   /**
-   * Create timeout for a job to run at the next scheduled time
+   * Update a job schedule
    */
-  private createTimeout(id: string): void {
-    const job = this.jobs.get(id);
+  updateSchedule(jobId: number, schedule: ScheduleConfig): ScheduledJob | undefined {
+    // Get scheduled job
+    const scheduledJob = this.scheduledJobs.get(jobId);
     
-    if (!job || !job.enabled || !job.nextRunAt) {
+    if (!scheduledJob) {
+      return undefined;
+    }
+    
+    // Update schedule
+    scheduledJob.schedule = schedule;
+    
+    // Calculate next run
+    if (schedule.enabled) {
+      scheduledJob.nextRun = calculateNextRun(schedule);
+    } else {
+      scheduledJob.nextRun = undefined;
+    }
+    
+    // Update scheduled job
+    this.scheduledJobs.set(jobId, scheduledJob);
+    
+    // Log schedule updated
+    alertService.createAlert({
+      type: AlertType.INFO,
+      severity: AlertSeverity.LOW,
+      category: AlertCategory.JOB,
+      title: 'Schedule Updated',
+      message: `Job ${jobId} schedule updated, next run: ${scheduledJob.nextRun?.toLocaleString() || 'manual execution only'}`
+    });
+    
+    return scheduledJob;
+  }
+  
+  /**
+   * Unschedule a job
+   */
+  unscheduleJob(jobId: number): boolean {
+    const result = this.scheduledJobs.delete(jobId);
+    
+    if (result) {
+      // Log job unscheduled
+      alertService.createAlert({
+        type: AlertType.INFO,
+        severity: AlertSeverity.LOW,
+        category: AlertCategory.JOB,
+        title: 'Job Unscheduled',
+        message: `Job ${jobId} has been unscheduled`
+      });
+    }
+    
+    return result;
+  }
+  
+  /**
+   * Get a scheduled job
+   */
+  getScheduledJob(jobId: number): ScheduledJob | undefined {
+    return this.scheduledJobs.get(jobId);
+  }
+  
+  /**
+   * Get all scheduled jobs
+   */
+  getAllScheduledJobs(): ScheduledJob[] {
+    return Array.from(this.scheduledJobs.values());
+  }
+  
+  /**
+   * Get due jobs
+   */
+  getDueJobs(): number[] {
+    const now = new Date();
+    const dueJobs: number[] = [];
+    
+    for (const [jobId, job] of this.scheduledJobs.entries()) {
+      if (job.nextRun && job.nextRun <= now && job.status !== JobStatus.RUNNING) {
+        dueJobs.push(jobId);
+      }
+    }
+    
+    return dueJobs;
+  }
+  
+  /**
+   * Start the scheduler
+   */
+  start(jobRunner: (jobId: number) => Promise<void>): void {
+    if (this.isRunning) {
       return;
     }
     
-    // Clear existing timeout
-    this.clearTimeout(id);
+    this.isRunning = true;
+    this.jobRunner = jobRunner;
     
-    // Calculate time until next run
+    // Start polling
+    this.poll();
+    this.pollIntervalId = window.setInterval(() => this.poll(), this.pollInterval);
+    
+    // Log scheduler started
+    alertService.createAlert({
+      type: AlertType.INFO,
+      severity: AlertSeverity.LOW,
+      category: AlertCategory.SYSTEM,
+      title: 'Scheduler Started',
+      message: `Scheduler has started with ${this.scheduledJobs.size} jobs scheduled`
+    });
+  }
+  
+  /**
+   * Stop the scheduler
+   */
+  stop(): void {
+    if (!this.isRunning) {
+      return;
+    }
+    
+    this.isRunning = false;
+    
+    // Stop polling
+    if (this.pollIntervalId !== null) {
+      window.clearInterval(this.pollIntervalId);
+      this.pollIntervalId = null;
+    }
+    
+    // Log scheduler stopped
+    alertService.createAlert({
+      type: AlertType.INFO,
+      severity: AlertSeverity.LOW,
+      category: AlertCategory.SYSTEM,
+      title: 'Scheduler Stopped',
+      message: 'Scheduler has been stopped'
+    });
+  }
+  
+  /**
+   * Poll for due jobs
+   */
+  private poll(): void {
+    // Check for due jobs
+    this.dueJobs = this.getDueJobs();
+    
+    // Process due jobs
+    this.processDueJobs();
+    
+    // Update next run times
+    this.updateNextRunTimes();
+  }
+  
+  /**
+   * Process due jobs
+   */
+  private processDueJobs(): void {
+    if (this.dueJobs.length === 0 || !this.jobRunner) {
+      return;
+    }
+    
+    // Process each due job
+    for (const jobId of this.dueJobs) {
+      // Skip if already running
+      if (this.runningJobs.has(jobId)) {
+        continue;
+      }
+      
+      // Get job
+      const job = this.scheduledJobs.get(jobId);
+      
+      if (!job) {
+        continue;
+      }
+      
+      // Update job status
+      job.status = JobStatus.RUNNING;
+      job.lastRun = new Date();
+      this.runningJobs.add(jobId);
+      
+      // Run job
+      this.jobRunner(jobId)
+        .then(() => {
+          // Update job status
+          if (job) {
+            job.status = JobStatus.SUCCEEDED;
+          }
+        })
+        .catch(error => {
+          // Update job status
+          if (job) {
+            job.status = JobStatus.FAILED;
+          }
+          
+          // Log error
+          alertService.createAlert({
+            type: AlertType.ERROR,
+            severity: AlertSeverity.HIGH,
+            category: AlertCategory.JOB,
+            title: 'Job Execution Error',
+            message: `Error executing job ${jobId}: ${error instanceof Error ? error.message : String(error)}`
+          });
+        })
+        .finally(() => {
+          // Remove from running jobs
+          this.runningJobs.delete(jobId);
+        });
+    }
+    
+    // Clear due jobs
+    this.dueJobs = [];
+  }
+  
+  /**
+   * Update next run times
+   */
+  private updateNextRunTimes(): void {
     const now = new Date();
-    const timeUntilNextRun = Math.max(0, job.nextRunAt.getTime() - now.getTime());
     
-    // Create timeout
-    const timeout = window.setTimeout(() => {
-      this.executeJob(id);
-      this.createTimeout(id); // Schedule next run
-    }, timeUntilNextRun);
-    
-    // Store timeout ID
-    this.timeouts.set(id, timeout);
-  }
-  
-  /**
-   * Clear timeout for a job
-   */
-  private clearTimeout(id: string): void {
-    const timeout = this.timeouts.get(id);
-    
-    if (timeout !== undefined) {
-      window.clearTimeout(timeout);
-      this.timeouts.delete(id);
+    for (const [jobId, job] of this.scheduledJobs.entries()) {
+      // Skip running jobs
+      if (job.status === JobStatus.RUNNING) {
+        continue;
+      }
+      
+      // Skip disabled schedules
+      if (!job.schedule.enabled) {
+        job.nextRun = undefined;
+        continue;
+      }
+      
+      // Update next run if it's in the past
+      if (job.nextRun && job.nextRun <= now) {
+        job.nextRun = calculateNextRun(job.schedule);
+      }
+      
+      // If no next run, calculate it
+      if (!job.nextRun) {
+        job.nextRun = calculateNextRun(job.schedule);
+      }
     }
   }
   
   /**
-   * Cancel a job
+   * Get job execution counts
    */
-  cancelJob(id: string): boolean {
-    // Clear timeout
-    this.clearTimeout(id);
+  getJobExecutionCounts(): Record<JobStatus, number> {
+    const counts: Record<JobStatus, number> = {
+      [JobStatus.IDLE]: 0,
+      [JobStatus.RUNNING]: 0,
+      [JobStatus.SUCCEEDED]: 0,
+      [JobStatus.FAILED]: 0
+    };
     
-    // Remove job
-    const job = this.jobs.get(id);
-    
-    if (!job) {
-      return false;
+    for (const job of this.scheduledJobs.values()) {
+      counts[job.status]++;
     }
     
-    this.jobs.delete(id);
-    
-    return true;
-  }
-  
-  /**
-   * Cancel all jobs
-   */
-  cancelAllJobs(): void {
-    // Clear all timeouts
-    for (const [id] of this.timeouts.entries()) {
-      this.clearTimeout(id);
-    }
-    
-    // Remove all jobs
-    this.jobs.clear();
-  }
-  
-  /**
-   * Get a job by ID
-   */
-  getJob(id: string): ScheduledJob | undefined {
-    return this.jobs.get(id);
-  }
-  
-  /**
-   * Get all jobs
-   */
-  getAllJobs(): ScheduledJob[] {
-    return Array.from(this.jobs.values());
-  }
-  
-  /**
-   * Get the next run date for a job
-   */
-  getNextRunDate(id: string): Date | undefined {
-    const job = this.jobs.get(id);
-    return job?.nextRunAt;
-  }
-  
-  /**
-   * Get the next run date for a cron expression
-   */
-  getNextRunDateForCron(cronExpression: string): Date {
-    return getNextRunDate(cronExpression);
-  }
-  
-  /**
-   * Enable a job
-   */
-  enableJob(id: string): ScheduledJob | undefined {
-    const job = this.jobs.get(id);
-    
-    if (!job) {
-      return undefined;
-    }
-    
-    job.enabled = true;
-    job.nextRunAt = getNextRunDate(job.schedule);
-    
-    // Create timeout for next run
-    this.createTimeout(id);
-    
-    return job;
-  }
-  
-  /**
-   * Disable a job
-   */
-  disableJob(id: string): ScheduledJob | undefined {
-    const job = this.jobs.get(id);
-    
-    if (!job) {
-      return undefined;
-    }
-    
-    job.enabled = false;
-    
-    // Clear timeout
-    this.clearTimeout(id);
-    
-    return job;
-  }
-  
-  /**
-   * Get schedule description
-   */
-  getScheduleDescription(schedule: string): string {
-    const [minute, hour, dayOfMonth, month, dayOfWeek] = schedule.split(' ');
-    
-    if (minute === '*' && hour === '*' && dayOfMonth === '*' && month === '*' && dayOfWeek === '*') {
-      return 'Every minute';
-    }
-    
-    if (minute === '0' && hour === '*' && dayOfMonth === '*' && month === '*' && dayOfWeek === '*') {
-      return 'Every hour, on the hour';
-    }
-    
-    if (minute === '0' && hour === '0' && dayOfMonth === '*' && month === '*' && dayOfWeek === '*') {
-      return 'Every day at midnight';
-    }
-    
-    if (minute === '0' && hour === '0' && dayOfMonth === '*' && month === '*' && dayOfWeek === '0') {
-      return 'Every Sunday at midnight';
-    }
-    
-    if (minute === '0' && hour === '0' && dayOfMonth === '1' && month === '*' && dayOfWeek === '*') {
-      return 'First day of every month at midnight';
-    }
-    
-    return `Cron: ${schedule}`;
-  }
-  
-  /**
-   * Get schedule for job frequency
-   */
-  getScheduleForFrequency(frequency: JobFrequency): string {
-    switch (frequency) {
-      case JobFrequency.MINUTELY:
-        return '* * * * *'; // Every minute
-        
-      case JobFrequency.HOURLY:
-        return '0 * * * *'; // On the hour, every hour
-        
-      case JobFrequency.DAILY:
-        return '0 0 * * *'; // Midnight every day
-        
-      case JobFrequency.WEEKLY:
-        return '0 0 * * 0'; // Midnight on Sunday
-        
-      case JobFrequency.MONTHLY:
-        return '0 0 1 * *'; // Midnight on the 1st of each month
-        
-      case JobFrequency.ONCE:
-      case JobFrequency.CUSTOM:
-      default:
-        return '0 0 * * *'; // Default to midnight every day
-    }
+    return counts;
   }
 }
 

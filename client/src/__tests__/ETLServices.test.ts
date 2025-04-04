@@ -3,7 +3,7 @@ import {
   dataConnector,
   transformationService,
   scheduler,
-  etlPipelineManager,
+  etlManager,
   AlertType,
   AlertSeverity,
   AlertCategory,
@@ -49,7 +49,7 @@ describe('ETL Services', () => {
       expect(retrievedAlert?.id).toBe(alert.id);
       
       // Get all alerts
-      const alerts = alertService.getAlerts();
+      const alerts = alertService.getAllAlerts();
       expect(alerts.length).toBeGreaterThan(0);
       expect(alerts.some(a => a.id === alert.id)).toBe(true);
     });
@@ -87,7 +87,7 @@ describe('ETL Services', () => {
       };
       
       // Apply the transformation
-      const result = await transformationService.applyTransformations(data, [rule]);
+      const result = transformationService.applyTransformation(rule, data);
       
       // Verify the result
       expect(result.success).toBe(true);
@@ -98,19 +98,20 @@ describe('ETL Services', () => {
   
   describe('Scheduler', () => {
     test('schedules and unschedules jobs', () => {
-      // Start the scheduler
-      scheduler.start();
+      // Create a mock job runner
+      const mockJobRunner = jest.fn().mockResolvedValue(undefined);
+      
+      // Start the scheduler with the job runner
+      scheduler.start(mockJobRunner);
       
       // Schedule a job
-      const handler = jest.fn().mockResolvedValue(undefined);
       const job = scheduler.scheduleJob(
-        1,
-        'Test Job',
+        1, 
         {
           frequency: ScheduleFrequency.ONCE,
-          startDate: new Date(Date.now() + 60000) // Start in 1 minute
-        },
-        handler
+          startDate: new Date(Date.now() + 60000), // Start in 1 minute
+          enabled: true
+        }
       );
       
       // Verify the job was scheduled
@@ -132,7 +133,7 @@ describe('ETL Services', () => {
     });
   });
   
-  describe('ETLPipelineManager', () => {
+  describe('ETLManager', () => {
     test('initializes and manages ETL components', async () => {
       // Sample data
       const jobs = [
@@ -204,21 +205,21 @@ describe('ETL Services', () => {
       ];
       
       // Initialize the pipeline manager
-      await etlPipelineManager.initialize(jobs, dataSources, transformationRules);
+      await etlManager.initialize(jobs, dataSources, transformationRules);
       
       // Verify initialization
-      expect(etlPipelineManager.getAllJobs().length).toBe(jobs.length);
-      expect(etlPipelineManager.getAllDataSources().length).toBe(dataSources.length);
-      expect(etlPipelineManager.getAllTransformationRules().length).toBe(transformationRules.length);
+      expect(etlManager.getAllJobs().length).toBe(jobs.length);
+      expect(etlManager.getAllDataSources().length).toBe(dataSources.length);
+      expect(etlManager.getAllTransformationRules().length).toBe(transformationRules.length);
       
       // Get system status
-      const status = etlPipelineManager.getSystemStatus();
+      const status = etlManager.getSystemStatus();
       expect(status.jobCount).toBe(jobs.length);
       expect(status.dataSourceCount).toBe(dataSources.length);
       expect(status.transformationRuleCount).toBe(transformationRules.length);
       
       // Shutdown the pipeline manager
-      etlPipelineManager.shutdown();
+      etlManager.shutdown();
     });
   });
 });

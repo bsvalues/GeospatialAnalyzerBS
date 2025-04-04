@@ -2,478 +2,424 @@ import {
   ETLJob, 
   JobStatus, 
   DataSource, 
-  TransformationRule, 
-  JobFrequency,
-  SystemStatus,
-  DataSourceType
+  TransformationRule,
+  DataSourceType,
+  FilterOperator,
+  FilterLogic,
+  TransformationType,
+  RecordCounts,
+  SystemStatus
 } from './ETLTypes';
 import { etlPipeline, JobRun } from './ETLPipeline';
-import { dataConnector, ConnectionResult } from './DataConnector';
-import { scheduler } from './Scheduler';
+import { scheduler, ScheduleFrequency, ScheduleConfig } from './Scheduler';
 import { alertService, AlertType, AlertCategory, AlertSeverity } from './AlertService';
 
 /**
  * ETL Pipeline Manager
  * 
- * This class coordinates all ETL operations and maintains system state.
+ * This class is responsible for coordinating all ETL services.
  */
 class ETLPipelineManager {
-  private initialized: boolean = false;
-  private running: boolean = false;
-  private startTime: Date = new Date();
-  private lastError?: string;
-  
-  private jobs: Map<number, ETLJob> = new Map();
-  private dataSources: Map<number, DataSource> = new Map();
-  private transformationRules: Map<number, TransformationRule> = new Map();
-  private jobRuns: Map<string, JobRun> = new Map();
-  
-  private nextJobId: number = 1;
-  private nextDataSourceId: number = 1;
-  private nextTransformationRuleId: number = 1;
+  private jobs = new Map<number, ETLJob>();
+  private dataSources = new Map<number, DataSource>();
+  private transformationRules = new Map<number, TransformationRule>();
+  private jobRuns = new Map<string, JobRun>();
+  private nextJobId = 1;
+  private nextDataSourceId = 1;
+  private nextTransformationRuleId = 1;
+  private isInitialized = false;
   
   /**
-   * Initialize the ETL system with sample data
+   * Initialize the ETL pipeline manager
    */
   initialize(): void {
-    if (this.initialized) {
+    if (this.isInitialized) {
       return;
     }
     
-    this.createSampleDataSources();
-    this.createSampleTransformationRules();
-    this.createSampleJobs();
+    // Initialize data
+    this.initializeData();
     
-    this.initialized = true;
-    this.running = true;
-    this.startTime = new Date();
+    // Start scheduler
+    scheduler.start(this.runJob.bind(this));
     
+    this.isInitialized = true;
+    
+    // Log initialization
     alertService.createAlert({
       type: AlertType.INFO,
       severity: AlertSeverity.LOW,
       category: AlertCategory.SYSTEM,
-      title: 'ETL System Initialized',
-      message: 'ETL system has been initialized successfully'
+      title: 'ETL Pipeline Manager Initialized',
+      message: 'ETL Pipeline Manager has been initialized'
     });
   }
   
   /**
-   * Create sample data sources
+   * Initialize data for demo purposes
    */
-  private createSampleDataSources(): void {
-    // Create property API data source
-    this.registerDataSource({
+  private initializeData(): void {
+    // Create data sources
+    this.createDemoDataSources();
+    
+    // Create transformation rules
+    this.createDemoTransformationRules();
+    
+    // Create jobs
+    this.createDemoJobs();
+    
+    // Schedule jobs
+    this.scheduleJobs();
+  }
+  
+  /**
+   * Create demo data sources
+   */
+  private createDemoDataSources(): void {
+    // PostgreSQL source
+    const postgresSource: DataSource = {
+      id: this.nextDataSourceId++,
+      name: 'PostgreSQL Database',
+      type: DataSourceType.POSTGRESQL,
+      config: {
+        host: 'localhost',
+        port: 5432,
+        database: 'etl_source',
+        user: 'etl_user',
+        password: '********',
+        options: {}
+      },
+      enabled: true,
+      description: 'Main PostgreSQL database containing property records',
+      tags: ['database', 'properties', 'source']
+    };
+    
+    // REST API source
+    const apiSource: DataSource = {
       id: this.nextDataSourceId++,
       name: 'Property API',
-      description: 'RESTful API for property data',
       type: DataSourceType.REST_API,
-      enabled: true,
       config: {
         url: 'https://api.example.com/properties',
         method: 'GET',
         headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer sample-token'
+          'Authorization': 'Bearer ********',
+          'Content-Type': 'application/json'
         },
-        data: [
-          { id: 1, addr: '123 Main St', price: 350000, sqft: 2200, yearBuilt: 2005, type: 'residential', latitude: 47.608013, longitude: -122.335167 },
-          { id: 2, addr: '456 Oak Ave', price: 425000, sqft: 2500, yearBuilt: 2010, type: 'residential', latitude: 47.608013, longitude: -122.335167 },
-          { id: 3, addr: '789 Pine St', price: 275000, sqft: 1800, yearBuilt: 1998, type: 'residential', latitude: 47.608013, longitude: -122.335167 },
-          { id: 4, addr: '101 Business Rd', price: 750000, sqft: 5000, yearBuilt: 2015, type: 'commercial', latitude: 47.608013, longitude: -122.335167 },
-          { id: 5, addr: '202 Industrial Park', price: 550000, sqft: 7500, yearBuilt: 1995, type: 'industrial', latitude: 47.608013, longitude: -122.335167 }
-        ],
-        options: {
-          loadMode: 'INSERT',
-          target: 'properties'
-        }
+        options: {}
       },
-      createdAt: new Date(),
-      updatedAt: new Date()
-    });
-    
-    // Create property database
-    this.registerDataSource({
-      id: this.nextDataSourceId++,
-      name: 'Property Database',
-      description: 'PostgreSQL database for property data',
-      type: DataSourceType.POSTGRESQL,
       enabled: true,
+      description: 'REST API for property data',
+      tags: ['api', 'properties', 'source']
+    };
+    
+    // CSV file source
+    const csvSource: DataSource = {
+      id: this.nextDataSourceId++,
+      name: 'Property CSV',
+      type: DataSourceType.FILE_CSV,
+      config: {
+        filePath: '/data/properties.csv',
+        delimiter: ',',
+        hasHeader: true,
+        options: {}
+      },
+      enabled: true,
+      description: 'CSV file containing property data',
+      tags: ['file', 'csv', 'properties', 'source']
+    };
+    
+    // In-memory source for testing
+    const inMemorySource: DataSource = {
+      id: this.nextDataSourceId++,
+      name: 'In-Memory Source',
+      type: DataSourceType.MEMORY,
+      config: {
+        data: [
+          { id: 1, address: '123 Main St', city: 'Springfield', state: 'IL', zipCode: '62701', price: 250000, bedrooms: 3, bathrooms: 2, sqft: 1800 },
+          { id: 2, address: '456 Elm St', city: 'Springfield', state: 'IL', zipCode: '62702', price: 180000, bedrooms: 2, bathrooms: 1, sqft: 1200 },
+          { id: 3, address: '789 Oak St', city: 'Springfield', state: 'IL', zipCode: '62703', price: 320000, bedrooms: 4, bathrooms: 3, sqft: 2400 },
+          { id: 4, address: '101 Pine St', city: 'Springfield', state: 'IL', zipCode: '62704', price: 210000, bedrooms: 3, bathrooms: 2, sqft: 1600 },
+          { id: 5, address: '202 Maple St', city: 'Springfield', state: 'IL', zipCode: '62705', price: 275000, bedrooms: 3, bathrooms: 2.5, sqft: 2000 }
+        ],
+        options: {}
+      },
+      enabled: true,
+      description: 'In-memory data for testing',
+      tags: ['memory', 'testing', 'source']
+    };
+    
+    // PostgreSQL destination
+    const postgresDestination: DataSource = {
+      id: this.nextDataSourceId++,
+      name: 'PostgreSQL Destination',
+      type: DataSourceType.POSTGRESQL,
       config: {
         host: 'localhost',
         port: 5432,
-        database: 'properties_db',
-        user: 'postgres',
+        database: 'etl_destination',
+        user: 'etl_user',
+        password: '********',
+        options: {
+          target: 'properties',
+          loadMode: 'INSERT'
+        }
+      },
+      enabled: true,
+      description: 'PostgreSQL database for destination',
+      tags: ['database', 'properties', 'destination']
+    };
+    
+    // In-memory destination for testing
+    const inMemoryDestination: DataSource = {
+      id: this.nextDataSourceId++,
+      name: 'In-Memory Destination',
+      type: DataSourceType.MEMORY,
+      config: {
         data: [],
         options: {
-          loadMode: 'INSERT',
-          target: 'properties'
+          target: 'properties',
+          loadMode: 'INSERT'
         }
       },
-      createdAt: new Date(),
-      updatedAt: new Date()
-    });
-    
-    // Create user API data source
-    this.registerDataSource({
-      id: this.nextDataSourceId++,
-      name: 'User API',
-      description: 'RESTful API for user data',
-      type: DataSourceType.REST_API,
       enabled: true,
-      config: {
-        url: 'https://api.example.com/users',
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer sample-token'
-        },
-        data: [
-          { id: 1, name: 'John Doe', email: 'john@example.com', role: 'admin' },
-          { id: 2, name: 'Jane Smith', email: 'jane@example.com', role: 'user' },
-          { id: 3, name: 'Bob Johnson', email: 'bob@example.com', role: 'user' }
-        ],
-        options: {
-          loadMode: 'INSERT',
-          target: 'users'
-        }
-      },
-      createdAt: new Date(),
-      updatedAt: new Date()
-    });
+      description: 'In-memory data for testing',
+      tags: ['memory', 'testing', 'destination']
+    };
     
-    // Create user database
-    this.registerDataSource({
-      id: this.nextDataSourceId++,
-      name: 'User Database',
-      description: 'PostgreSQL database for user data',
-      type: DataSourceType.POSTGRESQL,
-      enabled: true,
-      config: {
-        host: 'localhost',
-        port: 5432,
-        database: 'users_db',
-        user: 'postgres',
-        data: [],
-        options: {
-          loadMode: 'INSERT',
-          target: 'users'
-        }
-      },
-      createdAt: new Date(),
-      updatedAt: new Date()
-    });
-    
-    // Create analytics API data source
-    this.registerDataSource({
-      id: this.nextDataSourceId++,
-      name: 'Analytics API',
-      description: 'RESTful API for analytics data',
-      type: DataSourceType.REST_API,
-      enabled: true,
-      config: {
-        url: 'https://api.example.com/analytics',
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer sample-token'
-        },
-        data: [
-          { id: 1, event: 'pageview', page: '/home', count: 1250, date: '2023-01-01' },
-          { id: 2, event: 'pageview', page: '/properties', count: 875, date: '2023-01-01' },
-          { id: 3, event: 'pageview', page: '/contact', count: 320, date: '2023-01-01' },
-          { id: 4, event: 'conversion', page: '/properties', count: 45, date: '2023-01-01' }
-        ],
-        options: {
-          loadMode: 'INSERT',
-          target: 'analytics'
-        }
-      },
-      createdAt: new Date(),
-      updatedAt: new Date()
-    });
-    
-    // Create analytics database
-    this.registerDataSource({
-      id: this.nextDataSourceId++,
-      name: 'Analytics Database',
-      description: 'PostgreSQL database for analytics data',
-      type: DataSourceType.POSTGRESQL,
-      enabled: true,
-      config: {
-        host: 'localhost',
-        port: 5432,
-        database: 'analytics_db',
-        user: 'postgres',
-        data: [],
-        options: {
-          loadMode: 'INSERT',
-          target: 'analytics'
-        }
-      },
-      createdAt: new Date(),
-      updatedAt: new Date()
-    });
+    // Add data sources to map
+    this.dataSources.set(postgresSource.id, postgresSource);
+    this.dataSources.set(apiSource.id, apiSource);
+    this.dataSources.set(csvSource.id, csvSource);
+    this.dataSources.set(inMemorySource.id, inMemorySource);
+    this.dataSources.set(postgresDestination.id, postgresDestination);
+    this.dataSources.set(inMemoryDestination.id, inMemoryDestination);
   }
   
   /**
-   * Create sample transformation rules
+   * Create demo transformation rules
    */
-  private createSampleTransformationRules(): void {
-    // Create property filter transformation
-    this.registerTransformationRule({
+  private createDemoTransformationRules(): void {
+    // Filter rule
+    const filterRule: TransformationRule = {
       id: this.nextTransformationRuleId++,
-      name: 'Filter Residential Properties',
-      description: 'Filter to include only residential properties',
-      type: 'FILTER',
+      name: 'Filter Properties > $200k',
+      type: TransformationType.FILTER,
       config: {
         conditions: [
           {
-            field: 'type',
-            operator: 'EQUALS',
-            value: 'residential'
+            field: 'price',
+            operator: FilterOperator.GREATER_THAN,
+            value: 200000
           }
         ],
-        logic: 'AND'
+        logic: FilterLogic.AND
       },
-      enabled: true,
       order: 1,
-      createdAt: new Date(),
-      updatedAt: new Date()
-    });
+      enabled: true,
+      description: 'Filter properties with price > $200,000'
+    };
     
-    // Create property mapping transformation
-    this.registerTransformationRule({
+    // Map rule
+    const mapRule: TransformationRule = {
       id: this.nextTransformationRuleId++,
       name: 'Map Property Fields',
-      description: 'Map property fields to database schema',
-      type: 'MAP',
+      type: TransformationType.MAP,
       config: {
         mappings: [
-          { source: 'id', target: 'property_id' },
-          { source: 'addr', target: 'address' },
-          { source: 'price', target: 'list_price' },
-          { source: 'sqft', target: 'square_feet' },
-          { source: 'yearBuilt', target: 'year_built' },
-          { source: 'type', target: 'property_type' },
-          { source: 'latitude', target: 'lat' },
-          { source: 'longitude', target: 'lng' }
+          { source: 'address', target: 'propertyAddress' },
+          { source: 'city', target: 'propertyCity' },
+          { source: 'state', target: 'propertyState' },
+          { source: 'zipCode', target: 'propertyZipCode' },
+          { source: 'price', target: 'propertyPrice' },
+          { source: 'bedrooms', target: 'propertyBedrooms' },
+          { source: 'bathrooms', target: 'propertyBathrooms' },
+          { source: 'sqft', target: 'propertySqft' }
         ],
         includeOriginal: false
       },
-      enabled: true,
       order: 2,
-      createdAt: new Date(),
-      updatedAt: new Date()
-    });
+      enabled: true,
+      description: 'Map property fields to new names'
+    };
     
-    // Create user filter transformation
-    this.registerTransformationRule({
+    // Validation rule
+    const validationRule: TransformationRule = {
       id: this.nextTransformationRuleId++,
-      name: 'Filter Admin Users',
-      description: 'Filter to include only admin users',
-      type: 'FILTER',
+      name: 'Validate Property Data',
+      type: TransformationType.VALIDATE,
       config: {
-        conditions: [
-          {
-            field: 'role',
-            operator: 'EQUALS',
-            value: 'admin'
-          }
+        validations: [
+          { field: 'price', type: 'NUMBER', message: 'Price must be a number' },
+          { field: 'bedrooms', type: 'INTEGER', message: 'Bedrooms must be an integer' },
+          { field: 'bathrooms', type: 'NUMBER', message: 'Bathrooms must be a number' },
+          { field: 'sqft', type: 'NUMBER', message: 'Square footage must be a number' }
         ],
-        logic: 'AND'
+        failOnError: true
       },
+      order: 3,
       enabled: true,
-      order: 1,
-      createdAt: new Date(),
-      updatedAt: new Date()
-    });
+      description: 'Validate property data'
+    };
+    
+    // Aggregate rule
+    const aggregateRule: TransformationRule = {
+      id: this.nextTransformationRuleId++,
+      name: 'Aggregate by City',
+      type: TransformationType.AGGREGATE,
+      config: {
+        groupBy: ['city'],
+        aggregations: [
+          { field: 'id', function: 'COUNT', as: 'propertyCount' },
+          { field: 'price', function: 'AVG', as: 'avgPrice' },
+          { field: 'sqft', function: 'AVG', as: 'avgSqft' }
+        ]
+      },
+      order: 4,
+      enabled: false,
+      description: 'Aggregate properties by city'
+    };
+    
+    // Enrichment rule
+    const enrichmentRule: TransformationRule = {
+      id: this.nextTransformationRuleId++,
+      name: 'Enrich with Geocodes',
+      type: TransformationType.ENRICH,
+      config: {
+        type: 'GEOCODE',
+        fields: [
+          { source: 'address', target: 'geocode' }
+        ]
+      },
+      order: 5,
+      enabled: false,
+      description: 'Enrich properties with geocodes'
+    };
+    
+    // Add transformation rules to map
+    this.transformationRules.set(filterRule.id, filterRule);
+    this.transformationRules.set(mapRule.id, mapRule);
+    this.transformationRules.set(validationRule.id, validationRule);
+    this.transformationRules.set(aggregateRule.id, aggregateRule);
+    this.transformationRules.set(enrichmentRule.id, enrichmentRule);
   }
   
   /**
-   * Create sample jobs
+   * Create demo jobs
    */
-  private createSampleJobs(): void {
-    // Create property sync job
-    this.registerJob({
+  private createDemoJobs(): void {
+    // Property ETL job
+    const propertyJob: ETLJob = {
       id: this.nextJobId++,
-      name: 'Property Data Sync',
-      description: 'Sync property data from API to database',
-      sources: [1], // Property API
-      destinations: [2], // Property Database
-      transformations: [1, 2], // Filter Residential Properties, Map Property Fields
-      status: JobStatus.CREATED,
+      name: 'Property ETL',
+      sources: [4], // In-memory source
+      destinations: [6], // In-memory destination
+      transformations: [1, 2, 3], // Filter, Map, Validate
+      status: JobStatus.IDLE,
       enabled: true,
-      frequency: JobFrequency.DAILY,
-      schedule: '0 0 * * *', // Midnight every day
-      createdAt: new Date(),
-      updatedAt: new Date()
-    });
+      description: 'ETL job for property data'
+    };
     
-    // Create user sync job
-    this.registerJob({
+    // Property aggregation job
+    const aggregationJob: ETLJob = {
       id: this.nextJobId++,
-      name: 'User Data Sync',
-      description: 'Sync user data from API to database',
-      sources: [3], // User API
-      destinations: [4], // User Database
-      transformations: [3], // Filter Admin Users
-      status: JobStatus.CREATED,
-      enabled: true,
-      frequency: JobFrequency.HOURLY,
-      schedule: '0 * * * *', // Every hour
-      createdAt: new Date(),
-      updatedAt: new Date()
-    });
+      name: 'Property Aggregation',
+      sources: [4], // In-memory source
+      destinations: [6], // In-memory destination
+      transformations: [4], // Aggregate
+      status: JobStatus.IDLE,
+      enabled: false,
+      description: 'Aggregation job for property data'
+    };
     
-    // Create analytics sync job
-    this.registerJob({
+    // Property enrichment job
+    const enrichmentJob: ETLJob = {
       id: this.nextJobId++,
-      name: 'Analytics Data Sync',
-      description: 'Sync analytics data from API to database',
-      sources: [5], // Analytics API
-      destinations: [6], // Analytics Database
-      transformations: [],
-      status: JobStatus.CREATED,
-      enabled: true,
-      frequency: JobFrequency.DAILY,
-      schedule: '0 1 * * *', // 1 AM every day
-      createdAt: new Date(),
-      updatedAt: new Date()
-    });
+      name: 'Property Enrichment',
+      sources: [4], // In-memory source
+      destinations: [6], // In-memory destination
+      transformations: [5], // Enrichment
+      status: JobStatus.IDLE,
+      enabled: false,
+      description: 'Enrichment job for property data'
+    };
+    
+    // Add jobs to map
+    this.jobs.set(propertyJob.id, propertyJob);
+    this.jobs.set(aggregationJob.id, aggregationJob);
+    this.jobs.set(enrichmentJob.id, enrichmentJob);
   }
   
   /**
-   * Shut down the ETL system
+   * Schedule jobs
    */
-  shutdown(): void {
-    if (!this.running) {
-      return;
+  private scheduleJobs(): void {
+    // Schedule property ETL job to run daily
+    const propertyJobSchedule: ScheduleConfig = {
+      frequency: ScheduleFrequency.DAILY,
+      time: '00:00',
+      enabled: true
+    };
+    
+    scheduler.scheduleJob(1, propertyJobSchedule);
+    
+    // Schedule property aggregation job to run weekly
+    const aggregationJobSchedule: ScheduleConfig = {
+      frequency: ScheduleFrequency.WEEKLY,
+      dayOfWeek: 1, // Monday
+      time: '01:00',
+      enabled: false
+    };
+    
+    scheduler.scheduleJob(2, aggregationJobSchedule);
+    
+    // Schedule property enrichment job to run monthly
+    const enrichmentJobSchedule: ScheduleConfig = {
+      frequency: ScheduleFrequency.MONTHLY,
+      dayOfMonth: 1,
+      time: '02:00',
+      enabled: false
+    };
+    
+    scheduler.scheduleJob(3, enrichmentJobSchedule);
+  }
+  
+  /**
+   * Run a job
+   */
+  async runJob(jobId: number): Promise<void> {
+    // Get job
+    const job = this.jobs.get(jobId);
+    
+    if (!job) {
+      throw new Error(`Job with ID ${jobId} not found`);
     }
     
-    scheduler.cancelAllJobs();
-    this.running = false;
+    if (!job.enabled) {
+      throw new Error(`Job "${job.name}" (ID: ${jobId}) is disabled`);
+    }
     
-    alertService.createAlert({
-      type: AlertType.INFO,
-      severity: AlertSeverity.MEDIUM,
-      category: AlertCategory.SYSTEM,
-      title: 'ETL System Shutdown',
-      message: 'ETL system has been shut down'
-    });
-  }
-  
-  /**
-   * Get system status
-   */
-  getSystemStatus(): SystemStatus {
-    const now = new Date();
-    const uptime = now.getTime() - this.startTime.getTime();
+    // Update job status
+    job.status = JobStatus.RUNNING;
     
-    // Count active jobs
-    const activeJobs = Array.from(this.jobs.values()).filter(job => 
-      job.enabled && 
-      [JobStatus.SCHEDULED, JobStatus.QUEUED, JobStatus.RUNNING].includes(job.status)
-    ).length;
-    
-    // Count pending jobs
-    const pendingJobs = Array.from(this.jobs.values()).filter(job => 
-      job.enabled && job.status === JobStatus.QUEUED
-    ).length;
-    
-    return {
-      initialized: this.initialized,
-      running: this.running,
-      lastError: this.lastError,
-      activeJobs,
-      pendingJobs,
-      memoryUsage: 0, // Not applicable in browser
-      uptime,
-      currentTime: now
-    };
-  }
-  
-  /**
-   * Register a data source
-   */
-  registerDataSource(dataSource: DataSource): DataSource {
-    this.dataSources.set(dataSource.id, dataSource);
-    console.log('Data source registered with ID:', dataSource.id);
-    return dataSource;
-  }
-  
-  /**
-   * Get a data source by ID
-   */
-  getDataSource(id: number): DataSource | undefined {
-    return this.dataSources.get(id);
-  }
-  
-  /**
-   * Get all data sources
-   */
-  getAllDataSources(): DataSource[] {
-    return Array.from(this.dataSources.values());
-  }
-  
-  /**
-   * Register a transformation rule
-   */
-  registerTransformationRule(rule: TransformationRule): TransformationRule {
-    this.transformationRules.set(rule.id, rule);
-    return rule;
-  }
-  
-  /**
-   * Get a transformation rule by ID
-   */
-  getTransformationRule(id: number): TransformationRule | undefined {
-    return this.transformationRules.get(id);
-  }
-  
-  /**
-   * Get all transformation rules
-   */
-  getAllTransformationRules(): TransformationRule[] {
-    return Array.from(this.transformationRules.values());
-  }
-  
-  /**
-   * Register a job
-   */
-  registerJob(job: ETLJob): ETLJob {
-    this.jobs.set(job.id, job);
-    
-    // Schedule the job if it's enabled
-    if (job.enabled && job.frequency !== JobFrequency.ONCE) {
-      scheduler.scheduleJob(
-        `job-${job.id}`,
-        job.schedule || this.getDefaultSchedule(job.frequency),
-        async () => {
-          await this.executeJob(job.id, false);
-        }
-      );
+    try {
+      // Execute job
+      const jobRun = await etlPipeline.executeJob(job, this.dataSources, this.transformationRules, true);
+      
+      // Add job run to map
+      this.jobRuns.set(jobRun.id, jobRun);
       
       // Update job status
-      job.status = JobStatus.SCHEDULED;
-      job.nextRunAt = scheduler.getNextRunDate(`job-${job.id}`);
+      job.status = jobRun.status;
+      
+      return;
+    } catch (error) {
+      // Update job status
+      job.status = JobStatus.FAILED;
+      
+      // Re-throw error
+      throw error;
     }
-    
-    alertService.createAlert({
-      type: AlertType.INFO,
-      severity: AlertSeverity.LOW,
-      category: AlertCategory.JOB,
-      title: `Job Registered: ${job.name}`,
-      message: `ETL job "${job.name}" (ID: ${job.id}) has been registered`
-    });
-    
-    return job;
-  }
-  
-  /**
-   * Get a job by ID
-   */
-  getJob(id: number): ETLJob | undefined {
-    return this.jobs.get(id);
   }
   
   /**
@@ -484,322 +430,550 @@ class ETLPipelineManager {
   }
   
   /**
+   * Get a job by ID
+   */
+  getJob(jobId: number): ETLJob | undefined {
+    return this.jobs.get(jobId);
+  }
+  
+  /**
+   * Create a job
+   */
+  createJob(job: Omit<ETLJob, 'id' | 'status'>): ETLJob {
+    const newJob: ETLJob = {
+      id: this.nextJobId++,
+      status: JobStatus.IDLE,
+      ...job
+    };
+    
+    this.jobs.set(newJob.id, newJob);
+    
+    // Log job created
+    alertService.createAlert({
+      type: AlertType.INFO,
+      severity: AlertSeverity.LOW,
+      category: AlertCategory.JOB,
+      title: 'Job Created',
+      message: `Job "${newJob.name}" (ID: ${newJob.id}) has been created`
+    });
+    
+    return newJob;
+  }
+  
+  /**
+   * Update a job
+   */
+  updateJob(jobId: number, job: Partial<Omit<ETLJob, 'id'>>): ETLJob | undefined {
+    const existingJob = this.jobs.get(jobId);
+    
+    if (!existingJob) {
+      return undefined;
+    }
+    
+    const updatedJob: ETLJob = {
+      ...existingJob,
+      ...job,
+      id: existingJob.id
+    };
+    
+    this.jobs.set(jobId, updatedJob);
+    
+    // Log job updated
+    alertService.createAlert({
+      type: AlertType.INFO,
+      severity: AlertSeverity.LOW,
+      category: AlertCategory.JOB,
+      title: 'Job Updated',
+      message: `Job "${updatedJob.name}" (ID: ${updatedJob.id}) has been updated`
+    });
+    
+    return updatedJob;
+  }
+  
+  /**
    * Delete a job
    */
-  deleteJob(id: number): boolean {
-    const job = this.jobs.get(id);
+  deleteJob(jobId: number): boolean {
+    const job = this.jobs.get(jobId);
     
     if (!job) {
       return false;
     }
     
-    // Unschedule job if scheduled
-    scheduler.cancelJob(`job-${id}`);
+    // Unschedule job
+    scheduler.unscheduleJob(jobId);
     
-    // Remove job
-    this.jobs.delete(id);
+    // Delete job
+    const result = this.jobs.delete(jobId);
     
+    // Log job deleted
+    if (result) {
+      alertService.createAlert({
+        type: AlertType.INFO,
+        severity: AlertSeverity.LOW,
+        category: AlertCategory.JOB,
+        title: 'Job Deleted',
+        message: `Job "${job.name}" (ID: ${jobId}) has been deleted`
+      });
+    }
+    
+    return result;
+  }
+  
+  /**
+   * Enable a job
+   */
+  enableJob(jobId: number): boolean {
+    const job = this.jobs.get(jobId);
+    
+    if (!job) {
+      return false;
+    }
+    
+    job.enabled = true;
+    
+    // Log job enabled
     alertService.createAlert({
       type: AlertType.INFO,
-      severity: AlertSeverity.MEDIUM,
+      severity: AlertSeverity.LOW,
       category: AlertCategory.JOB,
-      title: `Job Deleted: ${job.name}`,
-      message: `ETL job "${job.name}" (ID: ${id}) has been deleted`
+      title: 'Job Enabled',
+      message: `Job "${job.name}" (ID: ${jobId}) has been enabled`
     });
     
     return true;
   }
   
   /**
-   * Enable a job
-   */
-  enableJob(id: number): ETLJob | undefined {
-    const job = this.jobs.get(id);
-    
-    if (!job) {
-      return undefined;
-    }
-    
-    job.enabled = true;
-    job.updatedAt = new Date();
-    
-    // Schedule the job if it's not a one-time job
-    if (job.frequency !== JobFrequency.ONCE) {
-      scheduler.scheduleJob(
-        `job-${job.id}`,
-        job.schedule || this.getDefaultSchedule(job.frequency),
-        async () => {
-          await this.executeJob(job.id, false);
-        }
-      );
-      
-      // Update job status
-      job.status = JobStatus.SCHEDULED;
-      job.nextRunAt = scheduler.getNextRunDate(`job-${job.id}`);
-    }
-    
-    alertService.createAlert({
-      type: AlertType.INFO,
-      severity: AlertSeverity.LOW,
-      category: AlertCategory.JOB,
-      title: `Job Enabled: ${job.name}`,
-      message: `ETL job "${job.name}" (ID: ${id}) has been enabled`
-    });
-    
-    return job;
-  }
-  
-  /**
    * Disable a job
    */
-  disableJob(id: number): ETLJob | undefined {
-    const job = this.jobs.get(id);
+  disableJob(jobId: number): boolean {
+    const job = this.jobs.get(jobId);
     
     if (!job) {
-      return undefined;
+      return false;
     }
     
     job.enabled = false;
-    job.updatedAt = new Date();
     
-    // Unschedule the job
-    scheduler.cancelJob(`job-${job.id}`);
-    
-    // Update job status if it was scheduled
-    if (job.status === JobStatus.SCHEDULED) {
-      job.status = JobStatus.CREATED;
-      job.nextRunAt = undefined;
-    }
-    
+    // Log job disabled
     alertService.createAlert({
       type: AlertType.INFO,
       severity: AlertSeverity.LOW,
       category: AlertCategory.JOB,
-      title: `Job Disabled: ${job.name}`,
-      message: `ETL job "${job.name}" (ID: ${id}) has been disabled`
+      title: 'Job Disabled',
+      message: `Job "${job.name}" (ID: ${jobId}) has been disabled`
     });
     
-    return job;
+    return true;
   }
   
   /**
-   * Execute a job
+   * Get all data sources
    */
-  async executeJob(id: number, isManual: boolean = false): Promise<JobRun | undefined> {
-    const job = this.jobs.get(id);
-    
-    if (!job) {
-      alertService.createAlert({
-        type: AlertType.ERROR,
-        severity: AlertSeverity.MEDIUM,
-        category: AlertCategory.JOB,
-        title: 'Job Execution Failed',
-        message: `Job with ID ${id} not found`
-      });
-      return undefined;
-    }
-    
-    if (!job.enabled) {
-      alertService.createAlert({
-        type: AlertType.WARNING,
-        severity: AlertSeverity.MEDIUM,
-        category: AlertCategory.JOB,
-        title: `Job Execution Skipped: ${job.name}`,
-        message: `ETL job "${job.name}" (ID: ${id}) is disabled and cannot be executed`
-      });
-      return undefined;
-    }
-    
-    if (job.status === JobStatus.RUNNING) {
-      alertService.createAlert({
-        type: AlertType.WARNING,
-        severity: AlertSeverity.MEDIUM,
-        category: AlertCategory.JOB,
-        title: `Job Execution Skipped: ${job.name}`,
-        message: `ETL job "${job.name}" (ID: ${id}) is already running`
-      });
-      return undefined;
-    }
-    
-    // Update job status
-    const prevStatus = job.status;
-    job.status = JobStatus.RUNNING;
-    job.updatedAt = new Date();
-    
-    try {
-      // Execute job
-      const run = await etlPipeline.executeJob(job, this.dataSources, this.transformationRules, isManual);
-      
-      // Store job run
-      this.jobRuns.set(run.id, run);
-      
-      // Update job status and timestamps
-      job.status = run.status;
-      job.lastRunAt = run.startTime;
-      
-      // Update next run time if scheduled
-      if (prevStatus === JobStatus.SCHEDULED) {
-        job.nextRunAt = scheduler.getNextRunDate(`job-${job.id}`);
-      }
-      
-      return run;
-    } catch (error) {
-      // Handle execution error
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      this.lastError = errorMessage;
-      
-      // Update job status
-      job.status = JobStatus.FAILED;
-      job.lastRunAt = new Date();
-      
-      // Log error
-      alertService.createAlert({
-        type: AlertType.ERROR,
-        severity: AlertSeverity.HIGH,
-        category: AlertCategory.JOB,
-        title: `Job Execution Error: ${job.name}`,
-        message: `Error executing ETL job "${job.name}" (ID: ${id}): ${errorMessage}`
-      });
-      
-      return undefined;
-    }
+  getAllDataSources(): DataSource[] {
+    return Array.from(this.dataSources.values());
   }
   
   /**
-   * Get job runs
+   * Get a data source by ID
    */
-  getJobRuns(): JobRun[] {
+  getDataSource(dataSourceId: number): DataSource | undefined {
+    return this.dataSources.get(dataSourceId);
+  }
+  
+  /**
+   * Create a data source
+   */
+  createDataSource(dataSource: Omit<DataSource, 'id'>): DataSource {
+    const newDataSource: DataSource = {
+      id: this.nextDataSourceId++,
+      ...dataSource
+    };
+    
+    this.dataSources.set(newDataSource.id, newDataSource);
+    
+    // Log data source created
+    alertService.createAlert({
+      type: AlertType.INFO,
+      severity: AlertSeverity.LOW,
+      category: AlertCategory.DATA_SOURCE,
+      title: 'Data Source Created',
+      message: `Data source "${newDataSource.name}" (ID: ${newDataSource.id}) has been created`
+    });
+    
+    return newDataSource;
+  }
+  
+  /**
+   * Update a data source
+   */
+  updateDataSource(dataSourceId: number, dataSource: Partial<Omit<DataSource, 'id'>>): DataSource | undefined {
+    const existingDataSource = this.dataSources.get(dataSourceId);
+    
+    if (!existingDataSource) {
+      return undefined;
+    }
+    
+    const updatedDataSource: DataSource = {
+      ...existingDataSource,
+      ...dataSource,
+      id: existingDataSource.id
+    };
+    
+    this.dataSources.set(dataSourceId, updatedDataSource);
+    
+    // Log data source updated
+    alertService.createAlert({
+      type: AlertType.INFO,
+      severity: AlertSeverity.LOW,
+      category: AlertCategory.DATA_SOURCE,
+      title: 'Data Source Updated',
+      message: `Data source "${updatedDataSource.name}" (ID: ${updatedDataSource.id}) has been updated`
+    });
+    
+    return updatedDataSource;
+  }
+  
+  /**
+   * Delete a data source
+   */
+  deleteDataSource(dataSourceId: number): boolean {
+    const dataSource = this.dataSources.get(dataSourceId);
+    
+    if (!dataSource) {
+      return false;
+    }
+    
+    // Check if data source is used by any jobs
+    const jobsUsingDataSource = this.getAllJobs().filter(
+      job => job.sources.includes(dataSourceId) || job.destinations.includes(dataSourceId)
+    );
+    
+    if (jobsUsingDataSource.length > 0) {
+      alertService.createAlert({
+        type: AlertType.ERROR,
+        severity: AlertSeverity.MEDIUM,
+        category: AlertCategory.DATA_SOURCE,
+        title: 'Data Source Deletion Failed',
+        message: `Cannot delete data source "${dataSource.name}" (ID: ${dataSourceId}) because it is used by ${jobsUsingDataSource.length} jobs`
+      });
+      
+      return false;
+    }
+    
+    // Delete data source
+    const result = this.dataSources.delete(dataSourceId);
+    
+    // Log data source deleted
+    if (result) {
+      alertService.createAlert({
+        type: AlertType.INFO,
+        severity: AlertSeverity.LOW,
+        category: AlertCategory.DATA_SOURCE,
+        title: 'Data Source Deleted',
+        message: `Data source "${dataSource.name}" (ID: ${dataSourceId}) has been deleted`
+      });
+    }
+    
+    return result;
+  }
+  
+  /**
+   * Enable a data source
+   */
+  enableDataSource(dataSourceId: number): boolean {
+    const dataSource = this.dataSources.get(dataSourceId);
+    
+    if (!dataSource) {
+      return false;
+    }
+    
+    dataSource.enabled = true;
+    
+    // Log data source enabled
+    alertService.createAlert({
+      type: AlertType.INFO,
+      severity: AlertSeverity.LOW,
+      category: AlertCategory.DATA_SOURCE,
+      title: 'Data Source Enabled',
+      message: `Data source "${dataSource.name}" (ID: ${dataSourceId}) has been enabled`
+    });
+    
+    return true;
+  }
+  
+  /**
+   * Disable a data source
+   */
+  disableDataSource(dataSourceId: number): boolean {
+    const dataSource = this.dataSources.get(dataSourceId);
+    
+    if (!dataSource) {
+      return false;
+    }
+    
+    dataSource.enabled = false;
+    
+    // Log data source disabled
+    alertService.createAlert({
+      type: AlertType.INFO,
+      severity: AlertSeverity.LOW,
+      category: AlertCategory.DATA_SOURCE,
+      title: 'Data Source Disabled',
+      message: `Data source "${dataSource.name}" (ID: ${dataSourceId}) has been disabled`
+    });
+    
+    return true;
+  }
+  
+  /**
+   * Get all transformation rules
+   */
+  getAllTransformationRules(): TransformationRule[] {
+    return Array.from(this.transformationRules.values());
+  }
+  
+  /**
+   * Get a transformation rule by ID
+   */
+  getTransformationRule(transformationRuleId: number): TransformationRule | undefined {
+    return this.transformationRules.get(transformationRuleId);
+  }
+  
+  /**
+   * Create a transformation rule
+   */
+  createTransformationRule(transformationRule: Omit<TransformationRule, 'id'>): TransformationRule {
+    const newTransformationRule: TransformationRule = {
+      id: this.nextTransformationRuleId++,
+      ...transformationRule
+    };
+    
+    this.transformationRules.set(newTransformationRule.id, newTransformationRule);
+    
+    // Log transformation rule created
+    alertService.createAlert({
+      type: AlertType.INFO,
+      severity: AlertSeverity.LOW,
+      category: AlertCategory.TRANSFORMATION,
+      title: 'Transformation Rule Created',
+      message: `Transformation rule "${newTransformationRule.name}" (ID: ${newTransformationRule.id}) has been created`
+    });
+    
+    return newTransformationRule;
+  }
+  
+  /**
+   * Update a transformation rule
+   */
+  updateTransformationRule(
+    transformationRuleId: number, 
+    transformationRule: Partial<Omit<TransformationRule, 'id'>>
+  ): TransformationRule | undefined {
+    const existingTransformationRule = this.transformationRules.get(transformationRuleId);
+    
+    if (!existingTransformationRule) {
+      return undefined;
+    }
+    
+    const updatedTransformationRule: TransformationRule = {
+      ...existingTransformationRule,
+      ...transformationRule,
+      id: existingTransformationRule.id
+    };
+    
+    this.transformationRules.set(transformationRuleId, updatedTransformationRule);
+    
+    // Log transformation rule updated
+    alertService.createAlert({
+      type: AlertType.INFO,
+      severity: AlertSeverity.LOW,
+      category: AlertCategory.TRANSFORMATION,
+      title: 'Transformation Rule Updated',
+      message: `Transformation rule "${updatedTransformationRule.name}" (ID: ${updatedTransformationRule.id}) has been updated`
+    });
+    
+    return updatedTransformationRule;
+  }
+  
+  /**
+   * Delete a transformation rule
+   */
+  deleteTransformationRule(transformationRuleId: number): boolean {
+    const transformationRule = this.transformationRules.get(transformationRuleId);
+    
+    if (!transformationRule) {
+      return false;
+    }
+    
+    // Check if transformation rule is used by any jobs
+    const jobsUsingTransformationRule = this.getAllJobs().filter(
+      job => job.transformations.includes(transformationRuleId)
+    );
+    
+    if (jobsUsingTransformationRule.length > 0) {
+      alertService.createAlert({
+        type: AlertType.ERROR,
+        severity: AlertSeverity.MEDIUM,
+        category: AlertCategory.TRANSFORMATION,
+        title: 'Transformation Rule Deletion Failed',
+        message: `Cannot delete transformation rule "${transformationRule.name}" (ID: ${transformationRuleId}) because it is used by ${jobsUsingTransformationRule.length} jobs`
+      });
+      
+      return false;
+    }
+    
+    // Delete transformation rule
+    const result = this.transformationRules.delete(transformationRuleId);
+    
+    // Log transformation rule deleted
+    if (result) {
+      alertService.createAlert({
+        type: AlertType.INFO,
+        severity: AlertSeverity.LOW,
+        category: AlertCategory.TRANSFORMATION,
+        title: 'Transformation Rule Deleted',
+        message: `Transformation rule "${transformationRule.name}" (ID: ${transformationRuleId}) has been deleted`
+      });
+    }
+    
+    return result;
+  }
+  
+  /**
+   * Enable a transformation rule
+   */
+  enableTransformationRule(transformationRuleId: number): boolean {
+    const transformationRule = this.transformationRules.get(transformationRuleId);
+    
+    if (!transformationRule) {
+      return false;
+    }
+    
+    transformationRule.enabled = true;
+    
+    // Log transformation rule enabled
+    alertService.createAlert({
+      type: AlertType.INFO,
+      severity: AlertSeverity.LOW,
+      category: AlertCategory.TRANSFORMATION,
+      title: 'Transformation Rule Enabled',
+      message: `Transformation rule "${transformationRule.name}" (ID: ${transformationRuleId}) has been enabled`
+    });
+    
+    return true;
+  }
+  
+  /**
+   * Disable a transformation rule
+   */
+  disableTransformationRule(transformationRuleId: number): boolean {
+    const transformationRule = this.transformationRules.get(transformationRuleId);
+    
+    if (!transformationRule) {
+      return false;
+    }
+    
+    transformationRule.enabled = false;
+    
+    // Log transformation rule disabled
+    alertService.createAlert({
+      type: AlertType.INFO,
+      severity: AlertSeverity.LOW,
+      category: AlertCategory.TRANSFORMATION,
+      title: 'Transformation Rule Disabled',
+      message: `Transformation rule "${transformationRule.name}" (ID: ${transformationRuleId}) has been disabled`
+    });
+    
+    return true;
+  }
+  
+  /**
+   * Get all job runs
+   */
+  getAllJobRuns(): JobRun[] {
     return Array.from(this.jobRuns.values());
-  }
-  
-  /**
-   * Get job run by ID
-   */
-  getJobRun(id: string): JobRun | undefined {
-    return this.jobRuns.get(id);
   }
   
   /**
    * Get job runs for a specific job
    */
-  getJobRunsByJobId(jobId: number): JobRun[] {
-    return this.getJobRuns().filter(run => run.jobId === jobId);
+  getJobRunsForJob(jobId: number): JobRun[] {
+    return this.getAllJobRuns().filter(run => run.jobId === jobId);
   }
   
   /**
-   * Test connection to a data source
+   * Get a job run by ID
    */
-  async testConnection(dataSourceId: number): Promise<ConnectionResult> {
-    const dataSource = this.dataSources.get(dataSourceId);
-    
-    if (!dataSource) {
-      return {
-        success: false,
-        error: `Data source with ID ${dataSourceId} not found`
-      };
-    }
-    
-    try {
-      const result = await dataConnector.testConnection(dataSource);
-      
-      if (result.success) {
-        alertService.createAlert({
-          type: AlertType.SUCCESS,
-          severity: AlertSeverity.LOW,
-          category: AlertCategory.DATA_SOURCE,
-          title: `Connection Test Successful: ${dataSource.name}`,
-          message: `Successfully connected to data source "${dataSource.name}" (ID: ${dataSourceId})`
-        });
-      } else {
-        alertService.createAlert({
-          type: AlertType.ERROR,
-          severity: AlertSeverity.MEDIUM,
-          category: AlertCategory.DATA_SOURCE,
-          title: `Connection Test Failed: ${dataSource.name}`,
-          message: `Failed to connect to data source "${dataSource.name}" (ID: ${dataSourceId}): ${result.error}`
-        });
-      }
-      
-      return result;
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      
-      alertService.createAlert({
-        type: AlertType.ERROR,
-        severity: AlertSeverity.MEDIUM,
-        category: AlertCategory.DATA_SOURCE,
-        title: `Connection Test Error: ${dataSource.name}`,
-        message: `Error testing connection to data source "${dataSource.name}" (ID: ${dataSourceId}): ${errorMessage}`
-      });
-      
-      return {
-        success: false,
-        error: errorMessage
-      };
-    }
+  getJobRun(jobRunId: string): JobRun | undefined {
+    return this.jobRuns.get(jobRunId);
   }
   
   /**
-   * Get default schedule for a job frequency
+   * Get system status
    */
-  private getDefaultSchedule(frequency: JobFrequency): string {
-    switch (frequency) {
-      case JobFrequency.MINUTELY:
-        return '* * * * *'; // Every minute
-        
-      case JobFrequency.HOURLY:
-        return '0 * * * *'; // On the hour, every hour
-        
-      case JobFrequency.DAILY:
-        return '0 0 * * *'; // Midnight every day
-        
-      case JobFrequency.WEEKLY:
-        return '0 0 * * 0'; // Midnight on Sunday
-        
-      case JobFrequency.MONTHLY:
-        return '0 0 1 * *'; // Midnight on the 1st of each month
-        
-      default:
-        return '0 0 * * *'; // Default to midnight every day
-    }
-  }
-  
-  /**
-   * Get job statistics
-   */
-  getJobStats(): { total: number; active: number; inactive: number; byStatus: Record<JobStatus, number> } {
+  getSystemStatus(): SystemStatus {
+    // Get job counts
     const jobs = this.getAllJobs();
-    const stats = {
-      total: jobs.length,
-      active: 0,
-      inactive: 0,
-      byStatus: {
-        [JobStatus.CREATED]: 0,
-        [JobStatus.SCHEDULED]: 0,
-        [JobStatus.QUEUED]: 0,
-        [JobStatus.RUNNING]: 0,
-        [JobStatus.SUCCEEDED]: 0,
-        [JobStatus.FAILED]: 0,
-        [JobStatus.CANCELLED]: 0,
-        [JobStatus.SKIPPED]: 0
-      }
+    const enabledJobCount = jobs.filter(job => job.enabled).length;
+    const runningJobCount = jobs.filter(job => job.status === JobStatus.RUNNING).length;
+    
+    // Get data source counts
+    const dataSources = this.getAllDataSources();
+    const enabledDataSourceCount = dataSources.filter(ds => ds.enabled).length;
+    
+    // Get transformation rule counts
+    const transformationRules = this.getAllTransformationRules();
+    const enabledTransformationRuleCount = transformationRules.filter(rule => rule.enabled).length;
+    
+    // Get scheduler status
+    const schedulerStatus = scheduler.getJobExecutionCounts();
+    
+    // Get job runs counts
+    const jobRuns = this.getAllJobRuns();
+    const recentJobRuns = jobRuns.filter(run => {
+      const runTime = run.startTime.getTime();
+      const now = new Date().getTime();
+      const oneDay = 24 * 60 * 60 * 1000;
+      return now - runTime < oneDay;
+    });
+    
+    const failedJobRuns = recentJobRuns.filter(run => run.status === JobStatus.FAILED).length;
+    const successJobRuns = recentJobRuns.filter(run => run.status === JobStatus.SUCCEEDED).length;
+    
+    // Calculate record counts
+    const recordCounts: RecordCounts = {
+      extracted: 0,
+      transformed: 0,
+      loaded: 0,
+      rejected: 0
     };
     
-    for (const job of jobs) {
-      // Count by enabled status
-      if (job.enabled) {
-        stats.active++;
-      } else {
-        stats.inactive++;
-      }
-      
-      // Count by job status
-      stats.byStatus[job.status]++;
+    for (const run of recentJobRuns) {
+      recordCounts.extracted += run.recordCounts.extracted;
+      recordCounts.transformed += run.recordCounts.transformed;
+      recordCounts.loaded += run.recordCounts.loaded;
+      recordCounts.rejected += run.recordCounts.rejected;
     }
     
-    return stats;
+    return {
+      jobCount: jobs.length,
+      enabledJobCount,
+      runningJobCount,
+      dataSourceCount: dataSources.length,
+      enabledDataSourceCount,
+      transformationRuleCount: transformationRules.length,
+      enabledTransformationRuleCount,
+      schedulerStatus,
+      recentJobRuns: recentJobRuns.length,
+      failedJobRuns,
+      successJobRuns,
+      recordCounts
+    };
   }
 }
 
 // Export singleton instance
+// Create a singleton instance for export
 export const etlPipelineManager = new ETLPipelineManager();

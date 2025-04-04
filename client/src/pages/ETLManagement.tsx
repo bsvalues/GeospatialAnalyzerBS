@@ -1,51 +1,41 @@
-import React, { useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import ETLDashboard from '../components/ETLDashboard';
-import { etlPipelineManager } from '../services/etl';
+import { initializeETL } from '../services/etl';
 
 /**
- * ETL Management Page
- * 
- * This page displays the ETL management interface with a dashboard,
- * data source management, transformation rule management, and job management.
+ * ETL Management page
  */
 const ETLManagement: React.FC = () => {
-  // Initialize ETL system on component mount
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+  
+  // Set page title and initialize ETL system
   useEffect(() => {
-    // Initialize the ETL pipeline manager
-    if (!etlPipelineManager.getSystemStatus().initialized) {
-      etlPipelineManager.initialize();
-    }
+    document.title = "ETL Management - GeospatialAnalyzerBS";
     
-    // Clean up on component unmount
-    return () => {
-      // Optionally shutdown the ETL pipeline manager
-      // Note: In a real app, you might want to keep it running in the background
-      // etlPipelineManager.shutdown();
-    };
+    // Initialize ETL system if needed
+    initializeETL();
+    
+    // Mark loading as complete
+    setIsLoading(false);
   }, []);
   
   return (
-    <div className="container mx-auto px-4 py-6">
-      <h1 className="text-3xl font-bold mb-6">ETL Data Management</h1>
-      
+    <div className="container mx-auto px-4 py-8">
       <div className="mb-8">
-        <p className="text-gray-700 mb-4">
-          Manage your data sources, transformation rules, and ETL jobs from this central dashboard.
-          Monitor job executions, view alerts, and analyze data quality.
+        <h1 className="text-3xl font-bold mb-2">ETL Management</h1>
+        <p className="text-gray-600">
+          Manage ETL jobs, data sources, and transformations for property data processing.
         </p>
       </div>
       
       {/* ETL Dashboard */}
-      <div className="mb-8">
+      {isLoading ? (
+        <div className="flex items-center justify-center h-64">
+          <p>Initializing ETL system...</p>
+        </div>
+      ) : (
         <ETLDashboard />
-      </div>
-      
-      {/* Additional sections could be added here:
-          - Data Source Management
-          - Transformation Rule Management
-          - Job Management
-          - Data Quality Reports
-      */}
+      )}
     </div>
   );
 };

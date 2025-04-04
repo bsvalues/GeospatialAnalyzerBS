@@ -1,74 +1,82 @@
 /**
- * Alert service
+ * Alert Service
  * 
- * This service manages alerts and notifications for the ETL system.
+ * This service is responsible for managing ETL system alerts.
  */
 
 /**
  * Alert type enum
  */
 export enum AlertType {
-  /** General information */
-  INFO = 'INFO',
-  
-  /** Success message */
-  SUCCESS = 'SUCCESS',
-  
-  /** Warning message */
-  WARNING = 'WARNING',
-  
-  /** Error message */
-  ERROR = 'ERROR'
+  INFO = 0,
+  SUCCESS = 1,
+  WARNING = 2,
+  ERROR = 3
 }
 
 /**
- * Alert severity level
+ * Alert severity enum
  */
 export enum AlertSeverity {
-  /** Low severity (informational) */
-  LOW = 'LOW',
-  
-  /** Medium severity (may require attention) */
-  MEDIUM = 'MEDIUM',
-  
-  /** High severity (requires attention) */
-  HIGH = 'HIGH',
-  
-  /** Critical severity (requires immediate action) */
-  CRITICAL = 'CRITICAL'
+  LOW = 0,
+  MEDIUM = 1,
+  HIGH = 2,
+  CRITICAL = 3
 }
 
 /**
- * Alert category
+ * Alert category enum
  */
 export enum AlertCategory {
-  /** System-related alerts */
-  SYSTEM = 'SYSTEM',
-  
-  /** Data source-related alerts */
-  DATA_SOURCE = 'DATA_SOURCE',
-  
-  /** Job-related alerts */
-  JOB = 'JOB',
-  
-  /** Transformation-related alerts */
-  TRANSFORMATION = 'TRANSFORMATION',
-  
-  /** Data quality-related alerts */
-  DATA_QUALITY = 'DATA_QUALITY',
-  
-  /** Authentication-related alerts */
-  AUTHENTICATION = 'AUTHENTICATION',
-  
-  /** Security-related alerts */
-  SECURITY = 'SECURITY',
-  
-  /** Performance-related alerts */
-  PERFORMANCE = 'PERFORMANCE'
+  SYSTEM = 0,
+  JOB = 1,
+  DATA_SOURCE = 2,
+  TRANSFORMATION = 3,
+  VALIDATION = 4,
+  SECURITY = 5,
+  PERFORMANCE = 6
 }
 
 /**
- * Alert payload
+ * Alert interface
+ */
+export interface Alert {
+  /** Alert ID */
+  id: string;
+  
+  /** Alert type */
+  type: AlertType;
+  
+  /** Alert severity */
+  severity: AlertSeverity;
+  
+  /** Alert category */
+  category: AlertCategory;
+  
+  /** Alert title */
+  title: string;
+  
+  /** Alert message */
+  message: string;
+  
+  /** Alert timestamp */
+  timestamp: Date;
+  
+  /** Whether the alert has been read */
+  read: boolean;
+  
+  /** Whether the alert has been acknowledged */
+  acknowledged: boolean;
+  
+  /** Related entity ID (job ID, data source ID, etc.) */
+  entityId?: string | number;
+  
+  /** Additional data */
+  data?: Record<string, any>;
+}
+
+/**
+ * Alert payload interface
  */
 export interface AlertPayload {
   /** Alert type */
@@ -86,47 +94,24 @@ export interface AlertPayload {
   /** Alert message */
   message: string;
   
-  /** Alert metadata (optional) */
-  metadata?: Record<string, any>;
+  /** Related entity ID (job ID, data source ID, etc.) */
+  entityId?: string | number;
   
-  /** Context (e.g., job ID, data source ID) */
-  context?: Record<string, any>;
-}
-
-/**
- * Alert interface
- */
-export interface Alert extends AlertPayload {
-  /** Alert ID */
-  id: string;
-  
-  /** Creation timestamp */
-  createdAt: Date;
-  
-  /** Whether the alert has been read */
-  read: boolean;
-  
-  /** Whether the alert has been acknowledged */
-  acknowledged: boolean;
-  
-  /** Acknowledgement timestamp */
-  acknowledgedAt?: Date;
-  
-  /** Resolution timestamp */
-  resolvedAt?: Date;
+  /** Additional data */
+  data?: Record<string, any>;
 }
 
 /**
  * Alert filter options
  */
 export interface AlertFilterOptions {
-  /** Filter by alert type */
+  /** Filter by type */
   type?: AlertType;
   
-  /** Filter by alert severity */
+  /** Filter by severity */
   severity?: AlertSeverity;
   
-  /** Filter by alert category */
+  /** Filter by category */
   category?: AlertCategory;
   
   /** Filter by read status */
@@ -135,18 +120,30 @@ export interface AlertFilterOptions {
   /** Filter by acknowledged status */
   acknowledged?: boolean;
   
-  /** Filter by created after date */
-  createdAfter?: Date;
+  /** Filter by entity ID */
+  entityId?: string | number;
   
-  /** Filter by created before date */
-  createdBefore?: Date;
-  
-  /** Filter by search text (in title and message) */
+  /** Filter by search text (in title or message) */
   searchText?: string;
+  
+  /** Filter by timestamp (from) */
+  timestampFrom?: Date;
+  
+  /** Filter by timestamp (to) */
+  timestampTo?: Date;
+  
+  /** Maximum number of alerts to return */
+  limit?: number;
+  
+  /** Sort field */
+  sortBy?: 'timestamp' | 'type' | 'severity' | 'category';
+  
+  /** Sort direction */
+  sortDirection?: 'asc' | 'desc';
 }
 
 /**
- * Alert stats
+ * Alert statistics
  */
 export interface AlertStats {
   /** Total number of alerts */
@@ -155,43 +152,70 @@ export interface AlertStats {
   /** Number of unread alerts */
   unread: number;
   
-  /** Number of acknowledged alerts */
-  acknowledged: number;
+  /** Number of unacknowledged alerts */
+  unacknowledged: number;
   
-  /** Number of alerts by type */
+  /** Alerts by type */
   byType: Record<AlertType, number>;
   
-  /** Number of alerts by severity */
+  /** Alerts by severity */
   bySeverity: Record<AlertSeverity, number>;
   
-  /** Number of alerts by category */
+  /** Alerts by category */
   byCategory: Record<AlertCategory, number>;
 }
 
+type AlertListener = () => void;
+
 /**
- * Alert service class
+ * Alert Service
+ * 
+ * This service manages ETL system alerts.
  */
 class AlertService {
-  private alerts: Map<string, Alert> = new Map();
   private nextId = 1;
+  private alerts = new Map<string, Alert>();
+  private listeners: AlertListener[] = [];
+  private maxAlerts = 1000;
   
   /**
    * Create a new alert
    */
   createAlert(payload: AlertPayload): Alert {
+    // Generate ID
     const id = `alert-${this.nextId++}`;
+    
+    // Create alert
     const alert: Alert = {
       id,
-      ...payload,
-      createdAt: new Date(),
+      timestamp: new Date(),
       read: false,
-      acknowledged: false
+      acknowledged: false,
+      ...payload
     };
     
+    // Add alert to map
     this.alerts.set(id, alert);
     
-    // In a real implementation, this would dispatch the alert via websocket, etc.
-    console.log(`Alert created: ${alert.title} (${alert.type}, ${alert.severity})`);
+    // If we have too many alerts, remove the oldest ones
+    if (this.alerts.size > this.maxAlerts) {
+      const alertsToDelete = [...this.alerts.entries()]
+        .sort((a, b) => a[1].timestamp.getTime() - b[1].timestamp.getTime())
+        .slice(0, this.alerts.size - this.maxAlerts)
+        .map(([id]) => id);
+        
+      for (const id of alertsToDelete) {
+        this.alerts.delete(id);
+      }
+    }
+    
+    // Notify listeners
+    this.notifyListeners();
+    
+    // Log to console if severity is high or critical
+    if (alert.severity >= AlertSeverity.HIGH) {
+      console.warn(`[ETL Alert] ${AlertType[alert.type]}: ${alert.title} - ${alert.message}`);
+    }
     
     return alert;
   }
@@ -207,70 +231,105 @@ class AlertService {
    * Get all alerts
    */
   getAllAlerts(): Alert[] {
-    return Array.from(this.alerts.values()).sort((a, b) => 
-      b.createdAt.getTime() - a.createdAt.getTime()
-    );
+    return Array.from(this.alerts.values())
+      .sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
   }
   
   /**
-   * Get filtered alerts
+   * Filter alerts
    */
-  getFilteredAlerts(options: AlertFilterOptions): Alert[] {
-    return this.getAllAlerts().filter(alert => {
-      // Apply filters
-      if (options.type && alert.type !== options.type) {
-        return false;
+  filterAlerts(options: AlertFilterOptions): Alert[] {
+    let filtered = this.getAllAlerts();
+    
+    // Apply filters
+    if (options.type !== undefined) {
+      filtered = filtered.filter(alert => alert.type === options.type);
+    }
+    
+    if (options.severity !== undefined) {
+      filtered = filtered.filter(alert => alert.severity === options.severity);
+    }
+    
+    if (options.category !== undefined) {
+      filtered = filtered.filter(alert => alert.category === options.category);
+    }
+    
+    if (options.read !== undefined) {
+      filtered = filtered.filter(alert => alert.read === options.read);
+    }
+    
+    if (options.acknowledged !== undefined) {
+      filtered = filtered.filter(alert => alert.acknowledged === options.acknowledged);
+    }
+    
+    if (options.entityId !== undefined) {
+      filtered = filtered.filter(alert => alert.entityId === options.entityId);
+    }
+    
+    if (options.searchText) {
+      const searchText = options.searchText.toLowerCase();
+      filtered = filtered.filter(
+        alert => 
+          alert.title.toLowerCase().includes(searchText) || 
+          alert.message.toLowerCase().includes(searchText)
+      );
+    }
+    
+    if (options.timestampFrom) {
+      filtered = filtered.filter(alert => alert.timestamp >= options.timestampFrom!);
+    }
+    
+    if (options.timestampTo) {
+      filtered = filtered.filter(alert => alert.timestamp <= options.timestampTo!);
+    }
+    
+    // Apply sorting
+    const sortBy = options.sortBy || 'timestamp';
+    const sortDirection = options.sortDirection || 'desc';
+    
+    filtered.sort((a, b) => {
+      let comparison: number;
+      
+      switch (sortBy) {
+        case 'type':
+          comparison = a.type - b.type;
+          break;
+        case 'severity':
+          comparison = a.severity - b.severity;
+          break;
+        case 'category':
+          comparison = a.category - b.category;
+          break;
+        case 'timestamp':
+        default:
+          comparison = a.timestamp.getTime() - b.timestamp.getTime();
+          break;
       }
       
-      if (options.severity && alert.severity !== options.severity) {
-        return false;
-      }
-      
-      if (options.category && alert.category !== options.category) {
-        return false;
-      }
-      
-      if (options.read !== undefined && alert.read !== options.read) {
-        return false;
-      }
-      
-      if (options.acknowledged !== undefined && alert.acknowledged !== options.acknowledged) {
-        return false;
-      }
-      
-      if (options.createdAfter && alert.createdAt < options.createdAfter) {
-        return false;
-      }
-      
-      if (options.createdBefore && alert.createdAt > options.createdBefore) {
-        return false;
-      }
-      
-      if (options.searchText) {
-        const searchTextLower = options.searchText.toLowerCase();
-        const titleLower = alert.title.toLowerCase();
-        const messageLower = alert.message.toLowerCase();
-        
-        if (!titleLower.includes(searchTextLower) && !messageLower.includes(searchTextLower)) {
-          return false;
-        }
-      }
-      
-      return true;
+      return sortDirection === 'asc' ? comparison : -comparison;
     });
+    
+    // Apply limit
+    if (options.limit) {
+      filtered = filtered.slice(0, options.limit);
+    }
+    
+    return filtered;
   }
   
   /**
    * Mark an alert as read
    */
   markAsRead(id: string): boolean {
-    const alert = this.getAlert(id);
+    const alert = this.alerts.get(id);
     
-    if (!alert) {
+    if (!alert || alert.read) {
       return false;
     }
     
     alert.read = true;
+    this.notifyListeners();
+    
     return true;
   }
   
@@ -278,13 +337,15 @@ class AlertService {
    * Mark an alert as unread
    */
   markAsUnread(id: string): boolean {
-    const alert = this.getAlert(id);
+    const alert = this.alerts.get(id);
     
-    if (!alert) {
+    if (!alert || !alert.read) {
       return false;
     }
     
     alert.read = false;
+    this.notifyListeners();
+    
     return true;
   }
   
@@ -301,22 +362,25 @@ class AlertService {
       }
     }
     
+    if (count > 0) {
+      this.notifyListeners();
+    }
+    
     return count;
   }
   
   /**
-   * Acknowledge an alert
+   * Mark an alert as acknowledged
    */
-  acknowledgeAlert(id: string): boolean {
-    const alert = this.getAlert(id);
+  acknowledge(id: string): boolean {
+    const alert = this.alerts.get(id);
     
-    if (!alert) {
+    if (!alert || alert.acknowledged) {
       return false;
     }
     
     alert.acknowledged = true;
-    alert.acknowledgedAt = new Date();
-    alert.read = true; // Also mark as read
+    this.notifyListeners();
     
     return true;
   }
@@ -325,26 +389,56 @@ class AlertService {
    * Delete an alert
    */
   deleteAlert(id: string): boolean {
-    return this.alerts.delete(id);
+    const result = this.alerts.delete(id);
+    
+    if (result) {
+      this.notifyListeners();
+    }
+    
+    return result;
   }
   
   /**
    * Delete all alerts
    */
-  deleteAllAlerts(): number {
+  clearAlerts(): number {
     const count = this.alerts.size;
-    this.alerts.clear();
+    
+    if (count > 0) {
+      this.alerts.clear();
+      this.notifyListeners();
+    }
+    
     return count;
+  }
+  
+  /**
+   * Delete alerts by filter
+   */
+  deleteAlerts(options: AlertFilterOptions): number {
+    const alertsToDelete = this.filterAlerts(options);
+    
+    if (alertsToDelete.length === 0) {
+      return 0;
+    }
+    
+    for (const alert of alertsToDelete) {
+      this.alerts.delete(alert.id);
+    }
+    
+    this.notifyListeners();
+    
+    return alertsToDelete.length;
   }
   
   /**
    * Get alert statistics
    */
-  getAlertStats(): AlertStats {
+  getStats(): AlertStats {
     const stats: AlertStats = {
-      total: 0,
+      total: this.alerts.size,
       unread: 0,
-      acknowledged: 0,
+      unacknowledged: 0,
       byType: {
         [AlertType.INFO]: 0,
         [AlertType.SUCCESS]: 0,
@@ -359,26 +453,22 @@ class AlertService {
       },
       byCategory: {
         [AlertCategory.SYSTEM]: 0,
-        [AlertCategory.DATA_SOURCE]: 0,
         [AlertCategory.JOB]: 0,
+        [AlertCategory.DATA_SOURCE]: 0,
         [AlertCategory.TRANSFORMATION]: 0,
-        [AlertCategory.DATA_QUALITY]: 0,
-        [AlertCategory.AUTHENTICATION]: 0,
+        [AlertCategory.VALIDATION]: 0,
         [AlertCategory.SECURITY]: 0,
         [AlertCategory.PERFORMANCE]: 0
       }
     };
     
-    // Calculate stats
     for (const alert of this.alerts.values()) {
-      stats.total++;
-      
       if (!alert.read) {
         stats.unread++;
       }
       
-      if (alert.acknowledged) {
-        stats.acknowledged++;
+      if (!alert.acknowledged) {
+        stats.unacknowledged++;
       }
       
       stats.byType[alert.type]++;
@@ -387,6 +477,37 @@ class AlertService {
     }
     
     return stats;
+  }
+  
+  /**
+   * Add a listener for alert changes
+   */
+  addListener(listener: AlertListener): void {
+    this.listeners.push(listener);
+  }
+  
+  /**
+   * Remove a listener
+   */
+  removeListener(listener: AlertListener): void {
+    const index = this.listeners.indexOf(listener);
+    
+    if (index !== -1) {
+      this.listeners.splice(index, 1);
+    }
+  }
+  
+  /**
+   * Notify all listeners
+   */
+  private notifyListeners(): void {
+    for (const listener of this.listeners) {
+      try {
+        listener();
+      } catch (error) {
+        console.error('Error in alert listener:', error);
+      }
+    }
   }
 }
 

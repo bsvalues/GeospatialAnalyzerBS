@@ -1,65 +1,42 @@
-/**
- * ETL System
- * 
- * This file exports all components of the ETL system.
- */
-
-// Re-export types
+// Re-export all types and interfaces
 export * from './ETLTypes';
 
-// Re-export AlertService
-export {
-  alertService,
-  AlertType,
-  AlertSeverity,
-  AlertCategory,
-  type Alert,
-  type AlertPayload,
-  type AlertFilterOptions,
-  type AlertStats
-} from './AlertService';
+// Re-export all services
+export { alertService, AlertType, AlertCategory, AlertSeverity } from './AlertService';
+export type { Alert, AlertPayload, AlertFilterOptions, AlertStats } from './AlertService';
 
-// Re-export TransformationService
-export {
-  transformationService,
-  type TransformationResult,
-  type ErrorMessage
-} from './TransformationService';
+export { dataConnector } from './DataConnector';
+export type { ConnectionResult, ExtractOptions, ExtractResult, LoadOptions, LoadResult } from './DataConnector';
 
-// Re-export DataQualityService
-export {
-  dataQualityService,
-  DataQualityIssueSeverity,
-  type DataQualityIssue,
-  type FieldStatistics,
-  type DataQualityAnalysisOptions,
-  type DataQualityAnalysisResult
+export { transformationService } from './TransformationService';
+export type { TransformationResult, ErrorMessage } from './TransformationService';
+
+export { dataQualityService, DataQualityIssueSeverity } from './DataQualityService';
+export type { 
+  DataQualityIssue, 
+  FieldStatistics, 
+  DataQualityAnalysisOptions, 
+  DataQualityAnalysisResult 
 } from './DataQualityService';
 
-// Re-export DataConnector
-export {
-  dataConnector,
-  type ConnectionResult,
-  type ExtractOptions,
-  type ExtractResult,
-  type LoadOptions,
-  type LoadResult
-} from './DataConnector';
+export { etlPipeline } from './ETLPipeline';
+export type { JobRun } from './ETLPipeline';
 
-// Re-export Scheduler
-export {
-  scheduler,
-  type JobCallback,
-  type ScheduledJob
-} from './Scheduler';
+export { scheduler, ScheduleFrequency } from './Scheduler';
+export type { ScheduleConfig, ScheduledJob } from './Scheduler';
 
-// Re-export ETLPipeline
-export {
-  etlPipeline,
-  type JobRun
-} from './ETLPipeline';
+export { etlPipelineManager as etlManager } from './ETLPipelineManager';
 
-// Re-export ETLPipelineManager
-export {
-  etlPipelineManager
-} from './ETLPipelineManager';
+/**
+ * Initialize the ETL pipeline system
+ * 
+ * This function initializes all ETL services.
+ */
+// Import directly from ETLPipelineManager to avoid circular dependency
+import { etlPipelineManager } from './ETLPipelineManager';
+
+export function initializeETL(): void {
+  // Initialize ETL pipeline manager
+  // This solves the circular dependency issue
+  etlPipelineManager.initialize();
+}

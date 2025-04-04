@@ -1,567 +1,1350 @@
 import React, { useState, useEffect } from 'react';
 import { 
-  etlPipelineManager, 
-  alertService, 
-  Alert, 
+  Card, 
+  CardContent, 
+  CardHeader, 
+  CardTitle, 
+  CardDescription, 
+  CardFooter 
+} from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { 
+  Table, 
+  TableBody, 
+  TableCaption, 
+  TableCell, 
+  TableHead, 
+  TableHeader, 
+  TableRow 
+} from "@/components/ui/table";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Progress } from "@/components/ui/progress";
+import { 
+  Dialog, 
+  DialogContent, 
+  DialogDescription, 
+  DialogFooter, 
+  DialogHeader, 
+  DialogTitle, 
+  DialogTrigger 
+} from "@/components/ui/dialog";
+import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import Tooltip from "@/components/ui/tooltip";
+
+import { 
+  Activity, 
+  AlertTriangle, 
+  CheckCircle2, 
+  ChevronDown, 
+  Clock, 
+  Download, 
+  File, 
+  FileText, 
+  Filter, 
+  HelpCircle, 
+  Info, 
+  ListFilter, 
+  MoreVertical, 
+  Play, 
+  Plus, 
+  RefreshCw, 
+  Search, 
+  Settings, 
+  Trash2, 
+  XCircle 
+} from 'lucide-react';
+
+import { 
+  JobStatus, 
   AlertType, 
-  AlertSeverity, 
-  SystemStatus, 
-  JobStatus,
-  DataSource,
-  TransformationRule,
-  ETLJob,
-  JobRun
+  DataSourceType, 
+  TransformationType,
+  FilterLogic,
+  initializeETL 
 } from '../services/etl';
 
+import type { 
+  ETLJob, 
+  DataSource, 
+  TransformationRule, 
+  JobRun, 
+  Alert as AlertModel, 
+  SystemStatus 
+} from '../services/etl';
+
+// Use direct imports to avoid circular dependencies
+import { etlPipelineManager as etlManager } from '../services/etl/ETLPipelineManager';
+import { alertService as alertSvc } from '../services/etl/AlertService';
+
 /**
- * ETL Dashboard Component
- * 
- * This component displays a dashboard for the ETL system, including:
- * - System status
- * - Recent alerts
- * - Job statistics
- * - Recent job runs
+ * Status badge component
+ */
+const StatusBadge: React.FC<{ status: JobStatus }> = ({ status }) => {
+  switch (status) {
+    case JobStatus.IDLE:
+      return <Badge variant="outline" className="bg-gray-100">Idle</Badge>;
+    case JobStatus.RUNNING:
+      return <Badge variant="outline" className="bg-blue-100 text-blue-800">Running</Badge>;
+    case JobStatus.SUCCEEDED:
+      return <Badge variant="outline" className="bg-green-100 text-green-800">Succeeded</Badge>;
+    case JobStatus.FAILED:
+      return <Badge variant="outline" className="bg-red-100 text-red-800">Failed</Badge>;
+    default:
+      return <Badge variant="outline">Unknown</Badge>;
+  }
+};
+
+/**
+ * Data source type badge component
+ */
+const DataSourceTypeBadge: React.FC<{ type: DataSourceType }> = ({ type }) => {
+  switch (type) {
+    case DataSourceType.POSTGRESQL:
+      return <Badge variant="outline" className="bg-indigo-100 text-indigo-800">PostgreSQL</Badge>;
+    case DataSourceType.MYSQL:
+      return <Badge variant="outline" className="bg-blue-100 text-blue-800">MySQL</Badge>;
+    case DataSourceType.REST_API:
+      return <Badge variant="outline" className="bg-purple-100 text-purple-800">REST API</Badge>;
+    case DataSourceType.FILE_CSV:
+      return <Badge variant="outline" className="bg-yellow-100 text-yellow-800">CSV File</Badge>;
+    case DataSourceType.FILE_JSON:
+      return <Badge variant="outline" className="bg-yellow-100 text-yellow-800">JSON File</Badge>;
+    case DataSourceType.MEMORY:
+      return <Badge variant="outline" className="bg-gray-100">In-Memory</Badge>;
+    default:
+      return <Badge variant="outline">{type}</Badge>;
+  }
+};
+
+/**
+ * Transformation type badge component
+ */
+const TransformationTypeBadge: React.FC<{ type: TransformationType }> = ({ type }) => {
+  switch (type) {
+    case TransformationType.FILTER:
+      return <Badge variant="outline" className="bg-blue-100 text-blue-800">Filter</Badge>;
+    case TransformationType.MAP:
+      return <Badge variant="outline" className="bg-green-100 text-green-800">Map</Badge>;
+    case TransformationType.JOIN:
+      return <Badge variant="outline" className="bg-purple-100 text-purple-800">Join</Badge>;
+    case TransformationType.AGGREGATE:
+      return <Badge variant="outline" className="bg-yellow-100 text-yellow-800">Aggregate</Badge>;
+    case TransformationType.VALIDATE:
+      return <Badge variant="outline" className="bg-red-100 text-red-800">Validate</Badge>;
+    case TransformationType.ENRICH:
+      return <Badge variant="outline" className="bg-indigo-100 text-indigo-800">Enrich</Badge>;
+    case TransformationType.CUSTOM:
+      return <Badge variant="outline" className="bg-gray-100">Custom</Badge>;
+    default:
+      return <Badge variant="outline">{type}</Badge>;
+  }
+};
+
+/**
+ * Alert type icon component
+ */
+const AlertTypeIcon: React.FC<{ type: AlertType }> = ({ type }) => {
+  switch (type) {
+    case AlertType.INFO:
+      return <Info className="h-4 w-4 text-blue-500" />;
+    case AlertType.SUCCESS:
+      return <CheckCircle2 className="h-4 w-4 text-green-500" />;
+    case AlertType.WARNING:
+      return <AlertTriangle className="h-4 w-4 text-yellow-500" />;
+    case AlertType.ERROR:
+      return <XCircle className="h-4 w-4 text-red-500" />;
+    default:
+      return <HelpCircle className="h-4 w-4" />;
+  }
+};
+
+/**
+ * ETL Dashboard component
  */
 const ETLDashboard: React.FC = () => {
-  // State for system status
-  const [systemStatus, setSystemStatus] = useState<SystemStatus>(etlPipelineManager.getSystemStatus());
-  
-  // State for alerts
-  const [alerts, setAlerts] = useState<Alert[]>([]);
-  
-  // State for jobs
+  // State
+  const [activeTab, setActiveTab] = useState<string>('dashboard');
   const [jobs, setJobs] = useState<ETLJob[]>([]);
-  const [jobRuns, setJobRuns] = useState<JobRun[]>([]);
-  
-  // State for data sources and transformation rules
   const [dataSources, setDataSources] = useState<DataSource[]>([]);
   const [transformationRules, setTransformationRules] = useState<TransformationRule[]>([]);
+  const [jobRuns, setJobRuns] = useState<JobRun[]>([]);
+  const [alerts, setAlerts] = useState<AlertModel[]>([]);
+  const [systemStatus, setSystemStatus] = useState<SystemStatus | null>(null);
+  const [refreshCounter, setRefreshCounter] = useState<number>(0);
+  const [selectedJobId, setSelectedJobId] = useState<number | null>(null);
+  const [selectedDataSourceId, setSelectedDataSourceId] = useState<number | null>(null);
+  const [selectedTransformationRuleId, setSelectedTransformationRuleId] = useState<number | null>(null);
   
-  // State for job stats
-  const [jobStats, setJobStats] = useState<{
-    total: number;
-    active: number;
-    inactive: number;
-    byStatus: Record<JobStatus, number>;
-  }>({
-    total: 0,
-    active: 0,
-    inactive: 0,
-    byStatus: {
-      [JobStatus.CREATED]: 0,
-      [JobStatus.SCHEDULED]: 0,
-      [JobStatus.QUEUED]: 0,
-      [JobStatus.RUNNING]: 0,
-      [JobStatus.SUCCEEDED]: 0,
-      [JobStatus.FAILED]: 0,
-      [JobStatus.CANCELLED]: 0,
-      [JobStatus.SKIPPED]: 0
-    }
+  // Job dialog state
+  const [jobDialogOpen, setJobDialogOpen] = useState<boolean>(false);
+  const [newJob, setNewJob] = useState<Partial<ETLJob>>({
+    name: '',
+    sources: [],
+    destinations: [],
+    transformations: [],
+    enabled: true,
+    description: ''
   });
   
-  // State for selected tab
-  const [selectedTab, setSelectedTab] = useState<
-    'overview' | 'data-sources' | 'transformations' | 'jobs' | 'alerts'
-  >('overview');
+  // Data source dialog state
+  const [dataSourceDialogOpen, setDataSourceDialogOpen] = useState<boolean>(false);
+  const [newDataSource, setNewDataSource] = useState<Partial<DataSource>>({
+    name: '',
+    type: DataSourceType.POSTGRESQL,
+    config: {},
+    enabled: true,
+    description: ''
+  });
   
-  // Update data on component mount and at regular intervals
+  // Transformation rule dialog state
+  const [transformationRuleDialogOpen, setTransformationRuleDialogOpen] = useState<boolean>(false);
+  const [newTransformationRule, setNewTransformationRule] = useState<Partial<TransformationRule>>({
+    name: '',
+    type: TransformationType.FILTER,
+    config: {
+      conditions: [],
+      logic: FilterLogic.AND
+    },
+    order: 1,
+    enabled: true,
+    description: ''
+  });
+  
+  // Initialize ETL system on mount
   useEffect(() => {
-    // Helper function to refresh data
-    const refreshData = () => {
-      setSystemStatus(etlPipelineManager.getSystemStatus());
-      setAlerts(alertService.getAllAlerts().slice(0, 5)); // Get only 5 most recent alerts
-      setJobs(etlPipelineManager.getAllJobs());
-      setJobRuns(etlPipelineManager.getJobRuns().slice(0, 5)); // Get only 5 most recent job runs
-      setDataSources(etlPipelineManager.getAllDataSources());
-      setTransformationRules(etlPipelineManager.getAllTransformationRules());
-      setJobStats(etlPipelineManager.getJobStats());
+    initializeETL();
+  }, []);
+  
+  // Fetch data on mount and when refresh counter changes
+  useEffect(() => {
+    setJobs(etlManager.getAllJobs());
+    setDataSources(etlManager.getAllDataSources());
+    setTransformationRules(etlManager.getAllTransformationRules());
+    setJobRuns(etlManager.getAllJobRuns());
+    setAlerts(alertSvc.getAllAlerts());
+    setSystemStatus(etlManager.getSystemStatus());
+  }, [refreshCounter]);
+  
+  // Set up alert listener
+  useEffect(() => {
+    const handleAlertCreated = () => {
+      setAlerts(alertSvc.getAllAlerts());
     };
     
-    // Initial data load
-    refreshData();
+    alertSvc.addListener(handleAlertCreated);
     
-    // Subscribe to alert updates
-    const alertListener = () => {
-      setAlerts(alertService.getAllAlerts().slice(0, 5));
-    };
-    
-    alertService.addListener(alertListener);
-    
-    // Set up interval for refreshing data
-    const intervalId = setInterval(refreshData, 5000);
-    
-    // Cleanup
     return () => {
-      clearInterval(intervalId);
-      alertService.removeListener(alertListener);
+      alertSvc.removeListener(handleAlertCreated);
     };
   }, []);
   
-  // Helper function to format date
-  const formatDate = (date: Date): string => {
+  // Refresh data
+  const refreshData = () => {
+    setRefreshCounter(prev => prev + 1);
+  };
+  
+  // Run a job
+  const runJob = async (jobId: number) => {
+    try {
+      await etlManager.runJob(jobId);
+      refreshData();
+    } catch (error) {
+      console.error('Error running job:', error);
+    }
+  };
+  
+  // Enable/disable a job
+  const toggleJobEnabled = (jobId: number, enabled: boolean) => {
+    if (enabled) {
+      etlManager.enableJob(jobId);
+    } else {
+      etlManager.disableJob(jobId);
+    }
+    refreshData();
+  };
+  
+  // Enable/disable a data source
+  const toggleDataSourceEnabled = (dataSourceId: number, enabled: boolean) => {
+    if (enabled) {
+      etlManager.enableDataSource(dataSourceId);
+    } else {
+      etlManager.disableDataSource(dataSourceId);
+    }
+    refreshData();
+  };
+  
+  // Enable/disable a transformation rule
+  const toggleTransformationRuleEnabled = (transformationRuleId: number, enabled: boolean) => {
+    if (enabled) {
+      etlManager.enableTransformationRule(transformationRuleId);
+    } else {
+      etlManager.disableTransformationRule(transformationRuleId);
+    }
+    refreshData();
+  };
+  
+  // Delete a job
+  const deleteJob = (jobId: number) => {
+    etlManager.deleteJob(jobId);
+    refreshData();
+  };
+  
+  // Delete a data source
+  const deleteDataSource = (dataSourceId: number) => {
+    etlManager.deleteDataSource(dataSourceId);
+    refreshData();
+  };
+  
+  // Delete a transformation rule
+  const deleteTransformationRule = (transformationRuleId: number) => {
+    etlManager.deleteTransformationRule(transformationRuleId);
+    refreshData();
+  };
+  
+  // Create a job
+  const createJob = () => {
+    if (newJob.name && newJob.sources && newJob.destinations) {
+      etlManager.createJob({
+        name: newJob.name,
+        sources: newJob.sources,
+        destinations: newJob.destinations,
+        transformations: newJob.transformations || [],
+        enabled: newJob.enabled || false,
+        description: newJob.description
+      });
+      setJobDialogOpen(false);
+      setNewJob({
+        name: '',
+        sources: [],
+        destinations: [],
+        transformations: [],
+        enabled: true,
+        description: ''
+      });
+      refreshData();
+    }
+  };
+  
+  // Create a data source
+  const createDataSource = () => {
+    if (newDataSource.name && newDataSource.type) {
+      etlManager.createDataSource({
+        name: newDataSource.name,
+        type: newDataSource.type,
+        config: newDataSource.config || {},
+        enabled: newDataSource.enabled || false,
+        description: newDataSource.description
+      });
+      setDataSourceDialogOpen(false);
+      setNewDataSource({
+        name: '',
+        type: DataSourceType.POSTGRESQL,
+        config: {},
+        enabled: true,
+        description: ''
+      });
+      refreshData();
+    }
+  };
+  
+  // Create a transformation rule
+  const createTransformationRule = () => {
+    if (newTransformationRule.name && newTransformationRule.type) {
+      etlManager.createTransformationRule({
+        name: newTransformationRule.name,
+        type: newTransformationRule.type,
+        config: newTransformationRule.config || {
+          conditions: [],
+          logic: FilterLogic.AND
+        },
+        order: newTransformationRule.order || 1,
+        enabled: newTransformationRule.enabled || false,
+        description: newTransformationRule.description
+      });
+      setTransformationRuleDialogOpen(false);
+      setNewTransformationRule({
+        name: '',
+        type: TransformationType.FILTER,
+        config: {
+          conditions: [],
+          logic: FilterLogic.AND
+        },
+        order: 1,
+        enabled: true,
+        description: ''
+      });
+      refreshData();
+    }
+  };
+  
+  // Format date
+  const formatDate = (date: Date | undefined): string => {
+    if (!date) {
+      return 'N/A';
+    }
+    
     return new Date(date).toLocaleString();
   };
   
-  // Helper function to format duration
+  // Format duration
   const formatDuration = (ms: number): string => {
-    const seconds = Math.floor(ms / 1000);
-    const minutes = Math.floor(seconds / 60);
-    const hours = Math.floor(minutes / 60);
-    const days = Math.floor(hours / 24);
-    
-    if (days > 0) {
-      return `${days}d ${hours % 24}h`;
-    } else if (hours > 0) {
-      return `${hours}h ${minutes % 60}m`;
-    } else if (minutes > 0) {
-      return `${minutes}m ${seconds % 60}s`;
+    if (ms < 1000) {
+      return `${ms}ms`;
+    } else if (ms < 60000) {
+      return `${(ms / 1000).toFixed(2)}s`;
     } else {
-      return `${seconds}s`;
+      const minutes = Math.floor(ms / 60000);
+      const seconds = ((ms % 60000) / 1000).toFixed(2);
+      return `${minutes}m ${seconds}s`;
     }
   };
   
-  // Helper function to get alert type class
-  const getAlertTypeClass = (type: AlertType): string => {
-    switch (type) {
-      case AlertType.SUCCESS:
-        return 'bg-green-100 text-green-800';
-      case AlertType.ERROR:
-        return 'bg-red-100 text-red-800';
-      case AlertType.WARNING:
-        return 'bg-yellow-100 text-yellow-800';
-      case AlertType.INFO:
-      default:
-        return 'bg-blue-100 text-blue-800';
+  // Render dashboard tab
+  const renderDashboardTab = () => {
+    if (!systemStatus) {
+      return (
+        <div className="flex items-center justify-center h-64">
+          <p>Loading system status...</p>
+        </div>
+      );
     }
+    
+    return (
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        {/* System status */}
+        <Card>
+          <CardHeader>
+            <CardTitle>System Status</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              <div className="flex justify-between">
+                <span>Jobs:</span>
+                <span>{systemStatus.jobCount} ({systemStatus.enabledJobCount} enabled)</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Data Sources:</span>
+                <span>{systemStatus.dataSourceCount} ({systemStatus.enabledDataSourceCount} enabled)</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Transformation Rules:</span>
+                <span>{systemStatus.transformationRuleCount} ({systemStatus.enabledTransformationRuleCount} enabled)</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Running Jobs:</span>
+                <span>{systemStatus.runningJobCount}</span>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        
+        {/* Job status */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Job Status</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              <div className="flex justify-between">
+                <span className="flex items-center">
+                  <div className="w-3 h-3 rounded-full bg-gray-300 mr-2"></div>
+                  Idle
+                </span>
+                <span>{systemStatus.schedulerStatus[JobStatus.IDLE]}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="flex items-center">
+                  <div className="w-3 h-3 rounded-full bg-blue-500 mr-2"></div>
+                  Running
+                </span>
+                <span>{systemStatus.schedulerStatus[JobStatus.RUNNING]}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="flex items-center">
+                  <div className="w-3 h-3 rounded-full bg-green-500 mr-2"></div>
+                  Succeeded
+                </span>
+                <span>{systemStatus.schedulerStatus[JobStatus.SUCCEEDED]}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="flex items-center">
+                  <div className="w-3 h-3 rounded-full bg-red-500 mr-2"></div>
+                  Failed
+                </span>
+                <span>{systemStatus.schedulerStatus[JobStatus.FAILED]}</span>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        
+        {/* Recent job runs */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Recent Job Runs</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              <div className="flex justify-between">
+                <span>Total Runs:</span>
+                <span>{systemStatus.recentJobRuns}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="flex items-center">
+                  <div className="w-3 h-3 rounded-full bg-green-500 mr-2"></div>
+                  Successful
+                </span>
+                <span>{systemStatus.successJobRuns}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="flex items-center">
+                  <div className="w-3 h-3 rounded-full bg-red-500 mr-2"></div>
+                  Failed
+                </span>
+                <span>{systemStatus.failedJobRuns}</span>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        
+        {/* Record counts */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Record Counts</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <div className="flex justify-between">
+                  <span>Extracted:</span>
+                  <span>{systemStatus.recordCounts.extracted}</span>
+                </div>
+                <Progress value={(systemStatus.recordCounts.extracted / Math.max(1, systemStatus.recordCounts.extracted + systemStatus.recordCounts.rejected)) * 100} />
+              </div>
+              <div className="space-y-2">
+                <div className="flex justify-between">
+                  <span>Transformed:</span>
+                  <span>{systemStatus.recordCounts.transformed}</span>
+                </div>
+                <Progress value={(systemStatus.recordCounts.transformed / Math.max(1, systemStatus.recordCounts.extracted)) * 100} />
+              </div>
+              <div className="space-y-2">
+                <div className="flex justify-between">
+                  <span>Loaded:</span>
+                  <span>{systemStatus.recordCounts.loaded}</span>
+                </div>
+                <Progress value={(systemStatus.recordCounts.loaded / Math.max(1, systemStatus.recordCounts.transformed)) * 100} />
+              </div>
+              <div className="space-y-2">
+                <div className="flex justify-between">
+                  <span>Rejected:</span>
+                  <span>{systemStatus.recordCounts.rejected}</span>
+                </div>
+                <Progress value={(systemStatus.recordCounts.rejected / Math.max(1, systemStatus.recordCounts.extracted + systemStatus.recordCounts.rejected)) * 100} className="bg-red-100" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        
+        {/* Recent alerts */}
+        <Card className="md:col-span-2">
+          <CardHeader>
+            <CardTitle>Recent Alerts</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {alerts.slice(0, 5).map(alert => (
+                <Alert key={alert.id} variant={
+                  alert.type === AlertType.ERROR ? "destructive" :
+                  alert.type === AlertType.WARNING ? "default" :
+                  alert.type === AlertType.SUCCESS ? "default" :
+                  "default"
+                }>
+                  <div className="flex items-start">
+                    <AlertTypeIcon type={alert.type} />
+                    <div className="ml-2">
+                      <AlertTitle>{alert.title}</AlertTitle>
+                      <AlertDescription>{alert.message}</AlertDescription>
+                      <div className="text-xs text-gray-500 mt-1">
+                        {formatDate(alert.timestamp)}
+                      </div>
+                    </div>
+                  </div>
+                </Alert>
+              ))}
+              {alerts.length === 0 && (
+                <div className="text-center py-4 text-gray-500">
+                  No recent alerts
+                </div>
+              )}
+            </div>
+          </CardContent>
+          <CardFooter className="justify-center">
+            <Button variant="ghost" size="sm" onClick={() => setActiveTab('alerts')}>
+              View All Alerts
+            </Button>
+          </CardFooter>
+        </Card>
+      </div>
+    );
   };
   
-  // Helper function to get job status class
-  const getJobStatusClass = (status: JobStatus): string => {
-    switch (status) {
-      case JobStatus.CREATED:
-        return 'bg-gray-200 text-gray-800';
-      case JobStatus.SCHEDULED:
-        return 'bg-blue-100 text-blue-800';
-      case JobStatus.QUEUED:
-        return 'bg-purple-100 text-purple-800';
-      case JobStatus.RUNNING:
-        return 'bg-yellow-100 text-yellow-800';
-      case JobStatus.SUCCEEDED:
-        return 'bg-green-100 text-green-800';
-      case JobStatus.FAILED:
-        return 'bg-red-100 text-red-800';
-      case JobStatus.CANCELLED:
-        return 'bg-orange-100 text-orange-800';
-      case JobStatus.SKIPPED:
-        return 'bg-gray-100 text-gray-800';
-      default:
-        return 'bg-gray-100 text-gray-800';
-    }
-  };
-  
-  // Render system overview
-  const renderOverview = () => (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-      {/* System Status Card */}
-      <div className="bg-white p-4 rounded-lg shadow">
-        <h3 className="font-medium text-gray-700 mb-2">System Status</h3>
-        <div className="flex items-center mb-2">
-          <div className={`w-3 h-3 rounded-full mr-2 ${systemStatus.running ? 'bg-green-500' : 'bg-red-500'}`}></div>
-          <span>{systemStatus.running ? 'Running' : 'Stopped'}</span>
-        </div>
-        <div className="text-sm text-gray-600">
-          <div>Uptime: {formatDuration(systemStatus.uptime)}</div>
-          <div>Active Jobs: {systemStatus.activeJobs}</div>
-          <div>Pending Jobs: {systemStatus.pendingJobs}</div>
-        </div>
-      </div>
-      
-      {/* Job Stats Card */}
-      <div className="bg-white p-4 rounded-lg shadow">
-        <h3 className="font-medium text-gray-700 mb-2">Job Statistics</h3>
-        <div className="text-sm text-gray-600">
-          <div>Total Jobs: {jobStats.total}</div>
-          <div>Active Jobs: {jobStats.active}</div>
-          <div>Inactive Jobs: {jobStats.inactive}</div>
-        </div>
-        <div className="mt-2">
-          <div className="flex items-center text-xs">
-            <div className="w-16">Created:</div>
-            <div className="flex-1 bg-gray-200 rounded-full h-2">
-              <div 
-                className="bg-gray-500 h-2 rounded-full" 
-                style={{ width: `${(jobStats.byStatus[JobStatus.CREATED] / jobStats.total) * 100}%` }}
-              ></div>
-            </div>
-            <div className="ml-2">{jobStats.byStatus[JobStatus.CREATED]}</div>
-          </div>
-          <div className="flex items-center text-xs mt-1">
-            <div className="w-16">Scheduled:</div>
-            <div className="flex-1 bg-gray-200 rounded-full h-2">
-              <div 
-                className="bg-blue-500 h-2 rounded-full" 
-                style={{ width: `${(jobStats.byStatus[JobStatus.SCHEDULED] / jobStats.total) * 100}%` }}
-              ></div>
-            </div>
-            <div className="ml-2">{jobStats.byStatus[JobStatus.SCHEDULED]}</div>
-          </div>
-          <div className="flex items-center text-xs mt-1">
-            <div className="w-16">Running:</div>
-            <div className="flex-1 bg-gray-200 rounded-full h-2">
-              <div 
-                className="bg-yellow-500 h-2 rounded-full" 
-                style={{ width: `${(jobStats.byStatus[JobStatus.RUNNING] / jobStats.total) * 100}%` }}
-              ></div>
-            </div>
-            <div className="ml-2">{jobStats.byStatus[JobStatus.RUNNING]}</div>
-          </div>
-          <div className="flex items-center text-xs mt-1">
-            <div className="w-16">Succeeded:</div>
-            <div className="flex-1 bg-gray-200 rounded-full h-2">
-              <div 
-                className="bg-green-500 h-2 rounded-full" 
-                style={{ width: `${(jobStats.byStatus[JobStatus.SUCCEEDED] / jobStats.total) * 100}%` }}
-              ></div>
-            </div>
-            <div className="ml-2">{jobStats.byStatus[JobStatus.SUCCEEDED]}</div>
-          </div>
-        </div>
-      </div>
-      
-      {/* Data Sources Card */}
-      <div className="bg-white p-4 rounded-lg shadow">
-        <h3 className="font-medium text-gray-700 mb-2">Data Sources</h3>
-        <div className="text-sm text-gray-600">
-          <div>Total Sources: {dataSources.length}</div>
-          <div>Active Sources: {dataSources.filter(ds => ds.enabled).length}</div>
-          <div>
-            Types: {
-              Object.entries(
-                dataSources.reduce((acc, ds) => {
-                  acc[ds.type] = (acc[ds.type] || 0) + 1;
-                  return acc;
-                }, {} as Record<string, number>)
-              ).map(([type, count]) => `${type} (${count})`).join(', ')
-            }
-          </div>
-        </div>
-      </div>
-      
-      {/* Transformation Rules Card */}
-      <div className="bg-white p-4 rounded-lg shadow">
-        <h3 className="font-medium text-gray-700 mb-2">Transformation Rules</h3>
-        <div className="text-sm text-gray-600">
-          <div>Total Rules: {transformationRules.length}</div>
-          <div>Active Rules: {transformationRules.filter(rule => rule.enabled).length}</div>
-          <div>
-            Types: {
-              Object.entries(
-                transformationRules.reduce((acc, rule) => {
-                  acc[rule.type] = (acc[rule.type] || 0) + 1;
-                  return acc;
-                }, {} as Record<string, number>)
-              ).map(([type, count]) => `${type} (${count})`).join(', ')
-            }
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-  
-  // Render recent alerts
-  const renderAlerts = () => (
-    <div className="bg-white rounded-lg shadow overflow-hidden mb-6">
-      <div className="px-4 py-3 border-b border-gray-200">
-        <h3 className="font-medium text-gray-700">Recent Alerts</h3>
-      </div>
-      <div className="divide-y divide-gray-200">
-        {alerts.length === 0 ? (
-          <div className="px-4 py-3 text-gray-500 text-sm">No alerts found</div>
-        ) : (
-          alerts.map(alert => (
-            <div key={alert.id} className="px-4 py-3">
-              <div className="flex items-center justify-between">
-                <span className={`px-2 py-1 text-xs rounded-full ${getAlertTypeClass(alert.type)}`}>
-                  {AlertType[alert.type]}
-                </span>
-                <span className="text-xs text-gray-500">
-                  {formatDate(alert.timestamp)}
-                </span>
-              </div>
-              <div className="font-medium mt-1">{alert.title}</div>
-              <div className="text-sm text-gray-600">{alert.message}</div>
-            </div>
-          ))
-        )}
-      </div>
-    </div>
-  );
-  
-  // Render job runs
-  const renderJobRuns = () => (
-    <div className="bg-white rounded-lg shadow overflow-hidden mb-6">
-      <div className="px-4 py-3 border-b border-gray-200">
-        <h3 className="font-medium text-gray-700">Recent Job Runs</h3>
-      </div>
-      <div className="divide-y divide-gray-200">
-        {jobRuns.length === 0 ? (
-          <div className="px-4 py-3 text-gray-500 text-sm">No job runs found</div>
-        ) : (
-          jobRuns.map(run => {
-            const job = jobs.find(j => j.id === run.jobId);
-            return (
-              <div key={run.id} className="px-4 py-3">
-                <div className="flex items-center justify-between">
-                  <span className="font-medium">{job?.name || `Job #${run.jobId}`}</span>
-                  <span className={`px-2 py-1 text-xs rounded-full ${getJobStatusClass(run.status)}`}>
-                    {JobStatus[run.status]}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between mt-1 text-sm">
-                  <span className="text-gray-600">
-                    {run.isManual ? 'Manual Execution' : 'Scheduled Execution'}
-                  </span>
-                  <span className="text-gray-500">
-                    {formatDate(run.startTime)}
-                  </span>
-                </div>
-                <div className="text-sm text-gray-600 mt-1">
-                  <span>Duration: {formatDuration(run.executionTime)}</span>
-                  {run.error && (
-                    <span className="text-red-600 ml-4">Error: {run.error}</span>
-                  )}
-                </div>
-                <div className="text-xs text-gray-500 mt-1">
-                  <span>Records: {run.recordCounts.extracted} extracted, {run.recordCounts.transformed} transformed, {run.recordCounts.loaded} loaded</span>
-                </div>
-              </div>
-            );
-          })
-        )}
-      </div>
-    </div>
-  );
-  
-  // Render data sources
-  const renderDataSources = () => (
-    <div className="bg-white rounded-lg shadow overflow-hidden mb-6">
-      <div className="px-4 py-3 border-b border-gray-200">
-        <h3 className="font-medium text-gray-700">Data Sources</h3>
-      </div>
-      <div className="divide-y divide-gray-200">
-        {dataSources.length === 0 ? (
-          <div className="px-4 py-3 text-gray-500 text-sm">No data sources found</div>
-        ) : (
-          dataSources.map(source => (
-            <div key={source.id} className="px-4 py-3">
-              <div className="flex items-center justify-between">
-                <span className="font-medium">{source.name}</span>
-                <span className={`px-2 py-1 text-xs rounded-full ${source.enabled ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}`}>
-                  {source.enabled ? 'Enabled' : 'Disabled'}
-                </span>
-              </div>
-              <div className="text-sm text-gray-600 mt-1">{source.description}</div>
-              <div className="flex items-center mt-1 text-xs text-gray-500">
-                <span className="px-2 py-1 bg-gray-100 rounded-full">{source.type}</span>
-                <span className="ml-2">ID: {source.id}</span>
-              </div>
-            </div>
-          ))
-        )}
-      </div>
-    </div>
-  );
-  
-  // Render transformation rules
-  const renderTransformationRules = () => (
-    <div className="bg-white rounded-lg shadow overflow-hidden mb-6">
-      <div className="px-4 py-3 border-b border-gray-200">
-        <h3 className="font-medium text-gray-700">Transformation Rules</h3>
-      </div>
-      <div className="divide-y divide-gray-200">
-        {transformationRules.length === 0 ? (
-          <div className="px-4 py-3 text-gray-500 text-sm">No transformation rules found</div>
-        ) : (
-          transformationRules.map(rule => (
-            <div key={rule.id} className="px-4 py-3">
-              <div className="flex items-center justify-between">
-                <span className="font-medium">{rule.name}</span>
-                <span className={`px-2 py-1 text-xs rounded-full ${rule.enabled ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}`}>
-                  {rule.enabled ? 'Enabled' : 'Disabled'}
-                </span>
-              </div>
-              <div className="text-sm text-gray-600 mt-1">{rule.description}</div>
-              <div className="flex items-center mt-1 text-xs text-gray-500">
-                <span className="px-2 py-1 bg-gray-100 rounded-full">{rule.type}</span>
-                <span className="ml-2">Order: {rule.order}</span>
-                <span className="ml-2">ID: {rule.id}</span>
-              </div>
-            </div>
-          ))
-        )}
-      </div>
-    </div>
-  );
-  
-  // Render jobs
-  const renderJobs = () => (
-    <div className="bg-white rounded-lg shadow overflow-hidden mb-6">
-      <div className="px-4 py-3 border-b border-gray-200">
-        <h3 className="font-medium text-gray-700">ETL Jobs</h3>
-      </div>
-      <div className="divide-y divide-gray-200">
-        {jobs.length === 0 ? (
-          <div className="px-4 py-3 text-gray-500 text-sm">No jobs found</div>
-        ) : (
-          jobs.map(job => (
-            <div key={job.id} className="px-4 py-3">
-              <div className="flex items-center justify-between">
-                <span className="font-medium">{job.name}</span>
-                <div className="flex space-x-2">
-                  <span className={`px-2 py-1 text-xs rounded-full ${job.enabled ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}`}>
-                    {job.enabled ? 'Enabled' : 'Disabled'}
-                  </span>
-                  <span className={`px-2 py-1 text-xs rounded-full ${getJobStatusClass(job.status)}`}>
-                    {JobStatus[job.status]}
-                  </span>
-                </div>
-              </div>
-              <div className="text-sm text-gray-600 mt-1">{job.description}</div>
-              <div className="flex flex-wrap items-center mt-1 text-xs text-gray-500">
-                <span className="px-2 py-1 bg-gray-100 rounded-full mr-2 mb-1">ID: {job.id}</span>
-                <span className="px-2 py-1 bg-gray-100 rounded-full mr-2 mb-1">Frequency: {job.frequency}</span>
-                {job.nextRunAt && (
-                  <span className="px-2 py-1 bg-gray-100 rounded-full mr-2 mb-1">
-                    Next Run: {formatDate(job.nextRunAt)}
-                  </span>
-                )}
-                {job.lastRunAt && (
-                  <span className="px-2 py-1 bg-gray-100 rounded-full mr-2 mb-1">
-                    Last Run: {formatDate(job.lastRunAt)}
-                  </span>
-                )}
-              </div>
-              <div className="flex flex-wrap mt-2">
-                <div className="w-full sm:w-1/2 text-xs">
-                  <span className="text-gray-500">Sources:</span>
-                  <div className="flex flex-wrap mt-1">
-                    {job.sources.map(sourceId => {
-                      const source = dataSources.find(ds => ds.id === sourceId);
-                      return (
-                        <span key={sourceId} className="px-2 py-1 bg-blue-50 text-blue-800 rounded mr-1 mb-1">
-                          {source?.name || `Source #${sourceId}`}
-                        </span>
-                      );
-                    })}
+  // Render jobs tab
+  const renderJobsTab = () => {
+    return (
+      <div className="space-y-4">
+        <div className="flex justify-between items-center">
+          <h2 className="text-xl font-semibold">ETL Jobs</h2>
+          <div className="flex space-x-2">
+            <Button variant="outline" size="sm" onClick={refreshData}>
+              <RefreshCw className="h-4 w-4 mr-2" />
+              Refresh
+            </Button>
+            <Dialog open={jobDialogOpen} onOpenChange={setJobDialogOpen}>
+              <DialogTrigger asChild>
+                <Button size="sm">
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Job
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Create New Job</DialogTitle>
+                  <DialogDescription>
+                    Create a new ETL job to process data.
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="job-name">Job Name</Label>
+                    <Input
+                      id="job-name"
+                      value={newJob.name}
+                      onChange={e => setNewJob({ ...newJob, name: e.target.value })}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="job-description">Description</Label>
+                    <Input
+                      id="job-description"
+                      value={newJob.description}
+                      onChange={e => setNewJob({ ...newJob, description: e.target.value })}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="job-sources">Sources</Label>
+                    <p className="text-sm text-gray-500">Select data sources</p>
+                    <div className="grid grid-cols-2 gap-2">
+                      {dataSources
+                        .filter(source => !source.config.options?.target)
+                        .map(source => (
+                          <div key={source.id} className="flex items-center space-x-2">
+                            <input
+                              type="checkbox"
+                              id={`source-${source.id}`}
+                              checked={newJob.sources?.includes(source.id) || false}
+                              onChange={e => {
+                                if (e.target.checked) {
+                                  setNewJob({
+                                    ...newJob,
+                                    sources: [...(newJob.sources || []), source.id]
+                                  });
+                                } else {
+                                  setNewJob({
+                                    ...newJob,
+                                    sources: (newJob.sources || []).filter(id => id !== source.id)
+                                  });
+                                }
+                              }}
+                            />
+                            <label htmlFor={`source-${source.id}`} className="text-sm">
+                              {source.name}
+                            </label>
+                          </div>
+                        ))}
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="job-destinations">Destinations</Label>
+                    <p className="text-sm text-gray-500">Select data destinations</p>
+                    <div className="grid grid-cols-2 gap-2">
+                      {dataSources
+                        .filter(source => source.config.options?.target)
+                        .map(source => (
+                          <div key={source.id} className="flex items-center space-x-2">
+                            <input
+                              type="checkbox"
+                              id={`destination-${source.id}`}
+                              checked={newJob.destinations?.includes(source.id) || false}
+                              onChange={e => {
+                                if (e.target.checked) {
+                                  setNewJob({
+                                    ...newJob,
+                                    destinations: [...(newJob.destinations || []), source.id]
+                                  });
+                                } else {
+                                  setNewJob({
+                                    ...newJob,
+                                    destinations: (newJob.destinations || []).filter(id => id !== source.id)
+                                  });
+                                }
+                              }}
+                            />
+                            <label htmlFor={`destination-${source.id}`} className="text-sm">
+                              {source.name}
+                            </label>
+                          </div>
+                        ))}
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="job-transformations">Transformations</Label>
+                    <p className="text-sm text-gray-500">Select transformation rules</p>
+                    <div className="grid grid-cols-2 gap-2">
+                      {transformationRules.map(rule => (
+                        <div key={rule.id} className="flex items-center space-x-2">
+                          <input
+                            type="checkbox"
+                            id={`transformation-${rule.id}`}
+                            checked={newJob.transformations?.includes(rule.id) || false}
+                            onChange={e => {
+                              if (e.target.checked) {
+                                setNewJob({
+                                  ...newJob,
+                                  transformations: [...(newJob.transformations || []), rule.id]
+                                });
+                              } else {
+                                setNewJob({
+                                  ...newJob,
+                                  transformations: (newJob.transformations || []).filter(id => id !== rule.id)
+                                });
+                              }
+                            }}
+                          />
+                          <label htmlFor={`transformation-${rule.id}`} className="text-sm">
+                            {rule.name}
+                          </label>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <input
+                      type="checkbox"
+                      id="job-enabled"
+                      checked={newJob.enabled || false}
+                      onChange={e => setNewJob({ ...newJob, enabled: e.target.checked })}
+                    />
+                    <Label htmlFor="job-enabled">Enabled</Label>
                   </div>
                 </div>
-                <div className="w-full sm:w-1/2 text-xs mt-2 sm:mt-0">
-                  <span className="text-gray-500">Destinations:</span>
-                  <div className="flex flex-wrap mt-1">
-                    {job.destinations.map(destId => {
-                      const dest = dataSources.find(ds => ds.id === destId);
-                      return (
-                        <span key={destId} className="px-2 py-1 bg-green-50 text-green-800 rounded mr-1 mb-1">
-                          {dest?.name || `Destination #${destId}`}
-                        </span>
-                      );
-                    })}
+                <DialogFooter>
+                  <Button variant="outline" onClick={() => setJobDialogOpen(false)}>
+                    Cancel
+                  </Button>
+                  <Button onClick={createJob}>Create Job</Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+          </div>
+        </div>
+        
+        <div className="border rounded-lg">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>ID</TableHead>
+                <TableHead>Name</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead>Sources</TableHead>
+                <TableHead>Destinations</TableHead>
+                <TableHead>Transformations</TableHead>
+                <TableHead>Enabled</TableHead>
+                <TableHead>Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {jobs.map(job => (
+                <TableRow key={job.id}>
+                  <TableCell>{job.id}</TableCell>
+                  <TableCell>
+                    <div className="font-medium">{job.name}</div>
+                    {job.description && (
+                      <div className="text-sm text-gray-500">{job.description}</div>
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    <StatusBadge status={job.status} />
+                  </TableCell>
+                  <TableCell>{job.sources.length}</TableCell>
+                  <TableCell>{job.destinations.length}</TableCell>
+                  <TableCell>{job.transformations.length}</TableCell>
+                  <TableCell>
+                    <Badge variant={job.enabled ? "default" : "outline"}>
+                      {job.enabled ? "Enabled" : "Disabled"}
+                    </Badge>
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex space-x-1">
+                      <Tooltip content="Run Job">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => runJob(job.id)}
+                          disabled={job.status === JobStatus.RUNNING || !job.enabled}
+                        >
+                          <Play className="h-4 w-4" />
+                        </Button>
+                      </Tooltip>
+                      
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon">
+                            <MoreVertical className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuLabel>Job Actions</DropdownMenuLabel>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem onClick={() => toggleJobEnabled(job.id, !job.enabled)}>
+                            {job.enabled ? "Disable" : "Enable"}
+                          </DropdownMenuItem>
+                          <DropdownMenuItem 
+                            className="text-red-600"
+                            onClick={() => deleteJob(job.id)}
+                          >
+                            Delete
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+          {jobs.length === 0 && (
+            <div className="text-center py-8 text-gray-500">
+              No jobs found
+            </div>
+          )}
+        </div>
+        
+        {/* Job Runs */}
+        <h3 className="text-lg font-semibold mt-8">Recent Job Runs</h3>
+        <div className="border rounded-lg">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>ID</TableHead>
+                <TableHead>Job</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead>Start Time</TableHead>
+                <TableHead>Duration</TableHead>
+                <TableHead>Records</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {jobRuns.map(run => {
+                const job = jobs.find(j => j.id === run.jobId);
+                return (
+                  <TableRow key={run.id}>
+                    <TableCell>{run.id}</TableCell>
+                    <TableCell>
+                      {job?.name || `Job #${run.jobId}`}
+                    </TableCell>
+                    <TableCell>
+                      <StatusBadge status={run.status} />
+                    </TableCell>
+                    <TableCell>{formatDate(run.startTime)}</TableCell>
+                    <TableCell>{formatDuration(run.executionTime)}</TableCell>
+                    <TableCell>
+                      <div className="text-xs space-y-1">
+                        <div>Extracted: {run.recordCounts.extracted}</div>
+                        <div>Transformed: {run.recordCounts.transformed}</div>
+                        <div>Loaded: {run.recordCounts.loaded}</div>
+                        <div>Rejected: {run.recordCounts.rejected}</div>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
+          {jobRuns.length === 0 && (
+            <div className="text-center py-8 text-gray-500">
+              No job runs found
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  };
+  
+  // Render data sources tab
+  const renderDataSourcesTab = () => {
+    return (
+      <div className="space-y-4">
+        <div className="flex justify-between items-center">
+          <h2 className="text-xl font-semibold">Data Sources</h2>
+          <div className="flex space-x-2">
+            <Button variant="outline" size="sm" onClick={refreshData}>
+              <RefreshCw className="h-4 w-4 mr-2" />
+              Refresh
+            </Button>
+            <Dialog open={dataSourceDialogOpen} onOpenChange={setDataSourceDialogOpen}>
+              <DialogTrigger asChild>
+                <Button size="sm">
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Source
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Create New Data Source</DialogTitle>
+                  <DialogDescription>
+                    Create a new data source for ETL jobs.
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="source-name">Name</Label>
+                    <Input
+                      id="source-name"
+                      value={newDataSource.name}
+                      onChange={e => setNewDataSource({ ...newDataSource, name: e.target.value })}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="source-type">Type</Label>
+                    <select
+                      id="source-type"
+                      className="w-full p-2 border rounded"
+                      value={newDataSource.type}
+                      onChange={e => setNewDataSource({ 
+                        ...newDataSource, 
+                        type: e.target.value as DataSourceType 
+                      })}
+                    >
+                      {Object.values(DataSourceType).map(type => (
+                        <option key={type} value={type}>{type}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="source-description">Description</Label>
+                    <Input
+                      id="source-description"
+                      value={newDataSource.description}
+                      onChange={e => setNewDataSource({ ...newDataSource, description: e.target.value })}
+                    />
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <input
+                      type="checkbox"
+                      id="source-enabled"
+                      checked={newDataSource.enabled || false}
+                      onChange={e => setNewDataSource({ ...newDataSource, enabled: e.target.checked })}
+                    />
+                    <Label htmlFor="source-enabled">Enabled</Label>
                   </div>
                 </div>
-              </div>
+                <DialogFooter>
+                  <Button variant="outline" onClick={() => setDataSourceDialogOpen(false)}>
+                    Cancel
+                  </Button>
+                  <Button onClick={createDataSource}>Create Data Source</Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+          </div>
+        </div>
+        
+        <div className="border rounded-lg">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>ID</TableHead>
+                <TableHead>Name</TableHead>
+                <TableHead>Type</TableHead>
+                <TableHead>Configuration</TableHead>
+                <TableHead>Enabled</TableHead>
+                <TableHead>Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {dataSources.map(source => (
+                <TableRow key={source.id}>
+                  <TableCell>{source.id}</TableCell>
+                  <TableCell>
+                    <div className="font-medium">{source.name}</div>
+                    {source.description && (
+                      <div className="text-sm text-gray-500">{source.description}</div>
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    <DataSourceTypeBadge type={source.type} />
+                  </TableCell>
+                  <TableCell>
+                    <div className="text-xs">
+                      {source.type === DataSourceType.POSTGRESQL && (
+                        <>
+                          <div>Host: {source.config.host || 'localhost'}</div>
+                          <div>Port: {source.config.port || 5432}</div>
+                          <div>Database: {source.config.database || '-'}</div>
+                        </>
+                      )}
+                      {source.type === DataSourceType.REST_API && (
+                        <>
+                          <div>URL: {source.config.url || '-'}</div>
+                          <div>Method: {source.config.method || 'GET'}</div>
+                        </>
+                      )}
+                      {source.type === DataSourceType.FILE_CSV && (
+                        <>
+                          <div>Path: {source.config.filePath || '-'}</div>
+                          <div>Delimiter: {source.config.delimiter || ','}</div>
+                        </>
+                      )}
+                      {source.type === DataSourceType.MEMORY && (
+                        <>
+                          <div>Records: {source.config.data?.length || 0}</div>
+                        </>
+                      )}
+                      {source.config.options?.target && (
+                        <div className="mt-1">
+                          <Badge variant="outline" className="bg-purple-100 text-purple-800">
+                            Destination: {source.config.options.target}
+                          </Badge>
+                        </div>
+                      )}
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <Badge variant={source.enabled ? "default" : "outline"}>
+                      {source.enabled ? "Enabled" : "Disabled"}
+                    </Badge>
+                  </TableCell>
+                  <TableCell>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon">
+                          <MoreVertical className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuLabel>Source Actions</DropdownMenuLabel>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem onClick={() => toggleDataSourceEnabled(source.id, !source.enabled)}>
+                          {source.enabled ? "Disable" : "Enable"}
+                        </DropdownMenuItem>
+                        <DropdownMenuItem 
+                          className="text-red-600"
+                          onClick={() => deleteDataSource(source.id)}
+                        >
+                          Delete
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+          {dataSources.length === 0 && (
+            <div className="text-center py-8 text-gray-500">
+              No data sources found
             </div>
-          ))
-        )}
+          )}
+        </div>
       </div>
-    </div>
-  );
+    );
+  };
   
-  // Render tabs
-  const renderTabs = () => (
-    <div className="border-b border-gray-200 mb-6">
-      <nav className="-mb-px flex space-x-8">
-        <button
-          className={`py-4 px-1 border-b-2 font-medium text-sm ${
-            selectedTab === 'overview'
-              ? 'border-blue-500 text-blue-600'
-              : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-          }`}
-          onClick={() => setSelectedTab('overview')}
-        >
-          Overview
-        </button>
-        <button
-          className={`py-4 px-1 border-b-2 font-medium text-sm ${
-            selectedTab === 'jobs'
-              ? 'border-blue-500 text-blue-600'
-              : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-          }`}
-          onClick={() => setSelectedTab('jobs')}
-        >
-          Jobs
-        </button>
-        <button
-          className={`py-4 px-1 border-b-2 font-medium text-sm ${
-            selectedTab === 'data-sources'
-              ? 'border-blue-500 text-blue-600'
-              : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-          }`}
-          onClick={() => setSelectedTab('data-sources')}
-        >
-          Data Sources
-        </button>
-        <button
-          className={`py-4 px-1 border-b-2 font-medium text-sm ${
-            selectedTab === 'transformations'
-              ? 'border-blue-500 text-blue-600'
-              : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-          }`}
-          onClick={() => setSelectedTab('transformations')}
-        >
-          Transformations
-        </button>
-        <button
-          className={`py-4 px-1 border-b-2 font-medium text-sm ${
-            selectedTab === 'alerts'
-              ? 'border-blue-500 text-blue-600'
-              : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-          }`}
-          onClick={() => setSelectedTab('alerts')}
-        >
-          Alerts
-        </button>
-      </nav>
-    </div>
-  );
+  // Render transformations tab
+  const renderTransformationsTab = () => {
+    return (
+      <div className="space-y-4">
+        <div className="flex justify-between items-center">
+          <h2 className="text-xl font-semibold">Transformation Rules</h2>
+          <div className="flex space-x-2">
+            <Button variant="outline" size="sm" onClick={refreshData}>
+              <RefreshCw className="h-4 w-4 mr-2" />
+              Refresh
+            </Button>
+            <Dialog open={transformationRuleDialogOpen} onOpenChange={setTransformationRuleDialogOpen}>
+              <DialogTrigger asChild>
+                <Button size="sm">
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Rule
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Create New Transformation Rule</DialogTitle>
+                  <DialogDescription>
+                    Create a new transformation rule for ETL jobs.
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="rule-name">Name</Label>
+                    <Input
+                      id="rule-name"
+                      value={newTransformationRule.name}
+                      onChange={e => setNewTransformationRule({ ...newTransformationRule, name: e.target.value })}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="rule-type">Type</Label>
+                    <select
+                      id="rule-type"
+                      className="w-full p-2 border rounded"
+                      value={newTransformationRule.type}
+                      onChange={e => setNewTransformationRule({ 
+                        ...newTransformationRule, 
+                        type: e.target.value as TransformationType 
+                      })}
+                    >
+                      {Object.values(TransformationType).map(type => (
+                        <option key={type} value={type}>{type}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="rule-order">Order</Label>
+                    <Input
+                      id="rule-order"
+                      type="number"
+                      min={1}
+                      value={newTransformationRule.order}
+                      onChange={e => setNewTransformationRule({ 
+                        ...newTransformationRule, 
+                        order: parseInt(e.target.value) 
+                      })}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="rule-description">Description</Label>
+                    <Input
+                      id="rule-description"
+                      value={newTransformationRule.description}
+                      onChange={e => setNewTransformationRule({ ...newTransformationRule, description: e.target.value })}
+                    />
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <input
+                      type="checkbox"
+                      id="rule-enabled"
+                      checked={newTransformationRule.enabled || false}
+                      onChange={e => setNewTransformationRule({ ...newTransformationRule, enabled: e.target.checked })}
+                    />
+                    <Label htmlFor="rule-enabled">Enabled</Label>
+                  </div>
+                </div>
+                <DialogFooter>
+                  <Button variant="outline" onClick={() => setTransformationRuleDialogOpen(false)}>
+                    Cancel
+                  </Button>
+                  <Button onClick={createTransformationRule}>Create Rule</Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+          </div>
+        </div>
+        
+        <div className="border rounded-lg">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>ID</TableHead>
+                <TableHead>Name</TableHead>
+                <TableHead>Type</TableHead>
+                <TableHead>Order</TableHead>
+                <TableHead>Configuration</TableHead>
+                <TableHead>Enabled</TableHead>
+                <TableHead>Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {transformationRules.map(rule => (
+                <TableRow key={rule.id}>
+                  <TableCell>{rule.id}</TableCell>
+                  <TableCell>
+                    <div className="font-medium">{rule.name}</div>
+                    {rule.description && (
+                      <div className="text-sm text-gray-500">{rule.description}</div>
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    <TransformationTypeBadge type={rule.type} />
+                  </TableCell>
+                  <TableCell>{rule.order}</TableCell>
+                  <TableCell>
+                    <div className="text-xs">
+                      {rule.type === TransformationType.FILTER && (
+                        <>
+                          <div>Conditions: {(rule.config as any).conditions?.length || 0}</div>
+                          <div>Logic: {(rule.config as any).logic}</div>
+                        </>
+                      )}
+                      {rule.type === TransformationType.MAP && (
+                        <>
+                          <div>Mappings: {(rule.config as any).mappings?.length || 0}</div>
+                        </>
+                      )}
+                      {rule.type === TransformationType.VALIDATE && (
+                        <>
+                          <div>Validations: {(rule.config as any).validations?.length || 0}</div>
+                        </>
+                      )}
+                      {rule.type === TransformationType.AGGREGATE && (
+                        <>
+                          <div>Group By: {(rule.config as any).groupBy?.join(', ') || '-'}</div>
+                          <div>Aggregations: {(rule.config as any).aggregations?.length || 0}</div>
+                        </>
+                      )}
+                      {rule.type === TransformationType.ENRICH && (
+                        <>
+                          <div>Type: {(rule.config as any).type}</div>
+                          <div>Fields: {(rule.config as any).fields?.length || 0}</div>
+                        </>
+                      )}
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <Badge variant={rule.enabled ? "default" : "outline"}>
+                      {rule.enabled ? "Enabled" : "Disabled"}
+                    </Badge>
+                  </TableCell>
+                  <TableCell>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon">
+                          <MoreVertical className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuLabel>Rule Actions</DropdownMenuLabel>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem onClick={() => toggleTransformationRuleEnabled(rule.id, !rule.enabled)}>
+                          {rule.enabled ? "Disable" : "Enable"}
+                        </DropdownMenuItem>
+                        <DropdownMenuItem 
+                          className="text-red-600"
+                          onClick={() => deleteTransformationRule(rule.id)}
+                        >
+                          Delete
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+          {transformationRules.length === 0 && (
+            <div className="text-center py-8 text-gray-500">
+              No transformation rules found
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  };
   
-  // Render tab content
-  const renderTabContent = () => {
-    switch (selectedTab) {
-      case 'overview':
-        return (
-          <>
-            {renderOverview()}
-            {renderJobRuns()}
-            {renderAlerts()}
-          </>
-        );
-      case 'jobs':
-        return renderJobs();
-      case 'data-sources':
-        return renderDataSources();
-      case 'transformations':
-        return renderTransformationRules();
-      case 'alerts':
-        return renderAlerts();
-      default:
-        return null;
-    }
+  // Render alerts tab
+  const renderAlertsTab = () => {
+    return (
+      <div className="space-y-4">
+        <div className="flex justify-between items-center">
+          <h2 className="text-xl font-semibold">System Alerts</h2>
+          <Button variant="outline" size="sm" onClick={refreshData}>
+            <RefreshCw className="h-4 w-4 mr-2" />
+            Refresh
+          </Button>
+        </div>
+        
+        <div className="border rounded-lg">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Type</TableHead>
+                <TableHead>Title</TableHead>
+                <TableHead>Message</TableHead>
+                <TableHead>Timestamp</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {alerts.map(alert => (
+                <TableRow key={alert.id}>
+                  <TableCell>
+                    <div className="flex items-center">
+                      <AlertTypeIcon type={alert.type} />
+                      <span className="ml-2">
+                        {alert.type}
+                      </span>
+                    </div>
+                  </TableCell>
+                  <TableCell>{alert.title}</TableCell>
+                  <TableCell>{alert.message}</TableCell>
+                  <TableCell>{formatDate(alert.timestamp)}</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+          {alerts.length === 0 && (
+            <div className="text-center py-8 text-gray-500">
+              No alerts found
+            </div>
+          )}
+        </div>
+      </div>
+    );
   };
   
   return (
-    <div>
-      {renderTabs()}
-      {renderTabContent()}
+    <div className="container mx-auto p-4 max-w-7xl">
+      <h1 className="text-2xl font-bold mb-6">ETL Management Dashboard</h1>
+      
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+        <TabsList className="grid w-full grid-cols-4 mb-6">
+          <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
+          <TabsTrigger value="jobs">Jobs</TabsTrigger>
+          <TabsTrigger value="data-sources">Data Sources</TabsTrigger>
+          <TabsTrigger value="transformations">Transformations</TabsTrigger>
+        </TabsList>
+        
+        <TabsContent value="dashboard">
+          {renderDashboardTab()}
+        </TabsContent>
+        
+        <TabsContent value="jobs">
+          {renderJobsTab()}
+        </TabsContent>
+        
+        <TabsContent value="data-sources">
+          {renderDataSourcesTab()}
+        </TabsContent>
+        
+        <TabsContent value="transformations">
+          {renderTransformationsTab()}
+        </TabsContent>
+        
+        <TabsContent value="alerts">
+          {renderAlertsTab()}
+        </TabsContent>
+      </Tabs>
     </div>
   );
 };

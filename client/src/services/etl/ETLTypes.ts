@@ -1,320 +1,193 @@
 /**
- * ETL system types
- * 
- * This file contains the type definitions for the ETL system.
+ * Job status enum
  */
+export enum JobStatus {
+  IDLE = 'IDLE',
+  RUNNING = 'RUNNING',
+  SUCCEEDED = 'SUCCEEDED',
+  FAILED = 'FAILED'
+}
 
 /**
  * Data source type enum
  */
 export enum DataSourceType {
-  /** PostgreSQL database */
   POSTGRESQL = 'POSTGRESQL',
-  
-  /** MySQL database */
   MYSQL = 'MYSQL',
-  
-  /** MongoDB database */
-  MONGODB = 'MONGODB',
-  
-  /** REST API */
   REST_API = 'REST_API',
-  
-  /** Local or remote file */
-  FILE = 'FILE',
-  
-  /** In-memory data */
-  MEMORY = 'MEMORY',
-  
-  /** Custom data source */
-  CUSTOM = 'CUSTOM'
-}
-
-/**
- * Connection mode enum
- */
-export enum ConnectionMode {
-  /** Direct connection */
-  DIRECT = 'DIRECT',
-  
-  /** Connection via proxy */
-  PROXY = 'PROXY',
-  
-  /** Connection via SSH tunnel */
-  SSH_TUNNEL = 'SSH_TUNNEL',
-  
-  /** Connection via VPN */
-  VPN = 'VPN'
-}
-
-/**
- * Connection type enum
- */
-export enum ConnectionType {
-  /** Persistent connection */
-  PERSISTENT = 'PERSISTENT',
-  
-  /** On-demand connection */
-  ON_DEMAND = 'ON_DEMAND',
-  
-  /** Pool of connections */
-  POOL = 'POOL'
-}
-
-/**
- * Authentication type enum
- */
-export enum AuthenticationType {
-  /** Username and password */
-  BASIC = 'BASIC',
-  
-  /** API key */
-  API_KEY = 'API_KEY',
-  
-  /** OAuth 2.0 */
-  OAUTH2 = 'OAUTH2',
-  
-  /** JWT token */
-  JWT = 'JWT',
-  
-  /** Certificate */
-  CERTIFICATE = 'CERTIFICATE',
-  
-  /** No authentication */
-  NONE = 'NONE'
-}
-
-/**
- * Load mode enum
- */
-export enum LoadMode {
-  /** Insert new records */
-  INSERT = 'INSERT',
-  
-  /** Update existing records */
-  UPDATE = 'UPDATE',
-  
-  /** Insert or update records (upsert) */
-  UPSERT = 'UPSERT',
-  
-  /** Delete records */
-  DELETE = 'DELETE',
-  
-  /** Truncate target and then insert */
-  TRUNCATE = 'TRUNCATE',
-  
-  /** Truncate target and then insert in a single transaction */
-  TRUNCATE_INSERT = 'TRUNCATE_INSERT'
-}
-
-/**
- * Job status enum
- */
-export enum JobStatus {
-  /** Job created but not yet scheduled */
-  CREATED = 'CREATED',
-  
-  /** Job is scheduled to run */
-  SCHEDULED = 'SCHEDULED',
-  
-  /** Job is queued for execution */
-  QUEUED = 'QUEUED',
-  
-  /** Job is currently running */
-  RUNNING = 'RUNNING',
-  
-  /** Job completed successfully */
-  SUCCEEDED = 'SUCCEEDED',
-  
-  /** Job failed */
-  FAILED = 'FAILED',
-  
-  /** Job was cancelled */
-  CANCELLED = 'CANCELLED',
-  
-  /** Job was skipped (due to dependencies, etc.) */
-  SKIPPED = 'SKIPPED'
-}
-
-/**
- * Job frequency enum
- */
-export enum JobFrequency {
-  /** Run once */
-  ONCE = 'ONCE',
-  
-  /** Run every minute */
-  MINUTELY = 'MINUTELY',
-  
-  /** Run every hour */
-  HOURLY = 'HOURLY',
-  
-  /** Run every day */
-  DAILY = 'DAILY',
-  
-  /** Run every week */
-  WEEKLY = 'WEEKLY',
-  
-  /** Run every month */
-  MONTHLY = 'MONTHLY',
-  
-  /** Custom schedule (cron expression) */
-  CUSTOM = 'CUSTOM'
-}
-
-/**
- * Transformation type enum
- */
-export enum TransformationType {
-  /** Filter records */
-  FILTER = 'FILTER',
-  
-  /** Map fields */
-  MAP = 'MAP',
-  
-  /** Sort records */
-  SORT = 'SORT',
-  
-  /** Aggregate records */
-  AGGREGATE = 'AGGREGATE',
-  
-  /** Join data from multiple sources */
-  JOIN = 'JOIN',
-  
-  /** Deduplicate records */
-  DEDUPLICATE = 'DEDUPLICATE',
-  
-  /** Validate data */
-  VALIDATE = 'VALIDATE',
-  
-  /** Enrich data */
-  ENRICH = 'ENRICH',
-  
-  /** Apply custom transformation */
-  CUSTOM = 'CUSTOM'
+  GRAPHQL_API = 'GRAPHQL_API',
+  FILE_CSV = 'FILE_CSV',
+  FILE_JSON = 'FILE_JSON',
+  FILE_XML = 'FILE_XML',
+  FILE_EXCEL = 'FILE_EXCEL',
+  MEMORY = 'MEMORY'
 }
 
 /**
  * Filter operator enum
  */
 export enum FilterOperator {
-  /** Equal to */
   EQUALS = 'EQUALS',
-  
-  /** Not equal to */
   NOT_EQUALS = 'NOT_EQUALS',
-  
-  /** Greater than */
   GREATER_THAN = 'GREATER_THAN',
-  
-  /** Greater than or equal to */
-  GREATER_THAN_OR_EQUALS = 'GREATER_THAN_OR_EQUALS',
-  
-  /** Less than */
   LESS_THAN = 'LESS_THAN',
-  
-  /** Less than or equal to */
+  GREATER_THAN_OR_EQUALS = 'GREATER_THAN_OR_EQUALS',
   LESS_THAN_OR_EQUALS = 'LESS_THAN_OR_EQUALS',
-  
-  /** In list of values */
   IN = 'IN',
-  
-  /** Not in list of values */
   NOT_IN = 'NOT_IN',
-  
-  /** Contains substring */
   CONTAINS = 'CONTAINS',
-  
-  /** Does not contain substring */
   NOT_CONTAINS = 'NOT_CONTAINS',
-  
-  /** Starts with substring */
   STARTS_WITH = 'STARTS_WITH',
-  
-  /** Ends with substring */
   ENDS_WITH = 'ENDS_WITH',
-  
-  /** Is null */
   IS_NULL = 'IS_NULL',
-  
-  /** Is not null */
   IS_NOT_NULL = 'IS_NOT_NULL',
-  
-  /** Between two values */
+  REGEX = 'REGEX',
   BETWEEN = 'BETWEEN',
-  
-  /** Not between two values */
-  NOT_BETWEEN = 'NOT_BETWEEN',
-  
-  /** Matches regular expression */
-  REGEX = 'REGEX'
+  NOT_BETWEEN = 'NOT_BETWEEN'
 }
 
 /**
- * Filter logic type (how to combine multiple conditions)
+ * Filter logic enum
  */
-export type FilterLogic = 'AND' | 'OR';
+export enum FilterLogic {
+  AND = 'AND',
+  OR = 'OR'
+}
 
 /**
- * Data source configuration
+ * Transformation type enum
+ */
+export enum TransformationType {
+  FILTER = 'FILTER',
+  MAP = 'MAP',
+  JOIN = 'JOIN',
+  AGGREGATE = 'AGGREGATE',
+  VALIDATE = 'VALIDATE',
+  ENRICH = 'ENRICH',
+  CUSTOM = 'CUSTOM'
+}
+
+/**
+ * Validation type
+ */
+export type ValidationType = 
+  'REQUIRED' | 
+  'EMAIL' | 
+  'URL' | 
+  'NUMBER' | 
+  'INTEGER' | 
+  'FLOAT' | 
+  'DATE' | 
+  'REGEX' | 
+  'CUSTOM';
+
+/**
+ * Aggregation function
+ */
+export type AggregationFunction = 
+  'COUNT' | 
+  'SUM' | 
+  'AVG' | 
+  'MIN' | 
+  'MAX' | 
+  'FIRST' | 
+  'LAST' | 
+  'ARRAY_AGG';
+
+/**
+ * Enrichment type
+ */
+export type EnrichmentType = 
+  'LOOKUP' | 
+  'GEOCODE' | 
+  'TRANSLATE' | 
+  'CUSTOM';
+
+/**
+ * Record counts interface
+ */
+export interface RecordCounts {
+  /** Number of records extracted */
+  extracted: number;
+  
+  /** Number of records transformed */
+  transformed: number;
+  
+  /** Number of records loaded */
+  loaded: number;
+  
+  /** Number of records rejected */
+  rejected: number;
+}
+
+/**
+ * ETL job interface
+ */
+export interface ETLJob {
+  /** Job ID */
+  id: number;
+  
+  /** Job name */
+  name: string;
+  
+  /** Data source IDs */
+  sources: number[];
+  
+  /** Data destination IDs */
+  destinations: number[];
+  
+  /** Transformation rule IDs in order of execution */
+  transformations: number[];
+  
+  /** Job status */
+  status: JobStatus;
+  
+  /** Whether the job is enabled */
+  enabled: boolean;
+  
+  /** Job description */
+  description?: string;
+}
+
+/**
+ * Data source config interface
  */
 export interface DataSourceConfig {
-  /** Connection host */
+  /** Host for database connections */
   host?: string;
   
-  /** Connection port */
+  /** Port for database connections */
   port?: number;
   
-  /** Database name */
+  /** Database name for database connections */
   database?: string;
   
-  /** Username */
+  /** Username for database connections */
   user?: string;
   
-  /** Password (should be securely stored in real implementation) */
+  /** Password for database connections */
   password?: string;
   
-  /** API URL */
+  /** URL for API connections */
   url?: string;
   
-  /** API method */
+  /** HTTP method for API connections */
   method?: string;
   
-  /** API headers */
+  /** HTTP headers for API connections */
   headers?: Record<string, string>;
   
-  /** File path */
-  path?: string;
+  /** File path for file connections */
+  filePath?: string;
   
-  /** File format */
-  format?: string;
+  /** Delimiter for CSV files */
+  delimiter?: string;
   
-  /** In-memory data */
+  /** Whether the CSV file has a header */
+  hasHeader?: boolean;
+  
+  /** In-memory data for testing */
   data?: any[];
-  
-  /** Connection mode */
-  connectionMode?: ConnectionMode;
-  
-  /** Connection type */
-  connectionType?: ConnectionType;
-  
-  /** Authentication type */
-  authenticationType?: AuthenticationType;
-  
-  /** Authentication config */
-  authConfig?: Record<string, any>;
-  
-  /** Connection pool settings */
-  poolConfig?: {
-    /** Minimum number of connections */
-    min?: number;
-    
-    /** Maximum number of connections */
-    max?: number;
-    
-    /** Connection idle timeout (ms) */
-    idleTimeout?: number;
-  };
   
   /** Additional options */
   options?: Record<string, any>;
@@ -330,30 +203,27 @@ export interface DataSource {
   /** Data source name */
   name: string;
   
-  /** Data source description */
-  description?: string;
-  
   /** Data source type */
   type: DataSourceType;
+  
+  /** Data source config */
+  config: DataSourceConfig;
   
   /** Whether the data source is enabled */
   enabled: boolean;
   
-  /** Data source configuration */
-  config: DataSourceConfig;
+  /** Data source description */
+  description?: string;
   
-  /** Creation timestamp */
-  createdAt: Date;
-  
-  /** Last update timestamp */
-  updatedAt: Date;
+  /** Data source tags */
+  tags?: string[];
 }
 
 /**
  * Filter condition interface
  */
 export interface FilterCondition {
-  /** Field to filter on */
+  /** Field name */
   field: string;
   
   /** Filter operator */
@@ -362,18 +232,18 @@ export interface FilterCondition {
   /** Filter value */
   value: any;
   
-  /** Second value for operators like BETWEEN */
+  /** Second value for BETWEEN operator */
   valueEnd?: any;
 }
 
 /**
- * Filter configuration interface
+ * Filter config interface
  */
 export interface FilterConfig {
   /** Filter conditions */
   conditions: FilterCondition[];
   
-  /** Logic to combine conditions */
+  /** Filter logic */
   logic: FilterLogic;
 }
 
@@ -381,18 +251,15 @@ export interface FilterConfig {
  * Field mapping interface
  */
 export interface FieldMapping {
-  /** Source field name */
+  /** Source field */
   source: string;
   
-  /** Target field name */
+  /** Target field */
   target: string;
-  
-  /** Optional transformation function (as string, carefully evaluated) */
-  transform?: string;
 }
 
 /**
- * Map configuration interface
+ * Map config interface
  */
 export interface MapConfig {
   /** Field mappings */
@@ -403,23 +270,109 @@ export interface MapConfig {
 }
 
 /**
- * Validation rule interface
+ * Join config interface
  */
-export interface ValidationRule {
+export interface JoinConfig {
+  /** Right dataset */
+  rightDataset: string;
+  
+  /** Join type */
+  joinType: 'INNER' | 'LEFT' | 'RIGHT' | 'FULL';
+  
+  /** Left join field */
+  leftField: string;
+  
+  /** Right join field */
+  rightField: string;
+}
+
+/**
+ * Aggregation interface
+ */
+export interface Aggregation {
+  /** Field to aggregate */
+  field: string;
+  
+  /** Aggregation function */
+  function: AggregationFunction;
+  
+  /** Output field */
+  as: string;
+}
+
+/**
+ * Aggregate config interface
+ */
+export interface AggregateConfig {
+  /** Fields to group by */
+  groupBy: string[];
+  
+  /** Aggregations to apply */
+  aggregations: Aggregation[];
+}
+
+/**
+ * Validation interface
+ */
+export interface Validation {
   /** Field to validate */
   field: string;
   
-  /** Validation rule type */
-  type: string;
+  /** Validation type */
+  type: ValidationType;
   
-  /** Rule config */
-  config: any;
+  /** Validation params (for REGEX, etc.) */
+  params?: any;
   
-  /** Error message */
+  /** Validation message */
   message: string;
+}
+
+/**
+ * Validation config interface
+ */
+export interface ValidationConfig {
+  /** Validations to apply */
+  validations: Validation[];
   
-  /** Whether to fail record if validation fails */
+  /** Whether to fail on error */
   failOnError: boolean;
+}
+
+/**
+ * Enrichment field interface
+ */
+export interface EnrichmentField {
+  /** Source field */
+  source: string;
+  
+  /** Target field */
+  target: string;
+}
+
+/**
+ * Enrichment config interface
+ */
+export interface EnrichmentConfig {
+  /** Enrichment type */
+  type: EnrichmentType;
+  
+  /** Fields to enrich */
+  fields: EnrichmentField[];
+  
+  /** Additional params */
+  params?: Record<string, any>;
+}
+
+/**
+ * Custom config interface
+ */
+export interface CustomConfig {
+  /** Function name */
+  function: string;
+  
+  /** Function parameters */
+  params?: Record<string, any>;
 }
 
 /**
@@ -432,254 +385,59 @@ export interface TransformationRule {
   /** Rule name */
   name: string;
   
-  /** Rule description */
-  description?: string;
-  
   /** Transformation type */
   type: TransformationType;
   
-  /** Rule configuration */
-  config: any;
+  /** Transformation config */
+  config: FilterConfig | MapConfig | JoinConfig | AggregateConfig | ValidationConfig | EnrichmentConfig | CustomConfig;
+  
+  /** Execution order */
+  order: number;
   
   /** Whether the rule is enabled */
   enabled: boolean;
   
-  /** Rule order (for applying multiple rules) */
-  order: number;
-  
-  /** Creation timestamp */
-  createdAt: Date;
-  
-  /** Last update timestamp */
-  updatedAt: Date;
-}
-
-/**
- * ETL job interface
- */
-export interface ETLJob {
-  /** Job ID */
-  id: number;
-  
-  /** Job name */
-  name: string;
-  
-  /** Job description */
+  /** Rule description */
   description?: string;
-  
-  /** Source data source IDs */
-  sources: number[];
-  
-  /** Destination data source IDs */
-  destinations: number[];
-  
-  /** Transformation rule IDs */
-  transformations: number[];
-  
-  /** Job status */
-  status: JobStatus;
-  
-  /** Whether the job is enabled */
-  enabled: boolean;
-  
-  /** Job frequency */
-  frequency: JobFrequency;
-  
-  /** Job schedule (cron expression for custom frequency) */
-  schedule?: string;
-  
-  /** Last run timestamp */
-  lastRunAt?: Date;
-  
-  /** Next run timestamp */
-  nextRunAt?: Date;
-  
-  /** Creation timestamp */
-  createdAt: Date;
-  
-  /** Last update timestamp */
-  updatedAt: Date;
-  
-  /** Job dependencies (IDs of jobs that must complete first) */
-  dependencies?: number[];
-  
-  /** Retry configuration */
-  retryConfig?: {
-    /** Maximum number of retries */
-    maxRetries: number;
-    
-    /** Retry delay (ms) */
-    retryDelay: number;
-    
-    /** Whether to use exponential backoff */
-    useExponentialBackoff: boolean;
-  };
-  
-  /** Notification settings */
-  notificationSettings?: {
-    /** Whether to notify on success */
-    onSuccess: boolean;
-    
-    /** Whether to notify on failure */
-    onFailure: boolean;
-    
-    /** Notification recipients */
-    recipients: string[];
-  };
-}
-
-/**
- * Record counts for job runs
- */
-export interface RecordCounts {
-  /** Number of records extracted */
-  extracted: number;
-  
-  /** Number of records transformed */
-  transformed: number;
-  
-  /** Number of records loaded */
-  loaded: number;
-  
-  /** Number of records that failed */
-  failed: number;
-}
-
-/**
- * Job run interface
- */
-export interface JobRun {
-  /** Run ID */
-  id: string;
-  
-  /** Job ID */
-  jobId: number;
-  
-  /** Run status */
-  status: JobStatus;
-  
-  /** Start timestamp */
-  startTime: Date;
-  
-  /** End timestamp */
-  endTime?: Date;
-  
-  /** Execution time (ms) */
-  executionTime: number;
-  
-  /** Record counts */
-  recordCounts: RecordCounts;
-  
-  /** Error message */
-  error?: string;
-  
-  /** Whether this was a manual run */
-  isManual: boolean;
 }
 
 /**
  * System status interface
  */
 export interface SystemStatus {
-  /** Whether the system is initialized */
-  initialized: boolean;
+  /** Number of jobs */
+  jobCount: number;
   
-  /** Whether the system is running */
-  running: boolean;
+  /** Number of enabled jobs */
+  enabledJobCount: number;
   
-  /** Last error message */
-  lastError?: string;
+  /** Number of running jobs */
+  runningJobCount: number;
   
-  /** Number of active jobs */
-  activeJobs: number;
+  /** Number of data sources */
+  dataSourceCount: number;
   
-  /** Number of pending jobs */
-  pendingJobs: number;
+  /** Number of enabled data sources */
+  enabledDataSourceCount: number;
   
-  /** Memory usage (MB) */
-  memoryUsage: number;
+  /** Number of transformation rules */
+  transformationRuleCount: number;
   
-  /** System uptime (ms) */
-  uptime: number;
+  /** Number of enabled transformation rules */
+  enabledTransformationRuleCount: number;
   
-  /** Current time */
-  currentTime: Date;
-}
-
-/**
- * Optimization suggestion interface
- */
-export interface OptimizationSuggestion {
-  /** Suggestion ID */
-  id: number;
+  /** Scheduler status */
+  schedulerStatus: Record<JobStatus, number>;
   
-  /** Job ID */
-  jobId: number;
+  /** Number of recent job runs */
+  recentJobRuns: number;
   
-  /** Suggestion title */
-  title: string;
+  /** Number of failed job runs */
+  failedJobRuns: number;
   
-  /** Suggestion description */
-  description: string;
+  /** Number of successful job runs */
+  successJobRuns: number;
   
-  /** Impact level (1-10) */
-  impact: number;
-  
-  /** Effort level (1-10) */
-  effort: number;
-  
-  /** Whether the suggestion has been implemented */
-  implemented: boolean;
-  
-  /** Creation timestamp */
-  createdAt: Date;
-  
-  /** Implementation timestamp */
-  implementedAt?: Date;
-  
-  /** Suggested code changes */
-  codeChanges?: string;
-}
-
-/**
- * Data quality issue severity enum
- */
-export enum DataQualityIssueSeverity {
-  /** Low severity */
-  LOW = 'LOW',
-  
-  /** Medium severity */
-  MEDIUM = 'MEDIUM',
-  
-  /** High severity */
-  HIGH = 'HIGH',
-  
-  /** Critical severity */
-  CRITICAL = 'CRITICAL'
-}
-
-/**
- * Data quality issue interface
- */
-export interface DataQualityIssue {
-  /** Issue ID */
-  id: string;
-  
-  /** Issue description */
-  description: string;
-  
-  /** Field name (if applicable) */
-  field?: string;
-  
-  /** Issue severity */
-  severity: DataQualityIssueSeverity;
-  
-  /** Recommendation to fix the issue */
-  recommendation: string;
-  
-  /** Number of records affected */
-  affectedRecords: number;
-  
-  /** Percentage of records affected */
-  affectedPercentage: number;
+  /** Record counts */
+  recordCounts: RecordCounts;
 }
