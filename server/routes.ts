@@ -1306,6 +1306,96 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ error: error.message || 'Failed to delete ETL data source' });
     }
   });
+  
+  // Data preview endpoint for ETL data sources
+  app.get('/api/etl/data-sources/:id/preview', async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ error: 'Invalid data source ID' });
+      }
+      
+      const dataSource = await storage.getEtlDataSourceById(id);
+      if (!dataSource) {
+        return res.status(404).json({ error: 'Data source not found' });
+      }
+      
+      // This would normally connect to the actual data source and pull a sample
+      // For demo purposes, we're generating sample data based on the data source type
+      
+      let previewData: {
+        columns: string[];
+        rows: any[][];
+        totalRows: number;
+      };
+      
+      // Generate different sample data based on the type of data source
+      switch (dataSource.type) {
+        case 'postgres':
+        case 'mysql':
+          previewData = {
+            columns: ['id', 'property_id', 'address', 'value', 'last_updated'],
+            rows: [
+              [1, 1001, '123 Main St', 349000, '2023-01-15'],
+              [2, 1002, '456 Oak Ave', 425000, '2023-01-16'],
+              [3, 1003, '789 Pine Rd', 512000, '2023-01-17'],
+              [4, 1004, '321 Cedar Ln', 275000, '2023-01-18'],
+              [5, 1005, '654 Maple Dr', 590000, '2023-01-19'],
+            ],
+            totalRows: 5000 // In a real implementation, this would be the actual count
+          };
+          break;
+          
+        case 'api':
+          previewData = {
+            columns: ['id', 'parcel_id', 'location', 'assessed_value', 'tax_year', 'land_size'],
+            rows: [
+              ['A1', 'P-10023', { lat: 46.23, lng: -119.51 }, 280000, 2023, 0.25],
+              ['A2', 'P-10024', { lat: 46.24, lng: -119.52 }, 320000, 2023, 0.33],
+              ['A3', 'P-10025', { lat: 46.25, lng: -119.53 }, 295000, 2023, 0.28],
+              ['A4', 'P-10026', { lat: 46.26, lng: -119.54 }, 410000, 2023, 0.5],
+            ],
+            totalRows: 2500
+          };
+          break;
+          
+        case 'csv':
+        case 'excel':
+          previewData = {
+            columns: ['PropertyID', 'Address', 'City', 'State', 'ZIP', 'Value', 'YearBuilt', 'SquareFeet'],
+            rows: [
+              ['BC12345', '789 Washington Blvd', 'Richland', 'WA', '99352', 450000, 1985, 2400],
+              ['BC12346', '456 Jefferson St', 'Kennewick', 'WA', '99336', 380000, 1992, 1950],
+              ['BC12347', '123 Lincoln Ave', 'Pasco', 'WA', '99301', 325000, 2005, 1800],
+              ['BC12348', '321 Roosevelt Dr', 'Richland', 'WA', '99352', 520000, 2010, 2800],
+              ['BC12349', '654 Adams Ct', 'Kennewick', 'WA', '99336', 410000, 1998, 2100],
+              ['BC12350', '987 Monroe Way', 'Pasco', 'WA', '99301', 295000, 1978, 1650],
+            ],
+            totalRows: 3200
+          };
+          break;
+          
+        default:
+          previewData = {
+            columns: ['Column1', 'Column2', 'Column3'],
+            rows: [
+              ['No preview available for this data source type.', '', ''],
+            ],
+            totalRows: 0
+          };
+      }
+      
+      res.json(previewData);
+    } catch (error: any) {
+      console.error('Error generating data preview:', error);
+      res.status(500).json({ 
+        error: error.message || 'Failed to generate data preview',
+        columns: ['Error'],
+        rows: [['An error occurred while previewing data']],
+        totalRows: 1
+      });
+    }
+  });
 
   // ETL Transformation Rules endpoints
   app.get('/api/etl/transformation-rules', async (req, res) => {

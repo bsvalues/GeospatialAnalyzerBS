@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Lightbulb, HelpCircle, Wrench, ArrowRight, MessageSquare, Database, Settings, Lock } from 'lucide-react';
+import { Lightbulb, HelpCircle, Wrench, ArrowRight, MessageSquare, Database, Settings, Lock, Table as TableIcon, X, FileText } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -48,6 +48,13 @@ interface ETLAssistantState {
   loadingOnboarding: boolean;
   previousInteractions: { question?: string; answer?: string }[];
   userQuestion: string;
+  showDataPreview: boolean;
+  dataPreviewLoading: boolean;
+  dataPreview?: {
+    columns: string[];
+    rows: any[][];
+    totalRows: number;
+  };
 }
 
 export function ETLAssistant({
@@ -68,6 +75,8 @@ export function ETLAssistant({
     loadingOnboarding: false,
     previousInteractions: [],
     userQuestion: '',
+    showDataPreview: false,
+    dataPreviewLoading: false,
   });
   
   const { toast } = useToast();
@@ -171,6 +180,66 @@ export function ETLAssistant({
   // Handle closing onboarding tips
   const handleCloseTips = () => {
     setState(prev => ({ ...prev, showTips: false }));
+  };
+  
+  // Handle fetching data preview for the selected source
+  const fetchDataPreview = async () => {
+    if (!selectedSource) {
+      toast({
+        title: 'No data source selected',
+        description: 'Please select a data source to preview its data.',
+        variant: 'destructive',
+      });
+      return;
+    }
+    
+    setState(prev => ({ ...prev, dataPreviewLoading: true, showDataPreview: true }));
+    
+    try {
+      const response = await fetch(`/api/etl/data-sources/${selectedSource.id}/preview`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to fetch data preview');
+      }
+      
+      const data = await response.json();
+      
+      setState(prev => ({ 
+        ...prev, 
+        dataPreviewLoading: false,
+        dataPreview: {
+          columns: data.columns || [],
+          rows: data.rows || [],
+          totalRows: data.totalRows || 0
+        }
+      }));
+    } catch (error) {
+      console.error('Error fetching data preview:', error);
+      setState(prev => ({ 
+        ...prev, 
+        dataPreviewLoading: false,
+        dataPreview: {
+          columns: ['Error'],
+          rows: [['Could not load data preview. The data source might be disconnected or invalid.']],
+          totalRows: 1
+        }
+      }));
+      toast({
+        title: 'Error',
+        description: 'Could not load data preview. Please check if the data source is connected.',
+        variant: 'destructive',
+      });
+    }
+  };
+  
+  // Close data preview
+  const closeDataPreview = () => {
+    setState(prev => ({ ...prev, showDataPreview: false }));
   };
   
   // Handle user asking a question
@@ -315,6 +384,85 @@ export function ETLAssistant({
     );
   }
   
+  // If showing data preview, render the data table
+  if (state.showDataPreview) {
+    return (
+      <Card className="w-full max-w-md shadow-lg">
+        <CardHeader>
+          <div className="flex justify-between items-center">
+            <div>
+              <CardTitle className="text-md font-bold">Data Preview</CardTitle>
+              {selectedSource && (
+                <CardDescription>
+                  {selectedSource.name} ({selectedSource.type})
+                </CardDescription>
+              )}
+            </div>
+            <Button variant="ghost" size="sm" onClick={closeDataPreview} className="h-8 w-8 p-0">
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {state.dataPreviewLoading ? (
+            <div className="flex flex-col items-center justify-center py-8">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+              <p className="mt-2 text-sm text-muted-foreground">Loading data preview...</p>
+            </div>
+          ) : state.dataPreview && state.dataPreview.columns.length > 0 ? (
+            <div className="overflow-x-auto max-h-[400px] overflow-y-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50 sticky top-0">
+                  <tr>
+                    {state.dataPreview.columns.map((column, index) => (
+                      <th 
+                        key={index}
+                        scope="col"
+                        className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                      >
+                        {column}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {state.dataPreview.rows.map((row, rowIndex) => (
+                    <tr key={rowIndex} className={rowIndex % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                      {row.map((cell, cellIndex) => (
+                        <td key={cellIndex} className="px-3 py-2 whitespace-nowrap text-xs">
+                          {cell !== null && cell !== undefined ? String(cell) : ''}
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <div className="flex flex-col items-center justify-center py-8">
+              <FileText className="h-12 w-12 text-muted-foreground" />
+              <p className="mt-2 text-sm text-muted-foreground">No data available to preview</p>
+            </div>
+          )}
+          {state.dataPreview && state.dataPreview.totalRows > state.dataPreview.rows.length && (
+            <div className="mt-4 text-xs text-center text-muted-foreground">
+              Showing {state.dataPreview.rows.length} of {state.dataPreview.totalRows} rows
+            </div>
+          )}
+        </CardContent>
+        <CardFooter>
+          <Button 
+            variant="outline" 
+            className="w-full" 
+            onClick={closeDataPreview}
+          >
+            Return to Assistant
+          </Button>
+        </CardFooter>
+      </Card>
+    );
+  }
+  
   // Main assistant card
   return (
     <Card className="w-full max-w-md shadow-lg">
@@ -443,6 +591,26 @@ export function ETLAssistant({
                 </Button>
               </div>
             </div>
+            
+            {selectedSource && (
+              <div className="pt-3 border-t border-border mt-3">
+                <div className="flex justify-between items-center">
+                  <h3 className="text-sm font-medium">Data Tools</h3>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="text-xs"
+                      onClick={fetchDataPreview}
+                      disabled={state.dataPreviewLoading}
+                    >
+                      <TableIcon className="h-3 w-3 mr-1" />
+                      Preview Data
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         ) : (
           <div className="flex flex-col items-center justify-center py-8">
