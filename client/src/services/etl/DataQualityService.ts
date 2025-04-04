@@ -1,706 +1,863 @@
 /**
- * Data quality analysis result interface
+ * Data Quality Service
+ * 
+ * Provides functionality for assessing and improving data quality
  */
-export interface DataQualityAnalysis {
-  completeness: number;
-  accuracy: number;
-  consistency: number;
-  overall: number;
-  issueCount: number;
-  issues: DataQualityIssue[];
-  summary: string;
-  metadata: Record<string, any>;
+
+/**
+ * Data quality issue enum
+ */
+export enum DataQualityIssueType {
+  MISSING_VALUE = 'missing_value',
+  INVALID_FORMAT = 'invalid_format',
+  OUT_OF_RANGE = 'out_of_range',
+  INCONSISTENT_VALUE = 'inconsistent_value',
+  DUPLICATE_RECORD = 'duplicate_record',
+  OUTLIER = 'outlier',
+  CUSTOM = 'custom'
+}
+
+/**
+ * Data quality issue severity enum
+ */
+export enum DataQualitySeverity {
+  INFO = 'info',
+  WARNING = 'warning',
+  ERROR = 'error',
+  CRITICAL = 'critical'
 }
 
 /**
  * Data quality issue interface
  */
 export interface DataQualityIssue {
-  field: string;
-  type: string;
-  severity: 'low' | 'medium' | 'high' | 'critical';
+  id: string;
+  type: DataQualityIssueType;
+  field?: string;
+  recordIndex?: number;
+  recordId?: string | number;
   message: string;
-  count: number;
-  examples: any[];
-  suggestedFix?: string;
+  severity: DataQualitySeverity;
+  details?: any;
+  suggestion?: string;
 }
 
 /**
  * Field statistics interface
  */
-interface FieldStatistics {
-  name: string;
+export interface FieldStatistics {
+  field: string;
   count: number;
   nullCount: number;
-  emptyCount: number;
+  nullPercentage: number;
   uniqueCount: number;
-  minValue?: any;
-  maxValue?: any;
-  avgValue?: any;
-  type: string;
-  values: Map<any, number>;
+  uniqueness: number;
   patterns: Map<string, number>;
-  issues: DataQualityIssue[];
+  min?: any;
+  max?: any;
+  mean?: number;
+  median?: number;
+  mode?: any;
+  stdDev?: number;
+  histogram?: any[];
+  commonValues?: [any, number][];
+  dataType: string;
+  formats: Map<string, number>;
+  formatConsistency: number;
 }
 
 /**
- * Data quality service for analyzing data quality
+ * Data quality analysis result interface
+ */
+export interface DataQualityAnalysisResult {
+  recordCount: number;
+  fieldCount: number;
+  completeness: number;
+  uniqueness: number;
+  consistency: number;
+  accuracy: number;
+  validity: number;
+  overallScore: number;
+  fieldStats: Map<string, FieldStatistics>;
+  issues: DataQualityIssue[];
+  suggestions: string[];
+  timestamp: Date;
+}
+
+/**
+ * Data quality rule interface
+ */
+export interface DataQualityRule {
+  id: string;
+  name: string;
+  field?: string;
+  type: DataQualityIssueType;
+  severity: DataQualitySeverity;
+  condition: (value: any, record: any, stats?: FieldStatistics) => boolean;
+  message: string;
+  suggestion?: string;
+  enabled: boolean;
+}
+
+/**
+ * Data quality service class
  */
 class DataQualityService {
+  private rules: DataQualityRule[] = [];
+  private nextRuleId = 1;
+  
   constructor() {
-    // Default constructor
+    console.log('Data quality service initialized');
+    this.initializeDefaultRules();
   }
   
   /**
-   * Analyze the quality of a dataset
+   * Analyze data quality
    */
-  analyzeQuality(data: any[]): DataQualityAnalysis {
-    console.log(`Analyzing quality of ${data.length} records`);
-    
-    if (data.length === 0) {
-      return this.emptyAnalysis();
+  analyzeDataQuality(data: any[], options: {
+    fields?: string[];
+    enabledRules?: boolean;
+    customRules?: DataQualityRule[];
+    generateSuggestions?: boolean;
+    computeStatistics?: boolean;
+  } = {}): DataQualityAnalysisResult {
+    if (!data || data.length === 0) {
+      return {
+        recordCount: 0,
+        fieldCount: 0,
+        completeness: 0,
+        uniqueness: 0,
+        consistency: 0,
+        accuracy: 0,
+        validity: 0,
+        overallScore: 0,
+        fieldStats: new Map(),
+        issues: [],
+        suggestions: [],
+        timestamp: new Date()
+      };
     }
     
-    // Calculate field statistics
-    const fieldStats = this.calculateFieldStatistics(data);
+    console.log(`Analyzing data quality for ${data.length} records`);
     
-    // Check for quality issues
-    this.checkQualityIssues(data, fieldStats);
+    // Identify all fields if not specified
+    const fields = options.fields || this.identifyFields(data);
     
-    // Collect all issues
-    const issues: DataQualityIssue[] = [];
-    for (const stats of fieldStats.values()) {
-      issues.push(...stats.issues);
-    }
+    // Compute statistics for each field
+    const fieldStats = this.computeFieldStatistics(data, fields);
+    
+    // Identify issues based on rules
+    const activeRules = [
+      ...(options.enabledRules !== false ? this.rules.filter(rule => rule.enabled) : []),
+      ...(options.customRules || [])
+    ];
+    
+    const issues = this.identifyIssues(data, activeRules, fieldStats);
     
     // Calculate quality scores
-    const completenessScore = this.calculateCompletenessScore(fieldStats);
-    const accuracyScore = this.calculateAccuracyScore(fieldStats);
-    const consistencyScore = this.calculateConsistencyScore(fieldStats);
-    const overallScore = (completenessScore + accuracyScore + consistencyScore) / 3;
+    const qualityScores = this.calculateQualityScores(data, fieldStats, issues);
     
-    // Generate summary
-    const summary = this.generateSummary(fieldStats, issues);
+    // Generate suggestions
+    const suggestions = options.generateSuggestions !== false
+      ? this.generateSuggestions(issues, fieldStats)
+      : [];
     
-    // Create metadata
-    const metadata = this.generateMetadata(fieldStats);
+    const overallScore = (
+      qualityScores.completeness +
+      qualityScores.uniqueness +
+      qualityScores.consistency +
+      qualityScores.accuracy +
+      qualityScores.validity
+    ) / 5;
+    
+    console.log(`Data quality analysis complete. Overall score: ${(overallScore * 100).toFixed(2)}%`);
     
     return {
-      completeness: completenessScore,
-      accuracy: accuracyScore,
-      consistency: consistencyScore,
-      overall: overallScore,
-      issueCount: issues.length,
+      recordCount: data.length,
+      fieldCount: fields.length,
+      ...qualityScores,
+      overallScore,
+      fieldStats,
       issues,
-      summary,
-      metadata
+      suggestions,
+      timestamp: new Date()
     };
   }
   
   /**
-   * Calculate statistics for each field in the dataset
+   * Add a new data quality rule
    */
-  private calculateFieldStatistics(data: any[]): Map<string, FieldStatistics> {
-    const fieldStats = new Map<string, FieldStatistics>();
+  addRule(rule: Omit<DataQualityRule, 'id'>): DataQualityRule {
+    const newRule: DataQualityRule = {
+      id: `rule-${this.nextRuleId++}`,
+      ...rule
+    };
     
-    // Initialize field statistics
-    const firstRecord = data[0];
-    for (const field of Object.keys(firstRecord)) {
-      fieldStats.set(field, {
-        name: field,
-        count: 0,
-        nullCount: 0,
-        emptyCount: 0,
-        uniqueCount: 0,
-        type: 'unknown',
-        values: new Map<any, number>(),
-        patterns: new Map<string, number>(),
-        issues: []
-      });
+    this.rules.push(newRule);
+    return newRule;
+  }
+  
+  /**
+   * Get all data quality rules
+   */
+  getRules(): DataQualityRule[] {
+    return [...this.rules];
+  }
+  
+  /**
+   * Remove a data quality rule
+   */
+  removeRule(ruleId: string): boolean {
+    const initialLength = this.rules.length;
+    this.rules = this.rules.filter(rule => rule.id !== ruleId);
+    return this.rules.length !== initialLength;
+  }
+  
+  /**
+   * Enable or disable a rule
+   */
+  setRuleEnabled(ruleId: string, enabled: boolean): boolean {
+    const rule = this.rules.find(rule => rule.id === ruleId);
+    
+    if (rule) {
+      rule.enabled = enabled;
+      return true;
     }
     
-    // Process each record
+    return false;
+  }
+  
+  /**
+   * Identify fields in the data
+   */
+  private identifyFields(data: any[]): string[] {
+    const fieldSet = new Set<string>();
+    
+    // Collect fields from all records
     for (const record of data) {
-      for (const [field, value] of Object.entries(record)) {
-        const stats = fieldStats.get(field);
-        
-        if (!stats) {
-          continue;
-        }
-        
-        stats.count++;
-        
-        // Check for null/undefined values
-        if (value === null || value === undefined) {
-          stats.nullCount++;
-          continue;
-        }
-        
-        // Check for empty strings
-        if (typeof value === 'string' && value.trim() === '') {
-          stats.emptyCount++;
-        }
-        
-        // Determine field type
-        if (stats.type === 'unknown') {
-          stats.type = this.determineType(value);
-        } else if (stats.type !== 'mixed' && stats.type !== this.determineType(value)) {
-          stats.type = 'mixed';
-        }
-        
-        // Track unique values
-        const valueKey = JSON.stringify(value);
-        const currentCount = stats.values.get(valueKey) || 0;
-        stats.values.set(valueKey, currentCount + 1);
-        
-        // Track patterns for strings
-        if (typeof value === 'string') {
-          const pattern = this.extractPattern(value);
-          const patternCount = stats.patterns.get(pattern) || 0;
-          stats.patterns.set(pattern, patternCount + 1);
-        }
-        
-        // Track min/max/avg for numeric values
-        if (typeof value === 'number') {
-          if (stats.minValue === undefined || value < stats.minValue) {
-            stats.minValue = value;
-          }
-          if (stats.maxValue === undefined || value > stats.maxValue) {
-            stats.maxValue = value;
-          }
-          stats.avgValue = (stats.avgValue || 0) + (value / data.length);
+      if (record && typeof record === 'object') {
+        for (const field of Object.keys(record)) {
+          fieldSet.add(field);
         }
       }
     }
     
-    // Calculate unique counts
-    for (const stats of fieldStats.values()) {
-      stats.uniqueCount = stats.values.size;
+    return Array.from(fieldSet);
+  }
+  
+  /**
+   * Compute statistics for each field
+   */
+  private computeFieldStatistics(data: any[], fields: string[]): Map<string, FieldStatistics> {
+    const fieldStats = new Map<string, FieldStatistics>();
+    
+    for (const field of fields) {
+      // Extract values for this field
+      const values = data.map(record => record[field]);
+      
+      // Count records
+      const count = values.length;
+      
+      // Count null/undefined values
+      const nullCount = values.filter(v => v === null || v === undefined).length;
+      const nullPercentage = nullCount / count;
+      
+      // Count unique values
+      const uniqueValues = new Set(values.map(v => 
+        v !== null && v !== undefined ? JSON.stringify(v) : null
+      ));
+      const uniqueCount = uniqueValues.size;
+      const uniqueness = uniqueCount / count;
+      
+      // Determine data type
+      const nonNullValues = values.filter(v => v !== null && v !== undefined);
+      let dataType = 'unknown';
+      
+      if (nonNullValues.length > 0) {
+        const types = new Map<string, number>();
+        
+        for (const value of nonNullValues) {
+          const type = typeof value;
+          types.set(type, (types.get(type) || 0) + 1);
+        }
+        
+        // Find the most common type
+        let maxCount = 0;
+        for (const [type, typeCount] of types) {
+          if (typeCount > maxCount) {
+            maxCount = typeCount;
+            dataType = type;
+          }
+        }
+        
+        // Special case for dates
+        if (dataType === 'string') {
+          // Check if values parse as dates
+          const dateCount = nonNullValues.filter(v => !isNaN(Date.parse(v))).length;
+          if (dateCount / nonNullValues.length > 0.8) {
+            dataType = 'date';
+          }
+        } else if (dataType === 'object') {
+          // Check if values are arrays or specific object types
+          const arrayCount = nonNullValues.filter(v => Array.isArray(v)).length;
+          if (arrayCount / nonNullValues.length > 0.8) {
+            dataType = 'array';
+          }
+        }
+      }
+      
+      // Analyze patterns and formats
+      const patterns = new Map<string, number>();
+      const formats = new Map<string, number>();
+      
+      for (const value of nonNullValues) {
+        const pattern = this.detectPattern(value);
+        patterns.set(pattern, (patterns.get(pattern) || 0) + 1);
+        
+        const format = this.detectFormat(value, dataType);
+        formats.set(format, (formats.get(format) || 0) + 1);
+      }
+      
+      // Calculate format consistency
+      const formatConsistency = nonNullValues.length > 0
+        ? Math.max(...Array.from(formats.values())) / nonNullValues.length
+        : 1;
+      
+      // Calculate numeric statistics if applicable
+      let min, max, mean, median, mode, stdDev, histogram;
+      
+      if ((dataType === 'number' || dataType === 'date') && nonNullValues.length > 0) {
+        if (dataType === 'date') {
+          // Convert dates to timestamps for calculations
+          const timestamps = nonNullValues.map(v => new Date(v).getTime());
+          min = new Date(Math.min(...timestamps));
+          max = new Date(Math.max(...timestamps));
+        } else {
+          // Regular numeric calculations
+          const numbers = nonNullValues.map(Number);
+          min = Math.min(...numbers);
+          max = Math.max(...numbers);
+          mean = numbers.reduce((sum, n) => sum + n, 0) / numbers.length;
+          
+          // Sort for median
+          const sorted = [...numbers].sort((a, b) => a - b);
+          median = sorted.length % 2 === 0
+            ? (sorted[sorted.length / 2 - 1] + sorted[sorted.length / 2]) / 2
+            : sorted[Math.floor(sorted.length / 2)];
+          
+          // Calculate standard deviation
+          const variance = numbers.reduce((sum, n) => sum + Math.pow(n - mean, 2), 0) / numbers.length;
+          stdDev = Math.sqrt(variance);
+          
+          // Create histogram (10 bins)
+          if (max > min) {
+            const binSize = (max - min) / 10;
+            histogram = Array(10).fill(0);
+            
+            for (const num of numbers) {
+              const binIndex = Math.min(Math.floor((num - min) / binSize), 9);
+              histogram[binIndex]++;
+            }
+          }
+        }
+      }
+      
+      // Find common values
+      const valueCounts = new Map<string, number>();
+      
+      for (const value of values) {
+        const key = value !== null && value !== undefined ? JSON.stringify(value) : 'null';
+        valueCounts.set(key, (valueCounts.get(key) || 0) + 1);
+      }
+      
+      const commonValues = Array.from(valueCounts.entries())
+        .filter(([_, count]) => count > 1)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 5)
+        .map(([key, count]) => [key === 'null' ? null : JSON.parse(key), count]);
+      
+      // Store field statistics
+      fieldStats.set(field, {
+        field,
+        count,
+        nullCount,
+        nullPercentage,
+        uniqueCount,
+        uniqueness,
+        patterns,
+        min,
+        max,
+        mean,
+        median,
+        stdDev,
+        histogram,
+        commonValues,
+        dataType,
+        formats,
+        formatConsistency,
+        mode: commonValues.length > 0 ? commonValues[0][0] : undefined
+      });
     }
     
     return fieldStats;
   }
   
   /**
-   * Check for quality issues in the dataset
+   * Identify issues based on rules
    */
-  private checkQualityIssues(data: any[], fieldStats: Map<string, FieldStatistics>): void {
-    // Check for issues in each field
-    for (const stats of fieldStats.values()) {
-      // Check for missing values
-      const missingRatio = (stats.nullCount + stats.emptyCount) / Math.max(1, stats.count);
-      if (missingRatio > 0) {
-        let severity: 'low' | 'medium' | 'high' | 'critical';
-        
-        if (missingRatio >= 0.5) {
-          severity = 'critical';
-        } else if (missingRatio >= 0.25) {
-          severity = 'high';
-        } else if (missingRatio >= 0.1) {
-          severity = 'medium';
-        } else {
-          severity = 'low';
-        }
-        
-        stats.issues.push({
-          field: stats.name,
-          type: 'missing_values',
-          severity,
-          message: `Field has ${Math.round(missingRatio * 100)}% missing values (${stats.nullCount} null, ${stats.emptyCount} empty)`,
-          count: stats.nullCount + stats.emptyCount,
-          examples: [],
-          suggestedFix: 'Consider using a fill_null transformation or filtering out records with missing values'
-        });
+  private identifyIssues(
+    data: any[],
+    rules: DataQualityRule[],
+    fieldStats: Map<string, FieldStatistics>
+  ): DataQualityIssue[] {
+    const issues: DataQualityIssue[] = [];
+    
+    for (let recordIndex = 0; recordIndex < data.length; recordIndex++) {
+      const record = data[recordIndex];
+      
+      if (!record || typeof record !== 'object') {
+        continue;
       }
       
-      // Check for type inconsistencies
-      if (stats.type === 'mixed') {
-        stats.issues.push({
-          field: stats.name,
-          type: 'inconsistent_types',
-          severity: 'high',
-          message: 'Field has inconsistent data types',
-          count: stats.count,
-          examples: this.findTypeMixExamples(data, stats.name),
-          suggestedFix: 'Consider using a cast_type transformation to standardize the data type'
-        });
-      }
+      const recordId = record.id || record._id || recordIndex;
       
-      // Check for high cardinality
-      if (stats.uniqueCount === stats.count && stats.count > 50) {
-        stats.issues.push({
-          field: stats.name,
-          type: 'high_cardinality',
-          severity: 'medium',
-          message: `Field has ${stats.uniqueCount} unique values in ${stats.count} records`,
-          count: stats.uniqueCount,
-          examples: [],
-          suggestedFix: 'Consider grouping values or using this field as an identifier'
-        });
-      }
-      
-      // Check for low cardinality
-      if (stats.uniqueCount === 1 && stats.count > 1) {
-        stats.issues.push({
-          field: stats.name,
-          type: 'low_cardinality',
-          severity: 'medium',
-          message: 'Field has only one unique value',
-          count: stats.count,
-          examples: [{ value: this.getFirstKey(stats.values) }],
-          suggestedFix: 'Consider removing this field if it provides no differentiating information'
-        });
-      }
-      
-      // Check for numeric outliers
-      if (stats.type === 'number' && stats.count > 10) {
-        const outliers = this.findNumericOutliers(data, stats.name);
-        if (outliers.length > 0) {
-          stats.issues.push({
-            field: stats.name,
-            type: 'numeric_outliers',
-            severity: 'medium',
-            message: `Field has ${outliers.length} numeric outliers`,
-            count: outliers.length,
-            examples: outliers.slice(0, 3).map(value => ({ value })),
-            suggestedFix: 'Consider using a filter transformation to remove outliers or standardize the data'
-          });
-        }
-      }
-      
-      // Check for pattern inconsistencies
-      if (stats.type === 'string' && stats.patterns.size > 1) {
-        const mainPattern = this.getMainPattern(stats.patterns);
-        const nonConformingCount = stats.count - (stats.patterns.get(mainPattern) || 0);
-        
-        if (nonConformingCount > 0 && (nonConformingCount / stats.count) > 0.1) {
-          stats.issues.push({
-            field: stats.name,
-            type: 'inconsistent_patterns',
-            severity: 'medium',
-            message: `Field has ${nonConformingCount} values not conforming to the main pattern`,
-            count: nonConformingCount,
-            examples: this.findPatternMismatches(data, stats.name, mainPattern),
-            suggestedFix: 'Consider using a standardize transformation to normalize the format'
-          });
-        }
-      }
-      
-      // Check for potential duplicates
-      if (stats.uniqueCount < stats.count && (stats.uniqueCount / stats.count) < 0.9) {
-        const duplicateValues = Array.from(stats.values.entries())
-          .filter(([_, count]) => count > 1)
-          .sort((a, b) => b[1] - a[1])
-          .slice(0, 3)
-          .map(([value]) => JSON.parse(value));
+      // Apply each rule
+      for (const rule of rules) {
+        try {
+          // Skip field-specific rules if the field doesn't match
+          if (rule.field && (!record.hasOwnProperty(rule.field) || record[rule.field] === undefined)) {
+            continue;
+          }
           
-        stats.issues.push({
-          field: stats.name,
-          type: 'duplicate_values',
-          severity: 'low',
-          message: `Field has duplicate values (${stats.count - stats.uniqueCount} duplicates)`,
-          count: stats.count - stats.uniqueCount,
-          examples: duplicateValues.map(value => ({ value })),
-          suggestedFix: 'Consider using a deduplicate transformation if these should be unique'
+          const value = rule.field ? record[rule.field] : record;
+          const stats = rule.field ? fieldStats.get(rule.field) : undefined;
+          
+          if (rule.condition(value, record, stats)) {
+            issues.push({
+              id: `issue-${issues.length + 1}`,
+              type: rule.type,
+              field: rule.field,
+              recordIndex,
+              recordId,
+              message: rule.message,
+              severity: rule.severity,
+              suggestion: rule.suggestion
+            });
+          }
+        } catch (error) {
+          console.error(`Error applying rule ${rule.name}:`, error);
+        }
+      }
+    }
+    
+    // Add dataset-level issues
+    
+    // Check for inconsistent field counts
+    const fieldCounts = data.map(record => Object.keys(record).length);
+    const inconsistentCount = fieldCounts.filter(count => count !== fieldCounts[0]).length;
+    
+    if (inconsistentCount > 0) {
+      issues.push({
+        id: `issue-${issues.length + 1}`,
+        type: DataQualityIssueType.INCONSISTENT_VALUE,
+        message: `${inconsistentCount} records have different field counts`,
+        severity: DataQualitySeverity.WARNING,
+        suggestion: 'Check for missing fields in these records or normalize the schema'
+      });
+    }
+    
+    // Check for low completeness fields
+    for (const [field, stats] of fieldStats) {
+      if (stats.nullPercentage > 0.2) {
+        issues.push({
+          id: `issue-${issues.length + 1}`,
+          type: DataQualityIssueType.MISSING_VALUE,
+          field,
+          message: `Field '${field}' is missing in ${stats.nullCount} records (${(stats.nullPercentage * 100).toFixed(1)}%)`,
+          severity: stats.nullPercentage > 0.5 ? DataQualitySeverity.ERROR : DataQualitySeverity.WARNING,
+          suggestion: 'Consider adding default values or making this field required'
         });
       }
     }
     
-    // Check for record-level issues
-    this.checkRecordLevelIssues(data, fieldStats);
-  }
-  
-  /**
-   * Check for issues affecting multiple fields or entire records
-   */
-  private checkRecordLevelIssues(data: any[], fieldStats: Map<string, FieldStatistics>): void {
-    const keyFields = Array.from(fieldStats.values())
-      .filter(stats => stats.uniqueCount === stats.count && stats.count > 0)
-      .map(stats => stats.name);
-      
-    if (keyFields.length > 0) {
-      // Add a note about potential key fields
-      const firstField = fieldStats.get(keyFields[0]);
-      if (firstField) {
-        firstField.issues.push({
-          field: firstField.name,
-          type: 'potential_key',
-          severity: 'low',
-          message: `Field is a potential unique identifier (${keyFields.length} potential key fields found)`,
-          count: firstField.count,
-          examples: [],
-          suggestedFix: 'Consider designating this field as a primary key or identifier'
+    // Check for low format consistency
+    for (const [field, stats] of fieldStats) {
+      if (stats.formatConsistency < 0.8 && stats.nullPercentage < 0.5) {
+        issues.push({
+          id: `issue-${issues.length + 1}`,
+          type: DataQualityIssueType.INCONSISTENT_VALUE,
+          field,
+          message: `Field '${field}' has inconsistent formats (${(stats.formatConsistency * 100).toFixed(1)}% consistency)`,
+          severity: DataQualitySeverity.WARNING,
+          suggestion: 'Standardize the format of this field'
         });
       }
     }
     
     // Check for duplicate records
-    if (data.length > 1) {
-      try {
-        const recordHashes = new Map<string, number>();
-        let duplicateCount = 0;
-        
-        for (const record of data) {
-          // Create a hash of the record excluding any likely key fields
-          const recordHash = JSON.stringify(
-            Object.fromEntries(
-              Object.entries(record)
-                .filter(([key]) => !keyFields.includes(key))
-            )
-          );
-          
-          const count = (recordHashes.get(recordHash) || 0) + 1;
-          recordHashes.set(recordHash, count);
-          
-          if (count === 2) {
-            duplicateCount++;
-          }
-        }
-        
-        if (duplicateCount > 0) {
-          // Add a dataset-level issue
-          // In a real implementation, we'd add this to a dataset-level issues array
-          const field = Array.from(fieldStats.keys())[0];
-          const stats = fieldStats.get(field);
-          
-          if (stats) {
-            stats.issues.push({
-              field: '_dataset_',
-              type: 'duplicate_records',
-              severity: 'medium',
-              message: `Dataset contains ${duplicateCount} potential duplicate records`,
-              count: duplicateCount,
-              examples: [],
-              suggestedFix: 'Consider using a deduplicate transformation at the record level'
-            });
-          }
-        }
-      } catch (error) {
-        console.warn('Error checking for duplicate records:', error);
-      }
+    const duplicateCount = this.countDuplicateRecords(data);
+    
+    if (duplicateCount > 0) {
+      issues.push({
+        id: `issue-${issues.length + 1}`,
+        type: DataQualityIssueType.DUPLICATE_RECORD,
+        message: `${duplicateCount} duplicate records found`,
+        severity: duplicateCount > data.length * 0.05 ? DataQualitySeverity.ERROR : DataQualitySeverity.WARNING,
+        suggestion: 'Remove duplicate records or add unique constraints'
+      });
     }
+    
+    return issues;
   }
   
   /**
-   * Calculate completeness score
+   * Calculate quality scores
    */
-  private calculateCompletenessScore(fieldStats: Map<string, FieldStatistics>): number {
-    let totalFields = 0;
-    let totalCompleteness = 0;
+  private calculateQualityScores(
+    data: any[],
+    fieldStats: Map<string, FieldStatistics>,
+    issues: DataQualityIssue[]
+  ): {
+    completeness: number;
+    uniqueness: number;
+    consistency: number;
+    accuracy: number;
+    validity: number;
+  } {
+    // Completeness: percentage of non-null values
+    const totalFields = data.length * fieldStats.size;
+    const nullCounts = Array.from(fieldStats.values()).reduce((sum, stats) => sum + stats.nullCount, 0);
+    const completeness = 1 - (nullCounts / totalFields);
     
-    for (const stats of fieldStats.values()) {
-      const fieldCompleteness = 1 - ((stats.nullCount + stats.emptyCount) / Math.max(1, stats.count));
-      totalCompleteness += fieldCompleteness;
-      totalFields++;
-    }
+    // Uniqueness: average uniqueness across fields
+    const uniqueness = Array.from(fieldStats.values())
+      .filter(stats => stats.uniqueness !== undefined)
+      .reduce((sum, stats) => sum + stats.uniqueness, 0) / fieldStats.size;
     
-    return totalFields > 0 ? totalCompleteness / totalFields : 1;
-  }
-  
-  /**
-   * Calculate accuracy score
-   */
-  private calculateAccuracyScore(fieldStats: Map<string, FieldStatistics>): number {
-    let totalFields = 0;
-    let totalAccuracy = 0;
+    // Consistency: average format consistency
+    const consistency = Array.from(fieldStats.values())
+      .filter(stats => stats.formatConsistency !== undefined)
+      .reduce((sum, stats) => sum + stats.formatConsistency, 0) / fieldStats.size;
     
-    for (const stats of fieldStats.values()) {
-      // Start with perfect accuracy
-      let fieldAccuracy = 1;
-      
-      // Reduce score for type inconsistencies
-      if (stats.type === 'mixed') {
-        fieldAccuracy *= 0.7;
-      }
-      
-      // Reduce score for pattern inconsistencies
-      if (stats.type === 'string' && stats.patterns.size > 1) {
-        const mainPattern = this.getMainPattern(stats.patterns);
-        const conformingCount = stats.patterns.get(mainPattern) || 0;
-        const patternConsistency = conformingCount / Math.max(1, stats.count - stats.nullCount - stats.emptyCount);
-        fieldAccuracy *= patternConsistency;
-      }
-      
-      // Reduce score for outliers
-      const outlierIssue = stats.issues.find(issue => issue.type === 'numeric_outliers');
-      if (outlierIssue) {
-        fieldAccuracy *= 1 - (outlierIssue.count / stats.count);
-      }
-      
-      totalAccuracy += fieldAccuracy;
-      totalFields++;
-    }
+    // Count issues by type for validity and accuracy
+    const validityIssues = issues.filter(issue => 
+      issue.type === DataQualityIssueType.INVALID_FORMAT || 
+      issue.type === DataQualityIssueType.OUT_OF_RANGE
+    ).length;
     
-    return totalFields > 0 ? totalAccuracy / totalFields : 1;
-  }
-  
-  /**
-   * Calculate consistency score
-   */
-  private calculateConsistencyScore(fieldStats: Map<string, FieldStatistics>): number {
-    let totalFields = 0;
-    let totalConsistency = 0;
+    const accuracyIssues = issues.filter(issue => 
+      issue.type === DataQualityIssueType.INCONSISTENT_VALUE || 
+      issue.type === DataQualityIssueType.OUTLIER
+    ).length;
     
-    for (const stats of fieldStats.values()) {
-      // Start with perfect consistency
-      let fieldConsistency = 1;
-      
-      // Reduce score for mixed types
-      if (stats.type === 'mixed') {
-        fieldConsistency *= 0.5;
-      }
-      
-      // Reduce score for inconsistent patterns
-      const patternIssue = stats.issues.find(issue => issue.type === 'inconsistent_patterns');
-      if (patternIssue) {
-        fieldConsistency *= 0.8;
-      }
-      
-      totalConsistency += fieldConsistency;
-      totalFields++;
-    }
+    // Validity: percentage of records without format issues
+    const validity = Math.max(0, 1 - (validityIssues / data.length));
     
-    return totalFields > 0 ? totalConsistency / totalFields : 1;
-  }
-  
-  /**
-   * Generate a summary of the data quality analysis
-   */
-  private generateSummary(fieldStats: Map<string, FieldStatistics>, issues: DataQualityIssue[]): string {
-    const criticalIssues = issues.filter(issue => issue.severity === 'critical').length;
-    const highIssues = issues.filter(issue => issue.severity === 'high').length;
-    const mediumIssues = issues.filter(issue => issue.severity === 'medium').length;
-    const lowIssues = issues.filter(issue => issue.severity === 'low').length;
+    // Accuracy: percentage of records without value issues
+    const accuracy = Math.max(0, 1 - (accuracyIssues / data.length));
     
-    let summary = `Data quality analysis found ${issues.length} issues: `;
-    
-    if (criticalIssues > 0) {
-      summary += `${criticalIssues} critical, `;
-    }
-    
-    if (highIssues > 0) {
-      summary += `${highIssues} high, `;
-    }
-    
-    if (mediumIssues > 0) {
-      summary += `${mediumIssues} medium, `;
-    }
-    
-    if (lowIssues > 0) {
-      summary += `${lowIssues} low `;
-    }
-    
-    summary = summary.replace(/, $/, '');
-    
-    // Add information about fields with most issues
-    const fieldsWithIssues = new Map<string, number>();
-    for (const issue of issues) {
-      const count = fieldsWithIssues.get(issue.field) || 0;
-      fieldsWithIssues.set(issue.field, count + 1);
-    }
-    
-    const mostProblematicFields = Array.from(fieldsWithIssues.entries())
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 3)
-      .map(([field, count]) => `${field} (${count})`);
-    
-    if (mostProblematicFields.length > 0) {
-      summary += `. Most problematic fields: ${mostProblematicFields.join(', ')}`;
-    }
-    
-    return summary;
-  }
-  
-  /**
-   * Generate metadata for the data quality analysis
-   */
-  private generateMetadata(fieldStats: Map<string, FieldStatistics>): Record<string, any> {
-    const metadata: Record<string, any> = {
-      fieldCount: fieldStats.size,
-      fieldTypes: {},
-      hasImportantIssues: false
+    return {
+      completeness,
+      uniqueness,
+      consistency,
+      accuracy,
+      validity
     };
-    
-    // Count field types
-    for (const stats of fieldStats.values()) {
-      metadata.fieldTypes[stats.type] = (metadata.fieldTypes[stats.type] || 0) + 1;
-      
-      // Check for important issues
-      if (stats.issues.some(issue => issue.severity === 'critical' || issue.severity === 'high')) {
-        metadata.hasImportantIssues = true;
-      }
-    }
-    
-    return metadata;
   }
   
   /**
-   * Find examples of mixed types in a field
+   * Generate suggestions based on issues
    */
-  private findTypeMixExamples(data: any[], field: string): any[] {
-    const examples: any[] = [];
-    const seenTypes = new Set<string>();
+  private generateSuggestions(
+    issues: DataQualityIssue[],
+    fieldStats: Map<string, FieldStatistics>
+  ): string[] {
+    const suggestions: string[] = [];
+    
+    // Group issues by field and type
+    const issuesByField = new Map<string | undefined, DataQualityIssue[]>();
+    
+    for (const issue of issues) {
+      const key = issue.field || '_global_';
+      
+      if (!issuesByField.has(key)) {
+        issuesByField.set(key, []);
+      }
+      
+      issuesByField.get(key)!.push(issue);
+    }
+    
+    // Generate suggestions for each field
+    for (const [field, fieldIssues] of issuesByField) {
+      if (field === '_global_') {
+        // Dataset-level suggestions
+        if (fieldIssues.some(issue => issue.type === DataQualityIssueType.DUPLICATE_RECORD)) {
+          suggestions.push('Add unique constraints or a deduplication process to prevent duplicate records');
+        }
+      } else {
+        // Field-level suggestions
+        const stats = fieldStats.get(field);
+        
+        if (!stats) continue;
+        
+        // Missing value suggestions
+        if (fieldIssues.some(issue => issue.type === DataQualityIssueType.MISSING_VALUE)) {
+          if (stats.nullPercentage > 0.8) {
+            suggestions.push(`Consider removing field '${field}' as it's mostly empty (${(stats.nullPercentage * 100).toFixed(1)}% null)`);
+          } else if (stats.nullPercentage > 0.2) {
+            suggestions.push(`Add default values for field '${field}' (${stats.nullCount} null values)`);
+          }
+        }
+        
+        // Format inconsistency suggestions
+        if (fieldIssues.some(issue => issue.type === DataQualityIssueType.INCONSISTENT_VALUE)) {
+          suggestions.push(`Standardize the format of field '${field}' (current consistency: ${(stats.formatConsistency * 100).toFixed(1)}%)`);
+        }
+        
+        // Value range suggestions
+        if (fieldIssues.some(issue => issue.type === DataQualityIssueType.OUT_OF_RANGE)) {
+          suggestions.push(`Add validation constraints for field '${field}' (found values outside expected range)`);
+        }
+        
+        // Invalid format suggestions
+        if (fieldIssues.some(issue => issue.type === DataQualityIssueType.INVALID_FORMAT)) {
+          suggestions.push(`Fix format inconsistencies in field '${field}' or add format validation`);
+        }
+      }
+    }
+    
+    // Add general suggestions based on quality scores
+    const fieldNamesWithLowCompleteness = Array.from(fieldStats.entries())
+      .filter(([_, stats]) => stats.nullPercentage > 0.5)
+      .map(([field, _]) => field);
+    
+    if (fieldNamesWithLowCompleteness.length > 0) {
+      suggestions.push(`Consider making these fields optional or removing them: ${fieldNamesWithLowCompleteness.join(', ')}`);
+    }
+    
+    return [...new Set(suggestions)]; // Remove duplicates
+  }
+  
+  /**
+   * Count duplicate records in the dataset
+   */
+  private countDuplicateRecords(data: any[]): number {
+    // Create a simple hash for each record
+    const recordHashes = new Map<string, number>();
     
     for (const record of data) {
-      if (field in record) {
-        const value = record[field];
-        const type = this.determineType(value);
-        
-        if (!seenTypes.has(type) && examples.length < 3) {
-          examples.push({ value, type });
-          seenTypes.add(type);
-        }
-        
-        if (seenTypes.size >= 3) {
-          break;
-        }
+      // Skip non-object records
+      if (!record || typeof record !== 'object') {
+        continue;
       }
+      
+      // Create a sorted JSON string as a hash
+      const hash = JSON.stringify(
+        Object.entries(record)
+          .filter(([key, _]) => !key.startsWith('_') && key !== 'id')
+          .sort(([keyA], [keyB]) => keyA.localeCompare(keyB))
+      );
+      
+      recordHashes.set(hash, (recordHashes.get(hash) || 0) + 1);
     }
     
-    return examples;
+    // Count records that appear more than once
+    return Array.from(recordHashes.values()).reduce((count, occurrences) => {
+      return count + (occurrences > 1 ? occurrences - 1 : 0);
+    }, 0);
   }
   
   /**
-   * Find numeric outliers in a field
+   * Detect pattern of a value
    */
-  private findNumericOutliers(data: any[], field: string): number[] {
-    try {
-      // Extract numeric values
-      const values = data
-        .filter(record => field in record && typeof record[field] === 'number')
-        .map(record => record[field]);
-      
-      if (values.length < 5) {
-        return [];
-      }
-      
-      // Calculate quartiles and IQR
-      const sorted = [...values].sort((a, b) => a - b);
-      const q1Index = Math.floor(sorted.length * 0.25);
-      const q3Index = Math.floor(sorted.length * 0.75);
-      const q1 = sorted[q1Index];
-      const q3 = sorted[q3Index];
-      const iqr = q3 - q1;
-      
-      // Define outlier bounds
-      const lowerBound = q1 - 1.5 * iqr;
-      const upperBound = q3 + 1.5 * iqr;
-      
-      // Find outliers
-      return values.filter(value => value < lowerBound || value > upperBound);
-    } catch (error) {
-      console.warn(`Error finding outliers for field ${field}:`, error);
-      return [];
-    }
-  }
-  
-  /**
-   * Find examples of pattern mismatches
-   */
-  private findPatternMismatches(data: any[], field: string, mainPattern: string): any[] {
-    const examples: any[] = [];
-    
-    for (const record of data) {
-      if (field in record && typeof record[field] === 'string') {
-        const value = record[field];
-        const pattern = this.extractPattern(value);
-        
-        if (pattern !== mainPattern && examples.length < 3) {
-          examples.push({ value, pattern });
-        }
-        
-        if (examples.length >= 3) {
-          break;
-        }
-      }
-    }
-    
-    return examples;
-  }
-  
-  /**
-   * Determine the type of a value
-   */
-  private determineType(value: any): string {
+  private detectPattern(value: any): string {
     if (value === null || value === undefined) {
       return 'null';
     }
     
-    if (Array.isArray(value)) {
-      return 'array';
-    }
+    const type = typeof value;
     
-    if (value instanceof Date) {
-      return 'date';
+    switch (type) {
+      case 'string':
+        if (value.length === 0) return 'empty_string';
+        if (!isNaN(Date.parse(value))) return 'date_string';
+        if (/^\d+$/.test(value)) return 'numeric_string';
+        if (/^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i.test(value)) return 'email';
+        if (/^https?:\/\//.test(value)) return 'url';
+        if (value.length < 10) return 'short_string';
+        if (value.length > 100) return 'long_string';
+        return 'string';
+        
+      case 'number':
+        if (Number.isInteger(value)) {
+          if (value === 0) return 'zero';
+          if (value === 1) return 'one';
+          if (value < 0) return 'negative_integer';
+          return 'positive_integer';
+        }
+        if (value === 0.0) return 'zero_float';
+        if (value < 0) return 'negative_float';
+        return 'positive_float';
+        
+      case 'boolean':
+        return value ? 'true' : 'false';
+        
+      case 'object':
+        if (Array.isArray(value)) {
+          if (value.length === 0) return 'empty_array';
+          return `array[${value.length}]`;
+        }
+        if (value instanceof Date) return 'date';
+        return 'object';
+        
+      default:
+        return type;
     }
-    
-    return typeof value;
   }
   
   /**
-   * Extract a pattern from a string value
+   * Detect format of a value
    */
-  private extractPattern(value: string): string {
-    try {
-      return value
-        .replace(/[a-z]/g, 'a')
-        .replace(/[A-Z]/g, 'A')
-        .replace(/[0-9]/g, '9')
-        .substring(0, 10);
-    } catch (error) {
-      return 'unknown';
-    }
-  }
-  
-  /**
-   * Get the first key from a Map
-   */
-  private getFirstKey(map: Map<any, any>): any {
-    for (const key of map.keys()) {
-      try {
-        return JSON.parse(key);
-      } catch {
-        return key;
-      }
-    }
-    return null;
-  }
-  
-  /**
-   * Get the most common pattern from a pattern Map
-   */
-  private getMainPattern(patterns: Map<string, number>): string {
-    let mainPattern = '';
-    let maxCount = 0;
-    
-    for (const [pattern, count] of patterns) {
-      if (count > maxCount) {
-        maxCount = count;
-        mainPattern = pattern;
-      }
+  private detectFormat(value: any, dataType: string): string {
+    if (value === null || value === undefined) {
+      return 'null';
     }
     
-    return mainPattern;
+    switch (dataType) {
+      case 'string':
+        const str = String(value);
+        // Detect date formats
+        if (!isNaN(Date.parse(str))) {
+          if (/^\d{4}-\d{2}-\d{2}$/.test(str)) return 'yyyy-mm-dd';
+          if (/^\d{4}\/\d{2}\/\d{2}$/.test(str)) return 'yyyy/mm/dd';
+          if (/^\d{2}-\d{2}-\d{4}$/.test(str)) return 'mm-dd-yyyy';
+          if (/^\d{2}\/\d{2}\/\d{4}$/.test(str)) return 'mm/dd/yyyy';
+          if (/^\d{2}-\d{2}-\d{2}$/.test(str)) return 'yy-mm-dd';
+          return 'date_string';
+        }
+        
+        // Detect common string formats
+        if (/^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i.test(str)) return 'email';
+        if (/^https?:\/\//.test(str)) return 'url';
+        if (/^\d+$/.test(str)) return 'numeric_string';
+        if (/^[A-Za-z0-9_-]+$/.test(str)) return 'alphanumeric';
+        if (/^[A-Za-z]+$/.test(str)) return 'alphabetic';
+        if (/^[A-Za-z\s]+$/.test(str)) return 'text';
+        return 'string';
+        
+      case 'number':
+        if (Number.isInteger(value)) return 'integer';
+        return 'float';
+        
+      case 'boolean':
+        return 'boolean';
+        
+      case 'date':
+        return 'date';
+        
+      case 'object':
+        if (Array.isArray(value)) return 'array';
+        return 'object';
+        
+      default:
+        return dataType;
+    }
   }
   
   /**
-   * Create an empty analysis result
+   * Initialize default rules
    */
-  private emptyAnalysis(): DataQualityAnalysis {
-    return {
-      completeness: 1,
-      accuracy: 1,
-      consistency: 1,
-      overall: 1,
-      issueCount: 0,
-      issues: [],
-      summary: 'No records to analyze',
-      metadata: {
-        fieldCount: 0,
-        fieldTypes: {},
-        hasImportantIssues: false
-      }
-    };
+  private initializeDefaultRules(): void {
+    // Missing values rule
+    this.addRule({
+      name: 'Required Field Check',
+      field: undefined, // Applied to specified fields in the analysis
+      type: DataQualityIssueType.MISSING_VALUE,
+      severity: DataQualitySeverity.WARNING,
+      condition: (value) => value === null || value === undefined,
+      message: 'Required field has missing value',
+      suggestion: 'Add a default value or make sure this field is always populated',
+      enabled: true
+    });
+    
+    // Email format rule
+    this.addRule({
+      name: 'Email Format Check',
+      field: undefined, // Applied to fields that appear to contain emails
+      type: DataQualityIssueType.INVALID_FORMAT,
+      severity: DataQualitySeverity.ERROR,
+      condition: (value, _, stats) => {
+        if (value === null || value === undefined || typeof value !== 'string') return false;
+        // Only apply to fields that are likely email fields
+        if (stats && stats.formats && 
+            stats.formats.has('email') && 
+            stats.formats.get('email')! > 0) {
+          return !/^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i.test(value);
+        }
+        return false;
+      },
+      message: 'Invalid email format',
+      suggestion: 'Validate email addresses before storing them',
+      enabled: true
+    });
+    
+    // Numeric range rule
+    this.addRule({
+      name: 'Numeric Range Check',
+      field: undefined, // Applied to numeric fields
+      type: DataQualityIssueType.OUT_OF_RANGE,
+      severity: DataQualitySeverity.WARNING,
+      condition: (value, _, stats) => {
+        if (value === null || value === undefined || typeof value !== 'number') return false;
+        if (!stats || stats.dataType !== 'number') return false;
+        
+        if (stats.mean !== undefined && stats.stdDev !== undefined) {
+          // Check for outliers (more than 3 standard deviations from the mean)
+          return Math.abs(value - stats.mean) > 3 * stats.stdDev;
+        }
+        
+        return false;
+      },
+      message: 'Value is outside the expected range',
+      suggestion: 'Check for data entry errors or add validation constraints',
+      enabled: true
+    });
+    
+    // Date format consistency rule
+    this.addRule({
+      name: 'Date Format Consistency Check',
+      field: undefined, // Applied to date fields
+      type: DataQualityIssueType.INCONSISTENT_VALUE,
+      severity: DataQualitySeverity.WARNING,
+      condition: (value, _, stats) => {
+        if (value === null || value === undefined) return false;
+        if (!stats || stats.dataType !== 'date') return false;
+        
+        if (typeof value === 'string' && !isNaN(Date.parse(value))) {
+          // Check if the date format is consistent with the most common format
+          const format = this.detectFormat(value, 'string');
+          
+          if (stats.formats && stats.formats.size > 0) {
+            let mostCommonFormat = '';
+            let maxCount = 0;
+            
+            for (const [fmt, count] of stats.formats) {
+              if (count > maxCount) {
+                maxCount = count;
+                mostCommonFormat = fmt;
+              }
+            }
+            
+            return format !== mostCommonFormat;
+          }
+        }
+        
+        return false;
+      },
+      message: 'Date format is inconsistent with other dates in this field',
+      suggestion: 'Standardize date formats across all records',
+      enabled: true
+    });
   }
 }
 

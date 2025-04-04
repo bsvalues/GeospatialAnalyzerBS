@@ -1,696 +1,657 @@
 import { ETLJob, JobStatus, TransformationRule } from './ETLTypes';
+import { etlPipeline, ETLPipelineOptions, ETLPipelineResult } from './ETLPipeline';
 import { scheduler } from './Scheduler';
-import { etlPipeline, ETLPipelineResult } from './ETLPipeline';
-import { alertService, Alert, AlertType, AlertSeverity, JobMetrics } from './AlertService';
-import { dataConnector } from './DataConnector';
+import { dataConnector, ConnectionTestResult } from './DataConnector';
 import { dataQualityService } from './DataQualityService';
 import { optimizationService } from './OptimizationService';
+import { alertService, AlertType, AlertSeverity, AlertCategory } from './AlertService';
 
 /**
- * ETL job run interface
+ * Interface for job run history
  */
 export interface JobRun {
-  id: string;
-  jobId: string;
-  jobName: string;
-  status: JobStatus;
+  id: number;
+  jobId: number;
   startTime: Date;
   endTime?: Date;
-  duration?: number;
-  error?: string;
-  metrics?: JobMetrics;
-  alerts: Alert[];
-  dataQualityScore?: number;
+  status: JobStatus;
+  records: {
+    extracted: number;
+    transformed: number;
+    loaded: number;
+    failed: number;
+  };
+  errors: any[];
+  executionTime?: number;
+  createdAt: Date;
+  logs?: string[]; // Optional logs from the execution
 }
 
 /**
- * ETL pipeline manager for coordinating ETL services
+ * ETL Pipeline Manager class
+ * 
+ * This class coordinates between the ETL pipeline, scheduler, and other services.
  */
 class ETLPipelineManager {
-  private jobs: Map<string, ETLJob> = new Map();
-  private transformationRules: Map<number, TransformationRule> = new Map();
-  private jobRuns: Map<string, JobRun[]> = new Map();
-  private initialized = false;
+  private jobs: Map<number, ETLJob> = new Map();
+  private jobRuns: Map<number, JobRun[]> = new Map();
+  private dataSources: Map<number, any> = new Map();
+  private rules: Map<number, TransformationRule> = new Map();
+  private nextJobId = 1;
+  private nextRunId = 1;
   
   constructor() {
-    // Default constructor
+    console.log('ETL Pipeline Manager initialized');
+    this.initializeManager();
   }
   
   /**
-   * Initialize the ETL pipeline manager
+   * Initialize the manager and set up job handlers
    */
-  initialize(): void {
-    if (this.initialized) {
-      return;
-    }
+  private initializeManager(): void {
+    // Set up a run handler for the scheduler
+    scheduler.scheduleJob(
+      0, // Special system job ID
+      'Clean Up Expired Alerts',
+      {
+        frequency: 'daily',
+        hour: 0,
+        minute: 0
+      },
+      async () => {
+        // Clean up expired alerts
+        const expiredAlerts = alertService.clearExpiredAlerts();
+        console.log(`Cleaned up ${expiredAlerts.length} expired alerts`);
+      }
+    );
     
-    console.log('Initializing ETL Pipeline Manager');
-    
-    // Initialize scheduler
-    scheduler.initialize();
-    
-    // Load jobs and rules from storage (via API in real implementation)
-    // For demo, we'll populate with mock data later
-    
-    this.initialized = true;
+    console.log('ETL Pipeline Manager initialized');
   }
   
   /**
-   * Register a job with the ETL pipeline manager
+   * Create a new ETL job
    */
-  registerJob(job: ETLJob): void {
-    console.log(`Registering job: ${job.name} (${job.id})`);
+  createJob(
+    name: string,
+    description: string,
+    sources: number[],
+    destinations: number[],
+    rules: number[],
+    enabled: boolean = true
+  ): ETLJob {
+    const now = new Date();
+    const jobId = this.nextJobId++;
     
-    this.jobs.set(job.id, job);
+    const job: ETLJob = {
+      id: jobId,
+      name,
+      description,
+      sources,
+      destinations,
+      rules,
+      enabled,
+      status: JobStatus.IDLE,
+      createdAt: now,
+      updatedAt: now
+    };
     
-    // Initialize job runs array
-    if (!this.jobRuns.has(job.id)) {
-      this.jobRuns.set(job.id, []);
-    }
+    this.jobs.set(jobId, job);
+    this.jobRuns.set(jobId, []);
     
-    // Schedule the job if it has a schedule and is enabled
-    if (job.schedule && job.enabled) {
-      this.scheduleJob(job);
-    }
+    console.log(`Created ETL job: ${name} (ID: ${jobId})`);
+    
+    return job;
   }
   
   /**
-   * Register a transformation rule with the ETL pipeline manager
+   * Get all ETL jobs
    */
-  registerTransformationRule(rule: TransformationRule): void {
-    console.log(`Registering transformation rule: ${rule.name} (${rule.id})`);
-    this.transformationRules.set(rule.id, rule);
+  getJobs(): ETLJob[] {
+    return Array.from(this.jobs.values());
   }
   
   /**
-   * Schedule a job for execution
+   * Get a specific ETL job by ID
    */
-  scheduleJob(job: ETLJob): void {
-    if (!job.schedule) {
-      console.warn(`Cannot schedule job without a schedule: ${job.id}`);
-      return;
+  getJob(id: number): ETLJob | undefined {
+    return this.jobs.get(id);
+  }
+  
+  /**
+   * Update an existing ETL job
+   */
+  updateJob(id: number, updates: Partial<ETLJob>): boolean {
+    const job = this.getJob(id);
+    
+    if (!job) {
+      return false;
     }
     
-    console.log(`Scheduling job: ${job.name} (${job.id})`);
+    const now = new Date();
     
-    // Schedule the job with the scheduler
-    scheduler.scheduleJob(job, async (jobId) => {
-      await this.executeJob(jobId);
+    // Update job properties
+    Object.assign(job, {
+      ...updates,
+      updatedAt: now
     });
+    
+    this.jobs.set(id, job);
+    
+    console.log(`Updated ETL job: ${job.name} (ID: ${id})`);
+    
+    return true;
   }
   
   /**
-   * Unschedule a job
+   * Delete an ETL job
    */
-  unscheduleJob(jobId: string): void {
-    console.log(`Unscheduling job: ${jobId}`);
-    scheduler.unscheduleJob(jobId);
+  deleteJob(id: number): boolean {
+    if (!this.jobs.has(id)) {
+      return false;
+    }
+    
+    // Get the job and runs for logging
+    const job = this.jobs.get(id)!;
+    const runs = this.jobRuns.get(id) || [];
+    
+    // Remove job and runs
+    this.jobs.delete(id);
+    this.jobRuns.delete(id);
+    
+    console.log(`Deleted ETL job: ${job.name} (ID: ${id}) with ${runs.length} run records`);
+    
+    return true;
   }
   
   /**
-   * Execute a job
+   * Execute an ETL job immediately
    */
-  async executeJob(jobId: string): Promise<JobRun> {
-    const job = this.jobs.get(jobId);
+  async executeJob(id: number, options?: ETLPipelineOptions): Promise<JobRun> {
+    const job = this.getJob(id);
+    
+    if (!job) {
+      throw new Error(`Job not found: ${id}`);
+    }
+    
+    const now = new Date();
+    const runId = this.nextRunId++;
+    
+    // Create a job run record
+    const jobRun: JobRun = {
+      id: runId,
+      jobId: id,
+      startTime: now,
+      status: JobStatus.RUNNING,
+      records: {
+        extracted: 0,
+        transformed: 0,
+        loaded: 0,
+        failed: 0
+      },
+      errors: [],
+      createdAt: now,
+      logs: ['Job execution started']
+    };
+    
+    // Add to job runs
+    const jobRuns = this.jobRuns.get(id) || [];
+    jobRuns.push(jobRun);
+    this.jobRuns.set(id, jobRuns);
+    
+    // Update job status
+    job.status = JobStatus.RUNNING;
+    job.lastRun = now;
+    this.jobs.set(id, job);
+    
+    // Create an alert for job start
+    alertService.createAlert({
+      type: AlertType.INFO,
+      severity: AlertSeverity.LOW,
+      category: AlertCategory.TRANSFORMATION,
+      title: 'ETL Job Started',
+      message: `ETL job "${job.name}" execution started`,
+      jobId: id
+    });
+    
+    try {
+      // Get the sources, destinations, and rules for this job
+      const sources = job.sources.map(sourceId => this.dataSources.get(sourceId)).filter(Boolean);
+      const destinations = job.destinations.map(destId => this.dataSources.get(destId)).filter(Boolean);
+      const transformRules = job.rules.map(ruleId => this.rules.get(ruleId)).filter(Boolean);
+      
+      // Validate that we have all the required data
+      if (sources.length === 0) {
+        throw new Error('No valid sources found for job');
+      }
+      
+      if (destinations.length === 0) {
+        throw new Error('No valid destinations found for job');
+      }
+      
+      // Sort rules by order
+      const sortedRules = [...transformRules].sort((a, b) => {
+        if (a.order !== undefined && b.order !== undefined) {
+          return a.order - b.order;
+        }
+        return 0;
+      });
+      
+      // Log source, destination, and rule counts
+      jobRun.logs?.push(`Job has ${sources.length} sources, ${destinations.length} destinations, and ${sortedRules.length} transformation rules`);
+      
+      // Execute the ETL pipeline for each source/destination pair
+      for (let i = 0; i < sources.length; i++) {
+        const source = sources[i];
+        
+        for (let j = 0; j < destinations.length; j++) {
+          const destination = destinations[j];
+          
+          jobRun.logs?.push(`Executing pipeline for source "${source.name}" to destination "${destination.name}"`);
+          
+          const pipelineResult = await etlPipeline.execute(
+            source,
+            destination,
+            sortedRules,
+            options
+          );
+          
+          // Add logs from the pipeline execution
+          if (jobRun.logs && pipelineResult.logs) {
+            jobRun.logs.push(...pipelineResult.logs);
+          }
+          
+          // Update record counts
+          jobRun.records.extracted += pipelineResult.recordCounts.extracted;
+          jobRun.records.transformed += pipelineResult.recordCounts.transformed;
+          jobRun.records.loaded += pipelineResult.recordCounts.loaded;
+          jobRun.records.failed += pipelineResult.recordCounts.failed;
+          
+          // Add any errors to the job run
+          if (pipelineResult.errors.length > 0) {
+            jobRun.errors.push(...pipelineResult.errors);
+          }
+          
+          // Data quality analysis
+          if (pipelineResult.dataQualityResult) {
+            jobRun.logs?.push(`Data quality analysis identified ${pipelineResult.dataQualityResult.issues.length} issues`);
+            
+            // Create alerts for data quality issues
+            if (pipelineResult.dataQualityResult.issues.length > 0) {
+              alertService.createAlert({
+                type: AlertType.WARNING,
+                severity: AlertSeverity.MEDIUM,
+                category: AlertCategory.DATA_QUALITY,
+                title: 'Data Quality Issues',
+                message: `${pipelineResult.dataQualityResult.issues.length} data quality issues detected during job "${job.name}" execution`,
+                jobId: id
+              });
+            }
+          }
+          
+          // Generate optimization suggestions
+          const suggestions = await optimizationService.analyzePipelineResult(job, pipelineResult);
+          if (suggestions.length > 0) {
+            jobRun.logs?.push(`Optimization analysis generated ${suggestions.length} suggestions`);
+          }
+        }
+      }
+      
+      // Update job run status to success
+      const endTime = new Date();
+      const executionTime = endTime.getTime() - now.getTime();
+      
+      jobRun.status = JobStatus.SUCCEEDED;
+      jobRun.endTime = endTime;
+      jobRun.executionTime = executionTime;
+      
+      // Add success log
+      jobRun.logs?.push(`Job execution completed successfully in ${executionTime}ms`);
+      
+      // Update job status
+      job.status = JobStatus.IDLE;
+      this.jobs.set(id, job);
+      
+      // Create an alert for job completion
+      alertService.createAlert({
+        type: AlertType.SUCCESS,
+        severity: AlertSeverity.LOW,
+        category: AlertCategory.TRANSFORMATION,
+        title: 'ETL Job Completed',
+        message: `ETL job "${job.name}" completed successfully in ${executionTime}ms`,
+        jobId: id
+      });
+    } catch (error) {
+      // Handle error and update job run status
+      const endTime = new Date();
+      const executionTime = endTime.getTime() - now.getTime();
+      
+      jobRun.status = JobStatus.FAILED;
+      jobRun.endTime = endTime;
+      jobRun.executionTime = executionTime;
+      
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      jobRun.errors.push({
+        type: 'job_execution_error',
+        message: errorMessage
+      });
+      
+      // Add error log
+      jobRun.logs?.push(`Job execution failed after ${executionTime}ms: ${errorMessage}`);
+      
+      // Update job status
+      job.status = JobStatus.IDLE;
+      this.jobs.set(id, job);
+      
+      // Create an alert for job failure
+      alertService.createAlert({
+        type: AlertType.ERROR,
+        severity: AlertSeverity.HIGH,
+        category: AlertCategory.TRANSFORMATION,
+        title: 'ETL Job Failed',
+        message: `ETL job "${job.name}" failed: ${errorMessage}`,
+        jobId: id
+      });
+      
+      console.error(`Job ${job.name} (ID: ${id}) execution failed:`, error);
+    }
+    
+    // Update job runs list
+    this.jobRuns.set(id, jobRuns);
+    
+    return jobRun;
+  }
+  
+  /**
+   * Get job run history for a specific job
+   */
+  getJobRuns(jobId: number): JobRun[] {
+    return this.jobRuns.get(jobId) || [];
+  }
+  
+  /**
+   * Get a specific job run by ID
+   */
+  getJobRun(jobId: number, runId: number): JobRun | undefined {
+    const runs = this.getJobRuns(jobId);
+    return runs.find(run => run.id === runId);
+  }
+  
+  /**
+   * Schedule a job for recurring execution
+   */
+  scheduleJob(jobId: number, scheduleOptions: any): number {
+    const job = this.getJob(jobId);
     
     if (!job) {
       throw new Error(`Job not found: ${jobId}`);
     }
     
-    console.log(`Executing job: ${job.name} (${jobId})`);
-    
-    // Create job run
-    const jobRunId = `run-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-    const jobRun: JobRun = {
-      id: jobRunId,
-      jobId: job.id,
-      jobName: job.name,
-      status: JobStatus.PENDING,
-      startTime: new Date(),
-      alerts: []
+    // Create a run handler that will execute this job
+    const runHandler = async (): Promise<void> => {
+      await this.executeJob(jobId);
     };
     
-    // Update job run status
-    jobRun.status = JobStatus.RUNNING;
+    // Schedule the job with the scheduler
+    const scheduleId = scheduler.scheduleJob(
+      jobId,
+      job.name,
+      scheduleOptions,
+      runHandler
+    );
     
-    // Save the job run
-    this.saveJobRun(jobRun);
+    // Update the job with the schedule
+    this.updateJob(jobId, {
+      schedule: scheduleOptions
+    });
     
-    try {
-      // Get transformation rules for this job
-      const transformationRules = Array.from(this.transformationRules.values())
-        .filter(rule => job.transformations.includes(rule.id));
-      
-      // Execute the ETL pipeline
-      const result = await etlPipeline.executeJob(job, transformationRules);
-      
-      // Update job with result
-      jobRun.status = result.status;
-      jobRun.endTime = result.endTime;
-      jobRun.duration = result.duration;
-      jobRun.dataQualityScore = result.dataQualityScore;
-      jobRun.alerts = result.alerts;
-      
-      // Add metrics
-      jobRun.metrics = {
-        recordsProcessed: result.recordsProcessed,
-        recordsCreated: result.recordsCreated,
-        recordsUpdated: result.recordsUpdated,
-        recordsDeleted: result.recordsDeleted,
-        errorRecords: 0, // Not tracked in this demo
-        duration: result.duration,
-        startTime: result.startTime,
-        endTime: result.endTime,
-        peakMemoryUsage: 0, // Not tracked in this demo
-        avgCpuUsage: 0 // Not tracked in this demo
-      };
-      
-      // Update job's last run info
-      job.lastRunAt = jobRun.endTime;
-      job.lastRunStatus = jobRun.status;
-      
-      // Save the job and job run
-      this.jobs.set(job.id, job);
-      this.saveJobRun(jobRun);
-      
-      // Generate optimization suggestions
-      if (result.status === JobStatus.COMPLETED) {
-        optimizationService.analyzeJob(job, transformationRules);
-      }
-      
-      return jobRun;
-    } catch (error) {
-      // Update job run with error
-      jobRun.status = JobStatus.FAILED;
-      jobRun.endTime = new Date();
-      jobRun.duration = jobRun.endTime.getTime() - jobRun.startTime.getTime();
-      jobRun.error = error instanceof Error ? error.message : String(error);
-      
-      // Create an alert for the error
-      const alert = alertService.createJobFailureAlert(job, error);
-      jobRun.alerts.push(alert);
-      
-      // Update job's last run info
-      job.lastRunAt = jobRun.endTime;
-      job.lastRunStatus = jobRun.status;
-      
-      // Save the job and job run
-      this.jobs.set(job.id, job);
-      this.saveJobRun(jobRun);
-      
-      return jobRun;
-    }
+    console.log(`Scheduled job ${job.name} (ID: ${jobId}) with schedule ID: ${scheduleId}`);
+    
+    return scheduleId;
   }
   
   /**
-   * Save job run
+   * Update a job schedule
    */
-  private saveJobRun(jobRun: JobRun): void {
-    // Get existing runs
-    const runs = this.jobRuns.get(jobRun.jobId) || [];
+  updateJobSchedule(jobId: number, scheduleId: number, scheduleOptions: any): boolean {
+    const job = this.getJob(jobId);
     
-    // Find and update existing run or add new run
-    const existingRunIndex = runs.findIndex(run => run.id === jobRun.id);
-    
-    if (existingRunIndex >= 0) {
-      runs[existingRunIndex] = jobRun;
-    } else {
-      runs.push(jobRun);
+    if (!job) {
+      return false;
     }
     
-    // Limit to last 100 runs
-    if (runs.length > 100) {
-      runs.sort((a, b) => b.startTime.getTime() - a.startTime.getTime());
-      runs.splice(100);
+    // Update the schedule in the scheduler
+    const result = scheduler.updateJobSchedule(scheduleId, {
+      name: job.name,
+      schedule: scheduleOptions
+    });
+    
+    if (result) {
+      // Update the job with the new schedule
+      this.updateJob(jobId, {
+        schedule: scheduleOptions
+      });
+      
+      console.log(`Updated schedule for job ${job.name} (ID: ${jobId})`);
     }
     
-    // Save runs
-    this.jobRuns.set(jobRun.jobId, runs);
+    return result;
   }
   
   /**
-   * Get a job by ID
+   * Unschedule a job
    */
-  getJob(jobId: string): ETLJob | undefined {
-    return this.jobs.get(jobId);
+  unscheduleJob(scheduleId: number): boolean {
+    return scheduler.deleteScheduledJob(scheduleId);
   }
   
   /**
-   * Get all jobs
+   * Add a data source to the manager
    */
-  getAllJobs(): ETLJob[] {
-    return Array.from(this.jobs.values());
+  addDataSource(dataSource: any): number {
+    const id = dataSource.id;
+    this.dataSources.set(id, dataSource);
+    console.log(`Added data source: ${dataSource.name} (ID: ${id})`);
+    return id;
+  }
+  
+  /**
+   * Get a data source by ID
+   */
+  getDataSource(id: number): any {
+    return this.dataSources.get(id);
+  }
+  
+  /**
+   * Get all data sources
+   */
+  getDataSources(): any[] {
+    return Array.from(this.dataSources.values());
+  }
+  
+  /**
+   * Add a transformation rule to the manager
+   */
+  addRule(rule: TransformationRule): number {
+    const id = rule.id;
+    this.rules.set(id, rule);
+    console.log(`Added transformation rule: ${rule.name} (ID: ${id})`);
+    return id;
   }
   
   /**
    * Get a transformation rule by ID
    */
-  getTransformationRule(ruleId: number): TransformationRule | undefined {
-    return this.transformationRules.get(ruleId);
+  getRule(id: number): TransformationRule | undefined {
+    return this.rules.get(id);
   }
   
   /**
    * Get all transformation rules
    */
-  getAllTransformationRules(): TransformationRule[] {
-    return Array.from(this.transformationRules.values());
+  getRules(): TransformationRule[] {
+    return Array.from(this.rules.values());
   }
   
   /**
-   * Get job runs for a job
+   * Pause a job (disable it temporarily)
    */
-  getJobRuns(jobId: string): JobRun[] {
-    return this.jobRuns.get(jobId) || [];
-  }
-  
-  /**
-   * Get all job runs
-   */
-  getAllJobRuns(): JobRun[] {
-    const allRuns: JobRun[] = [];
+  pauseJob(id: number): boolean {
+    const job = this.getJob(id);
     
-    for (const runs of this.jobRuns.values()) {
-      allRuns.push(...runs);
+    if (!job) {
+      return false;
     }
     
-    return allRuns.sort((a, b) => b.startTime.getTime() - a.startTime.getTime());
-  }
-  
-  /**
-   * Get recent job runs
-   */
-  getRecentJobRuns(limit = 10): JobRun[] {
-    return this.getAllJobRuns().slice(0, limit);
-  }
-  
-  /**
-   * Run a job immediately
-   */
-  async runJobNow(jobId: string): Promise<JobRun> {
-    return this.executeJob(jobId);
-  }
-  
-  /**
-   * Delete a job
-   */
-  deleteJob(jobId: string): void {
-    // Unschedule the job
-    this.unscheduleJob(jobId);
+    // Update the job to disable it
+    this.updateJob(id, {
+      enabled: false
+    });
     
-    // Remove job
-    this.jobs.delete(jobId);
+    // Create an alert
+    alertService.createAlert({
+      type: AlertType.INFO,
+      severity: AlertSeverity.LOW,
+      category: AlertCategory.TRANSFORMATION,
+      title: 'ETL Job Paused',
+      message: `ETL job "${job.name}" has been paused`,
+      jobId: id
+    });
     
-    // Keep job runs for history
+    console.log(`Paused job: ${job.name} (ID: ${id})`);
+    
+    return true;
   }
   
   /**
-   * Update a job
+   * Resume a paused job
    */
-  updateJob(job: ETLJob): void {
-    const existingJob = this.jobs.get(job.id);
+  resumeJob(id: number): boolean {
+    const job = this.getJob(id);
     
-    if (!existingJob) {
-      throw new Error(`Job not found: ${job.id}`);
+    if (!job) {
+      return false;
     }
     
-    // Update the job
-    this.jobs.set(job.id, job);
+    // Update the job to enable it
+    this.updateJob(id, {
+      enabled: true
+    });
     
-    // Handle scheduling changes
-    const wasScheduled = existingJob.schedule !== undefined && existingJob.enabled;
-    const isScheduled = job.schedule !== undefined && job.enabled;
+    // Create an alert
+    alertService.createAlert({
+      type: AlertType.INFO,
+      severity: AlertSeverity.LOW,
+      category: AlertCategory.TRANSFORMATION,
+      title: 'ETL Job Resumed',
+      message: `ETL job "${job.name}" has been resumed`,
+      jobId: id
+    });
     
-    if (wasScheduled && !isScheduled) {
-      // Job was unscheduled
-      this.unscheduleJob(job.id);
-    } else if (!wasScheduled && isScheduled) {
-      // Job was scheduled
-      this.scheduleJob(job);
-    } else if (wasScheduled && isScheduled) {
-      // Job schedule was updated
-      this.unscheduleJob(job.id);
-      this.scheduleJob(job);
+    console.log(`Resumed job: ${job.name} (ID: ${id})`);
+    
+    return true;
+  }
+  
+  /**
+   * Test a data source connection
+   */
+  async testConnection(dataSourceId: number): Promise<boolean> {
+    const dataSource = this.getDataSource(dataSourceId);
+    
+    if (!dataSource) {
+      throw new Error(`Data source not found: ${dataSourceId}`);
     }
-  }
-  
-  /**
-   * Load test data for development
-   */
-  loadTestData(): void {
-    // Generate sample ETL jobs and transformation rules
-    this.generateSampleJobs();
-    this.generateSampleTransformationRules();
     
-    // Schedule enabled jobs
-    for (const job of this.jobs.values()) {
-      if (job.schedule && job.enabled) {
-        this.scheduleJob(job);
-      }
-    }
-  }
-  
-  /**
-   * Generate sample ETL jobs
-   */
-  private generateSampleJobs(): void {
-    // Sample job 1: Property Database Extract
-    const job1: ETLJob = {
-      id: 'job-1',
-      name: 'Property Database Extract',
-      description: 'Extract properties from county database daily',
-      sources: [1],
-      transformations: [1, 2, 3],
-      destinations: [1],
-      schedule: {
-        frequency: 'DAILY',
-        options: {
-          hour: 1,
-          minute: 30
-        }
-      },
-      enabled: true,
-      continueOnError: false,
-      maxAttempts: 3,
-      timeout: 3600,
-      createdAt: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000),
-      updatedAt: new Date(Date.now() - 25 * 24 * 60 * 60 * 1000)
-    };
+    console.log(`Testing connection for data source: ${dataSource.name} (ID: ${dataSourceId})`);
     
-    // Sample job 2: Property Price Adjustments
-    const job2: ETLJob = {
-      id: 'job-2',
-      name: 'Property Price Adjustments',
-      description: 'Apply price adjustments to property values',
-      sources: [1],
-      transformations: [4, 5, 6],
-      destinations: [2],
-      schedule: {
-        frequency: 'WEEKLY',
-        options: {
-          dayOfWeek: 1, // Monday
-          hour: 2,
-          minute: 0
-        }
-      },
-      enabled: true,
-      continueOnError: true,
-      maxAttempts: 2,
-      timeout: 1800,
-      createdAt: new Date(Date.now() - 20 * 24 * 60 * 60 * 1000),
-      updatedAt: new Date(Date.now() - 15 * 24 * 60 * 60 * 1000)
-    };
-    
-    // Sample job 3: Market Data Integration
-    const job3: ETLJob = {
-      id: 'job-3',
-      name: 'Market Data Integration',
-      description: 'Integrate market data from external API',
-      sources: [2],
-      transformations: [7, 8, 9],
-      destinations: [3],
-      schedule: {
-        frequency: 'HOURLY',
-        options: {
-          minute: 15
-        }
-      },
-      enabled: false,
-      continueOnError: false,
-      maxAttempts: 5,
-      timeout: 900,
-      createdAt: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000),
-      updatedAt: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000)
-    };
-    
-    // Sample job 4: Property Valuation Model
-    const job4: ETLJob = {
-      id: 'job-4',
-      name: 'Property Valuation Model',
-      description: 'Run property valuation models on cleaned data',
-      sources: [3],
-      transformations: [10, 11, 12],
-      destinations: [4],
-      schedule: {
-        frequency: 'MONTHLY',
-        options: {
-          dayOfMonth: 1,
-          hour: 3,
-          minute: 0
-        }
-      },
-      enabled: true,
-      continueOnError: false,
-      maxAttempts: 2,
-      timeout: 7200,
-      createdAt: new Date(Date.now() - 8 * 24 * 60 * 60 * 1000),
-      updatedAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000)
-    };
-    
-    // Sample job 5: Data Quality Report
-    const job5: ETLJob = {
-      id: 'job-5',
-      name: 'Data Quality Report',
-      description: 'Generate data quality reports for all data sources',
-      sources: [1, 2, 3],
-      transformations: [],
-      destinations: [5],
-      schedule: {
-        frequency: 'WEEKLY',
-        options: {
-          dayOfWeek: 5, // Friday
-          hour: 18,
-          minute: 0
-        }
-      },
-      enabled: true,
-      continueOnError: true,
-      maxAttempts: 1,
-      timeout: 1200,
-      createdAt: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000),
-      updatedAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000)
-    };
-    
-    // Register jobs
-    this.registerJob(job1);
-    this.registerJob(job2);
-    this.registerJob(job3);
-    this.registerJob(job4);
-    this.registerJob(job5);
-    
-    // Generate some sample job runs for history
-    this.generateSampleJobRuns();
-  }
-  
-  /**
-   * Generate sample transformation rules
-   */
-  private generateSampleTransformationRules(): void {
-    // Sample rule 1: Filter Invalid Properties
-    const rule1: TransformationRule = {
-      id: 1,
-      name: 'Filter Invalid Properties',
-      description: 'Remove properties with missing essential data',
-      type: 'FILTER' as any,
-      config: {
-        conditions: [
-          { field: 'propertyId', operator: 'IS_NOT_NULL' },
-          { field: 'address', operator: 'IS_NOT_NULL' }
-        ],
-        operator: 'AND'
-      },
-      order: 1,
-      enabled: true,
-      createdAt: new Date(Date.now() - 35 * 24 * 60 * 60 * 1000),
-      updatedAt: new Date(Date.now() - 35 * 24 * 60 * 60 * 1000)
-    };
-    
-    // Sample rule 2: Standardize Addresses
-    const rule2: TransformationRule = {
-      id: 2,
-      name: 'Standardize Addresses',
-      description: 'Standardize property addresses to a consistent format',
-      type: 'STANDARDIZE' as any,
-      config: {
-        rules: [
-          { field: 'address', format: 'address' },
-          { field: 'city', format: 'name' },
-          { field: 'state', format: 'uppercase' },
-          { field: 'zip', format: 'zip' }
-        ]
-      },
-      order: 2,
-      enabled: true,
-      createdAt: new Date(Date.now() - 34 * 24 * 60 * 60 * 1000),
-      updatedAt: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
-    };
-    
-    // Sample rule 3: Calculate Price Per Sqft
-    const rule3: TransformationRule = {
-      id: 3,
-      name: 'Calculate Price Per Sqft',
-      description: 'Calculate price per square foot for each property',
-      type: 'PRICE_PER_SQFT' as any,
-      config: {
-        priceColumn: 'salePrice',
-        sqftColumn: 'squareFeet',
-        targetColumn: 'pricePerSqft'
-      },
-      order: 3,
-      enabled: true,
-      createdAt: new Date(Date.now() - 33 * 24 * 60 * 60 * 1000),
-      updatedAt: new Date(Date.now() - 31 * 24 * 60 * 60 * 1000)
-    };
-    
-    // Sample rule 4: Adjust Property Prices
-    const rule4: TransformationRule = {
-      id: 4,
-      name: 'Adjust Property Prices',
-      description: 'Apply market adjustment factors to property prices',
-      type: 'PRICE_ADJUST' as any,
-      config: {
-        priceColumn: 'salePrice',
-        targetColumn: 'adjustedPrice',
-        adjustmentFactors: [
-          {
-            column: 'propertyType',
-            values: {
-              'single_family': 1.05,
-              'condo': 0.98,
-              'multi_family': 1.12,
-              'land': 0.9
-            },
-            defaultAdjustment: 1.0
-          },
-          {
-            column: 'location',
-            values: {
-              'downtown': 1.2,
-              'suburban': 1.0,
-              'rural': 0.85
-            },
-            defaultAdjustment: 1.0
-          }
-        ]
-      },
-      order: 1,
-      enabled: true,
-      createdAt: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000),
-      updatedAt: new Date(Date.now() - 28 * 24 * 60 * 60 * 1000)
-    };
-    
-    // Sample rule 5: Calculate Property Age
-    const rule5: TransformationRule = {
-      id: 5,
-      name: 'Calculate Property Age',
-      description: 'Calculate the age of each property from yearBuilt',
-      type: 'CUSTOM_FUNCTION' as any,
-      config: {
-        function: 'function(yearBuilt) { return new Date().getFullYear() - yearBuilt; }',
-        targetColumn: 'propertyAge',
-        parameters: [{ column: 'yearBuilt' }]
-      },
-      order: 2,
-      enabled: true,
-      createdAt: new Date(Date.now() - 29 * 24 * 60 * 60 * 1000),
-      updatedAt: new Date(Date.now() - 27 * 24 * 60 * 60 * 1000)
-    };
-    
-    // Register rules
-    this.registerTransformationRule(rule1);
-    this.registerTransformationRule(rule2);
-    this.registerTransformationRule(rule3);
-    this.registerTransformationRule(rule4);
-    this.registerTransformationRule(rule5);
-    
-    // More rules would be added in a real implementation
-  }
-  
-  /**
-   * Generate sample job runs
-   */
-  private generateSampleJobRuns(): void {
-    // Generate some sample runs for each job
-    for (const job of this.jobs.values()) {
-      const runCount = Math.floor(Math.random() * 10) + 5; // 5-15 runs per job
+    try {
+      const result = await dataConnector.testConnection(dataSource);
       
-      for (let i = 0; i < runCount; i++) {
-        const startTime = new Date(Date.now() - (runCount - i) * 24 * 60 * 60 * 1000 / runCount);
-        const endTime = new Date(startTime.getTime() + Math.floor(Math.random() * 3600000)); // 0-60 minutes
-        const status = Math.random() < 0.8 ? JobStatus.COMPLETED : (Math.random() < 0.5 ? JobStatus.FAILED : JobStatus.CANCELLED);
+      if (result.success) {
+        console.log(`Connection test successful for data source: ${dataSource.name}`);
+        return true;
+      } else {
+        console.error(`Connection test failed for data source: ${dataSource.name} - ${result.message}`);
         
-        const jobRun: JobRun = {
-          id: `run-${Date.now() - i * 1000}-${Math.random().toString(36).substr(2, 9)}`,
-          jobId: job.id,
-          jobName: job.name,
-          status,
-          startTime,
-          endTime,
-          duration: endTime.getTime() - startTime.getTime(),
-          alerts: [],
-          metrics: {
-            recordsProcessed: Math.floor(Math.random() * 10000) + 1000,
-            recordsCreated: Math.floor(Math.random() * 1000) + 100,
-            recordsUpdated: Math.floor(Math.random() * 500) + 50,
-            recordsDeleted: Math.floor(Math.random() * 100),
-            errorRecords: status === JobStatus.FAILED ? Math.floor(Math.random() * 100) + 1 : 0,
-            duration: endTime.getTime() - startTime.getTime(),
-            startTime,
-            endTime,
-            peakMemoryUsage: Math.floor(Math.random() * 50) + 10, // 10-60%
-            avgCpuUsage: Math.floor(Math.random() * 40) + 10 // 10-50%
-          },
-          dataQualityScore: status === JobStatus.COMPLETED ? Math.random() * 0.3 + 0.7 : undefined // 0.7-1.0
-        };
+        // Create an alert
+        alertService.createAlert({
+          type: AlertType.ERROR,
+          severity: AlertSeverity.HIGH,
+          category: AlertCategory.CONNECTIVITY,
+          title: 'Connection Test Failed',
+          message: `Connection test failed for data source "${dataSource.name}": ${result.message}`
+        });
         
-        // Add error for failed runs
-        if (status === JobStatus.FAILED) {
-          jobRun.error = 'Sample error for demo: Data validation failed';
-          
-          // Add error alert
-          const alert: Alert = {
-            id: `alert-${Date.now() - i * 1000}`,
-            type: AlertType.JOB_FAILURE,
-            title: 'Job Failure',
-            message: `Job ${job.name} failed: Data validation error`,
-            severity: AlertSeverity.ERROR,
-            timestamp: endTime,
-            state: 'active' as any, // Simplified for demo
-            jobId: job.id,
-            jobName: job.name
-          };
-          
-          jobRun.alerts.push(alert);
-        }
-        
-        // Save the job run
-        this.saveJobRun(jobRun);
+        return false;
+      }
+    } catch (error) {
+      console.error(`Error testing connection for data source: ${dataSource.name}`, error);
+      
+      return false;
+    }
+  }
+  
+  /**
+   * Get job statistics
+   */
+  getJobStatistics(): {
+    total: number;
+    enabled: number;
+    scheduled: number;
+    byStatus: Record<JobStatus, number>;
+  } {
+    const byStatus: Record<JobStatus, number> = {
+      [JobStatus.IDLE]: 0,
+      [JobStatus.RUNNING]: 0,
+      [JobStatus.SUCCEEDED]: 0,
+      [JobStatus.FAILED]: 0,
+      [JobStatus.CANCELLED]: 0
+    };
+    
+    let enabledCount = 0;
+    let scheduledCount = 0;
+    
+    for (const job of this.jobs.values()) {
+      byStatus[job.status]++;
+      
+      if (job.enabled) {
+        enabledCount++;
       }
       
-      // Update job's last run info based on most recent run
+      if (job.schedule) {
+        scheduledCount++;
+      }
+    }
+    
+    return {
+      total: this.jobs.size,
+      enabled: enabledCount,
+      scheduled: scheduledCount,
+      byStatus
+    };
+  }
+  
+  /**
+   * Get the latest job run for each job
+   */
+  getLatestRuns(): Record<number, JobRun | undefined> {
+    const result: Record<number, JobRun | undefined> = {};
+    
+    for (const job of this.jobs.values()) {
       const runs = this.getJobRuns(job.id);
+      
       if (runs.length > 0) {
-        const lastRun = runs.sort((a, b) => b.startTime.getTime() - a.startTime.getTime())[0];
-        job.lastRunAt = lastRun.endTime;
-        job.lastRunStatus = lastRun.status;
-        this.jobs.set(job.id, job);
+        // Sort by start time descending to get the latest run
+        const sortedRuns = [...runs].sort(
+          (a, b) => b.startTime.getTime() - a.startTime.getTime()
+        );
+        result[job.id] = sortedRuns[0];
+      } else {
+        result[job.id] = undefined;
       }
     }
-  }
-  
-  /**
-   * Shutdown the ETL pipeline manager
-   */
-  shutdown(): void {
-    if (!this.initialized) {
-      return;
-    }
     
-    console.log('Shutting down ETL Pipeline Manager');
-    
-    // Shutdown scheduler
-    scheduler.shutdown();
-    
-    this.initialized = false;
+    return result;
   }
 }
 
