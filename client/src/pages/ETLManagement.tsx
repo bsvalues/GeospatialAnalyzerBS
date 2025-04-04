@@ -14,9 +14,11 @@ import { apiRequest } from '@/lib/queryClient';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Loader2, Play, Edit, Trash, Plus, RefreshCw } from 'lucide-react';
+import { Loader2, Play, Edit, Trash, Plus, RefreshCw, Minimize, Maximize } from 'lucide-react';
 // Import DataConnector for connection management
 import { dataConnector } from '../services/etl/DataConnector';
+// Import ETLAssistant component
+import { ETLAssistant } from '../components/automation/ETLAssistant';
 
 // Data Source Form Schema
 const dataSourceFormSchema = z.object({
@@ -54,6 +56,19 @@ const etlJobFormSchema = z.object({
 
 export default function ETLManagement() {
   const [activeTab, setActiveTab] = useState('data-sources');
+  const [isAssistantMinimized, setIsAssistantMinimized] = useState(false);
+  const [selectedDataSource, setSelectedDataSource] = useState<any>(null);
+  const [dataSources, setDataSources] = useState<any[]>([]);
+  
+  // Load data sources for assistant
+  useEffect(() => {
+    const sources = dataConnector.getAllDataSources();
+    setDataSources(sources);
+  }, []);
+  
+  const handleToggleAssistant = () => {
+    setIsAssistantMinimized(!isAssistantMinimized);
+  };
   
   return (
     <div className="container mx-auto py-6">
@@ -70,7 +85,7 @@ export default function ETLManagement() {
         </TabsList>
         
         <TabsContent value="data-sources">
-          <DataSourcesTab />
+          <DataSourcesTab onSelectedDataSource={setSelectedDataSource} />
         </TabsContent>
         
         <TabsContent value="transformations">
@@ -81,12 +96,24 @@ export default function ETLManagement() {
           <JobsTab />
         </TabsContent>
       </Tabs>
+      
+      {/* ETL Assistant */}
+      <div className={`fixed right-4 bottom-4 z-10 transition-all duration-300 ${isAssistantMinimized ? '' : 'w-80'}`}>
+        <ETLAssistant 
+          currentPage={activeTab}
+          selectedSource={selectedDataSource}
+          dataSources={dataSources}
+          userExperience="beginner"
+          minimized={isAssistantMinimized}
+          onToggleMinimize={handleToggleAssistant}
+        />
+      </div>
     </div>
   );
 }
 
 // Data Sources Tab
-function DataSourcesTab() {
+function DataSourcesTab({ onSelectedDataSource }: { onSelectedDataSource?: (dataSource: any) => void }) {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [selectedDataSource, setSelectedDataSource] = useState<any>(null);
@@ -268,6 +295,9 @@ function DataSourcesTab() {
   
   const handleEditDataSource = (dataSource: any) => {
     setSelectedDataSource(dataSource);
+    if (onSelectedDataSource) {
+      onSelectedDataSource(dataSource);
+    }
     setIsEditDialogOpen(true);
   };
   
@@ -293,7 +323,16 @@ function DataSourcesTab() {
       ) : dataSources && dataSources.length > 0 ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {dataSources.map((dataSource: any) => (
-            <Card key={dataSource.id} className="h-full">
+            <Card 
+              key={dataSource.id} 
+              className="h-full cursor-pointer hover:shadow-md transition-shadow"
+              onClick={() => {
+                setSelectedDataSource(dataSource);
+                if (onSelectedDataSource) {
+                  onSelectedDataSource(dataSource);
+                }
+              }}
+            >
               <CardHeader>
                 <CardTitle className="flex justify-between items-center">
                   {dataSource.name}
@@ -328,17 +367,22 @@ function DataSourcesTab() {
                       variant="outline" 
                       size="sm"
                       className="mr-2"
-                      onClick={() => handleTestDataConnection(dataSource.id)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleTestDataConnection(dataSource.id);
+                      }}
                     >
                       Test Connection
                     </Button>
                     <Button 
                       variant={dataSource.isConnected ? "secondary" : "default"}
                       size="sm"
-                      onClick={() => dataSource.isConnected 
-                        ? handleDisconnectDataSource(dataSource.id)
-                        : handleConnectDataSource(dataSource.id)
-                      }
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        dataSource.isConnected 
+                          ? handleDisconnectDataSource(dataSource.id)
+                          : handleConnectDataSource(dataSource.id);
+                      }}
                     >
                       {dataSource.isConnected ? "Disconnect" : "Connect"}
                     </Button>
@@ -346,10 +390,24 @@ function DataSourcesTab() {
                 </div>
               </CardContent>
               <CardFooter className="flex justify-end gap-2">
-                <Button size="sm" variant="outline" onClick={() => handleEditDataSource(dataSource)}>
+                <Button 
+                  size="sm" 
+                  variant="outline" 
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleEditDataSource(dataSource);
+                  }}
+                >
                   <Edit className="h-4 w-4 mr-1" /> Edit
                 </Button>
-                <Button size="sm" variant="destructive" onClick={() => handleDeleteDataSource(dataSource.id)}>
+                <Button 
+                  size="sm" 
+                  variant="destructive" 
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleDeleteDataSource(dataSource.id);
+                  }}
+                >
                   <Trash className="h-4 w-4 mr-1" /> Delete
                 </Button>
               </CardFooter>

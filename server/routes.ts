@@ -7,7 +7,10 @@ import {
   generateCodeFromLanguage, 
   optimizeCode, 
   debugCode,
-  generateContextualPropertyPrediction 
+  generateContextualPropertyPrediction,
+  getETLAssistance,
+  getETLOnboardingTips,
+  generateConnectionTroubleshooting
 } from "./services/openai";
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -1093,6 +1096,105 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('Error generating contextual property prediction:', error);
       res.status(500).json({ error: 'Failed to generate contextual property prediction' });
+    }
+  });
+
+  // AI-powered ETL Assistant endpoints
+  
+  // Get ETL assistance based on user interaction context
+  app.post('/api/etl/assistant', async (req, res) => {
+    try {
+      const { context, dataSources, userExperience, previousInteractions } = req.body;
+      
+      if (!context || !context.page) {
+        return res.status(400).json({ 
+          error: 'Missing required parameter: context.page' 
+        });
+      }
+      
+      if (!isOpenAIConfigured()) {
+        return res.status(500).json({ 
+          error: 'OpenAI API is not configured. Please set the OPENAI_API_KEY environment variable.' 
+        });
+      }
+      
+      const result = await getETLAssistance(
+        context,
+        dataSources || [],
+        userExperience || 'beginner',
+        previousInteractions || []
+      );
+      
+      res.json(result);
+    } catch (error) {
+      console.error('Error generating ETL assistance:', error);
+      res.status(500).json({ error: 'Failed to generate ETL assistance' });
+    }
+  });
+  
+  // Get ETL onboarding tips for specific features
+  app.post('/api/etl/onboarding-tips', async (req, res) => {
+    try {
+      const { feature, userExperience } = req.body;
+      
+      if (!feature) {
+        return res.status(400).json({ 
+          error: 'Missing required parameter: feature' 
+        });
+      }
+      
+      if (!isOpenAIConfigured()) {
+        return res.status(500).json({ 
+          error: 'OpenAI API is not configured. Please set the OPENAI_API_KEY environment variable.' 
+        });
+      }
+      
+      const validFeatures = ['data_sources', 'transformation_rules', 'jobs', 'optimization', 'general'];
+      
+      if (!validFeatures.includes(feature)) {
+        return res.status(400).json({
+          error: `Invalid feature. Must be one of: ${validFeatures.join(', ')}`
+        });
+      }
+      
+      const result = await getETLOnboardingTips(
+        feature as any,
+        userExperience || 'beginner'
+      );
+      
+      res.json(result);
+    } catch (error) {
+      console.error('Error generating ETL onboarding tips:', error);
+      res.status(500).json({ error: 'Failed to generate ETL onboarding tips' });
+    }
+  });
+  
+  // Generate connection troubleshooting suggestions
+  app.post('/api/etl/connection-troubleshooting', async (req, res) => {
+    try {
+      const { dataSource, errorMessage } = req.body;
+      
+      if (!dataSource || !errorMessage) {
+        return res.status(400).json({ 
+          error: 'Missing required parameters: dataSource and errorMessage' 
+        });
+      }
+      
+      if (!isOpenAIConfigured()) {
+        return res.status(500).json({ 
+          error: 'OpenAI API is not configured. Please set the OPENAI_API_KEY environment variable.' 
+        });
+      }
+      
+      const result = await generateConnectionTroubleshooting(
+        dataSource,
+        errorMessage
+      );
+      
+      res.json(result);
+    } catch (error) {
+      console.error('Error generating connection troubleshooting suggestions:', error);
+      res.status(500).json({ error: 'Failed to generate connection troubleshooting suggestions' });
     }
   });
 
