@@ -1,276 +1,251 @@
 /**
- * ETL Job Scheduler Service
+ * Scheduler.ts
  * 
- * This service manages scheduling of ETL jobs using cron expressions.
- * It periodically checks for jobs that need to be run based on their schedules.
+ * Service for scheduling and managing ETL jobs based on cron expressions
  */
-
 import { etlPipeline as ETLPipeline } from './ETLPipeline';
+import { getScheduleString } from './ETLTypes';
+import { JobScheduleImpl } from './JobScheduleImpl';
 
-/**
- * Helper to parse cron expressions
- */
-class CronParser {
-  /**
-   * Parse a cron expression and calculate the next run time
-   */
-  public static getNextRunTime(cronExpression: string): Date | null {
-    try {
-      // Simple cron parser for basic patterns
-      // Format: minute hour day month weekday
-      // e.g. "*/30 * * * *" for every 30 minutes
-      
-      const now = new Date();
-      const parts = cronExpression.trim().split(/\s+/);
-      
-      if (parts.length !== 5) {
-        console.error('Invalid cron expression format:', cronExpression);
-        return null;
-      }
-      
-      const [minuteExp, hourExp, dayExp, monthExp, weekdayExp] = parts;
-      
-      // Clone current date for calculating next run
-      const nextRun = new Date(now);
-      nextRun.setSeconds(0);
-      nextRun.setMilliseconds(0);
-      
-      // Handle common patterns
-      if (minuteExp.startsWith('*/')) {
-        // Every X minutes
-        const interval = parseInt(minuteExp.slice(2), 10);
-        if (isNaN(interval) || interval <= 0) {
-          console.error('Invalid minute interval:', minuteExp);
-          return null;
-        }
-        
-        const currentMinute = now.getMinutes();
-        const nextMinute = Math.ceil(currentMinute / interval) * interval;
-        
-        nextRun.setMinutes(nextMinute);
-        
-        if (nextRun <= now) {
-          nextRun.setTime(nextRun.getTime() + interval * 60 * 1000);
-        }
-        
-        return nextRun;
-      }
-      
-      if (minuteExp === '0' && hourExp.startsWith('*/')) {
-        // Every X hours at minute 0
-        const interval = parseInt(hourExp.slice(2), 10);
-        if (isNaN(interval) || interval <= 0) {
-          console.error('Invalid hour interval:', hourExp);
-          return null;
-        }
-        
-        const currentHour = now.getHours();
-        const nextHour = Math.ceil(currentHour / interval) * interval;
-        
-        nextRun.setMinutes(0);
-        nextRun.setHours(nextHour);
-        
-        if (nextRun <= now) {
-          nextRun.setTime(nextRun.getTime() + interval * 60 * 60 * 1000);
-        }
-        
-        return nextRun;
-      }
-      
-      if (minuteExp === '0' && hourExp === '0') {
-        // Daily at midnight, weekly, or monthly
-        nextRun.setHours(0);
-        nextRun.setMinutes(0);
-        
-        // Add one day by default
-        nextRun.setDate(nextRun.getDate() + 1);
-        
-        // Check if it's a specific day of week
-        if (weekdayExp !== '*') {
-          const targetDay = parseInt(weekdayExp, 10); // 0 = Sunday, 1 = Monday, etc.
-          if (!isNaN(targetDay) && targetDay >= 0 && targetDay <= 6) {
-            const currentDay = nextRun.getDay();
-            const daysToAdd = (targetDay + 7 - currentDay) % 7;
-            
-            if (daysToAdd > 0) {
-              nextRun.setDate(nextRun.getDate() + daysToAdd - 1); // -1 because we already added 1
-            }
-          }
-        }
-        
-        return nextRun;
-      }
-      
-      // For more complex cron expressions, we'd need a full cron parser library
-      console.warn('Complex cron expression detected, using approximation:', cronExpression);
-      
-      // Default: just add one hour as a fallback
-      nextRun.setTime(nextRun.getTime() + 60 * 60 * 1000);
-      return nextRun;
-    } catch (error) {
-      console.error('Error parsing cron expression:', error);
-      return null;
-    }
-  }
-}
+// Default check interval (1 minute)
+const DEFAULT_CHECK_INTERVAL = 60 * 1000;
 
-/**
- * ETL Job Scheduler
- */
-class Scheduler {
-  private intervalId: number | null = null;
-  private checkInterval: number = 60000; // Check every minute by default
-  
-  private static instance: Scheduler;
-  
-  /**
-   * Private constructor for singleton pattern
-   */
-  private constructor() {
-    // Private constructor for singleton pattern
-  }
-  
-  /**
-   * Get the singleton instance
-   */
-  public static getInstance(): Scheduler {
-    if (!Scheduler.instance) {
-      Scheduler.instance = new Scheduler();
-    }
-    return Scheduler.instance;
-  }
+class SchedulerService {
+  private timer: NodeJS.Timeout | null = null;
+  private checkInterval: number = DEFAULT_CHECK_INTERVAL;
+  private isActive: boolean = false;
+  private jobSchedules: Map<string, string> = new Map();
   
   /**
    * Start the scheduler
    */
-  public start(interval: number = this.checkInterval): void {
-    if (this.intervalId !== null) {
-      this.stop(); // Stop existing scheduler if running
+  start(checkInterval = DEFAULT_CHECK_INTERVAL): void {
+    if (this.timer) {
+      this.stop();
     }
     
-    console.log('Starting ETL job scheduler');
+    this.checkInterval = checkInterval;
+    this.isActive = true;
     
-    this.checkInterval = interval;
+    // Load existing job schedules
+    this.loadSchedules();
     
-    // Schedule initial check
-    this.checkSchedules();
-    
-    // Set interval for periodic checks
-    this.intervalId = window.setInterval(() => {
-      this.checkSchedules();
+    // Start interval for checking jobs
+    this.timer = setInterval(() => {
+      if (this.isActive) {
+        this.checkScheduledJobs();
+      }
     }, this.checkInterval);
+    
+    console.log(`Scheduler started with check interval: ${this.checkInterval}ms`);
   }
   
   /**
    * Stop the scheduler
    */
-  public stop(): void {
-    console.log('Stopping ETL job scheduler');
-    
-    if (this.intervalId !== null) {
-      window.clearInterval(this.intervalId);
-      this.intervalId = null;
+  stop(): void {
+    if (this.timer) {
+      clearInterval(this.timer);
+      this.timer = null;
     }
+    
+    this.isActive = false;
+    console.log('Scheduler stopped');
   }
   
   /**
-   * Check job schedules and run jobs if needed
+   * Set active state of the scheduler
    */
-  private checkSchedules(): void {
-    const jobs = ETLPipeline.getJobs();
-    const now = new Date();
-    
-    jobs.forEach(job => {
-      // Skip jobs that are not enabled or already running
-      if (!job.enabled || job.status === 'running' || !job.schedule) {
-        return;
-      }
-      
-      // Calculate next run time if not set
-      if (!job.nextRun) {
-        const nextRun = CronParser.getNextRunTime(job.schedule);
-        if (nextRun) {
-          ETLPipeline.updateJob(job.id, { nextRun });
-        }
-        return;
-      }
-      
-      // Check if it's time to run the job
-      if (job.nextRun <= now) {
-        console.log(`Running scheduled job: ${job.name} (${job.id})`);
-        
-        // Run the job
-        ETLPipeline.runJob(job.id).catch(error => {
-          console.error(`Error running scheduled job ${job.id}:`, error);
-        });
-        
-        // Calculate the next run time
-        const nextRun = CronParser.getNextRunTime(job.schedule);
-        if (nextRun) {
-          ETLPipeline.updateJob(job.id, { nextRun });
-        }
-      }
-    });
+  setActive(isActive: boolean): void {
+    this.isActive = isActive;
+    console.log(`Scheduler is now ${isActive ? 'active' : 'inactive'}`);
   }
   
   /**
-   * Schedule a job with a cron expression
-   * 
-   * @param jobId The ID of the job to schedule
-   * @param cronExpression The cron expression for scheduling
+   * Set check interval
    */
-  public scheduleJob(jobId: string, cronExpression: string): void {
-    const job = ETLPipeline.getJob(jobId);
-    
-    if (!job) {
-      throw new Error(`Job with ID ${jobId} not found`);
-    }
-    
-    const nextRun = CronParser.getNextRunTime(cronExpression);
-    
-    if (!nextRun) {
-      throw new Error(`Invalid cron expression: ${cronExpression}`);
-    }
-    
-    ETLPipeline.updateJob(jobId, {
-      schedule: cronExpression,
-      nextRun
-    });
-  }
-  
-  /**
-   * Unschedule a job
-   */
-  public unscheduleJob(jobId: string): void {
-    const job = ETLPipeline.getJob(jobId);
-    
-    if (!job) {
-      throw new Error(`Job with ID ${jobId} not found`);
-    }
-    
-    ETLPipeline.updateJob(jobId, {
-      schedule: undefined,
-      nextRun: undefined
-    });
-  }
-  
-  /**
-   * Set the check interval
-   */
-  public setCheckInterval(interval: number): void {
+  setCheckInterval(interval: number): void {
     if (interval < 1000) {
-      throw new Error('Check interval must be at least 1000ms');
+      console.warn('Check interval must be at least 1000ms, setting to 1000ms');
+      interval = 1000;
     }
     
     this.checkInterval = interval;
     
-    if (this.intervalId !== null) {
-      // Restart scheduler with new interval
+    // Restart timer with new interval if active
+    if (this.isActive && this.timer) {
       this.stop();
-      this.start();
+      this.start(interval);
     }
+    
+    console.log(`Scheduler check interval set to ${interval}ms`);
+  }
+  
+  /**
+   * Load schedules from ETL jobs
+   */
+  private loadSchedules(): void {
+    try {
+      const jobs = ETLPipeline.getJobs();
+      
+      jobs.forEach(job => {
+        if (job.schedule) {
+          const scheduleStr = getScheduleString(job.schedule);
+          if (scheduleStr) {
+            this.jobSchedules.set(job.id.toString(), scheduleStr);
+          }
+        }
+      });
+      
+      console.log(`Loaded ${this.jobSchedules.size} job schedules`);
+    } catch (error) {
+      console.error('Error loading job schedules:', error);
+    }
+  }
+  
+  /**
+   * Check if any scheduled jobs need to be run
+   */
+  private checkScheduledJobs(): void {
+    try {
+      const jobs = ETLPipeline.getJobs();
+      const now = new Date();
+      
+      jobs.forEach(job => {
+        // Skip jobs that are not enabled, already running, or don't have a schedule
+        if (!job.enabled || job.status === 'RUNNING' || !job.schedule) {
+          return;
+        }
+        
+        const scheduleStr = getScheduleString(job.schedule);
+        if (!scheduleStr) {
+          return;
+        }
+        
+        // Check if job should run based on schedule and last run time
+        if (this.shouldRunJob(scheduleStr, job.lastRun)) {
+          console.log(`Running scheduled job: ${job.name} (ID: ${job.id})`);
+          ETLPipeline.runJob(job.id)
+            .then(() => {
+              console.log(`Scheduled job started: ${job.name} (ID: ${job.id})`);
+            })
+            .catch(error => {
+              console.error(`Error running scheduled job ${job.name} (ID: ${job.id}):`, error);
+            });
+        }
+      });
+    } catch (error) {
+      console.error('Error checking scheduled jobs:', error);
+    }
+  }
+  
+  /**
+   * Determine if a job should run based on its schedule and last run time
+   */
+  private shouldRunJob(cronExpression: string, lastRun?: Date): boolean {
+    if (!cronExpression) {
+      return false;
+    }
+    
+    try {
+      // Parse cron expression (simplified implementation)
+      // Format: minute hour day month weekday
+      // e.g., "*/5 * * * *" = every 5 minutes
+      const parts = cronExpression.trim().split(/\s+/);
+      if (parts.length !== 5) {
+        console.warn(`Invalid cron expression: ${cronExpression}`);
+        return false;
+      }
+      
+      const now = new Date();
+      
+      // If no last run, or last run was a long time ago, run the job
+      if (!lastRun) {
+        return true;
+      }
+      
+      // Check if enough time has passed since last run
+      const minutesSinceLastRun = Math.floor((now.getTime() - lastRun.getTime()) / (60 * 1000));
+      
+      // Parse minute part of cron (simplified)
+      const minutePart = parts[0];
+      
+      // Handle */n format (every n minutes)
+      if (minutePart.startsWith('*/')) {
+        const interval = parseInt(minutePart.substring(2), 10);
+        return minutesSinceLastRun >= interval;
+      }
+      
+      // For more complex cron expressions, we'd need a full cron parser
+      // This is a simplified implementation that handles common cases
+      return minutesSinceLastRun >= 60;
+    } catch (error) {
+      console.error(`Error calculating schedule for cron "${cronExpression}":`, error);
+      return false;
+    }
+  }
+  
+  /**
+   * Schedule a job with a cron expression
+   */
+  scheduleJob(jobId: string, cronExpression: string): void {
+    try {
+      // Update job in ETL pipeline
+      const job = ETLPipeline.getJobs().find(j => j.id.toString() === jobId);
+      if (!job) {
+        throw new Error(`Job with ID ${jobId} not found`);
+      }
+      
+      // Create a JobScheduleImpl from the cron expression
+      const jobSchedule = JobScheduleImpl.fromCronExpression(cronExpression);
+      
+      ETLPipeline.updateJob(parseInt(jobId, 10), {
+        schedule: jobSchedule
+      });
+      
+      // Update local schedule map
+      this.jobSchedules.set(jobId, cronExpression);
+      
+      console.log(`Job ${jobId} scheduled with cron expression: ${cronExpression}`);
+    } catch (error) {
+      console.error(`Error scheduling job ${jobId}:`, error);
+      throw error;
+    }
+  }
+  
+  /**
+   * Remove schedule from a job
+   */
+  unscheduleJob(jobId: string): void {
+    try {
+      // Update job in ETL pipeline
+      const job = ETLPipeline.getJobs().find(j => j.id.toString() === jobId);
+      if (!job) {
+        throw new Error(`Job with ID ${jobId} not found`);
+      }
+      
+      ETLPipeline.updateJob(parseInt(jobId, 10), {
+        schedule: undefined
+      });
+      
+      // Remove from local schedule map
+      this.jobSchedules.delete(jobId);
+      
+      console.log(`Schedule removed from job ${jobId}`);
+    } catch (error) {
+      console.error(`Error unscheduling job ${jobId}:`, error);
+      throw error;
+    }
+  }
+  
+  /**
+   * Get all scheduled jobs
+   */
+  getScheduledJobs(): Record<string, string> {
+    return Object.fromEntries(this.jobSchedules);
   }
 }
 
-// Export singleton instance
-export default Scheduler.getInstance();
+// Export a singleton instance
+const Scheduler = new SchedulerService();
+export default Scheduler;

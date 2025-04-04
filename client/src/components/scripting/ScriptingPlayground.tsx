@@ -20,7 +20,7 @@ import {
 } from 'lucide-react';
 import { Property } from '@shared/schema';
 import ScriptExecutionEngine, { ScriptResult } from './ScriptExecutionEngine';
-import ETLPipeline from '../../services/etl/ETLPipeline';
+import { etlPipeline as ETLPipeline } from '../../services/etl/ETLPipeline';
 
 // Connection to the ETL pipeline for accessing processed data
 const getETLDataSources = () => {

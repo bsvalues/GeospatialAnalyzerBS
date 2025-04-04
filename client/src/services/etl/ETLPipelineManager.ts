@@ -1,357 +1,370 @@
+import { DataSource, ETLJob, JobStatus, TransformationRule } from './ETLTypes';
+import { dataConnector } from './DataConnector';
+import { transformationService } from './TransformationService';
+import { JobScheduleImpl } from './JobScheduleImpl';
+import { alertService, AlertType, AlertSeverity } from './AlertService';
+
 /**
- * ETLPipelineManager.ts
- * 
- * Manages ETL pipelines, scheduling, and execution
+ * Job Run interface
  */
+export interface JobRun {
+  id: string;
+  jobId: string;
+  startTime: Date;
+  endTime?: Date;
+  status: JobStatus;
+  recordsProcessed: number;
+  recordsLoaded?: number;
+  errors?: string[];
+  warnings?: string[];
+  logs?: string[];
+}
 
-import { etlPipeline } from './ETLPipeline';
-import {
-  ETLJob,
-  JobStatus,
-  JobFrequency,
-  JobSchedule,
-  TransformationRule
-} from './ETLTypes';
-
+/**
+ * ETL Pipeline Manager
+ * Responsible for executing and managing ETL jobs
+ */
 class ETLPipelineManager {
-  private scheduledJobs: Map<number, {
-    job: ETLJob;
-    transformationRules: TransformationRule[];
-    nextRunTimeout?: NodeJS.Timeout;
-  }> = new Map();
+  private runningJobs: Map<string, AbortController> = new Map();
+  private scheduledJobs: Map<string, NodeJS.Timeout> = new Map();
+  private jobRuns: JobRun[] = [];
+  
+  constructor() {
+    // Initialize
+  }
   
   /**
-   * Schedule a job for execution based on its schedule
+   * Get all job runs
    */
-  scheduleJob(job: ETLJob, transformationRules: TransformationRule[]): boolean {
-    // Skip if job has no schedule
-    if (!job.schedule) {
-      console.warn(`Job ${job.id} has no schedule defined`);
-      return false;
+  getJobRuns(): JobRun[] {
+    return this.jobRuns;
+  }
+  
+  /**
+   * Get job runs for a specific job
+   */
+  getJobRunsForJob(jobId: string): JobRun[] {
+    return this.jobRuns.filter(run => run.jobId === jobId);
+  }
+  
+  /**
+   * Get currently running jobs
+   */
+  getRunningJobs(): string[] {
+    return Array.from(this.runningJobs.keys());
+  }
+  
+  /**
+   * Execute an ETL job
+   */
+  async executeJob(job: ETLJob, dataSources: DataSource[], transformations: TransformationRule[]): Promise<JobRun> {
+    // Check if job is already running
+    if (this.runningJobs.has(job.id)) {
+      throw new Error(`Job ${job.name} is already running`);
     }
     
-    // Skip if job is already scheduled
-    if (this.scheduledJobs.has(job.id)) {
-      console.warn(`Job ${job.id} is already scheduled`);
-      return false;
+    console.log(`Executing job: ${job.name}`);
+    
+    // Create a new job run
+    const runId = `run-${Date.now()}`;
+    
+    const jobRun: JobRun = {
+      id: runId,
+      jobId: job.id,
+      startTime: new Date(),
+      status: JobStatus.RUNNING,
+      recordsProcessed: 0,
+      errors: [],
+      warnings: [],
+      logs: [`Starting job: ${job.name}`]
+    };
+    
+    // Add to job runs
+    this.jobRuns.push(jobRun);
+    
+    // Create an abort controller for cancellation
+    const abortController = new AbortController();
+    this.runningJobs.set(job.id, abortController);
+    
+    try {
+      // Get source data sources
+      const sources = job.sources.map(sourceId => {
+        const source = dataSources.find(ds => ds.id === sourceId);
+        if (!source) {
+          throw new Error(`Source with ID ${sourceId} not found`);
+        }
+        return source;
+      });
+      
+      // Get job transformations in order
+      const jobTransformations = job.transformations.map(transformationId => {
+        const transformation = transformations.find(t => t.id === transformationId);
+        if (!transformation) {
+          throw new Error(`Transformation with ID ${transformationId} not found`);
+        }
+        return transformation;
+      }).sort((a, b) => a.order - b.order);
+      
+      // Get destination data sources
+      const destinations = job.destinations.map(destId => {
+        const dest = dataSources.find(ds => ds.id === destId);
+        if (!dest) {
+          throw new Error(`Destination with ID ${destId} not found`);
+        }
+        return dest;
+      });
+      
+      // Extract data from sources
+      jobRun.logs?.push(`Extracting data from ${sources.length} source(s)`);
+      
+      let data: any[] = [];
+      for (const source of sources) {
+        // Check if job has been cancelled
+        if (abortController.signal.aborted) {
+          jobRun.logs?.push('Job cancelled during extraction phase');
+          throw new Error('Job cancelled');
+        }
+        
+        try {
+          const sourceData = await dataConnector.extractData(source);
+          jobRun.logs?.push(`Extracted ${sourceData.length} records from ${source.name}`);
+          data = data.concat(sourceData);
+        } catch (error) {
+          jobRun.logs?.push(`Error extracting data from ${source.name}: ${error instanceof Error ? error.message : String(error)}`);
+          jobRun.errors?.push(`Extraction error: ${error instanceof Error ? error.message : String(error)}`);
+          
+          if (!job.continueOnError) {
+            throw error;
+          }
+        }
+      }
+      
+      jobRun.recordsProcessed = data.length;
+      jobRun.logs?.push(`Total records extracted: ${data.length}`);
+      
+      // Apply transformations
+      jobRun.logs?.push(`Applying ${jobTransformations.length} transformation(s)`);
+      
+      for (const transformation of jobTransformations) {
+        // Check if job has been cancelled
+        if (abortController.signal.aborted) {
+          jobRun.logs?.push('Job cancelled during transformation phase');
+          throw new Error('Job cancelled');
+        }
+        
+        if (!transformation.enabled) {
+          jobRun.logs?.push(`Skipping disabled transformation: ${transformation.name}`);
+          continue;
+        }
+        
+        try {
+          const beforeCount = data.length;
+          jobRun.logs?.push(`Applying transformation: ${transformation.name}`);
+          
+          data = await transformationService.applyTransformation(transformation, data);
+          
+          const afterCount = data.length;
+          jobRun.logs?.push(`Transformation ${transformation.name} complete. Records: ${beforeCount} -> ${afterCount}`);
+        } catch (error) {
+          jobRun.logs?.push(`Error applying transformation ${transformation.name}: ${error instanceof Error ? error.message : String(error)}`);
+          jobRun.errors?.push(`Transformation error: ${error instanceof Error ? error.message : String(error)}`);
+          
+          if (!job.continueOnError) {
+            throw error;
+          }
+        }
+      }
+      
+      jobRun.recordsProcessed = data.length;
+      jobRun.logs?.push(`Total records after transformation: ${data.length}`);
+      
+      // Load data to destinations
+      jobRun.logs?.push(`Loading data to ${destinations.length} destination(s)`);
+      
+      let totalLoaded = 0;
+      
+      // This is a simplified implementation
+      // In a real-world scenario, we would use the DataConnector to write data to destinations
+      for (const destination of destinations) {
+        // Check if job has been cancelled
+        if (abortController.signal.aborted) {
+          jobRun.logs?.push('Job cancelled during loading phase');
+          throw new Error('Job cancelled');
+        }
+        
+        // Simulate loading data
+        try {
+          // In a real implementation, this would be:
+          // await dataConnector.loadData(destination, data);
+          
+          // Simulate a delay
+          await new Promise(resolve => setTimeout(resolve, 500));
+          
+          jobRun.logs?.push(`Loaded ${data.length} records to ${destination.name}`);
+          totalLoaded += data.length;
+        } catch (error) {
+          jobRun.logs?.push(`Error loading data to ${destination.name}: ${error instanceof Error ? error.message : String(error)}`);
+          jobRun.errors?.push(`Loading error: ${error instanceof Error ? error.message : String(error)}`);
+          
+          if (!job.continueOnError) {
+            throw error;
+          }
+        }
+      }
+      
+      jobRun.recordsLoaded = totalLoaded;
+      
+      // Update job run status
+      jobRun.status = JobStatus.COMPLETED;
+      jobRun.endTime = new Date();
+      jobRun.logs?.push(`Job completed successfully at ${jobRun.endTime.toISOString()}`);
+      
+      console.log(`Job ${job.name} completed successfully`);
+      
+      // Update job schedule if needed
+      if (job.schedule) {
+        if (job.schedule instanceof JobScheduleImpl) {
+          (job.schedule as JobScheduleImpl).updateAfterRun();
+        }
+      }
+      
+      return jobRun;
+    } catch (error) {
+      // Handle error
+      jobRun.status = abortController.signal.aborted ? JobStatus.CANCELLED : JobStatus.FAILED;
+      jobRun.endTime = new Date();
+      
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      
+      jobRun.logs?.push(`Job ${jobRun.status === JobStatus.CANCELLED ? 'cancelled' : 'failed'}: ${errorMessage}`);
+      if (jobRun.status === JobStatus.FAILED && !jobRun.errors?.includes(errorMessage)) {
+        jobRun.errors?.push(errorMessage);
+      }
+      
+      console.error(`Job ${job.name} ${jobRun.status === JobStatus.CANCELLED ? 'cancelled' : 'failed'}: ${errorMessage}`);
+      
+      // Create an alert for failed jobs (not cancelled ones)
+      if (jobRun.status === JobStatus.FAILED) {
+        alertService.createAlert({
+          jobId: job.id,
+          severity: AlertSeverity.ERROR,
+          type: AlertType.JOB_FAILURE,
+          message: `Job "${job.name}" failed: ${errorMessage}`,
+          details: {
+            runId: jobRun.id,
+            error: errorMessage
+          }
+        });
+      }
+      
+      return jobRun;
+    } finally {
+      // Clean up
+      this.runningJobs.delete(job.id);
     }
+  }
+  
+  /**
+   * Cancel a running job
+   */
+  cancelJob(jobId: string): boolean {
+    const controller = this.runningJobs.get(jobId);
+    if (controller) {
+      controller.abort();
+      return true;
+    }
+    return false;
+  }
+  
+  /**
+   * Schedule a job
+   */
+  scheduleJob(job: ETLJob, dataSources: DataSource[], transformations: TransformationRule[]): void {
+    // Cancel existing schedule if any
+    this.unscheduleJob(job.id);
+    
+    if (!job.schedule || !job.enabled) {
+      return;
+    }
+    
+    console.log(`Scheduling job: ${job.name} with expression: ${job.schedule.expression}`);
     
     // Calculate next run time
-    const nextRunTime = this.calculateNextRunTime(job.schedule);
+    let nextRun = job.schedule.nextRun;
     
-    if (!nextRunTime) {
-      console.warn(`Could not determine next run time for job ${job.id}`);
-      return false;
+    if (!nextRun) {
+      // If no next run time is calculated, schedule for soon
+      nextRun = new Date();
+      nextRun.setMinutes(nextRun.getMinutes() + 1);
     }
     
-    // Store the job in scheduled jobs
-    this.scheduledJobs.set(job.id, {
-      job,
-      transformationRules
-    });
+    const now = new Date();
+    const delayMs = Math.max(0, nextRun.getTime() - now.getTime());
     
-    // Schedule the job
-    this.scheduleNextRun(job.id, nextRunTime);
+    console.log(`Job ${job.name} scheduled to run in ${Math.round(delayMs / 1000)} seconds`);
     
-    console.log(`Job ${job.id} scheduled to run at ${nextRunTime.toISOString()}`);
-    return true;
+    // Schedule job
+    const timeout = setTimeout(() => {
+      // Only execute if job is still enabled
+      if (job.enabled) {
+        this.executeJob(job, dataSources, transformations)
+          .then(jobRun => {
+            console.log(`Scheduled job ${job.name} completed with status: ${jobRun.status}`);
+            
+            // Reschedule if job is still enabled and has a schedule
+            if (job.enabled && job.schedule) {
+              // For one-time jobs, don't reschedule if they've already run
+              if (job.schedule.expression.startsWith('@once') && job.schedule.runCount && job.schedule.runCount > 0) {
+                console.log(`One-time job ${job.name} has already run, not rescheduling`);
+                return;
+              }
+              
+              this.scheduleJob(job, dataSources, transformations);
+            }
+          })
+          .catch(error => {
+            console.error(`Error executing scheduled job ${job.name}:`, error);
+          });
+      }
+    }, delayMs);
+    
+    // Store timeout for later cancellation
+    this.scheduledJobs.set(job.id, timeout);
   }
   
   /**
    * Unschedule a job
    */
-  unscheduleJob(jobId: number): boolean {
-    const scheduledJob = this.scheduledJobs.get(jobId);
-    
-    if (!scheduledJob) {
-      console.warn(`Job ${jobId} is not scheduled`);
-      return false;
-    }
-    
-    // Clear the timeout if exists
-    if (scheduledJob.nextRunTimeout) {
-      clearTimeout(scheduledJob.nextRunTimeout);
-    }
-    
-    // Remove from scheduled jobs
-    this.scheduledJobs.delete(jobId);
-    
-    console.log(`Job ${jobId} unscheduled`);
-    return true;
-  }
-  
-  /**
-   * Update the schedule for a job
-   */
-  updateJobSchedule(jobId: number, schedule: JobSchedule): boolean {
-    const scheduledJob = this.scheduledJobs.get(jobId);
-    
-    if (!scheduledJob) {
-      console.warn(`Job ${jobId} is not scheduled`);
-      return false;
-    }
-    
-    // Update the job schedule
-    scheduledJob.job.schedule = schedule;
-    
-    // Clear existing timeout
-    if (scheduledJob.nextRunTimeout) {
-      clearTimeout(scheduledJob.nextRunTimeout);
-    }
-    
-    // Calculate new next run time
-    const nextRunTime = this.calculateNextRunTime(schedule);
-    
-    if (!nextRunTime) {
-      console.warn(`Could not determine next run time for job ${jobId}`);
+  unscheduleJob(jobId: string): void {
+    const timeout = this.scheduledJobs.get(jobId);
+    if (timeout) {
+      clearTimeout(timeout);
       this.scheduledJobs.delete(jobId);
-      return false;
-    }
-    
-    // Schedule the next run
-    this.scheduleNextRun(jobId, nextRunTime);
-    
-    console.log(`Job ${jobId} rescheduled to run at ${nextRunTime.toISOString()}`);
-    return true;
-  }
-  
-  /**
-   * Get all scheduled jobs
-   */
-  getScheduledJobs(): { jobId: number; nextRunTime: Date | null }[] {
-    return Array.from(this.scheduledJobs.entries()).map(([jobId, { job, nextRunTimeout }]) => ({
-      jobId,
-      nextRunTime: job.nextRun || null
-    }));
-  }
-  
-  /**
-   * Execute a job immediately
-   */
-  async executeJob(jobId: number): Promise<boolean> {
-    const scheduledJob = this.scheduledJobs.get(jobId);
-    
-    if (!scheduledJob) {
-      console.warn(`Job ${jobId} is not found in scheduler`);
-      return false;
-    }
-    
-    try {
-      console.log(`Manually executing job ${jobId}`);
-      
-      // Execute the job
-      const result = await etlPipeline.executeJob(scheduledJob.job, scheduledJob.transformationRules);
-      
-      // Update job status
-      scheduledJob.job.status = result.status;
-      scheduledJob.job.lastRun = new Date();
-      
-      // If job has schedule, calculate next run time
-      if (scheduledJob.job.schedule && result.status !== JobStatus.FAILED) {
-        const nextRunTime = this.calculateNextRunTime(scheduledJob.job.schedule);
-        
-        if (nextRunTime) {
-          scheduledJob.job.nextRun = nextRunTime;
-          
-          // If there's an existing timeout, clear it
-          if (scheduledJob.nextRunTimeout) {
-            clearTimeout(scheduledJob.nextRunTimeout);
-          }
-          
-          // Schedule the next run
-          this.scheduleNextRun(jobId, nextRunTime);
-        }
-      }
-      
-      return result.status === JobStatus.COMPLETED;
-    } catch (error) {
-      console.error(`Error executing job ${jobId}:`, error);
-      return false;
     }
   }
   
   /**
-   * Check if any jobs are currently running
+   * Unschedule all jobs
    */
-  hasRunningJobs(): boolean {
-    return Array.from(this.scheduledJobs.values()).some(({ job }) => job.status === JobStatus.RUNNING);
+  unscheduleAllJobs(): void {
+    for (const [jobId, timeout] of this.scheduledJobs.entries()) {
+      clearTimeout(timeout);
+    }
+    this.scheduledJobs.clear();
   }
   
-  // Private methods
-  
-  private calculateNextRunTime(schedule: JobSchedule): Date | null {
-    const now = new Date();
-    let nextRun: Date | null = null;
-    
-    // If start time is in the future, use that
-    if (schedule.startTime && new Date(schedule.startTime) > now) {
-      nextRun = new Date(schedule.startTime);
-    } else {
-      // Calculate based on frequency
-      switch (schedule.frequency) {
-        case JobFrequency.ONCE:
-          // For once, if start time is in the past, don't schedule
-          if (schedule.startTime && new Date(schedule.startTime) > now) {
-            nextRun = new Date(schedule.startTime);
-          }
-          break;
-          
-        case JobFrequency.HOURLY:
-          nextRun = new Date(now);
-          nextRun.setHours(nextRun.getHours() + 1);
-          nextRun.setMinutes(0);
-          nextRun.setSeconds(0);
-          nextRun.setMilliseconds(0);
-          break;
-          
-        case JobFrequency.DAILY:
-          nextRun = new Date(now);
-          nextRun.setDate(nextRun.getDate() + 1);
-          nextRun.setHours(0);
-          nextRun.setMinutes(0);
-          nextRun.setSeconds(0);
-          nextRun.setMilliseconds(0);
-          break;
-          
-        case JobFrequency.WEEKLY:
-          nextRun = new Date(now);
-          // Calculate days until next occurrence
-          const daysUntilNextRun = schedule.daysOfWeek && schedule.daysOfWeek.length > 0
-            ? this.calculateDaysUntilNextWeekday(now.getDay(), schedule.daysOfWeek)
-            : 7; // Default to 7 days if no specific days
-          nextRun.setDate(nextRun.getDate() + daysUntilNextRun);
-          nextRun.setHours(0);
-          nextRun.setMinutes(0);
-          nextRun.setSeconds(0);
-          nextRun.setMilliseconds(0);
-          break;
-          
-        case JobFrequency.MONTHLY:
-          nextRun = new Date(now);
-          // Move to next month
-          nextRun.setMonth(nextRun.getMonth() + 1);
-          // Set specific day of month if specified
-          if (schedule.dayOfMonth && schedule.dayOfMonth >= 1 && schedule.dayOfMonth <= 31) {
-            nextRun.setDate(Math.min(schedule.dayOfMonth, this.getDaysInMonth(nextRun.getFullYear(), nextRun.getMonth())));
-          } else {
-            nextRun.setDate(1); // Default to first day of month
-          }
-          nextRun.setHours(0);
-          nextRun.setMinutes(0);
-          nextRun.setSeconds(0);
-          nextRun.setMilliseconds(0);
-          break;
-          
-        case JobFrequency.CUSTOM:
-          // For custom frequency, we would parse the cron expression
-          // This is a simplification and would need a cron parser in real implementation
-          console.warn('Custom frequency scheduling not fully implemented');
-          nextRun = new Date(now);
-          nextRun.setDate(nextRun.getDate() + 1); // Default to daily
-          break;
-          
-        default:
-          console.warn(`Unknown job frequency: ${schedule.frequency}`);
-          return null;
-      }
-    }
-    
-    // Check if the calculated next run is before the end time (if specified)
-    if (schedule.endTime && nextRun && nextRun > new Date(schedule.endTime)) {
-      console.log('Next run time is after schedule end time, not scheduling');
-      return null;
-    }
-    
-    return nextRun;
+  /**
+   * Add a job run (for testing purposes)
+   */
+  addJobRun(jobRun: JobRun): void {
+    this.jobRuns.push(jobRun);
   }
   
-  private scheduleNextRun(jobId: number, nextRunTime: Date): void {
-    const scheduledJob = this.scheduledJobs.get(jobId);
-    
-    if (!scheduledJob) {
-      console.warn(`Job ${jobId} not found in scheduled jobs`);
-      return;
-    }
-    
-    // Calculate milliseconds until next run
-    const now = new Date();
-    const msUntilNextRun = nextRunTime.getTime() - now.getTime();
-    
-    // Update job nextRun property
-    scheduledJob.job.nextRun = nextRunTime;
-    
-    // Set timeout for next run
-    const timeout = setTimeout(async () => {
-      console.log(`Scheduled execution of job ${jobId}`);
-      
-      try {
-        // Execute the job
-        const result = await etlPipeline.executeJob(scheduledJob.job, scheduledJob.transformationRules);
-        
-        // Update job status
-        scheduledJob.job.status = result.status;
-        scheduledJob.job.lastRun = new Date();
-        
-        // Calculate next run time if not a one-time job
-        if (scheduledJob.job.schedule && scheduledJob.job.schedule.frequency !== JobFrequency.ONCE) {
-          const nextRunTime = this.calculateNextRunTime(scheduledJob.job.schedule);
-          
-          if (nextRunTime) {
-            // Schedule the next run
-            this.scheduleNextRun(jobId, nextRunTime);
-          } else {
-            console.log(`No more runs scheduled for job ${jobId}`);
-            // Remove from scheduled jobs if it was a one-time job or reached end time
-            this.scheduledJobs.delete(jobId);
-          }
-        } else {
-          // One-time job completed, remove from scheduled
-          this.scheduledJobs.delete(jobId);
-        }
-      } catch (error) {
-        console.error(`Error executing scheduled job ${jobId}:`, error);
-        
-        // Even if job failed, try to schedule next run
-        if (scheduledJob.job.schedule && scheduledJob.job.schedule.frequency !== JobFrequency.ONCE) {
-          const nextRunTime = this.calculateNextRunTime(scheduledJob.job.schedule);
-          
-          if (nextRunTime) {
-            this.scheduleNextRun(jobId, nextRunTime);
-          }
-        } else {
-          this.scheduledJobs.delete(jobId);
-        }
-      }
-    }, Math.max(0, msUntilNextRun));
-    
-    // Store the timeout reference
-    scheduledJob.nextRunTimeout = timeout;
-  }
-  
-  private calculateDaysUntilNextWeekday(currentDay: number, targetDays: number[]): number {
-    // Ensure target days are valid (0-6, where 0 is Sunday)
-    const validTargetDays = targetDays.filter(d => d >= 0 && d <= 6);
-    
-    if (validTargetDays.length === 0) {
-      return 7; // Default to 7 days if no valid target days
-    }
-    
-    // Sort the days to make the calculation easier
-    validTargetDays.sort((a, b) => a - b);
-    
-    // Find the next day that's greater than current day
-    for (const targetDay of validTargetDays) {
-      if (targetDay > currentDay) {
-        return targetDay - currentDay;
-      }
-    }
-    
-    // If we get here, we need to wrap around to the next week
-    return 7 - currentDay + validTargetDays[0];
-  }
-  
-  private getDaysInMonth(year: number, month: number): number {
-    return new Date(year, month + 1, 0).getDate();
+  /**
+   * Clear all job runs
+   */
+  clearJobRuns(): void {
+    this.jobRuns = [];
   }
 }
 

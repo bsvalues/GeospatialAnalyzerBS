@@ -14,7 +14,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
 import { ArrowRightIcon, ClockIcon, DatabaseIcon, FilterIcon, PlayIcon, PlusIcon, SettingsIcon, TableIcon, ZapIcon } from 'lucide-react';
 import ETLOptimizationPanel from './ETLOptimizationPanel';
-import ETLPipeline, { DataSource, DataTransformation, ETLJob, JobRun } from '../../services/etl/ETLPipeline';
+import { etlPipeline as ETLPipeline } from '../../services/etl/ETLPipeline';
+import { DataSource, DataTransformation, ETLJob, JobRun, getScheduleString } from '../../services/etl/ETLTypes';
 import Scheduler from '../../services/etl/Scheduler';
 
 /**
@@ -439,7 +440,7 @@ const ETLManager: React.FC = () => {
                         </Button>
                         <ScheduleJobButton 
                           jobId={job.id}
-                          currentSchedule={job.schedule}
+                          currentSchedule={getScheduleString(job.schedule)}
                           onSchedule={handleScheduleJob}
                         />
                       </div>
@@ -448,7 +449,7 @@ const ETLManager: React.FC = () => {
                       <div>
                         <h5 className="text-sm font-medium mb-1">Schedule</h5>
                         <p className="text-sm">
-                          {job.schedule ? job.schedule : 'Not scheduled'}
+                          {job.schedule ? getScheduleString(job.schedule) : 'Not scheduled'}
                         </p>
                       </div>
                       <div>

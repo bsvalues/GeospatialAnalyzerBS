@@ -1,517 +1,706 @@
 /**
  * DataValidationService.ts
  * 
- * Service for validating data in ETL pipelines and generating quality analysis reports
+ * Service for validating data quality in ETL pipelines
  */
 
-import {
-  DataQualityAnalysis,
-  DataQualityIssue,
-  DataQualitySeverity,
-  ValidationRule,
-  ValidationRuleType
-} from './ETLTypes';
+/**
+ * Validation rule
+ */
+export interface ValidationRule {
+  field: string;
+  type: ValidationRuleType;
+  config?: any;
+  errorMessage?: string;
+  warningOnly?: boolean;
+}
 
-class DataValidationService {
+/**
+ * Validation rule type
+ */
+export enum ValidationRuleType {
+  REQUIRED = 'required',
+  TYPE = 'type',
+  RANGE = 'range',
+  REGEX = 'regex',
+  ENUM = 'enum',
+  UNIQUE = 'unique',
+  CUSTOM = 'custom',
+  RELATIONSHIP = 'relationship',
+  FORMAT = 'format',
+  CONSISTENCY = 'consistency'
+}
+
+/**
+ * Validation result
+ */
+export interface ValidationResult {
+  valid: boolean;
+  errors: ValidationError[];
+  warnings: ValidationWarning[];
+  totalRecords: number;
+  validRecords: number;
+  invalidRecords: number;
+  stats: ValidationStats;
+}
+
+/**
+ * Validation error
+ */
+export interface ValidationError {
+  record: any;
+  field: string;
+  rule: ValidationRule;
+  message: string;
+  recordIndex: number;
+}
+
+/**
+ * Validation warning
+ */
+export interface ValidationWarning {
+  record: any;
+  field: string;
+  rule: ValidationRule;
+  message: string;
+  recordIndex: number;
+}
+
+/**
+ * Validation statistics
+ */
+export interface ValidationStats {
+  completeness: {
+    score: number;
+    missingFields: Record<string, number>;
+  };
+  accuracy: {
+    score: number;
+    invalidValues: Record<string, number>;
+  };
+  consistency: {
+    score: number;
+    inconsistentValues: Record<string, number>;
+  };
+}
+
+/**
+ * Data validation service
+ */
+export class DataValidationService {
   /**
-   * Analyze data quality and generate a report
+   * Validate data against a set of rules
    */
-  analyzeDataQuality(data: any[], options: {
-    fieldsToAnalyze?: string[];
-    strictMode?: boolean;
-    minAcceptableCompleteness?: number;
-    minAcceptableAccuracy?: number;
-    minAcceptableConsistency?: number;
-  } = {}): DataQualityAnalysis {
-    const {
-      fieldsToAnalyze,
-      strictMode = false,
-      minAcceptableCompleteness = 90,
-      minAcceptableAccuracy = 90,
-      minAcceptableConsistency = 90
-    } = options;
-    
-    // Start with empty issues array
-    const issues: DataQualityIssue[] = [];
-    
-    // If no data is provided, return a basic report
+  public validate(data: any[], rules: ValidationRule[]): ValidationResult {
     if (!data || data.length === 0) {
-      return {
-        totalIssues: 0,
-        completeness: 100,
-        accuracy: 100,
-        consistency: 100,
-        issues: [],
-        summary: 'No data provided for analysis'
-      };
+      return this.createEmptyResult();
     }
     
-    // Get all fields from first record or use specified fields
-    const fields = fieldsToAnalyze || Object.keys(data[0] || {});
+    const errors: ValidationError[] = [];
+    const warnings: ValidationWarning[] = [];
+    const stats = this.initializeStats(rules);
     
-    // Calculate completeness (missing data)
-    const completenessIssues = this.analyzeCompleteness(data, fields);
-    issues.push(...completenessIssues);
+    // Preprocess data for unique validation
+    const uniqueFields = rules
+      .filter(rule => rule.type === ValidationRuleType.UNIQUE)
+      .map(rule => rule.field);
     
-    // Calculate accuracy (data format and type validation)
-    const accuracyIssues = this.analyzeAccuracy(data, fields);
-    issues.push(...accuracyIssues);
-    
-    // Calculate consistency (variations in values)
-    const consistencyIssues = this.analyzeConsistency(data, fields);
-    issues.push(...consistencyIssues);
-    
-    // Calculate metrics
-    const totalFieldCount = fields.length * data.length;
-    const completeness = 100 - (
-      this.countIssuesByType(completenessIssues) / totalFieldCount * 100
-    );
-    
-    const accuracy = 100 - (
-      this.countIssuesByType(accuracyIssues) / totalFieldCount * 100
-    );
-    
-    const consistency = 100 - (
-      this.countIssuesByType(consistencyIssues) / totalFieldCount * 100
-    );
-    
-    // Generate recommendations based on issues
-    const aiRecommendations = this.generateRecommendations(
-      issues,
-      { completeness, accuracy, consistency }
-    );
-    
-    // Generate summary text
-    const summary = this.generateSummary(
-      issues,
-      { completeness, accuracy, consistency },
-      { minAcceptableCompleteness, minAcceptableAccuracy, minAcceptableConsistency }
-    );
-    
-    return {
-      totalIssues: issues.length,
-      completeness: Math.round(completeness * 10) / 10, // Round to 1 decimal place
-      accuracy: Math.round(accuracy * 10) / 10,
-      consistency: Math.round(consistency * 10) / 10,
-      issues,
-      summary,
-      aiRecommendations
-    };
-  }
-  
-  /**
-   * Validate a dataset against a set of validation rules
-   */
-  validateDataset(data: any[], rules: ValidationRule[]): {
-    valid: boolean;
-    errors: { row: number; field: string; message: string }[];
-    errorCount: number;
-    passRate: number;
-  } {
-    const errors: { row: number; field: string; message: string }[] = [];
-    let validationCount = 0;
-    
-    // Apply each validation rule to each data record
-    data.forEach((item, rowIndex) => {
-      rules.forEach(rule => {
-        validationCount++;
-        
-        const isValid = this.validateField(item, rule);
-        if (!isValid) {
-          errors.push({
-            row: rowIndex,
-            field: rule.field,
-            message: rule.errorMessage || `Validation failed for field ${rule.field} (${rule.type})`
-          });
-        }
-      });
+    const fieldValues: Record<string, Set<any>> = {};
+    uniqueFields.forEach(field => {
+      fieldValues[field] = new Set();
     });
+    
+    // Validate each record
+    let validRecords = 0;
+    let invalidRecords = 0;
+    
+    data.forEach((record, recordIndex) => {
+      let recordValid = true;
+      
+      for (const rule of rules) {
+        const { field, type, config, errorMessage, warningOnly } = rule;
+        const value = record[field];
+        
+        let isValid = true;
+        let message = errorMessage || `Validation failed for field "${field}"`;
+        
+        // Validate based on rule type
+        switch (type) {
+          case ValidationRuleType.REQUIRED:
+            isValid = value !== undefined && value !== null && value !== '';
+            if (!isValid) {
+              message = errorMessage || `Field "${field}" is required`;
+              stats.completeness.missingFields[field] = (stats.completeness.missingFields[field] || 0) + 1;
+            }
+            break;
+          
+          case ValidationRuleType.TYPE:
+            if (value !== undefined && value !== null) {
+              const expectedType = config?.type;
+              if (expectedType) {
+                isValid = this.validateType(value, expectedType);
+                if (!isValid) {
+                  message = errorMessage || `Field "${field}" must be of type ${expectedType}`;
+                  stats.accuracy.invalidValues[field] = (stats.accuracy.invalidValues[field] || 0) + 1;
+                }
+              }
+            }
+            break;
+          
+          case ValidationRuleType.RANGE:
+            if (value !== undefined && value !== null) {
+              const min = config?.min;
+              const max = config?.max;
+              
+              if (min !== undefined && max !== undefined) {
+                isValid = value >= min && value <= max;
+                message = errorMessage || `Field "${field}" must be between ${min} and ${max}`;
+              } else if (min !== undefined) {
+                isValid = value >= min;
+                message = errorMessage || `Field "${field}" must be at least ${min}`;
+              } else if (max !== undefined) {
+                isValid = value <= max;
+                message = errorMessage || `Field "${field}" must be at most ${max}`;
+              }
+              
+              if (!isValid) {
+                stats.accuracy.invalidValues[field] = (stats.accuracy.invalidValues[field] || 0) + 1;
+              }
+            }
+            break;
+          
+          case ValidationRuleType.REGEX:
+            if (value !== undefined && value !== null && typeof value === 'string') {
+              const pattern = config?.pattern;
+              if (pattern) {
+                try {
+                  const regex = new RegExp(pattern);
+                  isValid = regex.test(value);
+                  if (!isValid) {
+                    message = errorMessage || `Field "${field}" does not match the required pattern`;
+                    stats.accuracy.invalidValues[field] = (stats.accuracy.invalidValues[field] || 0) + 1;
+                  }
+                } catch (e) {
+                  console.error(`Invalid regex pattern for field "${field}":`, e);
+                  isValid = true; // Skip validation if pattern is invalid
+                }
+              }
+            }
+            break;
+          
+          case ValidationRuleType.ENUM:
+            if (value !== undefined && value !== null) {
+              const allowedValues = config?.values;
+              if (allowedValues && Array.isArray(allowedValues)) {
+                isValid = allowedValues.includes(value);
+                if (!isValid) {
+                  message = errorMessage || `Field "${field}" must be one of: ${allowedValues.join(', ')}`;
+                  stats.accuracy.invalidValues[field] = (stats.accuracy.invalidValues[field] || 0) + 1;
+                }
+              }
+            }
+            break;
+          
+          case ValidationRuleType.UNIQUE:
+            if (value !== undefined && value !== null) {
+              // Check if value is already in the set
+              if (fieldValues[field].has(JSON.stringify(value))) {
+                isValid = false;
+                message = errorMessage || `Field "${field}" must be unique`;
+                stats.consistency.inconsistentValues[field] = (stats.consistency.inconsistentValues[field] || 0) + 1;
+              } else {
+                fieldValues[field].add(JSON.stringify(value));
+              }
+            }
+            break;
+          
+          case ValidationRuleType.FORMAT:
+            if (value !== undefined && value !== null && typeof value === 'string') {
+              const format = config?.format;
+              if (format) {
+                isValid = this.validateFormat(value, format);
+                if (!isValid) {
+                  message = errorMessage || `Field "${field}" must be in ${format} format`;
+                  stats.accuracy.invalidValues[field] = (stats.accuracy.invalidValues[field] || 0) + 1;
+                }
+              }
+            }
+            break;
+          
+          case ValidationRuleType.RELATIONSHIP:
+            if (value !== undefined && value !== null) {
+              const relationData = config?.data;
+              const relationField = config?.field || 'id';
+              
+              if (relationData && Array.isArray(relationData)) {
+                isValid = relationData.some(item => item[relationField] === value);
+                if (!isValid) {
+                  message = errorMessage || `Field "${field}" must reference a valid ${config?.entityName || 'entity'}`;
+                  stats.consistency.inconsistentValues[field] = (stats.consistency.inconsistentValues[field] || 0) + 1;
+                }
+              }
+            }
+            break;
+          
+          case ValidationRuleType.CONSISTENCY:
+            if (config?.dependsOn && config?.condition) {
+              const dependentField = config.dependsOn;
+              const dependentValue = record[dependentField];
+              
+              isValid = this.evaluateConsistencyCondition(value, dependentValue, config.condition);
+              if (!isValid) {
+                message = errorMessage || `Field "${field}" is inconsistent with "${dependentField}"`;
+                stats.consistency.inconsistentValues[field] = (stats.consistency.inconsistentValues[field] || 0) + 1;
+              }
+            }
+            break;
+          
+          case ValidationRuleType.CUSTOM:
+            if (config?.validate && typeof config.validate === 'function') {
+              try {
+                isValid = config.validate(value, record);
+                if (!isValid) {
+                  message = errorMessage || `Field "${field}" failed custom validation`;
+                  stats.accuracy.invalidValues[field] = (stats.accuracy.invalidValues[field] || 0) + 1;
+                }
+              } catch (e) {
+                console.error(`Error in custom validation for field "${field}":`, e);
+                isValid = false;
+                message = `Error in custom validation: ${e instanceof Error ? e.message : String(e)}`;
+              }
+            }
+            break;
+        }
+        
+        // Record validation result
+        if (!isValid) {
+          const validationIssue = {
+            record,
+            field,
+            rule,
+            message,
+            recordIndex
+          };
+          
+          if (warningOnly) {
+            warnings.push(validationIssue);
+          } else {
+            errors.push(validationIssue);
+            recordValid = false;
+          }
+        }
+      }
+      
+      // Count valid/invalid records
+      if (recordValid) {
+        validRecords++;
+      } else {
+        invalidRecords++;
+      }
+    });
+    
+    // Calculate statistics
+    this.calculateStats(stats, data.length);
     
     return {
       valid: errors.length === 0,
       errors,
-      errorCount: errors.length,
-      passRate: validationCount > 0 ? (1 - errors.length / validationCount) * 100 : 100
+      warnings,
+      totalRecords: data.length,
+      validRecords,
+      invalidRecords,
+      stats
     };
   }
   
-  // Helper methods for data quality analysis
-  
-  private analyzeCompleteness(data: any[], fields: string[]): DataQualityIssue[] {
-    const issues: DataQualityIssue[] = [];
-    
-    // Check for null/undefined/empty values in each field
-    fields.forEach(field => {
-      const missingCount = data.filter(item => {
-        const value = item[field];
-        return value === null || value === undefined || value === '' || 
-               (typeof value === 'string' && value.trim() === '');
-      }).length;
-      
-      const missingPercentage = (missingCount / data.length) * 100;
-      
-      // Determine severity based on percentage of missing values
-      let severity: DataQualitySeverity = DataQualitySeverity.LOW;
-      if (missingPercentage > 10) {
-        severity = DataQualitySeverity.MEDIUM;
-      }
-      if (missingPercentage > 25) {
-        severity = DataQualitySeverity.HIGH;
-      }
-      
-      // Only add as an issue if there are missing values
-      if (missingCount > 0) {
-        issues.push({
-          field,
-          issue: `Missing data: ${missingCount} records (${missingPercentage.toFixed(1)}%)`,
-          severity,
-          recommendation: `Consider adding default values or making ${field} a required field.`,
-          rowCount: missingCount,
-          sampleValues: []
-        });
-      }
-    });
-    
-    return issues;
-  }
-  
-  private analyzeAccuracy(data: any[], fields: string[]): DataQualityIssue[] {
-    const issues: DataQualityIssue[] = [];
-    
-    // Analyze field types and formats
-    fields.forEach(field => {
-      const fieldValues = data.map(item => item[field]).filter(v => v !== null && v !== undefined);
-      
-      if (fieldValues.length === 0) {
-        return; // Skip empty fields
-      }
-      
-      // Determine expected type from first non-null value
-      const firstValue = fieldValues[0];
-      const expectedType = typeof firstValue;
-      
-      // Type consistency check
-      const typeInconsistencies = fieldValues.filter(value => typeof value !== expectedType);
-      if (typeInconsistencies.length > 0) {
-        const percentage = (typeInconsistencies.length / fieldValues.length) * 100;
-        
-        let severity: DataQualitySeverity = DataQualitySeverity.LOW;
-        if (percentage > 5) severity = DataQualitySeverity.MEDIUM;
-        if (percentage > 15) severity = DataQualitySeverity.HIGH;
-        
-        issues.push({
-          field,
-          issue: `Type inconsistency: ${typeInconsistencies.length} values are not ${expectedType} (${percentage.toFixed(1)}%)`,
-          severity,
-          recommendation: `Consider standardizing the data type for ${field} to ${expectedType}.`,
-          rowCount: typeInconsistencies.length,
-          sampleValues: typeInconsistencies.slice(0, 5).map(v => String(v))
-        });
-      }
-      
-      // Date format check
-      if (expectedType === 'string' && this.looksLikeDate(firstValue)) {
-        const invalidDates = fieldValues.filter(v => !this.isValidDate(v));
-        if (invalidDates.length > 0) {
-          const percentage = (invalidDates.length / fieldValues.length) * 100;
-          
-          let severity: DataQualitySeverity = DataQualitySeverity.LOW;
-          if (percentage > 5) severity = DataQualitySeverity.MEDIUM;
-          if (percentage > 15) severity = DataQualitySeverity.HIGH;
-          
-          issues.push({
-            field,
-            issue: `Invalid date format: ${invalidDates.length} values (${percentage.toFixed(1)}%)`,
-            severity,
-            recommendation: `Standardize date format in ${field}. Valid date format example: ${firstValue}.`,
-            rowCount: invalidDates.length,
-            sampleValues: invalidDates.slice(0, 5).map(v => String(v))
-          });
+  /**
+   * Create an empty validation result
+   */
+  private createEmptyResult(): ValidationResult {
+    return {
+      valid: true,
+      errors: [],
+      warnings: [],
+      totalRecords: 0,
+      validRecords: 0,
+      invalidRecords: 0,
+      stats: {
+        completeness: {
+          score: 1, // 100% complete if no data
+          missingFields: {}
+        },
+        accuracy: {
+          score: 1, // 100% accurate if no data
+          invalidValues: {}
+        },
+        consistency: {
+          score: 1, // 100% consistent if no data
+          inconsistentValues: {}
         }
       }
-      
-      // Numeric range check
-      if (expectedType === 'number') {
-        const outliers = this.findOutliers(fieldValues);
-        if (outliers.length > 0) {
-          const percentage = (outliers.length / fieldValues.length) * 100;
-          
-          let severity: DataQualitySeverity = DataQualitySeverity.LOW;
-          if (percentage > 3) severity = DataQualitySeverity.MEDIUM;
-          if (percentage > 10) severity = DataQualitySeverity.HIGH;
-          
-          issues.push({
-            field,
-            issue: `Potential outliers: ${outliers.length} values (${percentage.toFixed(1)}%)`,
-            severity,
-            recommendation: `Verify that outlier values in ${field} are accurate.`,
-            rowCount: outliers.length,
-            sampleValues: outliers.slice(0, 5).map(v => String(v))
-          });
-        }
-      }
-    });
-    
-    return issues;
+    };
   }
   
-  private analyzeConsistency(data: any[], fields: string[]): DataQualityIssue[] {
-    const issues: DataQualityIssue[] = [];
+  /**
+   * Initialize validation statistics
+   */
+  private initializeStats(rules: ValidationRule[]): ValidationStats {
+    const fields = new Set<string>();
+    rules.forEach(rule => fields.add(rule.field));
     
-    // Check for case inconsistency in string fields
+    const stats: ValidationStats = {
+      completeness: {
+        score: 0,
+        missingFields: {}
+      },
+      accuracy: {
+        score: 0,
+        invalidValues: {}
+      },
+      consistency: {
+        score: 0,
+        inconsistentValues: {}
+      }
+    };
+    
+    // Initialize counters for each field
     fields.forEach(field => {
-      const fieldValues = data.map(item => item[field])
-        .filter(v => v !== null && v !== undefined && typeof v === 'string');
-      
-      if (fieldValues.length < 5) {
-        return; // Skip fields with few values
-      }
-      
-      // Case consistency check for text fields
-      const lowerCase = fieldValues.filter(v => v === v.toLowerCase());
-      const upperCase = fieldValues.filter(v => v === v.toUpperCase());
-      const mixedCase = fieldValues.filter(v => v !== v.toLowerCase() && v !== v.toUpperCase());
-      
-      if (
-        lowerCase.length > 0 && upperCase.length > 0 && 
-        (lowerCase.length + upperCase.length) / fieldValues.length < 0.9
-      ) {
-        let severity: DataQualitySeverity = DataQualitySeverity.LOW;
-        if (mixedCase.length > fieldValues.length * 0.2) severity = DataQualitySeverity.MEDIUM;
-        if (mixedCase.length > fieldValues.length * 0.4) severity = DataQualitySeverity.HIGH;
-        
-        issues.push({
-          field,
-          issue: `Case inconsistency: Mixed case styles (${lowerCase.length} lowercase, ${upperCase.length} uppercase, ${mixedCase.length} mixed)`,
-          severity,
-          recommendation: `Standardize case format for ${field}, preferably to ${lowerCase.length > upperCase.length ? 'lowercase' : 'uppercase'}.`,
-          rowCount: fieldValues.length,
-          sampleValues: [
-            ...lowerCase.slice(0, 2),
-            ...upperCase.slice(0, 2),
-            ...mixedCase.slice(0, 2)
-          ]
-        });
-      }
-      
-      // Value format consistency for common patterns (emails, phone numbers, etc.)
-      if (this.looksLikeEmail(fieldValues[0])) {
-        const invalidEmails = fieldValues.filter(v => !this.isValidEmail(v));
-        if (invalidEmails.length > 0) {
-          const percentage = (invalidEmails.length / fieldValues.length) * 100;
-          
-          let severity: DataQualitySeverity = DataQualitySeverity.LOW;
-          if (percentage > 5) severity = DataQualitySeverity.MEDIUM;
-          if (percentage > 15) severity = DataQualitySeverity.HIGH;
-          
-          issues.push({
-            field,
-            issue: `Invalid email format: ${invalidEmails.length} values (${percentage.toFixed(1)}%)`,
-            severity,
-            recommendation: `Standardize email format in ${field}.`,
-            rowCount: invalidEmails.length,
-            sampleValues: invalidEmails.slice(0, 5)
-          });
-        }
-      }
+      stats.completeness.missingFields[field] = 0;
+      stats.accuracy.invalidValues[field] = 0;
+      stats.consistency.inconsistentValues[field] = 0;
     });
     
-    return issues;
+    return stats;
   }
   
-  // Helper methods
-  
-  private countIssuesByType(issues: DataQualityIssue[]): number {
-    return issues.reduce((sum, issue) => sum + (issue.rowCount || 0), 0);
+  /**
+   * Calculate validation statistics
+   */
+  private calculateStats(stats: ValidationStats, totalRecords: number): void {
+    if (totalRecords === 0) {
+      stats.completeness.score = 1;
+      stats.accuracy.score = 1;
+      stats.consistency.score = 1;
+      return;
+    }
+    
+    // Calculate completeness score
+    const totalCompleteness = Object.values(stats.completeness.missingFields).reduce((sum, count) => sum + count, 0);
+    const fields = Object.keys(stats.completeness.missingFields).length;
+    
+    stats.completeness.score = 1 - (totalCompleteness / (totalRecords * fields));
+    
+    // Calculate accuracy score
+    const totalInaccurate = Object.values(stats.accuracy.invalidValues).reduce((sum, count) => sum + count, 0);
+    
+    stats.accuracy.score = 1 - (totalInaccurate / totalRecords);
+    
+    // Calculate consistency score
+    const totalInconsistent = Object.values(stats.consistency.inconsistentValues).reduce((sum, count) => sum + count, 0);
+    
+    stats.consistency.score = 1 - (totalInconsistent / totalRecords);
+    
+    // Ensure scores are between 0 and 1
+    stats.completeness.score = Math.max(0, Math.min(1, stats.completeness.score));
+    stats.accuracy.score = Math.max(0, Math.min(1, stats.accuracy.score));
+    stats.consistency.score = Math.max(0, Math.min(1, stats.consistency.score));
   }
   
-  private generateSummary(
-    issues: DataQualityIssue[],
-    metrics: { completeness: number; accuracy: number; consistency: number },
-    thresholds: { minAcceptableCompleteness: number; minAcceptableAccuracy: number; minAcceptableConsistency: number }
-  ): string {
-    const { completeness, accuracy, consistency } = metrics;
-    const { minAcceptableCompleteness, minAcceptableAccuracy, minAcceptableConsistency } = thresholds;
-    
-    const highSeverityCount = issues.filter(i => i.severity === DataQualitySeverity.HIGH).length;
-    const mediumSeverityCount = issues.filter(i => i.severity === DataQualitySeverity.MEDIUM).length;
-    const lowSeverityCount = issues.filter(i => i.severity === DataQualitySeverity.LOW).length;
-    
-    let qualityLevel = '';
-    if (completeness >= 98 && accuracy >= 98 && consistency >= 98) {
-      qualityLevel = 'Excellent';
-    } else if (completeness >= 90 && accuracy >= 90 && consistency >= 90) {
-      qualityLevel = 'Good';
-    } else if (completeness >= 80 && accuracy >= 80 && consistency >= 80) {
-      qualityLevel = 'Fair';
-    } else {
-      qualityLevel = 'Poor';
+  /**
+   * Validate a value's type
+   */
+  private validateType(value: any, expectedType: string): boolean {
+    switch (expectedType.toLowerCase()) {
+      case 'string':
+        return typeof value === 'string';
+      
+      case 'number':
+        return typeof value === 'number' && !isNaN(value);
+      
+      case 'boolean':
+        return typeof value === 'boolean';
+      
+      case 'array':
+        return Array.isArray(value);
+      
+      case 'object':
+        return typeof value === 'object' && value !== null && !Array.isArray(value);
+      
+      case 'date':
+        if (value instanceof Date) {
+          return !isNaN(value.getTime());
+        } else if (typeof value === 'string') {
+          const date = new Date(value);
+          return !isNaN(date.getTime());
+        }
+        return false;
+      
+      case 'integer':
+        return typeof value === 'number' && Number.isInteger(value);
+      
+      case 'float':
+      case 'decimal':
+        return typeof value === 'number' && !Number.isInteger(value);
+      
+      case 'email':
+        return typeof value === 'string' && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+      
+      case 'url':
+        if (typeof value !== 'string') return false;
+        try {
+          new URL(value);
+          return true;
+        } catch (e) {
+          return false;
+        }
+      
+      default:
+        return true; // Unknown type, assume valid
     }
-    
-    let summary = `Data Quality Analysis: ${qualityLevel} quality data.\n\n`;
-    summary += `Found ${issues.length} issues (${highSeverityCount} high, ${mediumSeverityCount} medium, ${lowSeverityCount} low severity).\n`;
-    summary += `Completeness: ${completeness.toFixed(1)}% (threshold: ${minAcceptableCompleteness}%)\n`;
-    summary += `Accuracy: ${accuracy.toFixed(1)}% (threshold: ${minAcceptableAccuracy}%)\n`;
-    summary += `Consistency: ${consistency.toFixed(1)}% (threshold: ${minAcceptableConsistency}%)\n\n`;
-    
-    if (completeness < minAcceptableCompleteness) {
-      summary += `⚠️ Completeness is below the acceptable threshold. Focus on fixing missing data issues.\n`;
-    }
-    
-    if (accuracy < minAcceptableAccuracy) {
-      summary += `⚠️ Accuracy is below the acceptable threshold. Address data format and type issues.\n`;
-    }
-    
-    if (consistency < minAcceptableConsistency) {
-      summary += `⚠️ Consistency is below the acceptable threshold. Standardize data formats and values.\n`;
-    }
-    
-    return summary;
   }
   
-  private generateRecommendations(
-    issues: DataQualityIssue[],
-    metrics: { completeness: number; accuracy: number; consistency: number }
-  ): string[] {
+  /**
+   * Validate a string format
+   */
+  private validateFormat(value: string, format: string): boolean {
+    switch (format.toLowerCase()) {
+      case 'email':
+        return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+      
+      case 'phone':
+        // Basic phone validation - adjust as needed
+        return /^\+?[\d\s\-()]{7,}$/.test(value);
+      
+      case 'zip':
+      case 'zipcode':
+      case 'postal':
+      case 'postalcode':
+        // Basic postal code validation
+        return /^[\d\-\s]{5,10}$/.test(value);
+      
+      case 'date':
+        try {
+          const date = new Date(value);
+          return !isNaN(date.getTime());
+        } catch (e) {
+          return false;
+        }
+      
+      case 'time':
+        // Basic time format HH:MM or HH:MM:SS
+        return /^([01]\d|2[0-3]):([0-5]\d)(?::([0-5]\d))?$/.test(value);
+      
+      case 'datetime':
+        try {
+          const date = new Date(value);
+          return !isNaN(date.getTime());
+        } catch (e) {
+          return false;
+        }
+      
+      case 'url':
+        try {
+          new URL(value);
+          return true;
+        } catch (e) {
+          return false;
+        }
+      
+      case 'ip':
+      case 'ipv4':
+        // IPv4 validation
+        return /^(?:(?:25[0-5]|2[0-4]\d|[01]?\d\d?)\.){3}(?:25[0-5]|2[0-4]\d|[01]?\d\d?)$/.test(value);
+      
+      case 'ipv6':
+        // Basic IPv6 validation
+        return /^(?:[a-fA-F0-9]{1,4}:){7}[a-fA-F0-9]{1,4}$/.test(value);
+      
+      case 'creditcard':
+        // Basic credit card validation - remove spaces and verify length+checksum
+        const stripped = value.replace(/\s+/g, '');
+        if (!/^\d{13,19}$/.test(stripped)) return false;
+        
+        // Luhn algorithm
+        let sum = 0;
+        let double = false;
+        for (let i = stripped.length - 1; i >= 0; i--) {
+          let digit = parseInt(stripped.charAt(i), 10);
+          if (double) {
+            digit *= 2;
+            if (digit > 9) digit -= 9;
+          }
+          sum += digit;
+          double = !double;
+        }
+        return sum % 10 === 0;
+      
+      default:
+        return true; // Unknown format, assume valid
+    }
+  }
+  
+  /**
+   * Evaluate a consistency condition between two fields
+   */
+  private evaluateConsistencyCondition(value: any, dependentValue: any, condition: string): boolean {
+    switch (condition) {
+      case 'equals':
+        return value === dependentValue;
+      
+      case 'notEquals':
+        return value !== dependentValue;
+      
+      case 'greaterThan':
+        return value > dependentValue;
+      
+      case 'lessThan':
+        return value < dependentValue;
+      
+      case 'greaterThanOrEqual':
+        return value >= dependentValue;
+      
+      case 'lessThanOrEqual':
+        return value <= dependentValue;
+      
+      case 'bothExist':
+        return value !== undefined && value !== null && 
+               dependentValue !== undefined && dependentValue !== null;
+      
+      case 'neitherExist':
+        return (value === undefined || value === null) && 
+               (dependentValue === undefined || dependentValue === null);
+      
+      case 'oneExists':
+        return (value !== undefined && value !== null) !== 
+               (dependentValue !== undefined && dependentValue !== null);
+      
+      case 'contains':
+        if (typeof value === 'string' && typeof dependentValue === 'string') {
+          return value.includes(dependentValue);
+        }
+        return false;
+      
+      case 'startsWith':
+        if (typeof value === 'string' && typeof dependentValue === 'string') {
+          return value.startsWith(dependentValue);
+        }
+        return false;
+      
+      case 'endsWith':
+        if (typeof value === 'string' && typeof dependentValue === 'string') {
+          return value.endsWith(dependentValue);
+        }
+        return false;
+      
+      default:
+        return true; // Unknown condition, assume valid
+    }
+  }
+  
+  /**
+   * Generate a data quality analysis report
+   */
+  public generateQualityReport(data: any[], rules: ValidationRule[]): any {
+    const validationResult = this.validate(data, rules);
+    
+    // Calculate overall scores
+    const overallScore = (
+      validationResult.stats.completeness.score +
+      validationResult.stats.accuracy.score +
+      validationResult.stats.consistency.score
+    ) / 3;
+    
+    // Generate recommendations
+    const recommendations = this.generateRecommendations(validationResult);
+    
+    return {
+      ...validationResult,
+      overallScore,
+      recommendations,
+      timestamp: new Date()
+    };
+  }
+  
+  /**
+   * Generate recommendations based on validation results
+   */
+  private generateRecommendations(result: ValidationResult): string[] {
     const recommendations: string[] = [];
-    const { completeness, accuracy, consistency } = metrics;
     
-    // Add general recommendations based on metrics
-    if (completeness < 90) {
+    // Check completeness
+    if (result.stats.completeness.score < 0.9) {
+      const mostMissingFields = Object.entries(result.stats.completeness.missingFields)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 3);
+      
+      if (mostMissingFields.length > 0) {
+        const fieldList = mostMissingFields
+          .map(([field, count]) => `"${field}" (${count} records)`)
+          .join(', ');
+        
+        recommendations.push(
+          `Improve data completeness by addressing missing values in the following fields: ${fieldList}`
+        );
+      }
+    }
+    
+    // Check accuracy
+    if (result.stats.accuracy.score < 0.9) {
+      const mostInvalidFields = Object.entries(result.stats.accuracy.invalidValues)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 3);
+      
+      if (mostInvalidFields.length > 0) {
+        const fieldList = mostInvalidFields
+          .map(([field, count]) => `"${field}" (${count} records)`)
+          .join(', ');
+        
+        recommendations.push(
+          `Improve data accuracy by fixing invalid values in the following fields: ${fieldList}`
+        );
+      }
+    }
+    
+    // Check consistency
+    if (result.stats.consistency.score < 0.9) {
+      const mostInconsistentFields = Object.entries(result.stats.consistency.inconsistentValues)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 3);
+      
+      if (mostInconsistentFields.length > 0) {
+        const fieldList = mostInconsistentFields
+          .map(([field, count]) => `"${field}" (${count} records)`)
+          .join(', ');
+        
+        recommendations.push(
+          `Improve data consistency by addressing inconsistencies in the following fields: ${fieldList}`
+        );
+      }
+    }
+    
+    // Add general recommendations
+    if (result.errors.length > 0) {
       recommendations.push(
-        'Implement stricter validation on data input to prevent missing values.',
-        'Consider making critical fields required in forms and data entry points.'
+        `Address ${result.errors.length} validation errors to improve overall data quality.`
       );
     }
     
-    if (accuracy < 90) {
+    if (result.warnings.length > 0) {
       recommendations.push(
-        'Add type validation for numeric and date fields.',
-        'Implement format validation for specialized fields like emails and phone numbers.'
+        `Review ${result.warnings.length} data quality warnings that may affect analysis results.`
       );
     }
     
-    if (consistency < 90) {
+    // Default recommendation if no specific issues identified
+    if (recommendations.length === 0) {
       recommendations.push(
-        'Standardize text case (upper/lower) across string fields.',
-        'Normalize date formats to a single standard.'
-      );
-    }
-    
-    // Add specific recommendations based on high severity issues
-    const highSeverityIssues = issues.filter(i => i.severity === DataQualitySeverity.HIGH);
-    
-    // Use a different approach than Set to create a unique array of fields
-    const uniqueFields = highSeverityIssues
-      .map(i => i.field)
-      .filter((field, index, self) => self.indexOf(field) === index);
-    
-    if (uniqueFields.length > 0) {
-      recommendations.push(
-        `Prioritize fixing issues in these fields: ${uniqueFields.join(', ')}.`
+        'Data quality is good. Consider adding more validation rules for deeper quality analysis.'
       );
     }
     
     return recommendations;
   }
-  
-  // Validation helpers
-  
-  private validateField(item: any, rule: ValidationRule): boolean {
-    const value = item[rule.field];
-    
-    switch (rule.type) {
-      case ValidationRuleType.NOT_NULL:
-        return value !== null && value !== undefined;
-        
-      case ValidationRuleType.MIN_VALUE:
-        return typeof value === 'number' && value >= rule.parameters;
-        
-      case ValidationRuleType.MAX_VALUE:
-        return typeof value === 'number' && value <= rule.parameters;
-        
-      case ValidationRuleType.REGEX:
-        return typeof value === 'string' && new RegExp(rule.parameters).test(value);
-        
-      case ValidationRuleType.UNIQUENESS:
-        // Uniqueness can't be validated on a single record
-        return true;
-        
-      case ValidationRuleType.DATE_FORMAT:
-        if (typeof value !== 'string') return false;
-        return this.isValidDate(value);
-        
-      case ValidationRuleType.ENUM:
-        return Array.isArray(rule.parameters) && rule.parameters.includes(value);
-        
-      case ValidationRuleType.CUSTOM:
-        if (typeof rule.parameters !== 'string') return true;
-        try {
-          const validationFn = new Function('value', rule.parameters);
-          return validationFn(value);
-        } catch (error) {
-          console.error('Error executing custom validation:', error);
-          return false;
-        }
-        
-      default:
-        return true;
-    }
-  }
-  
-  // Utility functions
-  
-  private looksLikeDate(value: any): boolean {
-    if (typeof value !== 'string') return false;
-    
-    // Check for common date separators
-    return (
-      value.includes('-') || 
-      value.includes('/') || 
-      value.includes('.') ||
-      !isNaN(Date.parse(value))
-    );
-  }
-  
-  private isValidDate(value: any): boolean {
-    if (typeof value !== 'string') return false;
-    
-    const date = new Date(value);
-    return !isNaN(date.getTime());
-  }
-  
-  private looksLikeEmail(value: any): boolean {
-    if (typeof value !== 'string') return false;
-    return value.includes('@') && value.includes('.');
-  }
-  
-  private isValidEmail(value: any): boolean {
-    if (typeof value !== 'string') return false;
-    
-    // Simple email validation regex
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    return emailRegex.test(value);
-  }
-  
-  private findOutliers(values: number[]): number[] {
-    if (values.length < 5) return [];
-    
-    // Calculate quartiles and IQR
-    const sorted = [...values].sort((a, b) => a - b);
-    const q1Index = Math.floor(sorted.length * 0.25);
-    const q3Index = Math.floor(sorted.length * 0.75);
-    
-    const q1 = sorted[q1Index];
-    const q3 = sorted[q3Index];
-    const iqr = q3 - q1;
-    
-    const lowerBound = q1 - 1.5 * iqr;
-    const upperBound = q3 + 1.5 * iqr;
-    
-    // Return values outside the bounds
-    return values.filter(v => v < lowerBound || v > upperBound);
-  }
 }
 
-// Export a singleton instance
+// Export singleton instance
 export const dataValidationService = new DataValidationService();
