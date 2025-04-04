@@ -31,6 +31,7 @@ import NeighborhoodComparisonPage from '@/pages/neighborhood-comparison';
 import PropertyPredictionDemo from '@/pages/PropertyPredictionDemo';
 import PropertyDataSourcesPage from '@/pages/PropertyDataSources';
 import DataQualityDemo from '@/pages/DataQualityDemo';
+import { ProjectTrackerPage } from '@/pages/ProjectTrackerPage';
 
 function Router() {
   const [location] = useLocation();
@@ -60,6 +61,7 @@ function Router() {
         <Route path="/prediction" component={PropertyPredictionDemo} />
         <Route path="/property-data-sources" component={PropertyDataSourcesPage} />
         <Route path="/data-quality" component={DataQualityDemo} />
+        <Route path="/project-tracker" component={ProjectTrackerPage} />
         <Route component={NotFound} />
       </Switch>
     </>
