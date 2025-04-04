@@ -1,324 +1,500 @@
-import { DataSourceConfig, TransformationRule } from './ETLTypes';
-import { dataConnector, ConnectionStats } from './DataConnector';
-import { transformationService } from './TransformationService';
-import { dataQualityService, DataQualityAnalysisResult } from './DataQualityService';
+import { ETLJob, JobStatus } from './ETLTypes';
 import { alertService, AlertType, AlertSeverity, AlertCategory } from './AlertService';
+import { transformationService, TransformationResult } from './TransformationService';
 
 /**
- * ETL Pipeline options interface
+ * Extract result interface
  */
-export interface ETLPipelineOptions {
-  validateData?: boolean;
-  analyzeDataQuality?: boolean;
-  maxRetries?: number;
-  logTransformations?: boolean;
-  stopOnError?: boolean;
-  chunkSize?: number;
-  includeMetadata?: boolean;
+export interface ExtractResult {
+  sourceId: number;
+  data: any[];
+  success: boolean;
+  errors: string[];
+  executionTime: number;
 }
 
 /**
- * ETL Pipeline result interface
+ * Load result interface
  */
-export interface ETLPipelineResult {
+export interface LoadResult {
+  destinationId: number;
+  recordsLoaded: number;
   success: boolean;
-  sourceStats: ConnectionStats;
-  destinationStats: ConnectionStats;
-  recordCounts: {
-    extracted: number;
-    transformed: number;
-    loaded: number;
-    failed: number;
-  };
-  errors: any[];
-  warnings: any[];
+  errors: string[];
   executionTime: number;
-  transformationTime: number;
-  dataQualityResult?: DataQualityAnalysisResult;
-  logs: string[];
+}
+
+/**
+ * Pipeline execution options interface
+ */
+export interface PipelineExecutionOptions {
+  validateOnly?: boolean;
+  batchSize?: number;
+  continueOnError?: boolean;
+  maxRetries?: number;
+  context?: Record<string, any>;
+}
+
+/**
+ * Pipeline result interface
+ */
+export interface PipelineResult {
+  jobId: number;
+  sourceResults: ExtractResult[];
+  transformationResult?: TransformationResult;
+  destinationResults: LoadResult[];
+  recordsExtracted: number;
+  recordsTransformed: number;
+  recordsLoaded: number;
+  executionTime: number;
+  startTime: Date;
+  endTime: Date;
+  success: boolean;
+  errors: string[];
 }
 
 /**
  * ETL Pipeline class
  */
 class ETLPipeline {
-  private logs: string[] = [];
-  
   constructor() {
-    console.log('ETL Pipeline initialized');
+    console.log('ETLPipeline initialized');
   }
   
   /**
-   * Execute the ETL pipeline
+   * Execute an ETL job
    */
-  async execute(
-    source: DataSourceConfig,
-    destination: DataSourceConfig,
-    transformationRules: TransformationRule[],
-    options: ETLPipelineOptions = {}
-  ): Promise<ETLPipelineResult> {
-    // Reset logs for this execution
-    this.logs = [];
+  async executeJob(
+    job: ETLJob,
+    rules: any[] = [],
+    dataConnectors: Record<number, any> = {},
+    options: PipelineExecutionOptions = {}
+  ): Promise<PipelineResult> {
+    console.log(`Executing ETL job: ${job.name} (ID: ${job.id})`);
     
     const startTime = new Date();
-    this.log('Starting ETL pipeline execution');
+    let success = true;
+    const errors: string[] = [];
     
-    // Set default options
-    const defaultOptions: ETLPipelineOptions = {
-      validateData: true,
-      analyzeDataQuality: true,
-      maxRetries: 3,
-      logTransformations: true,
-      stopOnError: false,
-      chunkSize: 1000,
-      includeMetadata: true
+    // Set job status to running
+    job.status = JobStatus.RUNNING;
+    job.lastRun = startTime;
+    
+    // Initialize the result
+    const result: PipelineResult = {
+      jobId: job.id,
+      sourceResults: [],
+      destinationResults: [],
+      recordsExtracted: 0,
+      recordsTransformed: 0,
+      recordsLoaded: 0,
+      executionTime: 0,
+      startTime,
+      endTime: new Date(),
+      success: false,
+      errors: []
     };
     
-    const pipelineOptions = { ...defaultOptions, ...options };
-    const errors: any[] = [];
-    const warnings: any[] = [];
+    // Create context for transformation
+    const context = options.context || {};
     
     try {
-      // Extract data from source
-      this.log(`Extracting data from source: ${source.name}`);
-      const extractResult = await dataConnector.extractData(source);
-      const { data: extractedData, stats: sourceStats } = extractResult;
+      // Extract data from sources
+      const extractResults = await this.extractData(job.sources, dataConnectors, options);
+      result.sourceResults = extractResults;
       
-      this.log(`Extracted ${extractedData.length} records in ${sourceStats.duration}ms`);
+      // Combine all extracted data
+      let combinedData: any[] = [];
+      let extractError = false;
       
-      // Validate and analyze data quality if enabled
-      let dataQualityResult: DataQualityAnalysisResult | undefined;
-      
-      if (pipelineOptions.analyzeDataQuality) {
-        this.log('Analyzing data quality');
-        
-        try {
-          dataQualityResult = dataQualityService.analyzeDataQuality(extractedData);
+      for (const extractResult of extractResults) {
+        if (extractResult.success) {
+          combinedData = combinedData.concat(extractResult.data);
+          result.recordsExtracted += extractResult.data.length;
+        } else {
+          extractError = true;
+          errors.push(`Source ${extractResult.sourceId} extraction failed: ${extractResult.errors.join(', ')}`);
           
-          if (dataQualityResult.issues.length > 0) {
-            this.log(`Found ${dataQualityResult.issues.length} data quality issues`);
-            
-            // Add warnings for data quality issues
-            for (const issue of dataQualityResult.issues) {
-              warnings.push({
-                type: 'data_quality',
-                issue
-              });
-            }
+          if (!options.continueOnError) {
+            throw new Error(`Source ${extractResult.sourceId} extraction failed: ${extractResult.errors.join(', ')}`);
           }
-        } catch (error) {
-          this.log(`Error analyzing data quality: ${error instanceof Error ? error.message : String(error)}`);
-          warnings.push({
-            type: 'data_quality_analysis_error',
-            error
-          });
         }
       }
       
-      // Apply transformations
-      this.log(`Applying ${transformationRules.length} transformation rules`);
-      const transformStartTime = new Date();
+      // Early return if no data was extracted and we're not continuing on error
+      if (combinedData.length === 0 && !options.continueOnError) {
+        throw new Error('No data extracted from sources');
+      }
       
-      // Filter out disabled transformation rules
-      const activeRules = transformationRules.filter(rule => rule.enabled);
+      // Add extracted data to the context
+      context.sourceData = combinedData;
       
-      // Sort rules by order if specified
-      const sortedRules = [...activeRules].sort((a, b) => {
-        if (a.order !== undefined && b.order !== undefined) {
-          return a.order - b.order;
-        }
-        return 0;
-      });
-      
-      // Apply each transformation rule
-      let transformedData = [...extractedData];
-      let failedRecords = 0;
-      
-      for (const rule of sortedRules) {
-        if (pipelineOptions.logTransformations) {
-          this.log(`Applying transformation: ${rule.name} (${rule.type})`);
-        }
-        
+      // Transform data if rules are provided
+      if (rules.length > 0 && combinedData.length > 0) {
         try {
-          const result = await transformationService.applyTransformation(
-            transformedData,
-            rule
+          const transformationResult = await transformationService.applyTransformations(
+            combinedData,
+            rules,
+            context
           );
           
-          transformedData = result.data;
-          failedRecords += result.failedRecords.length;
+          result.transformationResult = transformationResult;
+          result.recordsTransformed = transformationResult.recordsOutput;
           
-          if (result.failedRecords.length > 0) {
-            this.log(`${result.failedRecords.length} records failed transformation: ${rule.name}`);
+          if (!transformationResult.success) {
+            errors.push(`Transformation failed: ${transformationResult.errors.map(e => e.message).join(', ')}`);
             
-            // Add errors for failed transformations
-            for (const failedRecord of result.failedRecords) {
-              errors.push({
-                type: 'transformation_error',
-                rule: rule.name,
-                record: failedRecord.record,
-                error: failedRecord.error
-              });
-              
-              if (pipelineOptions.stopOnError) {
-                throw new Error(`Transformation failed: ${failedRecord.error}`);
-              }
+            if (!options.continueOnError) {
+              throw new Error(`Transformation failed: ${transformationResult.errors.map(e => e.message).join(', ')}`);
             }
           }
+          
+          // Replace the data to be loaded with transformed data
+          combinedData = transformationResult.data;
         } catch (error) {
-          this.log(`Error applying transformation ${rule.name}: ${error instanceof Error ? error.message : String(error)}`);
+          const errorMessage = error instanceof Error ? error.message : String(error);
+          errors.push(`Transformation error: ${errorMessage}`);
           
-          errors.push({
-            type: 'transformation_rule_error',
-            rule: rule.name,
-            error
-          });
-          
-          if (pipelineOptions.stopOnError) {
+          if (!options.continueOnError) {
             throw error;
           }
         }
       }
       
-      const transformEndTime = new Date();
-      const transformationTime = transformEndTime.getTime() - transformStartTime.getTime();
-      
-      this.log(`Transformed ${transformedData.length} records in ${transformationTime}ms`);
-      
-      // Load data to destination
-      this.log(`Loading data to destination: ${destination.name}`);
-      const loadResult = await dataConnector.loadData(
-        destination,
-        transformedData,
-        {
-          chunkSize: pipelineOptions.chunkSize
-        }
-      );
-      
-      const { stats: destinationStats, recordsProcessed } = loadResult;
-      
-      this.log(`Loaded ${recordsProcessed} records in ${destinationStats.duration}ms`);
-      
-      // If the load operation had errors, add them to our errors array
-      if (loadResult.errors && loadResult.errors.length > 0) {
-        for (const error of loadResult.errors) {
-          errors.push({
-            type: 'load_error',
-            error
-          });
+      // Only load data if not in validate only mode
+      if (!options.validateOnly) {
+        // Load data to destinations
+        const loadResults = await this.loadData(job.destinations, combinedData, dataConnectors, options);
+        result.destinationResults = loadResults;
+        
+        // Calculate records loaded
+        for (const loadResult of loadResults) {
+          if (loadResult.success) {
+            result.recordsLoaded += loadResult.recordsLoaded;
+          } else {
+            errors.push(`Destination ${loadResult.destinationId} load failed: ${loadResult.errors.join(', ')}`);
+            
+            if (!options.continueOnError) {
+              throw new Error(`Destination ${loadResult.destinationId} load failed: ${loadResult.errors.join(', ')}`);
+            }
+          }
         }
       }
+      
+      // Set success flag based on errors
+      success = errors.length === 0;
+    } catch (error) {
+      success = false;
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      errors.push(errorMessage);
+      console.error(`Job execution failed: ${errorMessage}`);
+      
+      // Create an alert for the error
+      alertService.createAlert({
+        type: AlertType.ERROR,
+        severity: AlertSeverity.HIGH,
+        category: AlertCategory.TRANSFORMATION,
+        title: `ETL Job Failed: ${job.name}`,
+        message: errorMessage,
+        details: errors.join('\n'),
+        jobId: job.id
+      });
+    } finally {
+      // Update the job status
+      job.status = success ? JobStatus.SUCCEEDED : JobStatus.FAILED;
       
       // Calculate execution time
       const endTime = new Date();
       const executionTime = endTime.getTime() - startTime.getTime();
       
-      this.log(`ETL pipeline execution completed in ${executionTime}ms`);
+      // Update result
+      result.success = success;
+      result.errors = errors;
+      result.endTime = endTime;
+      result.executionTime = executionTime;
       
-      // Create the result object
-      const result: ETLPipelineResult = {
-        success: errors.length === 0,
-        sourceStats,
-        destinationStats,
-        recordCounts: {
-          extracted: extractedData.length,
-          transformed: transformedData.length,
-          loaded: recordsProcessed,
-          failed: failedRecords
-        },
-        errors,
-        warnings,
-        executionTime,
-        transformationTime,
-        dataQualityResult,
-        logs: [...this.logs]
-      };
+      console.log(`Job ${job.name} execution completed in ${executionTime}ms, success: ${success}`);
       
-      // Create an alert for the ETL result
-      if (result.success) {
+      // Create success alert if no errors
+      if (success) {
         alertService.createAlert({
           type: AlertType.SUCCESS,
           severity: AlertSeverity.LOW,
           category: AlertCategory.TRANSFORMATION,
-          title: 'ETL Pipeline Succeeded',
-          message: `ETL pipeline completed successfully: ${extractedData.length} records extracted, ${transformedData.length} records transformed, ${recordsProcessed} records loaded in ${executionTime}ms`
-        });
-      } else {
-        alertService.createAlert({
-          type: AlertType.ERROR,
-          severity: AlertSeverity.HIGH,
-          category: AlertCategory.TRANSFORMATION,
-          title: 'ETL Pipeline Failed',
-          message: `ETL pipeline completed with errors: ${errors.length} errors occurred during execution`
+          title: `ETL Job Completed: ${job.name}`,
+          message: `Job executed successfully in ${executionTime}ms`,
+          details: `Records extracted: ${result.recordsExtracted}, transformed: ${result.recordsTransformed}, loaded: ${result.recordsLoaded}`,
+          jobId: job.id
         });
       }
-      
-      return result;
-    } catch (error) {
-      const endTime = new Date();
-      const executionTime = endTime.getTime() - startTime.getTime();
-      
-      this.log(`ETL pipeline execution failed after ${executionTime}ms: ${error instanceof Error ? error.message : String(error)}`);
-      
-      // Create an alert for the failure
-      alertService.createAlert({
-        type: AlertType.ERROR,
-        severity: AlertSeverity.CRITICAL,
-        category: AlertCategory.TRANSFORMATION,
-        title: 'ETL Pipeline Failed',
-        message: `ETL pipeline execution failed: ${error instanceof Error ? error.message : String(error)}`
-      });
-      
-      // Return a failed result object
-      return {
-        success: false,
-        sourceStats: {
-          bytesTransferred: 0,
-          recordsCount: 0,
-          duration: executionTime,
-          startTime: startTime,
-          endTime: endTime,
-          avgTransferRate: 0,
-          recordsPerSecond: 0
-        },
-        destinationStats: {
-          bytesTransferred: 0,
-          recordsCount: 0,
-          duration: 0,
-          startTime: endTime,
-          endTime: endTime,
-          avgTransferRate: 0,
-          recordsPerSecond: 0
-        },
-        recordCounts: {
-          extracted: 0,
-          transformed: 0,
-          loaded: 0,
-          failed: 0
-        },
-        errors: [
-          {
-            type: 'execution_error',
-            error
-          }
-        ],
-        warnings: [],
-        executionTime,
-        transformationTime: 0,
-        logs: [...this.logs]
-      };
     }
+    
+    return result;
   }
   
   /**
-   * Add a log entry
+   * Validate an ETL job without executing the load phase
    */
-  private log(message: string): void {
-    const timestamp = new Date().toISOString();
-    const logEntry = `[${timestamp}] ${message}`;
+  async validateJob(
+    job: ETLJob,
+    rules: any[] = [],
+    dataConnectors: Record<number, any> = {},
+    options: PipelineExecutionOptions = {}
+  ): Promise<PipelineResult> {
+    // Set validateOnly to true and execute the job
+    return this.executeJob(job, rules, dataConnectors, {
+      ...options,
+      validateOnly: true
+    });
+  }
+  
+  /**
+   * Execute a data preview for an ETL job
+   */
+  async previewJob(
+    job: ETLJob,
+    rules: any[] = [],
+    dataConnectors: Record<number, any> = {},
+    options: PipelineExecutionOptions = {},
+    previewOptions: {
+      recordLimit?: number;
+      includeSource?: boolean;
+      sources?: number[];
+    } = {}
+  ): Promise<{
+    sourceData: any[];
+    transformedData: any[];
+    recordsProcessed: number;
+    executionTime: number;
+    success: boolean;
+    errors: string[];
+  }> {
+    console.log(`Executing preview for ETL job: ${job.name} (ID: ${job.id})`);
     
-    console.log(logEntry);
-    this.logs.push(logEntry);
+    const startTime = new Date();
+    let success = true;
+    const errors: string[] = [];
+    
+    const recordLimit = previewOptions.recordLimit || 100;
+    const result = {
+      sourceData: [] as any[],
+      transformedData: [] as any[],
+      recordsProcessed: 0,
+      executionTime: 0,
+      success: false,
+      errors: [] as string[]
+    };
+    
+    // Create context for transformation
+    const context = options.context || {};
+    
+    try {
+      // Filter sources if specified
+      const sourcesToExtract = previewOptions.sources && previewOptions.sources.length > 0
+        ? job.sources.filter(id => previewOptions.sources!.includes(id))
+        : job.sources;
+      
+      // Extract data from sources
+      const extractResults = await this.extractData(sourcesToExtract, dataConnectors, {
+        ...options,
+        batchSize: recordLimit
+      });
+      
+      // Combine all extracted data
+      let combinedData: any[] = [];
+      let extractError = false;
+      
+      for (const extractResult of extractResults) {
+        if (extractResult.success) {
+          combinedData = combinedData.concat(extractResult.data);
+          result.recordsProcessed += extractResult.data.length;
+        } else {
+          extractError = true;
+          errors.push(`Source ${extractResult.sourceId} extraction failed: ${extractResult.errors.join(', ')}`);
+          
+          if (!options.continueOnError) {
+            throw new Error(`Source ${extractResult.sourceId} extraction failed: ${extractResult.errors.join(', ')}`);
+          }
+        }
+      }
+      
+      // Limit records for preview
+      if (combinedData.length > recordLimit) {
+        combinedData = combinedData.slice(0, recordLimit);
+      }
+      
+      // Save source data if requested
+      if (previewOptions.includeSource) {
+        result.sourceData = [...combinedData];
+      }
+      
+      // Add extracted data to the context
+      context.sourceData = combinedData;
+      
+      // Transform data if rules are provided
+      if (rules.length > 0 && combinedData.length > 0) {
+        try {
+          const transformationResult = await transformationService.applyTransformations(
+            combinedData,
+            rules,
+            context
+          );
+          
+          if (!transformationResult.success) {
+            errors.push(`Transformation failed: ${transformationResult.errors.map(e => e.message).join(', ')}`);
+            
+            if (!options.continueOnError) {
+              throw new Error(`Transformation failed: ${transformationResult.errors.map(e => e.message).join(', ')}`);
+            }
+          }
+          
+          // Set transformed data
+          result.transformedData = transformationResult.data;
+        } catch (error) {
+          const errorMessage = error instanceof Error ? error.message : String(error);
+          errors.push(`Transformation error: ${errorMessage}`);
+          
+          if (!options.continueOnError) {
+            throw error;
+          }
+        }
+      } else {
+        // If no transformations, use source data
+        result.transformedData = combinedData;
+      }
+      
+      // Set success flag based on errors
+      success = errors.length === 0;
+    } catch (error) {
+      success = false;
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      errors.push(errorMessage);
+      console.error(`Job preview failed: ${errorMessage}`);
+    } finally {
+      // Calculate execution time
+      const endTime = new Date();
+      const executionTime = endTime.getTime() - startTime.getTime();
+      
+      // Update result
+      result.success = success;
+      result.errors = errors;
+      result.executionTime = executionTime;
+      
+      console.log(`Job ${job.name} preview completed in ${executionTime}ms, success: ${success}`);
+    }
+    
+    return result;
+  }
+  
+  /**
+   * Extract data from sources
+   * Note: In a real implementation, this would use DataConnectors to extract from various sources
+   */
+  private async extractData(
+    sourceIds: number[],
+    dataConnectors: Record<number, any>,
+    options: PipelineExecutionOptions
+  ): Promise<ExtractResult[]> {
+    const results: ExtractResult[] = [];
+    
+    // For each source, extract data
+    for (const sourceId of sourceIds) {
+      const startTime = Date.now();
+      let success = true;
+      const errors: string[] = [];
+      let data: any[] = [];
+      
+      try {
+        // Get the data connector for this source
+        const connector = dataConnectors[sourceId];
+        
+        if (!connector) {
+          throw new Error(`Data connector not found for source ID: ${sourceId}`);
+        }
+        
+        // Extract data using the connector
+        // In a real implementation, this would call connector.extract()
+        // For now, we'll simulate with mock data if the connector has a mockData property
+        if (connector.mockData) {
+          data = connector.mockData;
+        } else if (connector.extract) {
+          data = await connector.extract(options);
+        } else {
+          throw new Error(`Connector for source ID: ${sourceId} does not have an extract method`);
+        }
+      } catch (error) {
+        success = false;
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        errors.push(errorMessage);
+        console.error(`Extract failed for source ${sourceId}: ${errorMessage}`);
+      }
+      
+      // Add the result
+      results.push({
+        sourceId,
+        data,
+        success,
+        errors,
+        executionTime: Date.now() - startTime
+      });
+    }
+    
+    return results;
+  }
+  
+  /**
+   * Load data to destinations
+   * Note: In a real implementation, this would use DataConnectors to load to various destinations
+   */
+  private async loadData(
+    destinationIds: number[],
+    data: any[],
+    dataConnectors: Record<number, any>,
+    options: PipelineExecutionOptions
+  ): Promise<LoadResult[]> {
+    const results: LoadResult[] = [];
+    
+    // For each destination, load data
+    for (const destinationId of destinationIds) {
+      const startTime = Date.now();
+      let success = true;
+      const errors: string[] = [];
+      let recordsLoaded = 0;
+      
+      try {
+        // Get the data connector for this destination
+        const connector = dataConnectors[destinationId];
+        
+        if (!connector) {
+          throw new Error(`Data connector not found for destination ID: ${destinationId}`);
+        }
+        
+        // Load data using the connector
+        // In a real implementation, this would call connector.load()
+        if (connector.load) {
+          recordsLoaded = await connector.load(data, options);
+        } else {
+          // Mock successful load if no load method
+          recordsLoaded = data.length;
+        }
+      } catch (error) {
+        success = false;
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        errors.push(errorMessage);
+        console.error(`Load failed for destination ${destinationId}: ${errorMessage}`);
+      }
+      
+      // Add the result
+      results.push({
+        destinationId,
+        recordsLoaded,
+        success,
+        errors,
+        executionTime: Date.now() - startTime
+      });
+    }
+    
+    return results;
   }
 }
 

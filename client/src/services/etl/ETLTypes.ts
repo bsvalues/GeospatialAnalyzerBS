@@ -1,187 +1,488 @@
 /**
- * ETL Types
- * 
- * This file contains all the type definitions used throughout the ETL system.
+ * Data source type enum
  */
-
-// ===== DATABASE TYPES =====
+export enum DataSourceType {
+  DATABASE = 'DATABASE',
+  API = 'API',
+  FILE = 'FILE',
+  MEMORY = 'MEMORY'
+}
 
 /**
  * Database type enum
  */
 export enum DatabaseType {
-  POSTGRES = 'postgres',
-  MYSQL = 'mysql',
-  SQLITE = 'sqlite',
-  MONGODB = 'mongodb',
-  MSSQL = 'mssql',
-  ORACLE = 'oracle'
+  POSTGRES = 'POSTGRES',
+  MYSQL = 'MYSQL',
+  ORACLE = 'ORACLE',
+  SQLSERVER = 'SQLSERVER',
+  MONGODB = 'MONGODB',
+  SQLITE = 'SQLITE',
+  OTHER = 'OTHER'
 }
-
-/**
- * Database authentication type enum
- */
-export enum DatabaseAuthType {
-  BASIC = 'basic',
-  IAM = 'iam',
-  CERTIFICATE = 'certificate',
-  TOKEN = 'token',
-  WINDOWS = 'windows',
-  NONE = 'none'
-}
-
-/**
- * Database configuration interface
- */
-export interface DatabaseConfig {
-  id: number;
-  name: string;
-  description?: string;
-  dbType: DatabaseType;
-  host: string;
-  port?: number;
-  database: string;
-  username?: string;
-  password?: string;
-  authType?: DatabaseAuthType;
-  options?: Record<string, any>;
-  ssl?: boolean;
-  createdAt: Date;
-  updatedAt: Date;
-}
-
-// ===== API TYPES =====
 
 /**
  * API type enum
  */
 export enum ApiType {
-  REST = 'rest',
-  GRAPHQL = 'graphql',
-  SOAP = 'soap',
-  CUSTOM = 'custom'
+  REST = 'REST',
+  GRAPHQL = 'GRAPHQL',
+  SOAP = 'SOAP',
+  OTHER = 'OTHER'
 }
 
 /**
- * HTTP method enum
+ * File format enum
  */
-export enum HttpMethod {
-  GET = 'get',
-  POST = 'post',
-  PUT = 'put',
-  DELETE = 'delete',
-  PATCH = 'patch',
-  HEAD = 'head',
-  OPTIONS = 'options'
+export enum FileFormat {
+  CSV = 'CSV',
+  JSON = 'JSON',
+  XML = 'XML',
+  EXCEL = 'EXCEL',
+  PARQUET = 'PARQUET',
+  AVRO = 'AVRO',
+  TEXT = 'TEXT',
+  OTHER = 'OTHER'
 }
 
 /**
  * Authentication type enum
  */
 export enum AuthType {
-  NONE = 'none',
-  BASIC = 'basic',
-  API_KEY = 'api_key',
-  BEARER = 'bearer',
-  OAUTH1 = 'oauth1',
-  OAUTH2 = 'oauth2',
-  CUSTOM = 'custom'
+  NONE = 'NONE',
+  BASIC = 'BASIC',
+  TOKEN = 'TOKEN',
+  OAUTH = 'OAUTH',
+  API_KEY = 'API_KEY',
+  CERT = 'CERT',
+  CUSTOM = 'CUSTOM'
+}
+
+/**
+ * Schedule frequency enum
+ */
+export enum ScheduleFrequency {
+  ONCE = 'ONCE',
+  MINUTELY = 'MINUTELY',
+  HOURLY = 'HOURLY',
+  DAILY = 'DAILY',
+  WEEKLY = 'WEEKLY',
+  MONTHLY = 'MONTHLY',
+  CUSTOM = 'CUSTOM'
+}
+
+/**
+ * Job status enum
+ */
+export enum JobStatus {
+  CREATED = 'CREATED',
+  PENDING = 'PENDING',
+  RUNNING = 'RUNNING',
+  SUCCEEDED = 'SUCCEEDED',
+  FAILED = 'FAILED',
+  CANCELLED = 'CANCELLED',
+  SCHEDULED = 'SCHEDULED'
+}
+
+/**
+ * Job run status enum
+ */
+export enum JobRunStatus {
+  PENDING = 'PENDING',
+  RUNNING = 'RUNNING',
+  SUCCEEDED = 'SUCCEEDED',
+  FAILED = 'FAILED',
+  CANCELLED = 'CANCELLED'
+}
+
+/**
+ * Transformation type enum
+ */
+export enum TransformationType {
+  FILTER = 'FILTER',
+  MAP = 'MAP',
+  AGGREGATE = 'AGGREGATE',
+  GROUP = 'GROUP',
+  JOIN = 'JOIN',
+  SORT = 'SORT',
+  VALIDATE = 'VALIDATE',
+  ENRICH = 'ENRICH'
+}
+
+/**
+ * Filter operator enum
+ */
+export enum FilterOperator {
+  EQUALS = 'EQUALS',
+  NOT_EQUALS = 'NOT_EQUALS',
+  GREATER_THAN = 'GREATER_THAN',
+  LESS_THAN = 'LESS_THAN',
+  GREATER_THAN_OR_EQUALS = 'GREATER_THAN_OR_EQUALS',
+  LESS_THAN_OR_EQUALS = 'LESS_THAN_OR_EQUALS',
+  IN = 'IN',
+  NOT_IN = 'NOT_IN',
+  CONTAINS = 'CONTAINS',
+  NOT_CONTAINS = 'NOT_CONTAINS',
+  STARTS_WITH = 'STARTS_WITH',
+  ENDS_WITH = 'ENDS_WITH',
+  IS_NULL = 'IS_NULL',
+  IS_NOT_NULL = 'IS_NOT_NULL',
+  REGEX = 'REGEX'
+}
+
+/**
+ * Filter logic enum
+ */
+export enum FilterLogic {
+  AND = 'AND',
+  OR = 'OR'
+}
+
+/**
+ * Aggregate function enum
+ */
+export enum AggregateFunction {
+  SUM = 'SUM',
+  AVG = 'AVG',
+  MIN = 'MIN',
+  MAX = 'MAX',
+  COUNT = 'COUNT',
+  COUNT_DISTINCT = 'COUNT_DISTINCT',
+  FIRST = 'FIRST',
+  LAST = 'LAST',
+  MEDIAN = 'MEDIAN',
+  STDDEV = 'STDDEV',
+  VARIANCE = 'VARIANCE'
+}
+
+/**
+ * Join type enum
+ */
+export enum JoinType {
+  INNER = 'INNER',
+  LEFT = 'LEFT',
+  RIGHT = 'RIGHT',
+  FULL = 'FULL',
+  CROSS = 'CROSS'
+}
+
+/**
+ * Sort direction enum
+ */
+export enum SortDirection {
+  ASC = 'ASC',
+  DESC = 'DESC'
+}
+
+/**
+ * Data quality issue type enum
+ */
+export enum DataQualityIssueType {
+  MISSING_VALUE = 'MISSING_VALUE',
+  INVALID_FORMAT = 'INVALID_FORMAT',
+  OUT_OF_RANGE = 'OUT_OF_RANGE',
+  DUPLICATE_VALUE = 'DUPLICATE_VALUE',
+  INCONSISTENT_VALUE = 'INCONSISTENT_VALUE',
+  OUTLIER = 'OUTLIER'
+}
+
+/**
+ * Data quality issue severity enum
+ */
+export enum DataQualityIssueSeverity {
+  INFO = 'INFO',
+  WARNING = 'WARNING',
+  ERROR = 'ERROR',
+  CRITICAL = 'CRITICAL'
+}
+
+/**
+ * Optimization suggestion type
+ */
+export enum OptimizationSuggestionType {
+  RULE_ORDERING = 'RULE_ORDERING',
+  RULE_CONSOLIDATION = 'RULE_CONSOLIDATION',
+  REDUNDANT_RULE = 'REDUNDANT_RULE', 
+  EXCESSIVE_TRANSFORMS = 'EXCESSIVE_TRANSFORMS',
+  PERFORMANCE = 'PERFORMANCE'
+}
+
+/**
+ * Optimization suggestion severity
+ */
+export enum SuggestionSeverity {
+  INFO = 'INFO',
+  WARNING = 'WARNING',
+  ERROR = 'ERROR',
+  CRITICAL = 'CRITICAL'
+}
+
+/**
+ * Optimization suggestion category
+ */
+export enum SuggestionCategory {
+  PERFORMANCE = 'PERFORMANCE',
+  QUALITY = 'QUALITY',
+  RELIABILITY = 'RELIABILITY',
+  MAINTAINABILITY = 'MAINTAINABILITY',
+  COMPLEXITY = 'COMPLEXITY',
+  COST = 'COST',
+  DATA_QUALITY = 'DATA_QUALITY'
+}
+
+/**
+ * Optimization impact
+ */
+export enum OptimizationImpact {
+  LOW = 'LOW',
+  MEDIUM = 'MEDIUM',
+  HIGH = 'HIGH'
+}
+
+/**
+ * Optimization action type
+ */
+export enum OptimizationActionType {
+  REORDER_RULES = 'REORDER_RULES',
+  COMBINE_RULES = 'COMBINE_RULES',
+  REMOVE_RULE = 'REMOVE_RULE',
+  REVIEW_RULES = 'REVIEW_RULES',
+  CONSOLIDATE_TRANSFORMS = 'CONSOLIDATE_TRANSFORMS',
+  ADD_INDEXES = 'ADD_INDEXES',
+  ADD_FILTER = 'ADD_FILTER',
+  ADD_CACHING = 'ADD_CACHING',
+  PARALLELIZE = 'PARALLELIZE'
+}
+
+/**
+ * Database configuration interface
+ */
+export interface DatabaseConfig {
+  dbType: DatabaseType;
+  host: string;
+  port: number;
+  database: string;
+  schema?: string;
+  username?: string;
+  password?: string;
+  ssl?: boolean;
+  connectionString?: string;
+  connectionOptions?: Record<string, any>;
+  query?: string;
+  table?: string;
 }
 
 /**
  * API configuration interface
  */
 export interface ApiConfig {
-  id: number;
-  name: string;
-  description?: string;
   apiType: ApiType;
-  baseUrl: string;
-  endpoint?: string;
-  method?: HttpMethod;
+  url: string;
+  method?: string;
   headers?: Record<string, string>;
-  queryParams?: Record<string, string>;
-  bodyTemplate?: string;
-  authType: AuthType;
-  authConfig?: Record<string, any>;
-  rateLimit?: number;
-  timeout?: number;
-  createdAt: Date;
-  updatedAt: Date;
-}
-
-// ===== FILE TYPES =====
-
-/**
- * File format enum
- */
-export enum FileFormat {
-  CSV = 'csv',
-  JSON = 'json',
-  XML = 'xml',
-  EXCEL = 'excel',
-  PARQUET = 'parquet',
-  AVRO = 'avro'
-}
-
-/**
- * File delimiter enum
- */
-export enum FileDelimiter {
-  COMMA = ',',
-  TAB = '\t',
-  SEMICOLON = ';',
-  PIPE = '|',
-  SPACE = ' '
+  params?: Record<string, any>;
+  body?: any;
+  path?: string;
+  pagination?: {
+    enabled: boolean;
+    type?: 'offset' | 'page' | 'cursor';
+    paramName?: string;
+    limitParamName?: string;
+    pageSize?: number;
+    maxPages?: number;
+  };
+  authentication?: {
+    type: AuthType;
+    credentials?: Record<string, any>;
+  };
 }
 
 /**
  * File configuration interface
  */
 export interface FileConfig {
-  id: number;
-  name: string;
-  description?: string;
   format: FileFormat;
   path: string;
-  delimiter?: FileDelimiter;
-  hasHeader?: boolean;
+  delimiter?: string;
+  quoteChar?: string;
+  escapeChar?: string;
   encoding?: string;
-  compression?: 'none' | 'gzip' | 'zip' | 'bzip2';
-  schema?: Record<string, any>;
-  createdAt: Date;
-  updatedAt: Date;
+  hasHeader?: boolean;
+  sheet?: string | number;
+  compression?: string;
 }
-
-// ===== MEMORY TYPES =====
 
 /**
  * Memory configuration interface
  */
 export interface MemoryConfig {
-  id: number;
-  name: string;
-  description?: string;
-  variableName?: string;
-  createdAt: Date;
-  updatedAt: Date;
+  data?: any[] | string;
+  sourceId?: string;
 }
-
-// ===== TRANSFORMATION TYPES =====
 
 /**
- * Transformation type enum
+ * Data source configuration union type
  */
-export enum TransformationType {
-  FILTER = 'filter',
-  MAP = 'map',
-  AGGREGATE = 'aggregate',
-  JOIN = 'join',
-  SORT = 'sort',
-  VALIDATE = 'validate',
-  DEDUPLICATE = 'deduplicate',
-  CUSTOM = 'custom'
+export type DataSourceConfig = DatabaseConfig | ApiConfig | FileConfig | MemoryConfig;
+
+/**
+ * Filter condition interface
+ */
+export interface FilterCondition {
+  field: string;
+  operator: FilterOperator;
+  value: any;
+  valueType?: 'string' | 'number' | 'boolean' | 'date' | 'array';
+  caseSensitive?: boolean;
 }
+
+/**
+ * Filter group interface
+ */
+export interface FilterGroup {
+  logic: FilterLogic;
+  conditions: (FilterCondition | FilterGroup)[];
+}
+
+/**
+ * Field mapping interface
+ */
+export interface FieldMapping {
+  source: string;
+  target: string;
+  transform?: string;
+}
+
+/**
+ * Aggregate field interface
+ */
+export interface AggregateField {
+  source: string;
+  target: string;
+  function: AggregateFunction;
+}
+
+/**
+ * Join condition interface
+ */
+export interface JoinCondition {
+  leftField: string;
+  rightField: string;
+}
+
+/**
+ * Sort field interface
+ */
+export interface SortField {
+  field: string;
+  direction: SortDirection;
+}
+
+/**
+ * Validation rule interface
+ */
+export interface ValidationRule {
+  field: string;
+  rules: {
+    required?: boolean;
+    type?: string;
+    min?: number;
+    max?: number;
+    minLength?: number;
+    maxLength?: number;
+    pattern?: string;
+    enum?: any[];
+    custom?: string;
+  };
+  errorMessage?: string;
+}
+
+/**
+ * Enrichment source interface
+ */
+export interface EnrichmentSource {
+  type: 'static' | 'api' | 'database' | 'computed';
+  config: any;
+}
+
+/**
+ * Filter transformation configuration
+ */
+export interface FilterTransformConfig {
+  filter: FilterGroup;
+}
+
+/**
+ * Map transformation configuration
+ */
+export interface MapTransformConfig {
+  mappings: FieldMapping[];
+  includeOriginal?: boolean;
+}
+
+/**
+ * Aggregate transformation configuration
+ */
+export interface AggregateTransformConfig {
+  groupBy: string[];
+  aggregates: AggregateField[];
+}
+
+/**
+ * Group transformation configuration
+ */
+export interface GroupTransformConfig {
+  groupBy: string[];
+}
+
+/**
+ * Join transformation configuration
+ */
+export interface JoinTransformConfig {
+  rightSource: string;
+  joinType: JoinType;
+  conditions: JoinCondition[];
+  includeFields?: {
+    left?: string[];
+    right?: string[];
+  };
+}
+
+/**
+ * Sort transformation configuration
+ */
+export interface SortTransformConfig {
+  sortFields: SortField[];
+}
+
+/**
+ * Validate transformation configuration
+ */
+export interface ValidateTransformConfig {
+  validations: ValidationRule[];
+  errorHandling: 'fail' | 'filter' | 'tag';
+}
+
+/**
+ * Enrich transformation configuration
+ */
+export interface EnrichTransformConfig {
+  sources: Record<string, EnrichmentSource>;
+  mappings: FieldMapping[];
+}
+
+/**
+ * Transformation configuration union type
+ */
+export type TransformationConfig =
+  | FilterTransformConfig
+  | MapTransformConfig
+  | AggregateTransformConfig
+  | GroupTransformConfig
+  | JoinTransformConfig
+  | SortTransformConfig
+  | ValidateTransformConfig
+  | EnrichTransformConfig;
 
 /**
  * Transformation rule interface
@@ -193,23 +494,9 @@ export interface TransformationRule {
   type: TransformationType;
   order?: number;
   enabled: boolean;
-  config: any;
+  config: TransformationConfig;
   createdAt: Date;
   updatedAt: Date;
-}
-
-// ===== SCHEDULE TYPES =====
-
-/**
- * Schedule frequency enum
- */
-export enum ScheduleFrequency {
-  ONCE = 'once',
-  HOURLY = 'hourly',
-  DAILY = 'daily',
-  WEEKLY = 'weekly',
-  MONTHLY = 'monthly',
-  CUSTOM = 'custom'
 }
 
 /**
@@ -217,39 +504,14 @@ export enum ScheduleFrequency {
  */
 export interface ETLScheduleOptions {
   frequency: ScheduleFrequency;
+  minute?: number;
+  hour?: number;
+  dayOfMonth?: number;
+  month?: number;
+  dayOfWeek?: number;
+  timezone?: string;
   startDate?: Date;
   endDate?: Date;
-  hour?: number;
-  minute?: number;
-  daysOfWeek?: number[]; // 0-6, Sunday = 0
-  dayOfMonth?: number; // 1-31
-  cron?: string; // For custom schedules
-}
-
-/**
- * ETL schedule interface
- */
-export interface ETLSchedule {
-  id: number;
-  jobId: number;
-  options: ETLScheduleOptions;
-  nextRun?: Date;
-  enabled: boolean;
-  createdAt: Date;
-  updatedAt: Date;
-}
-
-// ===== JOB TYPES =====
-
-/**
- * Job status enum
- */
-export enum JobStatus {
-  IDLE = 'idle',
-  RUNNING = 'running',
-  SUCCEEDED = 'succeeded',
-  FAILED = 'failed',
-  CANCELLED = 'cancelled'
 }
 
 /**
@@ -264,8 +526,9 @@ export interface ETLJob {
   rules: number[];
   schedule?: ETLScheduleOptions;
   enabled: boolean;
-  lastRun?: Date;
   status: JobStatus;
+  lastRun?: Date;
+  nextRun?: Date;
   createdAt: Date;
   updatedAt: Date;
   createdBy?: string;
@@ -278,66 +541,71 @@ export interface ETLJob {
 export interface JobRun {
   id: number;
   jobId: number;
+  status: JobRunStatus;
   startTime: Date;
   endTime?: Date;
-  status: JobStatus;
-  records: {
-    extracted: number;
-    transformed: number;
-    loaded: number;
-    failed: number;
-  };
-  errors: any[];
-  executionTime?: number;
+  duration?: number;
+  errorMessage?: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+/**
+ * Data quality issue interface
+ */
+export interface DataQualityIssue {
+  id: string;
+  type: DataQualityIssueType;
+  severity: DataQualityIssueSeverity;
+  field?: string;
+  description: string;
+  affectedRows: number;
+  affectedRowsPercentage: number;
+  examples?: any[];
   createdAt: Date;
 }
 
-// ===== OPTIMIZATION TYPES =====
-
 /**
- * Optimization suggestion type enum
+ * Field statistics interface
  */
-export enum SuggestionType {
-  RULE_ORDERING = 'RULE_ORDERING',
-  RULE_CONSOLIDATION = 'RULE_CONSOLIDATION',
-  REDUNDANT_RULE = 'REDUNDANT_RULE',
-  EXCESSIVE_TRANSFORMS = 'EXCESSIVE_TRANSFORMS',
-  PERFORMANCE = 'PERFORMANCE'
+export interface FieldStatistics {
+  fieldName: string;
+  dataType: string;
+  count: number;
+  distinctCount: number;
+  nullCount: number;
+  emptyCount: number;
+  min?: any;
+  max?: any;
+  mean?: number;
+  median?: number;
+  stdDev?: number;
+  percentiles?: Record<string, number>;
+  mostCommonValues?: [any, number][];
+  leastCommonValues?: [any, number][];
+  histogram?: [number, number][];
+  patternAnalysis?: {
+    patterns: [string, number][];
+    examples: Record<string, string[]>;
+  };
 }
 
 /**
- * Optimization suggestion severity enum
+ * Data quality analysis result interface
  */
-export enum SuggestionSeverity {
-  LOW = 'low',
-  MEDIUM = 'medium',
-  HIGH = 'high',
-  CRITICAL = 'critical'
-}
-
-/**
- * Optimization suggestion category enum
- */
-export enum SuggestionCategory {
-  ORDERING = 'ordering',
-  EFFICIENCY = 'efficiency',
-  PERFORMANCE = 'performance',
-  RELIABILITY = 'reliability',
-  MAINTAINABILITY = 'maintainability'
-}
-
-/**
- * Optimization action type enum
- */
-export enum OptimizationActionType {
-  REORDER_RULES = 'REORDER_RULES',
-  COMBINE_RULES = 'COMBINE_RULES',
-  REVIEW_RULES = 'REVIEW_RULES',
-  CONSOLIDATE_TRANSFORMS = 'CONSOLIDATE_TRANSFORMS',
-  ADD_INDEXES = 'ADD_INDEXES',
-  ADD_FILTER = 'ADD_FILTER',
-  ADD_CACHING = 'ADD_CACHING',
-  PARALLELIZE = 'PARALLELIZE'
+export interface DataQualityAnalysisResult {
+  datasetSize: number;
+  fieldCount: number;
+  issueCount: number;
+  issuesBySeverity: Record<DataQualityIssueSeverity, number>;
+  issuesByType: Record<DataQualityIssueType, number>;
+  issuesByField: Record<string, DataQualityIssue[]>;
+  fieldStatistics: Record<string, FieldStatistics>;
+  qualityScore: number;
+  completenessScore: number;
+  validityScore: number;
+  consistencyScore: number;
+  timestamp: Date;
 }
 
 /**
@@ -357,23 +625,39 @@ export interface OptimizationSuggestion {
   title: string;
   description: string;
   details: string;
-  type: SuggestionType;
+  type: OptimizationSuggestionType;
   severity: SuggestionSeverity;
   category: SuggestionCategory;
-  impact: 'low' | 'medium' | 'high';
+  impact: OptimizationImpact;
+  status: 'pending' | 'applied' | 'rejected' | 'expired';
   action?: OptimizationAction;
-  applied: boolean;
-  timestamp: Date;
 }
 
-// ===== DATA SOURCE TYPES =====
+/**
+ * Data source interface
+ */
+export interface DataSource {
+  id: number;
+  name: string;
+  description?: string;
+  type: DataSourceType;
+  config: DataSourceConfig;
+  enabled: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+}
 
 /**
- * Data source type
+ * Job schedule interface
  */
-export type DataSource = DatabaseConfig | ApiConfig | FileConfig | MemoryConfig;
-
-/**
- * Data source config type
- */
-export type DataSourceConfig = DatabaseConfig | ApiConfig | FileConfig | MemoryConfig;
+export interface JobSchedule {
+  id: number;
+  jobId: number;
+  name: string;
+  schedule: ETLScheduleOptions;
+  enabled: boolean;
+  lastRun?: Date;
+  nextRun?: Date;
+  createdAt: Date;
+  updatedAt: Date;
+}

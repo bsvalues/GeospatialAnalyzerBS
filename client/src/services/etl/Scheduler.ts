@@ -1,5 +1,20 @@
-import { ScheduleFrequency, ETLScheduleOptions } from './ETLTypes';
+import { ScheduleFrequency } from './ETLTypes';
 import { alertService, AlertType, AlertSeverity, AlertCategory } from './AlertService';
+
+/**
+ * Schedule options interface
+ */
+export interface ScheduleOptions {
+  frequency: ScheduleFrequency;
+  minute?: number;
+  hour?: number;
+  dayOfMonth?: number;
+  month?: number;
+  dayOfWeek?: number;
+  timezone?: string;
+  startDate?: Date;
+  endDate?: Date;
+}
 
 /**
  * Scheduled job interface
@@ -8,93 +23,210 @@ export interface ScheduledJob {
   id: number;
   jobId: number;
   name: string;
-  schedule: ETLScheduleOptions;
+  schedule: ScheduleOptions;
   lastRun?: Date;
   nextRun?: Date;
   enabled: boolean;
   createdAt: Date;
   updatedAt: Date;
+  runHandler: () => Promise<void>;
 }
 
 /**
- * Run handler type
+ * Update scheduled job options interface
  */
-export type RunHandler = (jobId: number) => Promise<void>;
+export interface UpdateScheduledJobOptions {
+  name?: string;
+  schedule?: ScheduleOptions;
+  enabled?: boolean;
+}
 
 /**
- * Scheduler service
+ * Scheduler class
  */
 class Scheduler {
   private scheduledJobs: Map<number, ScheduledJob> = new Map();
-  private runHandlers: Map<number, RunHandler> = new Map();
-  private timerIds: Map<number, NodeJS.Timeout> = new Map();
-  private nextId = 1;
+  private timers: Map<number, NodeJS.Timeout> = new Map();
+  private nextScheduleId = 1;
+  private running = false;
   
   constructor() {
-    console.log('Scheduler service initialized');
-    this.initScheduler();
-  }
-  
-  /**
-   * Initialize the scheduler
-   */
-  private initScheduler(): void {
-    // In a real application, we would load scheduled jobs from a database
-    // For now, we'll just schedule a check every minute to see if any jobs need to run
-    setInterval(() => {
-      this.checkSchedules();
-    }, 60000); // Check every minute
-    
     console.log('Scheduler initialized');
+    this.start();
   }
   
   /**
-   * Schedule a new job
+   * Start the scheduler
+   */
+  start(): void {
+    if (this.running) {
+      return;
+    }
+    
+    this.running = true;
+    
+    // Schedule all enabled jobs
+    for (const [scheduleId, job] of this.scheduledJobs) {
+      if (job.enabled) {
+        this.scheduleJobExecution(scheduleId);
+      }
+    }
+    
+    console.log(`Scheduler started with ${this.scheduledJobs.size} jobs`);
+    
+    // Create a system alert
+    alertService.createAlert({
+      type: AlertType.INFO,
+      severity: AlertSeverity.LOW,
+      category: AlertCategory.SCHEDULING,
+      title: 'Scheduler Started',
+      message: `Scheduler started with ${this.scheduledJobs.size} jobs`
+    });
+  }
+  
+  /**
+   * Stop the scheduler
+   */
+  stop(): void {
+    if (!this.running) {
+      return;
+    }
+    
+    this.running = false;
+    
+    // Clear all timers
+    for (const [scheduleId, timer] of this.timers) {
+      clearTimeout(timer);
+    }
+    
+    this.timers.clear();
+    
+    console.log('Scheduler stopped');
+    
+    // Create a system alert
+    alertService.createAlert({
+      type: AlertType.WARNING,
+      severity: AlertSeverity.MEDIUM,
+      category: AlertCategory.SCHEDULING,
+      title: 'Scheduler Stopped',
+      message: 'All scheduled jobs have been cancelled'
+    });
+  }
+  
+  /**
+   * Schedule a job
    */
   scheduleJob(
     jobId: number,
     name: string,
-    schedule: ETLScheduleOptions,
-    runHandler: RunHandler
-  ): number {
+    scheduleOptions: ScheduleOptions,
+    runHandler: () => Promise<void>
+  ): ScheduledJob {
+    const id = this.nextScheduleId++;
     const now = new Date();
-    const id = this.nextId++;
     
     const scheduledJob: ScheduledJob = {
       id,
       jobId,
       name,
-      schedule,
-      nextRun: this.calculateNextRun(schedule),
+      schedule: scheduleOptions,
+      lastRun: undefined,
+      nextRun: this.calculateNextRun(scheduleOptions),
       enabled: true,
       createdAt: now,
-      updatedAt: now
+      updatedAt: now,
+      runHandler
     };
     
+    // Store the job
     this.scheduledJobs.set(id, scheduledJob);
-    this.runHandlers.set(id, runHandler);
     
-    // Schedule the job
-    this.scheduleNextRun(id);
+    // Schedule the job if the scheduler is running
+    if (this.running) {
+      this.scheduleJobExecution(id);
+    }
     
-    alertService.createAlert({
-      type: AlertType.INFO,
-      severity: AlertSeverity.LOW,
-      category: AlertCategory.SCHEDULING,
-      title: 'Job Scheduled',
-      message: `Job "${name}" has been scheduled (ID: ${id})`,
-      jobId
-    });
+    console.log(`Job '${name}' scheduled with ID ${id}, next run: ${scheduledJob.nextRun?.toISOString() || 'not scheduled'}`);
     
-    console.log(`Job scheduled: ${name} (ID: ${id}), next run: ${scheduledJob.nextRun}`);
+    return scheduledJob;
+  }
+  
+  /**
+   * Update a scheduled job
+   */
+  updateJobSchedule(id: number, options: UpdateScheduledJobOptions): boolean {
+    // Find the job
+    const job = this.scheduledJobs.get(id);
     
-    return id;
+    if (!job) {
+      console.warn(`Scheduled job with ID ${id} not found`);
+      return false;
+    }
+    
+    // Clear the current timer
+    if (this.timers.has(id)) {
+      clearTimeout(this.timers.get(id)!);
+      this.timers.delete(id);
+    }
+    
+    // Update the job
+    const updatedJob = { ...job, updatedAt: new Date() };
+    
+    if (options.name !== undefined) {
+      updatedJob.name = options.name;
+    }
+    
+    if (options.schedule !== undefined) {
+      updatedJob.schedule = options.schedule;
+      updatedJob.nextRun = this.calculateNextRun(options.schedule);
+    }
+    
+    if (options.enabled !== undefined) {
+      updatedJob.enabled = options.enabled;
+    }
+    
+    // Store the updated job
+    this.scheduledJobs.set(id, updatedJob);
+    
+    // Reschedule the job if it's enabled and the scheduler is running
+    if (updatedJob.enabled && this.running) {
+      this.scheduleJobExecution(id);
+    }
+    
+    console.log(`Scheduled job '${updatedJob.name}' (ID: ${id}) updated, next run: ${updatedJob.nextRun?.toISOString() || 'not scheduled'}`);
+    
+    return true;
+  }
+  
+  /**
+   * Delete a scheduled job
+   */
+  deleteScheduledJob(id: number): boolean {
+    // Find the job
+    if (!this.scheduledJobs.has(id)) {
+      console.warn(`Scheduled job with ID ${id} not found`);
+      return false;
+    }
+    
+    // Clear the timer
+    if (this.timers.has(id)) {
+      clearTimeout(this.timers.get(id)!);
+      this.timers.delete(id);
+    }
+    
+    // Remove the job
+    const job = this.scheduledJobs.get(id)!;
+    this.scheduledJobs.delete(id);
+    
+    console.log(`Scheduled job '${job.name}' (ID: ${id}) deleted`);
+    
+    return true;
   }
   
   /**
    * Get all scheduled jobs
    */
-  getScheduledJobs(): ScheduledJob[] {
+  getAllScheduledJobs(): ScheduledJob[] {
     return Array.from(this.scheduledJobs.values());
   }
   
@@ -106,297 +238,321 @@ class Scheduler {
   }
   
   /**
-   * Get scheduled jobs for a specific ETL job
+   * Get scheduled jobs for a specific job ID
    */
   getScheduledJobsByJobId(jobId: number): ScheduledJob[] {
-    return this.getScheduledJobs().filter(job => job.jobId === jobId);
+    return this.getAllScheduledJobs().filter(job => job.jobId === jobId);
   }
   
   /**
-   * Update an existing scheduled job
+   * Schedule execution of a job
    */
-  updateJobSchedule(
-    id: number,
-    updates: {
-      name?: string;
-      schedule?: ETLScheduleOptions;
-      enabled?: boolean;
-    }
-  ): boolean {
-    const job = this.scheduledJobs.get(id);
+  private scheduleJobExecution(scheduleId: number): void {
+    // Find the job
+    const job = this.scheduledJobs.get(scheduleId);
     
-    if (!job) {
-      return false;
+    if (!job || !job.enabled) {
+      return;
     }
     
+    // Clear any existing timer
+    if (this.timers.has(scheduleId)) {
+      clearTimeout(this.timers.get(scheduleId)!);
+      this.timers.delete(scheduleId);
+    }
+    
+    // Calculate next run time
+    const nextRun = job.nextRun || this.calculateNextRun(job.schedule);
+    
+    if (!nextRun) {
+      console.warn(`Could not calculate next run time for job '${job.name}' (ID: ${scheduleId})`);
+      return;
+    }
+    
+    // Update the job's next run time
+    job.nextRun = nextRun;
+    this.scheduledJobs.set(scheduleId, job);
+    
+    // Calculate the delay until the next run
     const now = new Date();
+    const delay = Math.max(0, nextRun.getTime() - now.getTime());
     
-    if (updates.name) {
-      job.name = updates.name;
+    // If the next run is in the past, execute immediately
+    if (delay === 0) {
+      this.executeScheduledJob(scheduleId);
+      return;
     }
     
-    if (updates.schedule) {
-      job.schedule = updates.schedule;
-      job.nextRun = this.calculateNextRun(updates.schedule);
-      
-      // Reset the timer
-      this.scheduleNextRun(id);
-    }
+    // Schedule the execution
+    const timer = setTimeout(() => {
+      this.executeScheduledJob(scheduleId);
+    }, delay);
     
-    if (updates.enabled !== undefined) {
-      job.enabled = updates.enabled;
-      
-      if (!updates.enabled) {
-        // Cancel the current timer
-        this.cancelSchedule(id);
-      } else if (!this.timerIds.has(id)) {
-        // Re-enable the timer
-        this.scheduleNextRun(id);
-      }
-    }
+    // Store the timer
+    this.timers.set(scheduleId, timer);
     
-    job.updatedAt = now;
-    this.scheduledJobs.set(id, job);
-    
-    console.log(`Job schedule updated: ${job.name} (ID: ${id}), next run: ${job.nextRun}`);
-    
-    return true;
+    console.log(`Job '${job.name}' (ID: ${scheduleId}) scheduled to run in ${delay}ms (${nextRun.toISOString()})`);
   }
   
   /**
-   * Delete a scheduled job
+   * Execute a scheduled job
    */
-  deleteScheduledJob(id: number): boolean {
-    if (!this.scheduledJobs.has(id)) {
-      return false;
+  private async executeScheduledJob(scheduleId: number): Promise<void> {
+    // Find the job
+    const job = this.scheduledJobs.get(scheduleId);
+    
+    if (!job || !job.enabled) {
+      return;
     }
     
-    const job = this.scheduledJobs.get(id)!;
-    
-    // Cancel any pending timer
-    this.cancelSchedule(id);
-    
-    // Remove the job and handler
-    this.scheduledJobs.delete(id);
-    this.runHandlers.delete(id);
-    
-    console.log(`Job schedule deleted: ${job.name} (ID: ${id})`);
-    
-    return true;
-  }
-  
-  /**
-   * Run a job immediately
-   */
-  async runJobNow(id: number): Promise<void> {
-    const job = this.scheduledJobs.get(id);
-    
-    if (!job) {
-      throw new Error(`Scheduled job not found: ${id}`);
-    }
-    
-    const handler = this.runHandlers.get(id);
-    
-    if (!handler) {
-      throw new Error(`Run handler not found for job: ${id}`);
-    }
-    
-    const now = new Date();
-    job.lastRun = now;
-    job.updatedAt = now;
-    
-    console.log(`Running job now: ${job.name} (ID: ${id})`);
+    console.log(`Executing scheduled job '${job.name}' (ID: ${scheduleId})`);
     
     try {
-      await handler(job.jobId);
+      // Execute the job
+      await job.runHandler();
       
-      // If this is a one-time job, disable it after running
-      if (job.schedule.frequency === ScheduleFrequency.ONCE) {
-        job.enabled = false;
-        this.cancelSchedule(id);
-        console.log(`One-time job completed and disabled: ${job.name} (ID: ${id})`);
-      } else {
-        // Calculate the next run time
-        job.nextRun = this.calculateNextRun(job.schedule);
-        this.scheduleNextRun(id);
-        console.log(`Job completed, next run: ${job.nextRun}`);
-      }
+      // Update the job's last run time
+      job.lastRun = new Date();
       
-      // Update the job in the map
-      this.scheduledJobs.set(id, job);
+      // Calculate the next run time
+      job.nextRun = this.calculateNextRun(job.schedule);
+      
+      // Update the job
+      job.updatedAt = new Date();
+      this.scheduledJobs.set(scheduleId, job);
+      
+      console.log(`Scheduled job '${job.name}' (ID: ${scheduleId}) executed successfully, next run: ${job.nextRun?.toISOString() || 'not scheduled'}`);
+      
+      // Create a success alert
+      alertService.createAlert({
+        type: AlertType.SUCCESS,
+        severity: AlertSeverity.LOW,
+        category: AlertCategory.SCHEDULING,
+        title: `Scheduled Job Executed: ${job.name}`,
+        message: `Job executed successfully`,
+        jobId: job.jobId
+      });
     } catch (error) {
-      console.error(`Error running job ${job.name} (ID: ${id}):`, error);
+      console.error(`Error executing scheduled job '${job.name}' (ID: ${scheduleId}):`, error);
       
-      const message = error instanceof Error ? error.message : String(error);
-      
+      // Create an error alert
+      const errorMessage = error instanceof Error ? error.message : String(error);
       alertService.createAlert({
         type: AlertType.ERROR,
         severity: AlertSeverity.HIGH,
         category: AlertCategory.SCHEDULING,
-        title: 'Job Execution Failed',
-        message: `Failed to execute job "${job.name}": ${message}`,
+        title: `Scheduled Job Failed: ${job.name}`,
+        message: `Error executing job: ${errorMessage}`,
         jobId: job.jobId
       });
-      
-      throw error;
+    } finally {
+      // Schedule the next execution if the job is still enabled
+      if (job.enabled && this.running) {
+        this.scheduleJobExecution(scheduleId);
+      }
     }
   }
   
   /**
    * Calculate the next run time based on a schedule
    */
-  private calculateNextRun(schedule: ETLScheduleOptions): Date {
+  private calculateNextRun(schedule: ScheduleOptions): Date | undefined {
+    // If frequency is ONCE and there's a start date, use that
+    if (schedule.frequency === ScheduleFrequency.ONCE && schedule.startDate) {
+      const startDate = new Date(schedule.startDate);
+      
+      // If the start date is in the past, return undefined
+      if (startDate < new Date()) {
+        return undefined;
+      }
+      
+      return startDate;
+    }
+    
     const now = new Date();
     const result = new Date(now);
     
-    // Handle different frequencies
+    // Check if the schedule has an end date and if it's in the past
+    if (schedule.endDate && new Date(schedule.endDate) < now) {
+      return undefined;
+    }
+    
+    // If there's a start date and it's in the future, use that as the base
+    if (schedule.startDate && new Date(schedule.startDate) > now) {
+      result.setTime(new Date(schedule.startDate).getTime());
+    }
+    
+    // Calculate the next run time based on the frequency
     switch (schedule.frequency) {
-      case ScheduleFrequency.ONCE:
-        if (schedule.startDate && schedule.startDate > now) {
-          return new Date(schedule.startDate);
-        }
-        // If no valid start date, schedule for 1 minute from now
-        result.setMinutes(result.getMinutes() + 1);
-        return result;
+      case ScheduleFrequency.MINUTELY:
+        // For minutely schedules, round to the next minute
+        result.setSeconds(0, 0);
+        result.setTime(result.getTime() + 60 * 1000);
+        break;
         
       case ScheduleFrequency.HOURLY:
-        // If minute is specified, use it, otherwise keep the current minute
+        // For hourly schedules, set to the specified minute or the next hour
+        result.setSeconds(0, 0);
         if (schedule.minute !== undefined) {
-          result.setMinutes(schedule.minute, 0, 0);
-          // If the calculated time is in the past, add an hour
-          if (result < now) {
+          if (result.getMinutes() >= schedule.minute) {
+            // If we're past the specified minute, go to the next hour
             result.setHours(result.getHours() + 1);
           }
+          result.setMinutes(schedule.minute);
         } else {
-          // Default to the next hour
+          // If no minute is specified, go to the next hour
           result.setHours(result.getHours() + 1);
-          result.setMinutes(0, 0, 0);
+          result.setMinutes(0);
         }
-        return result;
+        break;
         
       case ScheduleFrequency.DAILY:
-        // Set the hour and minute
-        result.setHours(schedule.hour || 0);
-        result.setMinutes(schedule.minute || 0, 0, 0);
-        // If the calculated time is in the past, add a day
-        if (result < now) {
+        // For daily schedules, set to the specified hour and minute or next day
+        result.setSeconds(0, 0);
+        if (schedule.hour !== undefined) {
+          if (result.getHours() > schedule.hour || 
+              (result.getHours() === schedule.hour && result.getMinutes() >= (schedule.minute || 0))) {
+            // If we're past the specified time, go to the next day
+            result.setDate(result.getDate() + 1);
+          }
+          result.setHours(schedule.hour);
+          result.setMinutes(schedule.minute || 0);
+        } else {
+          // If no hour is specified, go to the next day at midnight
           result.setDate(result.getDate() + 1);
+          result.setHours(0);
+          result.setMinutes(0);
         }
-        return result;
+        break;
         
       case ScheduleFrequency.WEEKLY:
-        // Set the day of week, hour, and minute
-        const daysToAdd = this.calculateDaysToNext(now.getDay(), schedule.daysOfWeek || [0]);
-        result.setDate(result.getDate() + daysToAdd);
-        result.setHours(schedule.hour || 0);
-        result.setMinutes(schedule.minute || 0, 0, 0);
-        return result;
+        // For weekly schedules, set to the specified day, hour, and minute or next week
+        result.setSeconds(0, 0);
+        if (schedule.dayOfWeek !== undefined) {
+          const currentDay = result.getDay();
+          let daysToAdd = schedule.dayOfWeek - currentDay;
+          
+          if (daysToAdd < 0 || (daysToAdd === 0 && 
+            (result.getHours() > (schedule.hour || 0) || 
+            (result.getHours() === (schedule.hour || 0) && result.getMinutes() >= (schedule.minute || 0))))) {
+            // If we're past the specified day or time, go to next week
+            daysToAdd += 7;
+          }
+          
+          result.setDate(result.getDate() + daysToAdd);
+          result.setHours(schedule.hour || 0);
+          result.setMinutes(schedule.minute || 0);
+        } else {
+          // If no day is specified, go to the next week
+          result.setDate(result.getDate() + 7);
+          result.setHours(schedule.hour || 0);
+          result.setMinutes(schedule.minute || 0);
+        }
+        break;
         
       case ScheduleFrequency.MONTHLY:
-        // Set the day of month, hour, and minute
-        result.setDate(schedule.dayOfMonth || 1);
-        result.setHours(schedule.hour || 0);
-        result.setMinutes(schedule.minute || 0, 0, 0);
-        // If the calculated time is in the past, add a month
-        if (result < now) {
+        // For monthly schedules, set to the specified day, hour, and minute or next month
+        result.setSeconds(0, 0);
+        if (schedule.dayOfMonth !== undefined) {
+          // If the day is in the past this month or doesn't exist this month
+          const lastDayOfMonth = new Date(result.getFullYear(), result.getMonth() + 1, 0).getDate();
+          const targetDay = Math.min(schedule.dayOfMonth, lastDayOfMonth);
+          
+          if (result.getDate() > targetDay || 
+              (result.getDate() === targetDay && 
+               (result.getHours() > (schedule.hour || 0) || 
+                (result.getHours() === (schedule.hour || 0) && result.getMinutes() >= (schedule.minute || 0))))) {
+            // Move to next month
+            result.setMonth(result.getMonth() + 1);
+          }
+          
+          // Set day, hour, and minute
+          const nextLastDayOfMonth = new Date(result.getFullYear(), result.getMonth() + 1, 0).getDate();
+          result.setDate(Math.min(schedule.dayOfMonth, nextLastDayOfMonth));
+          result.setHours(schedule.hour || 0);
+          result.setMinutes(schedule.minute || 0);
+        } else {
+          // If no day is specified, go to the first day of next month
           result.setMonth(result.getMonth() + 1);
+          result.setDate(1);
+          result.setHours(schedule.hour || 0);
+          result.setMinutes(schedule.minute || 0);
         }
-        return result;
+        break;
         
       case ScheduleFrequency.CUSTOM:
-        // For custom schedules, we would need to implement a cron parser
-        // This is outside the scope of this example
+        // For custom schedules, we would need a more complex implementation
+        // This is a placeholder for a custom schedule calculation
         console.warn('Custom schedule frequency not fully implemented');
-        // Default to daily at midnight
         result.setDate(result.getDate() + 1);
-        result.setHours(0, 0, 0, 0);
-        return result;
-    }
-  }
-  
-  /**
-   * Calculate the number of days to the next occurrence of a day of week
-   */
-  private calculateDaysToNext(currentDay: number, daysOfWeek: number[]): number {
-    if (daysOfWeek.length === 0) {
-      return 7; // Default to one week if no days specified
-    }
-    
-    // Sort the days
-    const sortedDays = [...daysOfWeek].sort((a, b) => a - b);
-    
-    // Find the next day
-    for (const day of sortedDays) {
-      if (day > currentDay) {
-        return day - currentDay;
-      }
-    }
-    
-    // If no day is greater, wrap around to the first day
-    return 7 - currentDay + sortedDays[0];
-  }
-  
-  /**
-   * Schedule the next run for a job
-   */
-  private scheduleNextRun(id: number): void {
-    // Cancel any existing timer
-    this.cancelSchedule(id);
-    
-    const job = this.scheduledJobs.get(id);
-    
-    if (!job || !job.enabled || !job.nextRun) {
-      return;
-    }
-    
-    const now = new Date();
-    const timeUntilNextRun = Math.max(0, job.nextRun.getTime() - now.getTime());
-    
-    console.log(`Scheduling job ${job.name} (ID: ${id}) to run in ${Math.floor(timeUntilNextRun / 1000)} seconds`);
-    
-    // Set a timer for the next run
-    const timerId = setTimeout(async () => {
-      this.timerIds.delete(id);
-      
-      try {
-        await this.runJobNow(id);
-      } catch (error) {
-        console.error(`Error in scheduled execution of job ${job.name} (ID: ${id}):`, error);
-      }
-    }, timeUntilNextRun);
-    
-    this.timerIds.set(id, timerId);
-  }
-  
-  /**
-   * Cancel a scheduled timer
-   */
-  private cancelSchedule(id: number): void {
-    const timerId = this.timerIds.get(id);
-    
-    if (timerId) {
-      clearTimeout(timerId);
-      this.timerIds.delete(id);
-    }
-  }
-  
-  /**
-   * Check all schedules and run any jobs that are due
-   */
-  private async checkSchedules(): Promise<void> {
-    const now = new Date();
-    
-    for (const [id, job] of this.scheduledJobs.entries()) {
-      if (job.enabled && job.nextRun && job.nextRun <= now && !this.timerIds.has(id)) {
-        console.log(`Job ${job.name} (ID: ${id}) is due to run`);
+        break;
         
-        try {
-          await this.runJobNow(id);
-        } catch (error) {
-          console.error(`Error running scheduled job ${job.name} (ID: ${id}):`, error);
-        }
-      }
+      default:
+        console.warn(`Unknown schedule frequency: ${schedule.frequency}`);
+        return undefined;
     }
+    
+    return result;
+  }
+  
+  /**
+   * Get scheduled jobs count statistics
+   */
+  getScheduledJobsStats(): {
+    total: number;
+    enabled: number;
+    disabled: number;
+    byFrequency: Record<ScheduleFrequency, number>;
+  } {
+    const stats = {
+      total: this.scheduledJobs.size,
+      enabled: 0,
+      disabled: 0,
+      byFrequency: {
+        [ScheduleFrequency.ONCE]: 0,
+        [ScheduleFrequency.MINUTELY]: 0,
+        [ScheduleFrequency.HOURLY]: 0,
+        [ScheduleFrequency.DAILY]: 0,
+        [ScheduleFrequency.WEEKLY]: 0,
+        [ScheduleFrequency.MONTHLY]: 0,
+        [ScheduleFrequency.CUSTOM]: 0
+      }
+    };
+    
+    // Count jobs by status and frequency
+    for (const job of this.scheduledJobs.values()) {
+      if (job.enabled) {
+        stats.enabled++;
+      } else {
+        stats.disabled++;
+      }
+      
+      stats.byFrequency[job.schedule.frequency]++;
+    }
+    
+    return stats;
+  }
+  
+  /**
+   * Clear all scheduled jobs
+   */
+  clearScheduledJobs(): void {
+    // Clear all timers
+    for (const [scheduleId, timer] of this.timers) {
+      clearTimeout(timer);
+    }
+    
+    this.timers.clear();
+    this.scheduledJobs.clear();
+    
+    console.log('All scheduled jobs cleared');
+  }
+  
+  /**
+   * Check if the scheduler is running
+   */
+  isRunning(): boolean {
+    return this.running;
   }
 }
 
