@@ -17,7 +17,9 @@ import { TransformationType } from "../../services/etl/ETLTypes";
 
 export interface TransformationAnimationProps {
   transformationType?: TransformationType;
+  type?: TransformationType; // For backwards compatibility with older code
   isActive: boolean;
+  isComplete?: boolean; // For backwards compatibility
   speed?: "slow" | "normal" | "fast";
   showText?: boolean;
   onComplete?: () => void;
@@ -28,13 +30,17 @@ export interface TransformationAnimationProps {
  * Animated component to visualize ETL data transformations in progress
  */
 export const TransformationAnimation: React.FC<TransformationAnimationProps> = ({
-  transformationType = TransformationType.TRANSFORM,
+  transformationType,
+  type,
   isActive,
+  isComplete,
   speed = "normal",
   showText = true,
   onComplete,
   size = "md"
 }) => {
+  // Handle backward compatibility with older code
+  const actualType: TransformationType = (transformationType || type || TransformationType.TRANSFORM) as TransformationType;
   const [animationComplete, setAnimationComplete] = React.useState(false);
 
   // Determine animation duration based on speed
@@ -163,12 +169,17 @@ export const TransformationAnimation: React.FC<TransformationAnimationProps> = (
     }
   };
 
-  // Reset animation state when isActive changes
+  // Reset animation state when isActive changes or handle isComplete for backwards compatibility
   React.useEffect(() => {
     if (isActive) {
       setAnimationComplete(false);
     }
-  }, [isActive]);
+    
+    // Handle isComplete prop for backward compatibility
+    if (isComplete) {
+      setAnimationComplete(true);
+    }
+  }, [isActive, isComplete]);
 
   // Trigger the onComplete callback
   React.useEffect(() => {
@@ -182,10 +193,10 @@ export const TransformationAnimation: React.FC<TransformationAnimationProps> = (
       }, getDuration() * 1000);
     }
     return () => clearTimeout(timer);
-  }, [isActive, animationComplete, onComplete]);
+  }, [isActive, animationComplete, onComplete, getDuration]);
 
   const sizeClasses = getSizeClasses();
-  const colorScheme = getColorScheme(transformationType);
+  const colorScheme = getColorScheme(actualType);
 
   return (
     <div className="flex flex-col items-center">
@@ -193,7 +204,7 @@ export const TransformationAnimation: React.FC<TransformationAnimationProps> = (
       <div className={`relative flex items-center justify-center rounded-full ${sizeClasses.container} ${colorScheme}`}>
         {/* Static icon */}
         <div className={`${sizeClasses.icon} ${isActive ? 'opacity-0' : 'opacity-100'} transition-opacity duration-300`}>
-          {getIconComponent(transformationType)}
+          {getIconComponent(actualType)}
         </div>
         
         {/* Animated icon overlay */}
@@ -216,7 +227,7 @@ export const TransformationAnimation: React.FC<TransformationAnimationProps> = (
                 ease: "easeInOut"
               }}
             >
-              {getIconComponent(transformationType)}
+              {getIconComponent(actualType)}
             </motion.div>
           </motion.div>
         )}
@@ -253,7 +264,7 @@ export const TransformationAnimation: React.FC<TransformationAnimationProps> = (
       {/* Label text */}
       {showText && (
         <div className={`mt-2 ${sizeClasses.text} font-medium`}>
-          {getLabel(transformationType)}
+          {getLabel(actualType)}
         </div>
       )}
     </div>
