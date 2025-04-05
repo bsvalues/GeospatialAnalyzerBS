@@ -27,6 +27,11 @@ export const MapComponent: React.FC<MapComponentProps> = ({
   zoom = 10,
   children 
 }) => {
+  console.log('MapComponent loaded with properties:', properties?.length, 'items');
+  // Log a few sample properties to debug
+  if (properties?.length > 0) {
+    console.log('Sample property data:', properties[0]);
+  }
   // State for active visualization layers
   const [showHeatmap, setShowHeatmap] = useState<boolean>(false);
   const [showHotspots, setShowHotspots] = useState<boolean>(false);
