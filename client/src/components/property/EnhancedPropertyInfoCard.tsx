@@ -111,9 +111,11 @@ const EnhancedPropertyInfoCard: React.FC<EnhancedPropertyInfoCardProps> = ({
   if (!property) {
     return (
       <div className={cn("h-full flex flex-col items-center justify-center p-8 text-gray-400", className)}>
-        <Home className="h-16 w-16 mb-4 opacity-30" />
+        <div className="inline-flex rounded-full bg-muted p-6 mb-4">
+          <Home className="h-16 w-16 opacity-30" />
+        </div>
         <p className="text-lg font-medium">No property selected</p>
-        <p className="text-sm text-center">Click on a property marker on the map to view its details</p>
+        <p className="text-sm text-center max-w-md">Click on a property marker on the map to view its details</p>
       </div>
     );
   }
