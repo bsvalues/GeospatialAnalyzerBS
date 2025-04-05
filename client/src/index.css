@@ -168,7 +168,7 @@
 }
 
 .auto-hiding-panel {
-  @apply bg-white border rounded-md shadow-md overflow-hidden;
+  @apply bg-white border rounded-md shadow-md overflow-visible;
 }
 
 .auto-hiding-panel.position-left {

@@ -87,12 +87,12 @@ const Dashboard: React.FC<DashboardProps> = ({ className }) => {
       </div>
 
       {/* Panel content */}
-      <div className="flex-grow overflow-hidden relative">
+      <div className="flex-grow relative w-full overflow-visible">
         {/* Subtle radial gradient overlay for depth */}
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(255,255,255,0)_0%,rgba(255,255,255,0.7)_80%,rgba(255,255,255,0.95)_100%)] z-[1] pointer-events-none" />
 
         {activeTab === 'overview' && (
-          <div className="h-full p-6 overflow-auto relative z-10" data-tour="overview-panel">
+          <div className="h-full p-6 overflow-visible relative z-10" data-tour="overview-panel">
             <div className="max-w-7xl mx-auto">
               <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-8">
                 <div data-tour="welcome-message">

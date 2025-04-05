@@ -87,7 +87,7 @@ function Router() {
         <Route path="/etl-job-simulation" component={ETLJobSimulationDemo} />
         <Route path="/regression">
           {() => (
-            <div className="w-full h-full overflow-auto">
+            <div className="w-full h-full overflow-visible">
               <RegressionPanel properties={[]} />
             </div>
           )}
