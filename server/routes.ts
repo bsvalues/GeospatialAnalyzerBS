@@ -17,7 +17,9 @@ import {
   insertIncomeHotelMotelSchema,
   insertIncomeHotelMotelDetailSchema,
   insertIncomeLeaseUpSchema,
-  insertIncomeLeaseUpMonthListingSchema
+  insertIncomeLeaseUpMonthListingSchema,
+  insertPropertySchema,
+  type InsertProperty
 } from "../shared/schema";
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -3912,6 +3914,190 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   const httpServer = createServer(app);
+
+  // Helper function to validate an object against a schema
+  function validateSchema(data: any, schema: z.ZodType<any>) {
+    try {
+      schema.parse(data);
+      return true;
+    } catch (error) {
+      const zodError = error as z.ZodError;
+      const errorMessages = zodError.errors.map(err => `${err.path.join('.')}: ${err.message}`);
+      throw new Error(`Validation failed: ${errorMessages.join(', ')}`);
+    }
+  }
+  
+  // Helper function to handle API errors
+  function handleError(error: unknown, res: Response) {
+    console.error('API Error:', error);
+    const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred';
+    res.status(500).json({ error: errorMessage });
+  }
+
+  // FTP data import for properties
+  app.post('/api/etl/import/properties', async (req, res) => {
+    try {
+      const { data, source, fileType } = req.body;
+      
+      if (!Array.isArray(data) || data.length === 0) {
+        return res.status(400).json({ error: 'Invalid or empty data array' });
+      }
+      
+      // Log import details
+      console.log(`Processing import from ${source} with ${data.length} records (${fileType})`);
+      
+      // Track success and error counts
+      let successCount = 0;
+      let errorCount = 0;
+      const errors: {record: any, error: string}[] = [];
+      
+      // Process each property
+      for (const item of data) {
+        try {
+          // Map incoming data to property schema
+          const property = mapToPropertySchema(item, fileType);
+          
+          // Validate the mapped data
+          validateSchema(property, insertPropertySchema);
+          
+          // Insert the property
+          await storage.createProperty(property);
+          successCount++;
+        } catch (err) {
+          errorCount++;
+          errors.push({
+            record: item,
+            error: (err as Error).message
+          });
+          
+          // Don't fail the entire batch for individual record errors
+          console.error(`Error processing record:`, err);
+        }
+      }
+      
+      // Return summary
+      res.json({
+        totalRecords: data.length,
+        successCount,
+        errorCount,
+        errors: errors.slice(0, 10) // Limit error details to first 10
+      });
+    } catch (error) {
+      handleError(error, res);
+    }
+  });
+
+  // Helper function to map incoming data to property schema based on file type
+  function mapToPropertySchema(item: any, fileType: string): InsertProperty {
+    // Default mapping strategy
+    const property: InsertProperty = {
+      parcelId: '',
+      address: '',
+      squareFeet: 0
+    };
+    
+    // Apply different mapping strategies based on file type and data structure
+    if (fileType === 'csv') {
+      // Attempt to intelligently map fields based on common column names
+      property.parcelId = item['parcel_id'] || item['parcelId'] || item['ParcelID'] || item['PARCEL_ID'] || '';
+      property.address = item['address'] || item['Address'] || item['PROPERTY_ADDRESS'] || item['property_address'] || '';
+      
+      // Handle numeric fields - parse safely with defaults
+      property.squareFeet = parseFloat(item['square_feet'] || item['squareFeet'] || item['SquareFeet'] || item['SQUARE_FEET'] || '0') || 0;
+      property.value = item['value'] || item['assessed_value'] || item['ASSESSED_VALUE'] || null;
+      property.owner = item['owner'] || item['OWNER_NAME'] || item['owner_name'] || null;
+      property.salePrice = item['sale_price'] || item['salePrice'] || item['SALE_PRICE'] || null;
+      
+      // Optional fields
+      if (item['year_built'] || item['yearBuilt'] || item['YEAR_BUILT']) {
+        property.yearBuilt = parseInt(item['year_built'] || item['yearBuilt'] || item['YEAR_BUILT']) || null;
+      }
+      
+      if (item['property_type'] || item['propertyType'] || item['PROPERTY_TYPE']) {
+        property.propertyType = item['property_type'] || item['propertyType'] || item['PROPERTY_TYPE'];
+      }
+      
+      if (item['zoning'] || item['ZONING']) {
+        property.zoning = item['zoning'] || item['ZONING'];
+      }
+      
+      if ((item['latitude'] || item['LAT']) && (item['longitude'] || item['LONG'] || item['LNG'])) {
+        const lat = parseFloat(item['latitude'] || item['LAT']) || null;
+        const lng = parseFloat(item['longitude'] || item['LONG'] || item['LNG']) || null;
+        property.latitude = lat !== null ? String(lat) : null;
+        property.longitude = lng !== null ? String(lng) : null;
+      }
+      
+      // Handle various lot size names
+      if (item['lot_size'] || item['lotSize'] || item['LOT_SIZE']) {
+        property.lotSize = parseFloat(item['lot_size'] || item['lotSize'] || item['LOT_SIZE']) || null;
+      }
+      
+      // Handle bedroom/bathroom counts
+      if (item['bedrooms'] || item['BEDROOMS'] || item['bed_count']) {
+        property.bedrooms = parseInt(item['bedrooms'] || item['BEDROOMS'] || item['bed_count']) || null;
+      }
+      
+      if (item['bathrooms'] || item['BATHROOMS'] || item['bath_count']) {
+        property.bathrooms = parseFloat(item['bathrooms'] || item['BATHROOMS'] || item['bath_count']) || null;
+      }
+    } 
+    else if (fileType === 'json') {
+      // For JSON, we assume the structure is more standardized
+      // but still handle common variations
+      property.parcelId = item.parcelId || item.parcel_id || item.id || '';
+      property.address = item.address || item.propertyAddress || '';
+      property.squareFeet = parseFloat(item.squareFeet || item.square_feet || '0') || 0;
+      property.value = item.value || item.assessedValue || null;
+      property.owner = item.owner || item.ownerName || null;
+      property.salePrice = item.salePrice || item.sale_price || null;
+      
+      // Optional fields
+      if (item.yearBuilt || item.year_built) {
+        property.yearBuilt = parseInt(item.yearBuilt || item.year_built) || null;
+      }
+      
+      if (item.propertyType || item.property_type) {
+        property.propertyType = item.propertyType || item.property_type;
+      }
+      
+      if (item.zoning) {
+        property.zoning = item.zoning;
+      }
+      
+      if ((item.latitude || item.lat) && (item.longitude || item.lng)) {
+        const lat = parseFloat(item.latitude || item.lat) || null;
+        const lng = parseFloat(item.longitude || item.lng) || null;
+        property.latitude = lat !== null ? String(lat) : null;
+        property.longitude = lng !== null ? String(lng) : null;
+      }
+      
+      // Handle lot size
+      if (item.lotSize || item.lot_size) {
+        property.lotSize = parseFloat(item.lotSize || item.lot_size) || null;
+      }
+      
+      // Handle bedroom/bathroom counts
+      if (item.bedrooms || item.bedroomCount) {
+        property.bedrooms = parseInt(item.bedrooms || item.bedroomCount) || null;
+      }
+      
+      if (item.bathrooms || item.bathroomCount) {
+        property.bathrooms = parseFloat(item.bathrooms || item.bathroomCount) || null;
+      }
+    }
+    
+    // Require these fields to be valid
+    if (!property.parcelId) {
+      throw new Error('Missing required field: parcelId');
+    }
+    
+    if (!property.address) {
+      throw new Error('Missing required field: address');
+    }
+    
+    return property;
+  }
 
   return httpServer;
 }
