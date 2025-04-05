@@ -7,18 +7,13 @@ import { Property } from '@shared/schema';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 
-// Fix the Leaflet default icon issue
-import icon from 'leaflet/dist/images/marker-icon.png';
-import iconShadow from 'leaflet/dist/images/marker-shadow.png';
-
-let DefaultIcon = L.icon({
-  iconUrl: icon,
-  shadowUrl: iconShadow,
-  iconSize: [25, 41],
-  iconAnchor: [12, 41]
+// Fix the Leaflet default icon issue - crucial for marker display
+delete L.Icon.Default.prototype._getIconUrl;
+L.Icon.Default.mergeOptions({
+  iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png',
+  iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png',
+  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png'
 });
-
-L.Marker.prototype.options.icon = DefaultIcon;
 
 const { BaseLayer, Overlay } = LayersControl;
 
@@ -30,76 +25,46 @@ interface MapComponentProps {
   children?: React.ReactNode;
 }
 
-/**
- * Helper function to get marker icon path based on property type
- */
-function getMarkerIconForProperty(property: Property, isSelected: boolean): string {
-  const baseUrl = '/markers/';
-  const type = property.propertyType?.toLowerCase() || 'unknown';
+// Simple marker component to display a single property marker
+const PropertyMarker = ({ property, onClick }: { property: Property; onClick: (property: Property) => void }) => {
+  if (!property.latitude || !property.longitude) {
+    return null;
+  }
   
-  // Base markers by property type
-  const iconMap: {[key: string]: string} = {
-    'residential': baseUrl + 'house.svg',
-    'commercial': baseUrl + 'commercial.svg',
-    'industrial': baseUrl + 'industrial.svg',
-    'agricultural': baseUrl + 'farm.svg',
-    'vacant': baseUrl + 'vacant.svg',
-    'unknown': baseUrl + 'property.svg'
-  };
-  
-  // Use default if type not in mapping
-  return iconMap[type] || iconMap.unknown;
-}
+  try {
+    // Parse latitude and longitude to numbers
+    const lat = typeof property.latitude === 'string' ? parseFloat(property.latitude) : Number(property.latitude);
+    const lng = typeof property.longitude === 'string' ? parseFloat(property.longitude) : Number(property.longitude);
+    
+    // Validate coordinates
+    if (isNaN(lat) || isNaN(lng) || lat < -90 || lat > 90 || lng < -180 || lng > 180) {
+      console.error('Invalid coordinates for property:', property.parcelId, lat, lng);
+      return null;
+    }
+    
+    console.log(`Creating marker for ${property.parcelId} at ${lat}, ${lng}`);
+    
+    return (
+      <Marker 
+        position={[lat, lng]} 
+        eventHandlers={{
+          click: () => onClick(property)
+        }}
+      />
+    );
+  } catch (error) {
+    console.error('Error creating marker for property:', property.parcelId, error);
+    return null;
+  }
+};
 
-// Simple property markers component - no clustering
-const PropertyMarkers = ({ properties, onSelect }: { properties: Property[]; onSelect: (property: Property) => void }) => {
-  console.log('PropertyMarkers received', properties?.length, 'properties');
-  
+// Display test markers at known coordinates
+const TestMarkers = () => {
   return (
     <>
-      {properties?.map((property) => {
-        if (!property.latitude || !property.longitude) {
-          return null;
-        }
-        
-        try {
-          // Convert to numbers
-          const lat = typeof property.latitude === 'string' ? parseFloat(property.latitude) : Number(property.latitude);
-          const lng = typeof property.longitude === 'string' ? parseFloat(property.longitude) : Number(property.longitude);
-          
-          // Skip invalid coordinates
-          if (isNaN(lat) || isNaN(lng) || lat < -90 || lat > 90 || lng < -180 || lng > 180) {
-            console.error('Invalid coordinates for property:', property.parcelId, lat, lng);
-            return null;
-          }
-          
-          // Get icon based on property type
-          const iconUrl = getMarkerIconForProperty(property, false);
-          const customIcon = L.icon({
-            iconUrl,
-            iconSize: [32, 32],
-            iconAnchor: [16, 32],
-            popupAnchor: [0, -32]
-          });
-          
-          return (
-            <Marker 
-              key={property.id} 
-              position={[lat, lng]} 
-              icon={customIcon}
-              eventHandlers={{
-                click: () => {
-                  console.log('Marker clicked for property:', property.parcelId);
-                  onSelect(property);
-                }
-              }}
-            />
-          );
-        } catch (error) {
-          console.error('Error creating marker for property:', property.parcelId, error);
-          return null;
-        }
-      })}
+      <Marker position={[46.2, -119.2]} />
+      <Marker position={[46.3, -119.1]} />
+      <Marker position={[46.4, -119.0]} />
     </>
   );
 };
@@ -115,35 +80,29 @@ export const MapComponent: React.FC<MapComponentProps> = ({
 }) => {
   console.log('MapComponent loaded with properties:', properties?.length, 'items');
   
-  // Log some sample properties to debug
+  // Log sample property data for debugging
   if (properties?.length > 0) {
     console.log('Sample property data:', properties[0]);
   }
   
-  // State for active visualization layers
-  const [showHeatmap, setShowHeatmap] = useState<boolean>(false);
-  const [showHotspots, setShowHotspots] = useState<boolean>(false);
-  
-  // State for property selection and popup position
+  // State for property selection and popup
   const [selectedProperty, setSelectedProperty] = useState<Property | null>(null);
   const [popupPosition, setPopupPosition] = useState<[number, number] | null>(null);
   
-  // Handler for property selection
+  // Handle property selection
   const handlePropertySelect = (property: Property) => {
-    setSelectedProperty(property);
     console.log('Selected property:', property);
+    setSelectedProperty(property);
     
-    // Set popup position if coordinates are available
+    // Set popup position
     if (property.latitude && property.longitude) {
       const lat = typeof property.latitude === 'string' ? parseFloat(property.latitude) : Number(property.latitude);
       const lng = typeof property.longitude === 'string' ? parseFloat(property.longitude) : Number(property.longitude);
       setPopupPosition([lat, lng]);
-    } else {
-      setPopupPosition(null);
     }
   };
   
-  // Handler to close the popup
+  // Handle closing the popup
   const handleClosePopup = () => {
     setSelectedProperty(null);
     setPopupPosition(null);
@@ -153,7 +112,7 @@ export const MapComponent: React.FC<MapComponentProps> = ({
     <MapContainer 
       center={center} 
       zoom={zoom} 
-      style={{ height: '100%', width: '100%' }}
+      style={{ height: '100%', width: '100%', zIndex: 0 }}
       zoomControl={false}
     >
       <ZoomControl position="bottomright" />
@@ -171,33 +130,25 @@ export const MapComponent: React.FC<MapComponentProps> = ({
             attribution='&copy; <a href="https://www.esri.com/">Esri</a>'
           />
         </BaseLayer>
-        <BaseLayer name="Topographic">
-          <TileLayer
-            url="https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png"
-            attribution='&copy; <a href="https://opentopomap.org">OpenTopoMap</a> contributors'
-          />
-        </BaseLayer>
-        
-        <Overlay name="Heat Map">
-          <HeatmapVisualization properties={properties} />
-        </Overlay>
-        
-        <Overlay name="Hotspot Analysis">
-          <HotspotVisualization properties={properties} />
-        </Overlay>
       </LayersControl>
       
-      {/* Property markers - simple implementation */}
-      <PropertyMarkers properties={properties} onSelect={handlePropertySelect} />
+      {/* Test markers at fixed coordinates */}
+      <TestMarkers />
+      
+      {/* Real property markers */}
+      {properties.slice(0, 10).map(property => (
+        <PropertyMarker
+          key={property.id}
+          property={property}
+          onClick={handlePropertySelect}
+        />
+      ))}
       
       {/* Selected property popup */}
       {selectedProperty && popupPosition && (
         <Popup 
           position={popupPosition}
-          eventHandlers={{ 
-            remove: handleClosePopup 
-          }}
-          className="property-detail-popup"
+          eventHandlers={{ remove: handleClosePopup }}
         >
           <PropertyInfoPopup 
             property={selectedProperty} 
@@ -206,7 +157,6 @@ export const MapComponent: React.FC<MapComponentProps> = ({
         </Popup>
       )}
       
-      {/* Additional map elements passed as children */}
       {children}
     </MapContainer>
   );
