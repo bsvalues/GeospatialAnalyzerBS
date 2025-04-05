@@ -133,16 +133,18 @@ export function ProximityAnalysisPanel({
   // Render the empty state when no property is selected
   if (!selectedProperty) {
     return (
-      <div className={`${className} flex items-center justify-center min-h-[400px]`}>
-        <div className="text-center max-w-md p-8">
-          <div className="inline-flex rounded-full bg-muted p-6 mb-4 mx-auto">
+      <div className={`${className} w-full h-full flex items-center justify-center min-h-[400px]`}>
+        <div className="text-center w-full max-w-md p-8">
+          <div className="flex items-center justify-center rounded-full bg-muted p-6 mb-4 mx-auto">
             <Navigation className="h-12 w-12 text-muted-foreground" />
           </div>
-          <h3 className="text-lg font-medium mb-2">No Property Selected</h3>
-          <p className="text-muted-foreground max-w-sm mx-auto">
-            Select a property from the map to analyze how nearby points of interest
-            affect its value.
-          </p>
+          <div className="w-full max-w-lg mx-auto">
+            <h3 className="text-lg font-medium mb-2">No Property Selected</h3>
+            <p className="text-muted-foreground">
+              Select a property from the map to analyze how nearby points of interest
+              affect its value.
+            </p>
+          </div>
         </div>
       </div>
     );

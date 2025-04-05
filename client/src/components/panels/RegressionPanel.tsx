@@ -168,8 +168,8 @@ export function RegressionPanel({ properties }: RegressionPanelProps) {
   };
   
   return (
-    <div className="p-4 space-y-4 h-full overflow-auto">
-      <div className="flex justify-between items-center">
+    <div className="p-4 space-y-4 w-full h-full overflow-auto">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <h2 className="text-2xl font-bold tracking-tight">Regression Analysis</h2>
           <p className="text-muted-foreground">
@@ -177,7 +177,7 @@ export function RegressionPanel({ properties }: RegressionPanelProps) {
           </p>
         </div>
         
-        <div className="flex space-x-2">
+        <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
           {savedModels.length > 0 && (
             <Select 
               value={activeModel?.modelName} 
@@ -186,7 +186,7 @@ export function RegressionPanel({ properties }: RegressionPanelProps) {
                 if (selected) setActiveModel(selected);
               }}
             >
-              <SelectTrigger className="w-[240px]">
+              <SelectTrigger className="w-full sm:w-[240px]">
                 <SelectValue placeholder="Select a model" />
               </SelectTrigger>
               <SelectContent>
@@ -199,23 +199,27 @@ export function RegressionPanel({ properties }: RegressionPanelProps) {
             </Select>
           )}
           
-          <Button 
-            variant="default" 
-            onClick={generateDemoModel}
-            disabled={isLoading}
-          >
-            <Calculator className="mr-2 h-4 w-4" />
-            Run OLS Regression
-          </Button>
-          
-          <Button 
-            variant="outline" 
-            onClick={generateGWRModel}
-            disabled={isLoading}
-          >
-            <GitMerge className="mr-2 h-4 w-4" />
-            Run GWR Regression
-          </Button>
+          <div className="flex space-x-2">
+            <Button 
+              variant="default" 
+              onClick={generateDemoModel}
+              disabled={isLoading}
+              className="flex-1 sm:flex-none"
+            >
+              <Calculator className="mr-2 h-4 w-4" />
+              Run OLS Regression
+            </Button>
+            
+            <Button 
+              variant="outline" 
+              onClick={generateGWRModel}
+              disabled={isLoading}
+              className="flex-1 sm:flex-none"
+            >
+              <GitMerge className="mr-2 h-4 w-4" />
+              Run GWR Regression
+            </Button>
+          </div>
         </div>
       </div>
       
@@ -339,7 +343,7 @@ export function RegressionPanel({ properties }: RegressionPanelProps) {
           </TabsContent>
         </Tabs>
       ) : (
-        <Card className="border-dashed">
+        <Card className="border-dashed w-full">
           <CardHeader>
             <CardTitle>No Regression Model Selected</CardTitle>
             <CardDescription>
@@ -347,14 +351,16 @@ export function RegressionPanel({ properties }: RegressionPanelProps) {
             </CardDescription>
           </CardHeader>
           <CardContent className="flex flex-col items-center justify-center p-6 space-y-4">
-            <div className="inline-flex rounded-full bg-muted p-6">
+            <div className="flex items-center justify-center rounded-full bg-muted p-6">
               <Calculator className="h-12 w-12 text-muted-foreground" />
             </div>
-            <p className="text-center text-muted-foreground max-w-md">
-              Create a model by clicking "Run OLS Regression" or "Run GWR Regression" to analyze property data.
-              <br />
-              OLS provides a basic linear model, while GWR accounts for spatial relationships.
-            </p>
+            <div className="w-full max-w-lg">
+              <p className="text-center text-muted-foreground">
+                Create a model by clicking "Run OLS Regression" or "Run GWR Regression" to analyze property data.
+                <br />
+                OLS provides a basic linear model, while GWR accounts for spatial relationships.
+              </p>
+            </div>
           </CardContent>
         </Card>
       )}
