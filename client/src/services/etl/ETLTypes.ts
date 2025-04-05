@@ -73,7 +73,8 @@ export enum TransformationType {
   VALIDATION = 'validation',  // Alias for VALIDATE for better readability
   CLEANSE = 'cleanse',
   CLEAN = 'clean',           // Alias for CLEANSE
-  ENRICH = 'enrich',
+  TRANSFORM = 'transform',   // General transformation operation
+  ENRICH = 'enrich',         // Data enrichment operation
   ENRICHMENT = 'enrichment',  // Alias for ENRICH for better readability
   NORMALIZE = 'normalize',
   DEDUPLICATE = 'deduplicate',

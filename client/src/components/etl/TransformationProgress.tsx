@@ -1,207 +1,248 @@
-import React, { useState, useEffect } from 'react';
-import { 
-  Card, 
-  CardContent, 
-  CardDescription, 
-  CardFooter, 
-  CardHeader, 
-  CardTitle 
-} from '@/components/ui/card';
-import { Progress } from '@/components/ui/progress';
-import { motion, AnimatePresence } from 'framer-motion';
-import { LoadingAnimation } from '@/components/ui/loading-animation';
-import { Badge } from '@/components/ui/badge';
-import { Check, AlertTriangle, X } from 'lucide-react';
-import { cn } from '@/lib/utils';
-import { TransformationType } from '@/services/etl/ETLTypes';
-
-interface Step {
-  id: number;
-  type: TransformationType;
-  name: string;
-  status: 'waiting' | 'in-progress' | 'completed' | 'failed';
-  startTime?: Date;
-  endTime?: Date;
-  progress?: number;
-  recordsProcessed?: number;
-  totalRecords?: number;
-  message?: string;
-}
+import React, { useState, useEffect } from "react";
+import { motion } from "framer-motion";
+import { TransformationAnimation } from "./TransformationAnimation";
+import { TransformationType } from "../../services/etl/ETLTypes";
+import { Progress } from "@/components/ui/progress";
+import { Badge } from "@/components/ui/badge";
+import { CheckCircle, AlertCircle, Clock } from "lucide-react";
 
 interface TransformationProgressProps {
-  steps: Step[];
+  steps: {
+    id: string;
+    name: string;
+    type: TransformationType;
+    description?: string;
+  }[];
+  isRunning: boolean;
+  currentStep?: number;
+  progress?: number;
   onComplete?: () => void;
-  className?: string;
-  compact?: boolean;
+  errors?: string[];
+  speed?: "slow" | "normal" | "fast";
 }
 
-const getAnimationType = (transformationType: TransformationType) => {
-  switch (transformationType) {
-    case TransformationType.FILTER:
-      return 'filtering';
-    case TransformationType.MAP:
-    case TransformationType.AGGREGATE:
-    case TransformationType.JOIN:
-      return 'transforming';
-    case TransformationType.VALIDATION:
-      return 'analyzing';
-    case TransformationType.ENRICHMENT:
-      return 'extracting';
-    default:
-      return 'loading';
-  }
-};
-
-const StepItem = ({ step, isActive, compact }: { step: Step; isActive: boolean; compact: boolean }) => {
-  const animationType = getAnimationType(step.type);
+/**
+ * Component to display the progress of multiple transformation steps
+ */
+export const TransformationProgress: React.FC<TransformationProgressProps> = ({
+  steps,
+  isRunning,
+  currentStep = 0,
+  progress = 0,
+  onComplete,
+  errors = [],
+  speed = "normal"
+}) => {
+  const [activeStep, setActiveStep] = useState(currentStep);
+  const [completedSteps, setCompletedSteps] = useState<string[]>([]);
+  const [animationComplete, setAnimationComplete] = useState(false);
+  
+  // Reset state when isRunning changes to false
+  useEffect(() => {
+    if (!isRunning) {
+      setActiveStep(0);
+      setCompletedSteps([]);
+      setAnimationComplete(false);
+    }
+  }, [isRunning]);
+  
+  // Update active step based on progress or current step
+  useEffect(() => {
+    if (!isRunning) return;
+    
+    if (currentStep >= 0 && currentStep < steps.length) {
+      setActiveStep(currentStep);
+    }
+  }, [currentStep, isRunning, steps.length]);
+  
+  // Handle step completion
+  const handleStepComplete = (stepId: string, index: number) => {
+    if (completedSteps.includes(stepId)) return;
+    
+    setCompletedSteps((prev) => [...prev, stepId]);
+    
+    // Move to next step if available
+    if (index < steps.length - 1) {
+      setActiveStep(index + 1);
+    } else {
+      // All steps completed
+      setAnimationComplete(true);
+      if (onComplete) {
+        onComplete();
+      }
+    }
+  };
+  
+  // Calculate overall progress
+  const calculateOverallProgress = () => {
+    if (progress > 0) {
+      return progress;
+    }
+    
+    return Math.min(100, (completedSteps.length / steps.length) * 100);
+  };
+  
+  // Check if a step has an error
+  const hasError = (stepId: string) => {
+    return errors.some(err => err.includes(stepId));
+  };
+  
+  // Get status badge for a step
+  const getStepStatus = (step: { id: string }, index: number) => {
+    if (hasError(step.id)) {
+      return (
+        <Badge variant="destructive" className="ml-2 font-normal">
+          <AlertCircle className="w-3 h-3 mr-1" />
+          Error
+        </Badge>
+      );
+    }
+    
+    if (completedSteps.includes(step.id)) {
+      return (
+        <Badge variant="outline" className="ml-2 font-normal bg-green-100 text-green-800">
+          <CheckCircle className="w-3 h-3 mr-1" />
+          Complete
+        </Badge>
+      );
+    }
+    
+    if (activeStep === index && isRunning) {
+      return (
+        <Badge variant="outline" className="ml-2 font-normal bg-blue-100 text-blue-800">
+          <motion.div
+            animate={{ rotate: 360 }}
+            transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
+            className="mr-1"
+          >
+            <Clock className="w-3 h-3" />
+          </motion.div>
+          Running
+        </Badge>
+      );
+    }
+    
+    return (
+      <Badge variant="outline" className="ml-2 font-normal text-gray-500">
+        Pending
+      </Badge>
+    );
+  };
   
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 10 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, height: 0 }}
-      className={cn(
-        "border rounded-md p-3 mb-2",
-        isActive ? "border-primary bg-primary/5" : "border-muted",
-        step.status === 'failed' && "border-destructive bg-destructive/5"
-      )}
-    >
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          {step.status === 'waiting' ? (
-            <div className="w-5 h-5 rounded-full border-2 border-muted-foreground/30" />
-          ) : step.status === 'in-progress' ? (
-            <LoadingAnimation type={animationType} showText={false} size="sm" />
-          ) : step.status === 'completed' ? (
-            <div className="w-5 h-5 rounded-full bg-primary/20 flex items-center justify-center">
-              <Check className="h-3 w-3 text-primary" />
-            </div>
-          ) : (
-            <div className="w-5 h-5 rounded-full bg-destructive/20 flex items-center justify-center">
-              <X className="h-3 w-3 text-destructive" />
-            </div>
-          )}
-          <div>
-            <div className="font-medium text-sm">{step.name}</div>
-            {!compact && step.message && (
-              <div className="text-xs text-muted-foreground mt-1">{step.message}</div>
-            )}
+    <div className="space-y-6">
+      {/* Overall progress */}
+      <div className="space-y-2">
+        <div className="flex justify-between items-center">
+          <div className="text-sm font-medium">Overall Progress</div>
+          <div className="text-sm text-gray-500">
+            {completedSteps.length} of {steps.length} completed
           </div>
         </div>
-        
-        <div className="flex items-center gap-2">
-          {step.status === 'in-progress' && step.progress !== undefined && (
-            <div className="w-24">
-              <Progress value={step.progress} className="h-2" />
+        <Progress value={calculateOverallProgress()} className="h-2" />
+      </div>
+      
+      {/* Current animation */}
+      {isRunning && !animationComplete && activeStep < steps.length && (
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="bg-gray-50 p-4 rounded-md border"
+        >
+          <TransformationAnimation
+            transformationType={steps[activeStep].type}
+            isActive={isRunning}
+            speed={speed}
+            showText={true}
+            onComplete={() => handleStepComplete(steps[activeStep].id, activeStep)}
+          />
+          <div className="text-center mt-3 text-sm font-medium">
+            Processing: {steps[activeStep].name}
+          </div>
+          {steps[activeStep].description && (
+            <div className="text-center mt-1 text-xs text-gray-500">
+              {steps[activeStep].description}
             </div>
           )}
-          
-          <Badge variant={
-            step.status === 'completed' ? "default" : 
-            step.status === 'failed' ? "destructive" : 
-            step.status === 'in-progress' ? "secondary" : 
-            "outline"
-          }>
-            {step.status === 'in-progress' && step.recordsProcessed !== undefined && step.totalRecords !== undefined ? 
-              `${step.recordsProcessed}/${step.totalRecords}` : 
-              step.status.replace('-', ' ')}
-          </Badge>
+        </motion.div>
+      )}
+      
+      {/* Step list */}
+      <div className="space-y-2">
+        <div className="text-sm font-medium">Transformation Steps</div>
+        <div className="space-y-2">
+          {steps.map((step, index) => (
+            <div
+              key={step.id}
+              className={`flex items-center p-3 rounded-md border 
+                ${activeStep === index && isRunning ? 'bg-blue-50 border-blue-200' : ''}
+                ${completedSteps.includes(step.id) ? 'bg-green-50 border-green-200' : ''}
+                ${hasError(step.id) ? 'bg-red-50 border-red-200' : ''}
+              `}
+            >
+              <div className="flex-1">
+                <div className="flex items-center">
+                  <div className="font-medium">{step.name}</div>
+                  {getStepStatus(step, index)}
+                </div>
+                {step.description && (
+                  <div className="text-xs text-gray-500 mt-1">{step.description}</div>
+                )}
+                {hasError(step.id) && (
+                  <div className="text-xs text-red-500 mt-1">
+                    {errors.find(err => err.includes(step.id))}
+                  </div>
+                )}
+              </div>
+              <div className="flex-shrink-0 ml-4">
+                <TransformationAnimation
+                  transformationType={step.type}
+                  isActive={activeStep === index && isRunning}
+                  showText={false}
+                  size="sm"
+                  speed={speed}
+                />
+              </div>
+            </div>
+          ))}
         </div>
       </div>
       
-      {!compact && step.status === 'in-progress' && step.recordsProcessed !== undefined && step.totalRecords !== undefined && (
-        <div className="mt-2">
-          <Progress value={(step.recordsProcessed / step.totalRecords) * 100} className="h-1" />
-          <div className="flex justify-between mt-1 text-xs text-muted-foreground">
-            <span>{step.recordsProcessed} processed</span>
-            <span>{step.totalRecords} total</span>
+      {/* Error summary */}
+      {errors.length > 0 && (
+        <motion.div
+          initial={{ opacity: 0, height: 0 }}
+          animate={{ opacity: 1, height: 'auto' }}
+          className="bg-red-50 p-4 rounded-md border border-red-200"
+        >
+          <div className="font-medium text-red-800 flex items-center">
+            <AlertCircle className="w-4 h-4 mr-2" />
+            Transformation Errors ({errors.length})
           </div>
-        </div>
+          <ul className="mt-2 text-sm text-red-700 space-y-1 list-disc pl-5">
+            {errors.map((error, index) => (
+              <li key={index}>{error}</li>
+            ))}
+          </ul>
+        </motion.div>
       )}
-    </motion.div>
+      
+      {/* Completion message */}
+      {completedSteps.length === steps.length && steps.length > 0 && (
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="bg-green-50 p-4 rounded-md border border-green-200 text-center"
+        >
+          <CheckCircle className="w-8 h-8 text-green-500 mx-auto mb-2" />
+          <div className="font-medium text-green-800">All transformations completed successfully!</div>
+          <div className="text-sm text-green-600 mt-1">
+            {steps.length} transformation {steps.length === 1 ? 'step' : 'steps'} processed
+          </div>
+        </motion.div>
+      )}
+    </div>
   );
 };
 
-export function TransformationProgress({
-  steps,
-  onComplete,
-  className,
-  compact = false
-}: TransformationProgressProps) {
-  const [activeStepIndex, setActiveStepIndex] = useState<number>(
-    steps.findIndex(step => step.status === 'in-progress')
-  );
-  
-  const totalSteps = steps.length;
-  const completedSteps = steps.filter(step => step.status === 'completed').length;
-  const failedSteps = steps.filter(step => step.status === 'failed').length;
-  const overallProgress = Math.round((completedSteps / totalSteps) * 100);
-  
-  useEffect(() => {
-    const newActiveIndex = steps.findIndex(step => step.status === 'in-progress');
-    if (newActiveIndex !== -1) {
-      setActiveStepIndex(newActiveIndex);
-    }
-    
-    // Call onComplete when all steps are either completed or failed
-    if (completedSteps + failedSteps === totalSteps && onComplete) {
-      onComplete();
-    }
-  }, [steps, completedSteps, failedSteps, totalSteps, onComplete]);
-  
-  return (
-    <Card className={className}>
-      <CardHeader className="pb-2">
-        <CardTitle className="text-lg flex items-center justify-between">
-          <span>Transformation Progress</span>
-          <span className="text-sm font-medium">{overallProgress}%</span>
-        </CardTitle>
-        <CardDescription>
-          {failedSteps > 0 ? (
-            <span className="flex items-center gap-1 text-destructive">
-              <AlertTriangle className="h-4 w-4" />
-              {failedSteps} step{failedSteps > 1 ? 's' : ''} failed
-            </span>
-          ) : completedSteps === totalSteps ? (
-            <span className="flex items-center gap-1 text-primary">
-              <Check className="h-4 w-4" />
-              All steps completed
-            </span>
-          ) : (
-            `Step ${activeStepIndex + 1} of ${totalSteps}`
-          )}
-        </CardDescription>
-        <Progress value={overallProgress} className="h-2 mt-2" />
-      </CardHeader>
-      
-      <CardContent className="pt-3">
-        <AnimatePresence>
-          {steps.map((step, index) => (
-            <StepItem 
-              key={step.id} 
-              step={step} 
-              isActive={index === activeStepIndex}
-              compact={compact}
-            />
-          ))}
-        </AnimatePresence>
-      </CardContent>
-      
-      {!compact && (failedSteps > 0 || completedSteps === totalSteps) && (
-        <CardFooter className="pt-0 flex justify-end">
-          <div className="text-sm">
-            {failedSteps > 0 ? (
-              <span className="text-destructive">
-                Transformation completed with errors
-              </span>
-            ) : completedSteps === totalSteps ? (
-              <span className="text-primary">
-                Transformation completed successfully
-              </span>
-            ) : null}
-          </div>
-        </CardFooter>
-      )}
-    </Card>
-  );
-}
+export default TransformationProgress;

@@ -40,6 +40,7 @@ import DatabaseTestPage from './pages/DatabaseTestPage';
 import IncomeApproachPage from './pages/IncomeApproachPage';
 import AnimationDemo from './pages/AnimationDemo';
 import ETLWizardPage from './pages/ETLWizardPage';
+import ETLAnimationDemo from './pages/ETLAnimationDemo';
 
 function Router() {
   const [location] = useLocation();
@@ -78,6 +79,7 @@ function Router() {
         <Route path="/income-approach" component={IncomeApproachPage} />
         <Route path="/animation-demo" component={AnimationDemo} />
         <Route path="/etl-wizard" component={ETLWizardPage} />
+        <Route path="/etl-animation-demo" component={ETLAnimationDemo} />
         <Route component={NotFound} />
       </Switch>
     </>
