@@ -123,7 +123,7 @@ const EnhancedPropertyInfoCard: React.FC<EnhancedPropertyInfoCardProps> = ({
   }
   
   return (
-    <div className={cn("h-full overflow-auto relative z-10", className)}>
+    <div className={cn("h-full overflow-visible relative z-10", className)}>
       {/* Property header with close button */}
       <div className="sticky top-0 bg-white z-20 border-b px-4 pt-3 pb-2 flex justify-between">
         <div>
@@ -267,8 +267,8 @@ const EnhancedPropertyInfoCard: React.FC<EnhancedPropertyInfoCardProps> = ({
                       <span className="text-sm text-gray-500 ml-2">Map preview would appear here</span>
                     </div>
                     <div className="mt-2 text-sm">
-                      <div><span className="font-medium">Latitude:</span> {typeof property.latitude === 'number' ? property.latitude.toFixed(6) : (property.latitude || 'N/A')}</div>
-                      <div><span className="font-medium">Longitude:</span> {typeof property.longitude === 'number' ? property.longitude.toFixed(6) : (property.longitude || 'N/A')}</div>
+                      <div><span className="font-medium">Latitude:</span> {property.latitude !== null && property.latitude !== undefined && typeof property.latitude === 'number' ? property.latitude.toFixed(6) : (property.latitude || 'N/A')}</div>
+                      <div><span className="font-medium">Longitude:</span> {property.longitude !== null && property.longitude !== undefined && typeof property.longitude === 'number' ? property.longitude.toFixed(6) : (property.longitude || 'N/A')}</div>
                     </div>
                   </div>
                 )}

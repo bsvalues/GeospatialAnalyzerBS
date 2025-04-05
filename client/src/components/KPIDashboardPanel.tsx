@@ -36,7 +36,7 @@ export const KPIDashboardPanel: React.FC<KPIDashboardPanelProps> = ({
   }, []);
   
   return (
-    <div className={`${className} p-6 h-full overflow-auto`}>
+    <div className={`${className} p-6 h-full overflow-visible`}>
       <h2 className="text-2xl font-semibold mb-6">Key Performance Indicators</h2>
       
       {isLoading ? (
