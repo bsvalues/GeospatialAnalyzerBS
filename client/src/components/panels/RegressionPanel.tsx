@@ -347,10 +347,10 @@ export function RegressionPanel({ properties }: RegressionPanelProps) {
             </CardDescription>
           </CardHeader>
           <CardContent className="flex flex-col items-center justify-center p-6 space-y-4">
-            <div className="rounded-full bg-muted p-6">
+            <div className="inline-flex rounded-full bg-muted p-6">
               <Calculator className="h-12 w-12 text-muted-foreground" />
             </div>
-            <p className="text-center text-muted-foreground">
+            <p className="text-center text-muted-foreground max-w-md">
               Create a model by clicking "Run OLS Regression" or "Run GWR Regression" to analyze property data.
               <br />
               OLS provides a basic linear model, while GWR accounts for spatial relationships.

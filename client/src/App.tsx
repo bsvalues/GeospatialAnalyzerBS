@@ -11,6 +11,7 @@ import { AutoHideProvider } from './contexts/AutoHideContext';
 import { TourProvider } from './contexts/TourContext';
 import PropertyTrendsDemo from './components/comparison/PropertyTrendsDemo';
 import NeighborhoodTimelineDemo from './components/neighborhood/NeighborhoodTimelineDemo';
+import { RegressionPanel } from './components/panels/RegressionPanel';
 
 // Page imports
 import HomePage from '@/pages/home';
@@ -84,6 +85,13 @@ function Router() {
         <Route path="/etl-animation-demo" component={ETLAnimationDemo} />
         <Route path="/step-progress-demo" component={StepProgressDemo} />
         <Route path="/etl-job-simulation" component={ETLJobSimulationDemo} />
+        <Route path="/regression">
+          {() => (
+            <div className="container mx-auto p-4">
+              <RegressionPanel properties={[]} />
+            </div>
+          )}
+        </Route>
         <Route component={NotFound} />
       </Switch>
     </>
