@@ -3,7 +3,8 @@ import { StepProgressAnimation, Step } from "./StepProgressAnimation";
 
 export interface WizardStep {
   id: string | number;
-  name: string;
+  name: string;  // Keep for backward compatibility
+  title?: string; // Add this for new components
   description?: string;
 }
 
@@ -31,7 +32,7 @@ export const WizardStepProgress: React.FC<WizardStepProgressProps> = ({
   // Convert WizardStep interface to Step interface for StepProgressAnimation
   const convertedSteps: Step[] = steps.map(step => ({
     id: String(step.id), // Ensure id is a string
-    title: step.name,
+    title: step.title || step.name, // Use title if available, otherwise fall back to name
     description: step.description
   }));
   

@@ -9,7 +9,8 @@ import { CheckCircle, AlertCircle, Clock } from "lucide-react";
 interface TransformationProgressProps {
   steps: {
     id: string;
-    name: string;
+    name?: string; // Keep for backward compatibility
+    title?: string; // Add this for new components
     type: TransformationType;
     description?: string;
   }[];
@@ -157,7 +158,7 @@ export const TransformationProgress: React.FC<TransformationProgressProps> = ({
             onComplete={() => handleStepComplete(steps[activeStep].id, activeStep)}
           />
           <div className="text-center mt-3 text-sm font-medium">
-            Processing: {steps[activeStep].name}
+            Processing: {steps[activeStep].title || steps[activeStep].name}
           </div>
           {steps[activeStep].description && (
             <div className="text-center mt-1 text-xs text-gray-500">
@@ -182,7 +183,7 @@ export const TransformationProgress: React.FC<TransformationProgressProps> = ({
             >
               <div className="flex-1">
                 <div className="flex items-center">
-                  <div className="font-medium">{step.name}</div>
+                  <div className="font-medium">{step.title || step.name}</div>
                   {getStepStatus(step, index)}
                 </div>
                 {step.description && (

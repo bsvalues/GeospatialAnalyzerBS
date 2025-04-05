@@ -64,43 +64,50 @@ export const ETLJobSimulation: React.FC<ETLJobSimulationProps> = ({
   const processSteps = [
     {
       id: "connect",
-      name: "Connect to Source",
+      name: "Connect to Source", // Keep for backward compatibility
+      title: "Connect to Source", // Add for new components
       type: TransformationType.TRANSFORM,
       description: "Connecting to SQL database"
     },
     {
       id: "extract",
-      name: "Extract Property Data",
+      name: "Extract Property Data", // Keep for backward compatibility
+      title: "Extract Property Data", // Add for new components
       type: TransformationType.TRANSFORM,
       description: "Retrieving property records"
     },
     {
       id: "validate",
-      name: "Validate Data Format",
+      name: "Validate Data Format", // Keep for backward compatibility
+      title: "Validate Data Format", // Add for new components
       type: TransformationType.VALIDATE,
       description: "Checking data integrity"
     },
     {
       id: "clean",
-      name: "Clean Property Records",
+      name: "Clean Property Records", // Keep for backward compatibility
+      title: "Clean Property Records", // Add for new components
       type: TransformationType.CLEAN,
       description: "Standardizing address formats"
     },
     {
       id: "transform",
-      name: "Transform to Target Schema",
+      name: "Transform to Target Schema", // Keep for backward compatibility
+      title: "Transform to Target Schema", // Add for new components
       type: TransformationType.TRANSFORM,
       description: "Mapping to target fields"
     },
     {
       id: "enrich",
-      name: "Enrich with Geocoding",
+      name: "Enrich with Geocoding", // Keep for backward compatibility
+      title: "Enrich with Geocoding", // Add for new components
       type: TransformationType.ENRICH,
       description: "Adding coordinate data"
     },
     {
       id: "load",
-      name: "Load to Target System",
+      name: "Load to Target System", // Keep for backward compatibility
+      title: "Load to Target System", // Add for new components
       type: TransformationType.TRANSFORM,
       description: "Storing in property database"
     }
