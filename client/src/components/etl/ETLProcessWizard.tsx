@@ -50,7 +50,8 @@ import {
   JobStatus, 
   DataSourceType, 
   TransformationType, 
-  ETLJobRun
+  ETLJobRun,
+  JobFrequency
 } from "../../services/etl/ETLTypes";
 import { LoadingAnimation } from "../ui/loading-animation";
 import { TransformationAnimation } from "./TransformationAnimation";
@@ -95,9 +96,8 @@ const ETLProcessWizard: React.FC<ETLProcessWizardProps> = ({
     transformations: [],
     enabled: true,
     schedule: {
-      frequency: "manual",
-      startTime: null,
-      endTime: null,
+      frequency: JobFrequency.MANUAL,
+      startTime: "",
       daysOfWeek: [],
     }
   });
@@ -419,11 +419,11 @@ const ETLProcessWizard: React.FC<ETLProcessWizardProps> = ({
                   <SelectValue placeholder="Select frequency" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="manual">Manual (On-demand)</SelectItem>
-                  <SelectItem value="hourly">Hourly</SelectItem>
-                  <SelectItem value="daily">Daily</SelectItem>
-                  <SelectItem value="weekly">Weekly</SelectItem>
-                  <SelectItem value="monthly">Monthly</SelectItem>
+                  <SelectItem value={JobFrequency.MANUAL}>Manual (On-demand)</SelectItem>
+                  <SelectItem value={JobFrequency.HOURLY}>Hourly</SelectItem>
+                  <SelectItem value={JobFrequency.DAILY}>Daily</SelectItem>
+                  <SelectItem value={JobFrequency.WEEKLY}>Weekly</SelectItem>
+                  <SelectItem value={JobFrequency.MONTHLY}>Monthly</SelectItem>
                 </SelectContent>
               </Select>
               
@@ -435,7 +435,7 @@ const ETLProcessWizard: React.FC<ETLProcessWizardProps> = ({
               )}
             </div>
             
-            {jobConfig.schedule?.frequency !== 'manual' && (
+            {jobConfig.schedule?.frequency !== JobFrequency.MANUAL && (
               <div>
                 <Label htmlFor="schedule-time">Run Time</Label>
                 <Input 
@@ -456,7 +456,7 @@ const ETLProcessWizard: React.FC<ETLProcessWizardProps> = ({
             )}
           </div>
           
-          {jobConfig.schedule?.frequency === 'weekly' && (
+          {jobConfig.schedule?.frequency === JobFrequency.WEEKLY && (
             <div>
               <Label className="mb-2 block">Days of the Week</Label>
               <div className="flex space-x-2 flex-wrap gap-y-2">
@@ -597,13 +597,13 @@ const ETLProcessWizard: React.FC<ETLProcessWizardProps> = ({
                   Frequency: <span className="font-medium">{jobConfig.schedule?.frequency || 'Manual'}</span>
                 </div>
                 
-                {jobConfig.schedule?.frequency !== 'manual' && jobConfig.schedule?.startTime && (
+                {jobConfig.schedule?.frequency !== JobFrequency.MANUAL && jobConfig.schedule?.startTime && (
                   <div className="text-sm">
                     Time: <span className="font-medium">{jobConfig.schedule.startTime}</span>
                   </div>
                 )}
                 
-                {jobConfig.schedule?.frequency === 'weekly' && jobConfig.schedule?.daysOfWeek && jobConfig.schedule.daysOfWeek.length > 0 && (
+                {jobConfig.schedule?.frequency === JobFrequency.WEEKLY && jobConfig.schedule?.daysOfWeek && jobConfig.schedule.daysOfWeek.length > 0 && (
                   <div className="text-sm">
                     Days: <span className="font-medium">
                       {jobConfig.schedule.daysOfWeek.map(day => 

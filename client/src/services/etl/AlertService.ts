@@ -58,7 +58,7 @@ class AlertService {
   private listeners: Array<(alerts: Alert[]) => void> = [];
   
   /**
-   * Create a specific type of alert
+   * Create a specific type of alert with full options
    * @param options Alert options
    * @returns Created alert
    */
@@ -71,16 +71,143 @@ class AlertService {
     details?: string;
     source?: string;
     relatedEntityId?: string;
-  }): Alert {
+  }): Alert;
+  
+  /**
+   * Create a specific type of alert with simplified options
+   * @param options Simplified alert options
+   * @returns Created alert
+   */
+  createAlert(options: {
+    severity: string;
+    message: string;
+    source: string;
+    category: string;
+    details?: string;
+    relatedEntityId?: string;
+  }): Alert;
+  
+  /**
+   * Create a specific type of alert (implementation)
+   * @param options Alert options
+   * @returns Created alert
+   */
+  createAlert(options: any): Alert {
+    // Map string severity to enum if needed
+    const severity = typeof options.severity === 'string' && !Object.values(AlertSeverity).includes(options.severity as any)
+      ? this.mapSeverityString(options.severity)
+      : options.severity;
+      
+    // Map string category to enum if needed
+    const category = typeof options.category === 'string' && !Object.values(AlertCategory).includes(options.category as any)
+      ? this.mapCategoryString(options.category)
+      : options.category;
+    
     return this.addAlert({
-      title: options.title,
+      title: options.title || this.getTitleFromSeverity(severity),
       message: options.message,
       details: options.details,
-      category: options.category,
-      severity: options.severity,
+      category: category,
+      severity: severity,
       source: options.source || 'system',
       relatedEntityId: options.relatedEntityId
     });
+  }
+  
+  /**
+   * Map severity string to AlertSeverity enum
+   * @param severity Severity string
+   * @returns AlertSeverity enum value
+   * @private
+   */
+  private mapSeverityString(severity: string): AlertSeverity {
+    switch (severity.toLowerCase()) {
+      case 'low':
+        return AlertSeverity.LOW;
+      case 'info':
+        return AlertSeverity.INFO;
+      case 'success':
+        return AlertSeverity.SUCCESS;
+      case 'warning':
+        return AlertSeverity.WARNING;
+      case 'medium':
+        return AlertSeverity.MEDIUM;
+      case 'error':
+        return AlertSeverity.ERROR;
+      case 'high':
+        return AlertSeverity.HIGH;
+      case 'critical':
+        return AlertSeverity.CRITICAL;
+      default:
+        return AlertSeverity.INFO;
+    }
+  }
+  
+  /**
+   * Map category string to AlertCategory enum
+   * @param category Category string
+   * @returns AlertCategory enum value
+   * @private
+   */
+  private mapCategoryString(category: string): AlertCategory {
+    switch (category.toLowerCase()) {
+      case 'import':
+        return AlertCategory.IMPORT;
+      case 'export':
+        return AlertCategory.EXPORT;
+      case 'data_quality':
+        return AlertCategory.DATA_QUALITY;
+      case 'connection':
+        return AlertCategory.CONNECTION;
+      case 'transform':
+        return AlertCategory.TRANSFORM;
+      case 'security':
+        return AlertCategory.SECURITY;
+      case 'validation':
+        return AlertCategory.VALIDATION;
+      case 'performance':
+        return AlertCategory.PERFORMANCE;
+      case 'system':
+        return AlertCategory.SYSTEM;
+      case 'job':
+        return AlertCategory.JOB;
+      case 'job_execution':
+        return AlertCategory.JOB;
+      case 'data_source':
+        return AlertCategory.DATA_SOURCE;
+      case 'transformation':
+        return AlertCategory.TRANSFORMATION;
+      case 'batch_execution':
+        return AlertCategory.JOB;
+      default:
+        return AlertCategory.SYSTEM;
+    }
+  }
+  
+  /**
+   * Get a default title based on severity
+   * @param severity Alert severity
+   * @returns Default title
+   * @private
+   */
+  private getTitleFromSeverity(severity: AlertSeverity): string {
+    switch (severity) {
+      case AlertSeverity.LOW:
+      case AlertSeverity.INFO:
+        return 'Information';
+      case AlertSeverity.SUCCESS:
+        return 'Success';
+      case AlertSeverity.WARNING:
+      case AlertSeverity.MEDIUM:
+        return 'Warning';
+      case AlertSeverity.ERROR:
+      case AlertSeverity.HIGH:
+        return 'Error';
+      case AlertSeverity.CRITICAL:
+        return 'Critical Error';
+      default:
+        return 'Alert';
+    }
   }
   
   /**

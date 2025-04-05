@@ -24,6 +24,7 @@ export function initializeETL(): void {
 // Type aliases for backward compatibility
 export type TransformationRule = import('./ETLTypes').Transformation;
 export type JobRun = import('./ETLTypes').ETLJobRun;
+export type SystemStatus = import('./ETLTypes').SystemStatusInfo;
 export type Alert = {
   id: string;
   severity: import('./AlertService').AlertSeverity;
@@ -34,10 +35,11 @@ export type Alert = {
   details?: string;
   category: import('./AlertService').AlertCategory;
   relatedEntityId?: string;
+  title: string;
 };
 
 // Import enums directly
-import { DataSourceType as DSType, JobStatus as JStatus } from './ETLTypes';
+import { DataSourceType as DSType, JobStatus as JStatus, SystemStatus as SStatus } from './ETLTypes';
 
 // Define DataSourceType constants for backward compatibility
 export const DataSourceType = {
@@ -58,4 +60,10 @@ export const JobStatus = {
   ...JStatus,
   SUCCEEDED: 'success' as JStatus,
   FAILED: 'error' as JStatus,
+  CANCELED: 'cancelled' as JStatus, // Alias for CANCELLED for backward compatibility
+};
+
+// Export system status enum
+export const SystemStatus = {
+  ...SStatus,
 };

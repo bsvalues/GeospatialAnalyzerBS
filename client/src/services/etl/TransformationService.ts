@@ -9,7 +9,8 @@ import {
   CustomConfig,
   FilterOperator,
   FilterLogic,
-  TransformationType
+  TransformationType,
+  ExtendedFilterOperator
 } from './ETLTypes';
 import { alertService, AlertType, AlertCategory, AlertSeverity } from './AlertService';
 
@@ -220,19 +221,19 @@ class TransformationService {
       case FilterOperator.CONTAINS:
         return String(fieldValue).includes(String(value));
         
-      case FilterOperator.NOT_CONTAINS:
+      case ExtendedFilterOperator.NOT_CONTAINS:
         return !String(fieldValue).includes(String(value));
         
-      case FilterOperator.STARTS_WITH:
+      case ExtendedFilterOperator.STARTS_WITH:
         return String(fieldValue).startsWith(String(value));
         
-      case FilterOperator.ENDS_WITH:
+      case ExtendedFilterOperator.ENDS_WITH:
         return String(fieldValue).endsWith(String(value));
         
-      case FilterOperator.IS_NULL:
+      case ExtendedFilterOperator.IS_NULL:
         return fieldValue === null || fieldValue === undefined;
         
-      case FilterOperator.IS_NOT_NULL:
+      case ExtendedFilterOperator.IS_NOT_NULL:
         return fieldValue !== null && fieldValue !== undefined;
         
       case FilterOperator.REGEX:
