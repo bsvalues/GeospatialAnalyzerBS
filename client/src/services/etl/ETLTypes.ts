@@ -14,6 +14,8 @@ export enum JobStatus {
 export enum DataSourceType {
   POSTGRESQL = 'POSTGRESQL',
   MYSQL = 'MYSQL',
+  SQL_SERVER = 'SQL_SERVER',
+  ODBC = 'ODBC',
   REST_API = 'REST_API',
   GRAPHQL_API = 'GRAPHQL_API',
   FILE_CSV = 'FILE_CSV',

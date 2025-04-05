@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Link } from 'wouter';
 import { 
   Card, 
   CardContent, 
@@ -48,6 +49,7 @@ import {
   CheckCircle2, 
   ChevronDown, 
   Clock, 
+  Database,
   Download, 
   File, 
   FileText, 
@@ -114,6 +116,10 @@ const DataSourceTypeBadge: React.FC<{ type: DataSourceType }> = ({ type }) => {
       return <Badge variant="outline" className="bg-indigo-100 text-indigo-800">PostgreSQL</Badge>;
     case DataSourceType.MYSQL:
       return <Badge variant="outline" className="bg-blue-100 text-blue-800">MySQL</Badge>;
+    case DataSourceType.SQL_SERVER:
+      return <Badge variant="outline" className="bg-red-100 text-red-800">SQL Server</Badge>;
+    case DataSourceType.ODBC:
+      return <Badge variant="outline" className="bg-orange-100 text-orange-800">ODBC</Badge>;
     case DataSourceType.REST_API:
       return <Badge variant="outline" className="bg-purple-100 text-purple-800">REST API</Badge>;
     case DataSourceType.FILE_CSV:
@@ -902,6 +908,18 @@ const ETLDashboard: React.FC = () => {
               <RefreshCw className="h-4 w-4 mr-2" />
               Refresh
             </Button>
+            <Link href="/database-connection">
+              <Button variant="outline" size="sm">
+                <Database className="h-4 w-4 mr-2" />
+                Direct Database
+              </Button>
+            </Link>
+            <Link href="/ftp-data-migration">
+              <Button variant="outline" size="sm">
+                <FileText className="h-4 w-4 mr-2" />
+                FTP Migration
+              </Button>
+            </Link>
             <Dialog open={dataSourceDialogOpen} onOpenChange={setDataSourceDialogOpen}>
               <DialogTrigger asChild>
                 <Button size="sm">

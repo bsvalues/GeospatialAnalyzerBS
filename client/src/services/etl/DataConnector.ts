@@ -2,6 +2,24 @@ import { DataSource, DataSourceType } from './ETLTypes';
 import { alertService, AlertType, AlertCategory, AlertSeverity } from './AlertService';
 
 /**
+ * Connection config interface for all connectors
+ */
+export interface ConnectionConfig {
+  [key: string]: any;
+}
+
+/**
+ * Interface for data connectors to implement
+ */
+export interface IDataConnector {
+  connect(): Promise<boolean>;
+  disconnect(): Promise<boolean>;
+  isConnected(): boolean;
+  getConnectionError(): Error | null;
+  getDataSource(): DataSource;
+}
+
+/**
  * Connection result interface
  */
 export interface ConnectionResult {
