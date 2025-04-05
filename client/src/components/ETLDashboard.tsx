@@ -548,14 +548,14 @@ const ETLDashboard: React.FC = () => {
                   <span>Loaded:</span>
                   <span>{systemStatus.recordCounts?.loaded || 0}</span>
                 </div>
-                <Progress value={(systemStatus.recordCounts.loaded / Math.max(1, systemStatus.recordCounts.transformed)) * 100} />
+                <Progress value={(systemStatus.recordCounts?.loaded || 0) / Math.max(1, (systemStatus.recordCounts?.transformed || 0)) * 100} />
               </div>
               <div className="space-y-2">
                 <div className="flex justify-between">
                   <span>Rejected:</span>
-                  <span>{systemStatus.recordCounts.rejected}</span>
+                  <span>{systemStatus.recordCounts?.rejected || 0}</span>
                 </div>
-                <Progress value={(systemStatus.recordCounts.rejected / Math.max(1, systemStatus.recordCounts.extracted + systemStatus.recordCounts.rejected)) * 100} className="bg-red-100" />
+                <Progress value={((systemStatus.recordCounts?.rejected || 0) / Math.max(1, (systemStatus.recordCounts?.extracted || 0) + (systemStatus.recordCounts?.rejected || 0))) * 100} className="bg-red-100" />
               </div>
             </div>
           </CardContent>
@@ -875,10 +875,10 @@ const ETLDashboard: React.FC = () => {
                     <TableCell>{formatDuration(run.executionTime)}</TableCell>
                     <TableCell>
                       <div className="text-xs space-y-1">
-                        <div>Extracted: {run.recordCounts.extracted}</div>
-                        <div>Transformed: {run.recordCounts.transformed}</div>
-                        <div>Loaded: {run.recordCounts.loaded}</div>
-                        <div>Rejected: {run.recordCounts.rejected}</div>
+                        <div>Extracted: {run.recordCounts?.extracted || 0}</div>
+                        <div>Transformed: {run.recordCounts?.transformed || 0}</div>
+                        <div>Loaded: {run.recordCounts?.loaded || 0}</div>
+                        <div>Rejected: {run.recordCounts?.rejected || 0}</div>
                       </div>
                     </TableCell>
                   </TableRow>
