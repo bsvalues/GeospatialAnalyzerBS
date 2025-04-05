@@ -150,9 +150,9 @@ const EnhancedPropertyInfoCard: React.FC<EnhancedPropertyInfoCardProps> = ({
             <div className="text-2xl font-semibold">{property.value || 'N/A'}</div>
           </div>
           <div>
-            <Tooltip 
+            <Tooltip
               content={statusInfo.description}
-              placement="top"
+              side="top"
             >
               <div 
                 data-testid="value-indicator"
@@ -267,8 +267,8 @@ const EnhancedPropertyInfoCard: React.FC<EnhancedPropertyInfoCardProps> = ({
                       <span className="text-sm text-gray-500 ml-2">Map preview would appear here</span>
                     </div>
                     <div className="mt-2 text-sm">
-                      <div><span className="font-medium">Latitude:</span> {typeof property.latitude === 'number' ? property.latitude.toFixed(6) : property.latitude}</div>
-                      <div><span className="font-medium">Longitude:</span> {typeof property.longitude === 'number' ? property.longitude.toFixed(6) : property.longitude}</div>
+                      <div><span className="font-medium">Latitude:</span> {typeof property.latitude === 'number' ? property.latitude.toFixed(6) : (property.latitude || 'N/A')}</div>
+                      <div><span className="font-medium">Longitude:</span> {typeof property.longitude === 'number' ? property.longitude.toFixed(6) : (property.longitude || 'N/A')}</div>
                     </div>
                   </div>
                 )}
