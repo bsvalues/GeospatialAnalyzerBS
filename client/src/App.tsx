@@ -43,7 +43,6 @@ import ETLWizardPage from './pages/ETLWizardPage';
 import ETLAnimationDemo from './pages/ETLAnimationDemo';
 import StepProgressDemo from './pages/StepProgressDemo';
 import ETLJobSimulationDemo from './pages/ETLJobSimulationDemo';
-import { SchemaValidationPage } from './pages/SchemaValidationPage';
 
 function Router() {
   const [location] = useLocation();
@@ -85,7 +84,6 @@ function Router() {
         <Route path="/etl-animation-demo" component={ETLAnimationDemo} />
         <Route path="/step-progress-demo" component={StepProgressDemo} />
         <Route path="/etl-job-simulation" component={ETLJobSimulationDemo} />
-        <Route path="/schema-validation" component={SchemaValidationPage} />
         <Route component={NotFound} />
       </Switch>
     </>
@@ -104,8 +102,17 @@ export function App() {
         <PropertyFilterProvider>
           <AutoHideProvider>
             <TourProvider>
-              <div className="flex flex-col h-screen bg-gray-50">
-                <div className="flex-grow overflow-hidden">
+              <div className="flex flex-col min-h-screen bg-gradient-to-b from-[#f8faff] to-[#e6eeff]">
+                <div className="flex-grow overflow-y-auto">
+                  {/* Dynamic Background */}
+                  <div className="fixed inset-0 bg-gradient-to-br from-[#f0f4ff] via-white to-[#f0f4ff] z-0" />
+                  
+                  {/* Multiple Glowing Orbs */}
+                  <div className="fixed top-1/4 right-1/4 w-[400px] h-[400px] bg-blue-400 rounded-full blur-[140px] opacity-20 z-0" />
+                  <div className="fixed bottom-1/4 left-1/4 w-[350px] h-[350px] bg-purple-300 rounded-full blur-[120px] opacity-15 z-0" />
+                  
+                  {/* Radial Gradient Canvas Background */}
+                  <div className="fixed inset-0 z-[1] bg-[radial-gradient(circle_at_center,rgba(255,255,255,0)_0%,rgba(255,255,255,0.8)_50%,rgba(255,255,255,0.9)_100%)]" />
                   <Router />
                 </div>
               </div>

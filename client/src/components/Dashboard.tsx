@@ -67,7 +67,7 @@ const Dashboard: React.FC<DashboardProps> = ({ className }) => {
   });
 
   return (
-    <div className={`h-full flex flex-col ${className} bg-white`} data-testid="dashboard-container">
+    <div className={`min-h-screen flex flex-col ${className} bg-gradient-to-b from-[#f8faff] to-[#e6eeff]`} data-testid="dashboard-container">
       {/* Tab navigation */}
       <TabNavigation activeTab={activeTab} onTabChange={setActiveTab} data-tour="app-navigation" />
 
