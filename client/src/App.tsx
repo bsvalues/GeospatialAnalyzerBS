@@ -34,6 +34,7 @@ import DataQualityDemo from '@/pages/DataQualityDemo';
 import PropertyBulkImportPage from '@/pages/PropertyBulkImportPage';
 import { ProjectTrackerPage } from '@/pages/ProjectTrackerPage';
 import IncomeTestPage from '@/pages/income-test';
+import FTPDataMigrationPage from '@/pages/FTPDataMigrationPage';
 
 function Router() {
   const [location] = useLocation();
@@ -66,6 +67,7 @@ function Router() {
         <Route path="/project-tracker" component={ProjectTrackerPage} />
         <Route path="/property-bulk-import" component={PropertyBulkImportPage} />
         <Route path="/income-test" component={IncomeTestPage} />
+        <Route path="/ftp-data-migration" component={FTPDataMigrationPage} />
         <Route component={NotFound} />
       </Switch>
     </>

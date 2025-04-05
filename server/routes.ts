@@ -3934,11 +3934,67 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.status(500).json({ error: errorMessage });
   }
 
+  // FTP connection endpoint
+  app.post('/api/etl/ftp/connect', async (req, res) => {
+    try {
+      const { host, port, username, password, secure, path } = req.body;
+      
+      // In a real implementation, we would connect to the FTP server
+      // and list files in the specified directory
+      
+      // For now, we'll return mock data for the UI to display
+      const mockFiles = [
+        'benton_county_properties_2024.csv',
+        'historical_values_2020_2023.json',
+        'commercial_properties_2024.xml',
+        'residential_zones.csv',
+        'property_tax_assessments.csv',
+        'valuation_history.json'
+      ];
+      
+      // Simulate a short delay to mimic network latency
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      return res.status(200).json({ 
+        success: true, 
+        message: `Connected to ${host}:${port} successfully`, 
+        files: mockFiles
+      });
+    } catch (error) {
+      handleError(error, res);
+    }
+  });
+
   // FTP data import for properties
   app.post('/api/etl/import/properties', async (req, res) => {
     try {
-      const { data, source, fileType } = req.body;
+      const { data, source, fileType, host, port, username, password, secure, path, file, useFieldMapping } = req.body;
       
+      // Handle FTP direct import case
+      if (host && file) {
+        console.log(`Processing FTP import from ${host}:${port || 21}, file: ${file}`);
+        
+        // In a real implementation, we would:
+        // 1. Connect to the FTP server
+        // 2. Download the specified file
+        // 3. Parse it based on its type
+        // 4. Import the data
+        
+        // For this demo, we'll simulate a successful import with mock data
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        
+        return res.status(200).json({
+          success: true,
+          rowsImported: 245,
+          importTimeMs: 4780,
+          missingValues: 12,
+          completeness: 98,
+          accuracy: 96,
+          consistency: 89
+        });
+      }
+      
+      // Handle regular data import case
       if (!Array.isArray(data) || data.length === 0) {
         return res.status(400).json({ error: 'Invalid or empty data array' });
       }
