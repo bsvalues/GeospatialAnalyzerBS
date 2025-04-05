@@ -14,6 +14,11 @@ import {
   generateConnectionTroubleshooting
 } from "./services/openai";
 import {
+  testDatabaseConnection,
+  executeQuery,
+  getDatabaseMetadata
+} from "./services/database";
+import {
   insertIncomeHotelMotelSchema,
   insertIncomeHotelMotelDetailSchema,
   insertIncomeLeaseUpSchema,
@@ -35,7 +40,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json(clientConfig);
   });
   
-  // SQL Server connection test
+  // Advanced Database Routes
+  
+  // Test database connection
+  app.post('/api/database/test', testDatabaseConnection);
+  
+  // Execute database query
+  app.post('/api/database/query', executeQuery);
+  
+  // Get database metadata
+  app.post('/api/database/metadata', getDatabaseMetadata);
+  
+  // Legacy routes - redirect to new API endpoints
+  
+  // SQL Server connection test (legacy route)
   app.post('/api/sqlserver/test', async (req, res) => {
     try {
       const { connection } = req.body;
@@ -44,15 +62,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: 'Missing connection configuration' });
       }
       
-      // For now, we'll simulate a successful connection
-      // In a real implementation, we would use the mssql package to test the connection
-      res.json({ success: true });
+      // Convert legacy format to new format
+      const config = {
+        type: 'sqlserver',
+        server: connection.server,
+        port: connection.port,
+        database: connection.database,
+        username: connection.username,
+        password: connection.password,
+        useWindowsAuth: connection.useWindowsAuth || false,
+        trustServerCertificate: connection.trustServerCertificate || false,
+        encrypt: connection.encrypt !== false
+      };
+      
+      // Call the new database test service
+      req.body = { config };
+      return testDatabaseConnection(req, res);
     } catch (error: any) {
       handleError(error, res);
     }
   });
   
-  // SQL Server query execution
+  // SQL Server query execution (legacy route)
   app.post('/api/sqlserver/query', async (req, res) => {
     try {
       const { connection, sql, params } = req.body;
@@ -61,18 +92,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: 'Missing required parameters' });
       }
       
-      // For now, we'll return a sample response
-      // In a real implementation, we would use the mssql package to execute the query
-      res.json([
-        { id: 1, name: 'Sample Property 1', address: '123 Main St' },
-        { id: 2, name: 'Sample Property 2', address: '456 Oak Ave' }
-      ]);
+      // Convert legacy format to new format
+      const config = {
+        type: 'sqlserver',
+        server: connection.server,
+        port: connection.port,
+        database: connection.database,
+        username: connection.username,
+        password: connection.password,
+        useWindowsAuth: connection.useWindowsAuth || false,
+        trustServerCertificate: connection.trustServerCertificate || false,
+        encrypt: connection.encrypt !== false
+      };
+      
+      // Call the new database query service
+      req.body = { config, query: sql, parameters: params };
+      return executeQuery(req, res);
     } catch (error: any) {
       handleError(error, res);
     }
   });
   
-  // ODBC connection test
+  // ODBC connection test (legacy route)
   app.post('/api/odbc/test', async (req, res) => {
     try {
       const { connection } = req.body;
@@ -81,15 +122,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: 'Missing connection configuration' });
       }
       
-      // For now, we'll simulate a successful connection
-      // In a real implementation, we would use an ODBC package to test the connection
-      res.json({ success: true });
+      // Convert legacy format to new format
+      const config = {
+        type: 'odbc',
+        connectionString: connection.connectionString,
+        server: connection.server,
+        database: connection.database,
+        username: connection.username,
+        password: connection.password,
+        useWindowsAuth: connection.useWindowsAuth || false,
+        useConnectionString: !!connection.connectionString
+      };
+      
+      // Call the new database test service
+      req.body = { config };
+      return testDatabaseConnection(req, res);
     } catch (error: any) {
       handleError(error, res);
     }
   });
   
-  // ODBC query execution
+  // ODBC query execution (legacy route)
   app.post('/api/odbc/query', async (req, res) => {
     try {
       const { connection, sql, params } = req.body;
@@ -98,12 +151,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: 'Missing required parameters' });
       }
       
-      // For now, we'll return a sample response
-      // In a real implementation, we would use an ODBC package to execute the query
-      res.json([
-        { id: 1, name: 'Sample Property 1', address: '123 Main St' },
-        { id: 2, name: 'Sample Property 2', address: '456 Oak Ave' }
-      ]);
+      // Convert legacy format to new format
+      const config = {
+        type: 'odbc',
+        connectionString: connection.connectionString,
+        server: connection.server,
+        database: connection.database,
+        username: connection.username,
+        password: connection.password,
+        useWindowsAuth: connection.useWindowsAuth || false,
+        useConnectionString: !!connection.connectionString
+      };
+      
+      // Call the new database query service
+      req.body = { config, query: sql, parameters: params };
+      return executeQuery(req, res);
     } catch (error: any) {
       handleError(error, res);
     }
