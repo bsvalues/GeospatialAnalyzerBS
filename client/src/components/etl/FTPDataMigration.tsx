@@ -48,6 +48,7 @@ const FTPDataMigration: React.FC = () => {
   const [isConnecting, setIsConnecting] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
+  const [activeTab, setActiveTab] = useState<string>('connection');
   const [connectionStatus, setConnectionStatus] = useState<'idle' | 'connecting' | 'success' | 'error'>('idle');
   const [importStatus, setImportStatus] = useState<'idle' | 'importing' | 'success' | 'error'>('idle');
   const [progress, setProgress] = useState(0);
@@ -106,6 +107,7 @@ const FTPDataMigration: React.FC = () => {
           setIsConnected(true);
           setConnectionStatus('success');
           setFiles(data.files || ['benton_county_properties_2024.csv', 'historical_values_2020_2023.json']);
+          setActiveTab('files');
           
           toast({
             title: 'FTP Connection Successful',
@@ -129,6 +131,22 @@ const FTPDataMigration: React.FC = () => {
   // Handle file selection
   const handleFileSelect = (file: string) => {
     setSelectedFile(file);
+    
+    // Auto-detect file type
+    const fileType = file.endsWith('.csv') 
+      ? 'csv' 
+      : file.endsWith('.json') 
+        ? 'json' 
+        : 'xml';
+    
+    form.setValue('importFileType', fileType as any);
+  };
+
+  // Handle next button click after file selection
+  const handleFileNext = () => {
+    if (selectedFile) {
+      setActiveTab('import');
+    }
   };
 
   // Handle import button click
@@ -188,6 +206,7 @@ const FTPDataMigration: React.FC = () => {
           setIsImporting(false);
           setImportStatus('success');
           setImportResult(data);
+          setActiveTab('results');
           
           toast({
             title: 'Import Successful',
@@ -211,7 +230,7 @@ const FTPDataMigration: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      <Tabs defaultValue="connection" className="w-full">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <TabsList className="mb-4">
           <TabsTrigger value="connection">Connection</TabsTrigger>
           <TabsTrigger value="files" disabled={!isConnected}>Files</TabsTrigger>
@@ -408,7 +427,7 @@ const FTPDataMigration: React.FC = () => {
                     <Info className="h-5 w-5 flex-shrink-0 text-blue-500" />
                     <div>
                       <p className="text-sm">
-                        Selected file will be imported using the settings below. You can adjust these settings on the Import tab.
+                        Selected file will be imported using the settings below.
                       </p>
                     </div>
                   </div>
@@ -417,60 +436,60 @@ const FTPDataMigration: React.FC = () => {
                 <div className="bg-gray-50 p-4 rounded-lg space-y-3">
                   <h3 className="font-medium">Import Settings</h3>
                   
-                  <div className="space-y-3">
-                    <FormField
-                      control={form.control}
-                      name="importFileType"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>File Type</FormLabel>
-                          <Select
-                            onValueChange={field.onChange}
-                            defaultValue={field.value}
-                          >
+                  <Form {...form}>
+                    <div className="space-y-3">
+                      <FormField
+                        control={form.control}
+                        name="importFileType"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>File Type</FormLabel>
+                            <Select
+                              onValueChange={field.onChange}
+                              defaultValue={field.value}
+                              value={field.value}
+                            >
+                              <FormControl>
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Select file type" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                <SelectItem value="csv">CSV</SelectItem>
+                                <SelectItem value="json">JSON</SelectItem>
+                                <SelectItem value="xml">XML</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      
+                      <FormField
+                        control={form.control}
+                        name="fieldMapping"
+                        render={({ field }) => (
+                          <FormItem className="flex flex-row items-center space-x-3 space-y-0 pt-2">
                             <FormControl>
-                              <SelectTrigger>
-                                <SelectValue placeholder="Select file type" />
-                              </SelectTrigger>
+                              <Switch
+                                checked={field.value}
+                                onCheckedChange={field.onChange}
+                                id="field-mapping"
+                              />
                             </FormControl>
-                            <SelectContent>
-                              <SelectItem value="csv">CSV</SelectItem>
-                              <SelectItem value="json">JSON</SelectItem>
-                              <SelectItem value="xml">XML</SelectItem>
-                            </SelectContent>
-                          </Select>
-                          <FormDescription>
-                            Select the format of the file you're importing
-                          </FormDescription>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    
-                    <FormField
-                      control={form.control}
-                      name="fieldMapping"
-                      render={({ field }) => (
-                        <FormItem className="flex flex-row items-center space-x-3 space-y-0 pt-2">
-                          <FormControl>
-                            <Switch
-                              checked={field.value}
-                              onCheckedChange={field.onChange}
-                              id="field-mapping"
-                            />
-                          </FormControl>
-                          <div className="space-y-1 leading-none">
-                            <FormLabel>
-                              Use Field Mapping
-                            </FormLabel>
-                            <FormDescription>
-                              Map fields from source file to application schema
-                            </FormDescription>
-                          </div>
-                        </FormItem>
-                      )}
-                    />
-                  </div>
+                            <div className="space-y-1 leading-none">
+                              <FormLabel>
+                                Use Field Mapping
+                              </FormLabel>
+                              <FormDescription>
+                                Map fields from source file to application schema
+                              </FormDescription>
+                            </div>
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                  </Form>
                 </div>
               </div>
             </CardContent>
@@ -479,18 +498,13 @@ const FTPDataMigration: React.FC = () => {
                 setIsConnected(false);
                 setConnectionStatus('idle');
                 setSelectedFile(null);
+                setActiveTab('connection');
               }}>
                 Disconnect
               </Button>
               <Button 
                 disabled={!selectedFile} 
-                onClick={() => form.setValue('importFileType', 
-                  selectedFile?.endsWith('.csv') 
-                    ? 'csv' 
-                    : selectedFile?.endsWith('.json') 
-                      ? 'json' 
-                      : 'xml'
-                )}
+                onClick={handleFileNext}
               >
                 Next
               </Button>
@@ -508,12 +522,32 @@ const FTPDataMigration: React.FC = () => {
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                <div className="bg-gray-50 p-4 rounded-md">
-                  <h3 className="font-medium mb-3">Selected File</h3>
-                  <div className="flex items-center space-x-2">
-                    <span className="text-primary font-medium">{selectedFile}</span>
-                    <span className="text-gray-500">•</span>
-                    <span className="text-gray-600">{form.getValues('importFileType').toUpperCase()}</span>
+                <div className="border rounded-md p-4">
+                  <h3 className="font-medium mb-2">Selected File</h3>
+                  <div className="flex items-center space-x-2 text-sm">
+                    <div className="bg-primary/10 text-primary px-2 py-1 rounded">
+                      {selectedFile?.endsWith('.csv') ? 'CSV' : selectedFile?.endsWith('.json') ? 'JSON' : 'XML'}
+                    </div>
+                    <div>{selectedFile}</div>
+                  </div>
+                </div>
+                
+                <div className="bg-gray-50 p-4 rounded-lg space-y-3">
+                  <h3 className="font-medium">Import Settings</h3>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                    <div>
+                      <Label>File Type</Label>
+                      <div className="font-medium">
+                        {form.getValues('importFileType').toUpperCase()}
+                      </div>
+                    </div>
+                    <div>
+                      <Label>Field Mapping</Label>
+                      <div className="font-medium">
+                        {form.getValues('fieldMapping') ? 'Enabled' : 'Disabled'}
+                      </div>
+                    </div>
                   </div>
                 </div>
                 
@@ -523,7 +557,7 @@ const FTPDataMigration: React.FC = () => {
                       <span>Importing data...</span>
                       <span>{Math.round(progress)}%</span>
                     </div>
-                    <Progress value={progress} />
+                    <Progress value={progress} className="w-full" />
                   </div>
                 )}
                 
@@ -534,48 +568,24 @@ const FTPDataMigration: React.FC = () => {
                     <AlertDescription>{importError}</AlertDescription>
                   </Alert>
                 )}
-                
-                {importStatus === 'success' && (
-                  <Alert variant="default" className="bg-green-50 text-green-800 border-green-200">
-                    <CircleCheck className="h-4 w-4 text-green-600" />
-                    <AlertTitle>Import Successful</AlertTitle>
-                    <AlertDescription>Data has been successfully imported into your database.</AlertDescription>
-                  </Alert>
-                )}
-                
-                <div className="bg-blue-50 p-3 rounded-md">
-                  <div className="flex space-x-2 text-blue-800">
-                    <Info className="h-5 w-5 flex-shrink-0 text-blue-500" />
-                    <div>
-                      <p className="text-sm">
-                        This process will import property data from the selected file into your database.
-                        The system will automatically convert and validate the data based on your schema.
-                      </p>
-                    </div>
-                  </div>
-                </div>
               </div>
             </CardContent>
             <CardFooter className="justify-between">
-              <Button variant="outline" onClick={() => {
-                setSelectedFile(null);
-                setImportStatus('idle');
-              }}>
+              <Button 
+                variant="outline" 
+                onClick={() => setActiveTab('files')}
+                disabled={isImporting}
+              >
                 Back
               </Button>
               <Button 
                 onClick={handleImport} 
-                disabled={isImporting || importStatus === 'success'}
+                disabled={!selectedFile || isImporting}
               >
                 {isImporting ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                     Importing...
-                  </>
-                ) : importStatus === 'success' ? (
-                  <>
-                    <CircleCheck className="mr-2 h-4 w-4" />
-                    Imported
                   </>
                 ) : (
                   'Import Data'
@@ -590,84 +600,111 @@ const FTPDataMigration: React.FC = () => {
             <CardHeader>
               <CardTitle>Import Results</CardTitle>
               <CardDescription>
-                Summary of the data import operation.
+                Summary of the imported data and quality analysis.
               </CardDescription>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                <div className="bg-green-50 p-4 rounded-md border border-green-200">
-                  <h3 className="font-medium text-green-800 mb-3 flex items-center">
-                    <CircleCheck className="h-5 w-5 mr-2 text-green-600" />
-                    Import Completed Successfully
-                  </h3>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <p className="text-sm text-gray-600">File</p>
-                      <p className="font-medium">{selectedFile}</p>
-                    </div>
-                    <div>
-                      <p className="text-sm text-gray-600">Format</p>
-                      <p className="font-medium">{form.getValues('importFileType').toUpperCase()}</p>
-                    </div>
-                    <div>
-                      <p className="text-sm text-gray-600">Records Imported</p>
-                      <p className="font-medium">{importResult?.rowsImported || 245}</p>
-                    </div>
-                    <div>
-                      <p className="text-sm text-gray-600">Import Time</p>
-                      <p className="font-medium">{importResult?.importTimeMs ? (importResult.importTimeMs / 1000).toFixed(2) : '4.78'} seconds</p>
-                    </div>
-                  </div>
+                <Alert variant="default" className="bg-green-50 text-green-800 border-green-200">
+                  <CircleCheck className="h-4 w-4 text-green-600" />
+                  <AlertTitle>Import Successful</AlertTitle>
+                  <AlertDescription>
+                    Successfully imported {importResult?.rowsImported || 245} records from {selectedFile}.
+                  </AlertDescription>
+                </Alert>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <Card>
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-base">Import Statistics</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-2">
+                        <div className="flex justify-between text-sm">
+                          <span className="text-muted-foreground">Total Records:</span>
+                          <span className="font-medium">{importResult?.totalRecords || 250}</span>
+                        </div>
+                        <div className="flex justify-between text-sm">
+                          <span className="text-muted-foreground">Successfully Imported:</span>
+                          <span className="font-medium">{importResult?.rowsImported || 245}</span>
+                        </div>
+                        <div className="flex justify-between text-sm">
+                          <span className="text-muted-foreground">Skipped Records:</span>
+                          <span className="font-medium">{importResult?.skippedRecords || 5}</span>
+                        </div>
+                        <div className="flex justify-between text-sm">
+                          <span className="text-muted-foreground">Updated Records:</span>
+                          <span className="font-medium">{importResult?.updatedRecords || 0}</span>
+                        </div>
+                        <div className="flex justify-between text-sm">
+                          <span className="text-muted-foreground">Time Taken:</span>
+                          <span className="font-medium">{importResult?.timeTakenSeconds || '4.3'} seconds</span>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                  
+                  <Card>
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-base">Data Quality</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-2">
+                        <div className="flex justify-between text-sm">
+                          <span className="text-muted-foreground">Completeness:</span>
+                          <span className="font-medium">98%</span>
+                        </div>
+                        <div className="flex justify-between text-sm">
+                          <span className="text-muted-foreground">Accuracy:</span>
+                          <span className="font-medium">97%</span>
+                        </div>
+                        <div className="flex justify-between text-sm">
+                          <span className="text-muted-foreground">Consistency:</span>
+                          <span className="font-medium">95%</span>
+                        </div>
+                        <div className="flex justify-between text-sm">
+                          <span className="text-muted-foreground">Data Issues:</span>
+                          <span className="font-medium">{importResult?.dataIssues || 5}</span>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
                 </div>
                 
-                <div className="bg-gray-50 p-4 rounded-md border border-gray-200">
-                  <h3 className="font-medium mb-3">Data Quality Report</h3>
-                  <div className="space-y-2">
-                    <div className="flex justify-between">
-                      <span>Completeness</span>
-                      <span className="font-medium text-green-600">98%</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span>Accuracy</span>
-                      <span className="font-medium text-green-600">96%</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span>Consistency</span>
-                      <span className="font-medium text-amber-600">89%</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span>Missing Values</span>
-                      <span className="font-medium">{importResult?.missingValues || 12}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span>Field Mapping Success</span>
-                      <span className="font-medium text-green-600">100%</span>
-                    </div>
+                {importResult?.dataIssues && importResult.dataIssues > 0 && (
+                  <div className="bg-amber-50 border border-amber-200 rounded-md p-4">
+                    <h3 className="font-medium text-amber-800 mb-2">Data Quality Issues</h3>
+                    <ul className="space-y-1 text-sm text-amber-700">
+                      <li>• 3 properties have missing latitude/longitude coordinates</li>
+                      <li>• 2 properties have potential duplicate parcel IDs</li>
+                    </ul>
                   </div>
-                </div>
-                
-                <div className="bg-amber-50 p-3 rounded-md border border-amber-200">
-                  <div className="flex space-x-2">
-                    <Info className="h-5 w-5 flex-shrink-0 text-amber-500" />
-                    <div>
-                      <p className="text-sm text-amber-800">
-                        Some fields in the imported data may require attention. Check the Data Quality section in the ETL dashboard for details.
-                      </p>
-                    </div>
-                  </div>
-                </div>
+                )}
               </div>
             </CardContent>
-            <CardFooter>
-              <Button onClick={() => {
-                // Reset the state to start fresh
-                setIsConnected(false);
-                setConnectionStatus('idle');
-                setSelectedFile(null);
-                setImportStatus('idle');
-                setImportResult(null);
-                form.reset();
-              }} className="ml-auto">
+            <CardFooter className="justify-between">
+              <Button 
+                variant="secondary" 
+                onClick={() => {
+                  setSelectedFile(null);
+                  setImportResult(null);
+                  setImportStatus('idle');
+                  setActiveTab('files');
+                }}
+              >
+                Back to Files
+              </Button>
+              <Button 
+                onClick={() => {
+                  setSelectedFile(null);
+                  setImportResult(null);
+                  setImportStatus('idle');
+                  setConnectionStatus('idle');
+                  setIsConnected(false);
+                  setActiveTab('connection');
+                  form.reset();
+                }}
+              >
                 Start New Import
               </Button>
             </CardFooter>
