@@ -1,5 +1,7 @@
 /* Import Benton County Theme */
 @import './styles/benton-county-theme.css';
+/* Import map-specific styles */
+@import './styles/map-popups.css';
 
 @tailwind base;
 @tailwind components;
