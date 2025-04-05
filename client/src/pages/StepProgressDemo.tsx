@@ -26,37 +26,37 @@ const StepProgressDemo = () => {
       id: "connect",
       title: "Connect",
       description: "Connect to data source",
-      status: errorStep === "connect" ? "error" : undefined
+      error: errorStep === "connect" ? "Connection failed" : undefined
     },
     {
       id: "extract",
       title: "Extract",
       description: "Extract source data",
-      status: errorStep === "extract" ? "error" : undefined
+      error: errorStep === "extract" ? "Extraction failed" : undefined
     },
     {
       id: "validate",
       title: "Validate",
       description: "Validate data quality",
-      status: errorStep === "validate" ? "error" : undefined
+      error: errorStep === "validate" ? "Validation failed" : undefined
     },
     {
       id: "transform",
       title: "Transform",
       description: "Transform data format",
-      status: errorStep === "transform" ? "error" : undefined
+      error: errorStep === "transform" ? "Transformation failed" : undefined
     },
     {
       id: "enrich",
       title: "Enrich",
       description: "Add additional data",
-      status: errorStep === "enrich" ? "error" : undefined
+      error: errorStep === "enrich" ? "Enrichment failed" : undefined
     },
     {
       id: "load",
       title: "Load",
       description: "Load into target system",
-      status: errorStep === "load" ? "error" : undefined
+      error: errorStep === "load" ? "Loading failed" : undefined
     }
   ];
   
@@ -131,12 +131,11 @@ const StepProgressDemo = () => {
             <CardContent className="space-y-6">
               <div className="bg-gray-50 p-6 rounded-md border overflow-x-auto">
                 <StepProgressAnimation
-                  steps={steps}
+                  steps={showDescription ? steps : steps.map(step => ({ ...step, description: undefined })) }
                   currentStep={currentStep}
                   animated={animated}
                   speed={speed}
-                  showDescription={showDescription}
-                  variant={variant}
+                  vertical={variant === "vertical"}
                   size={size}
                   onComplete={() => console.log("Process complete!")}
                 />
@@ -255,12 +254,11 @@ const StepProgressDemo = () => {
               
               <div className="bg-gray-50 p-6 rounded-md border overflow-x-auto">
                 <StepProgressAnimation
-                  steps={onboardingSteps}
+                  steps={showDescription ? onboardingSteps : onboardingSteps.map(step => ({ ...step, description: undefined }))}
                   currentStep={Math.min(currentStep, onboardingSteps.length)}
                   animated={animated}
                   speed={speed}
-                  showDescription={showDescription}
-                  variant="horizontal"
+                  vertical={false}
                   size={size}
                 />
               </div>

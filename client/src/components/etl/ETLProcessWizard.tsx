@@ -771,10 +771,11 @@ const ETLProcessWizard: React.FC<ETLProcessWizardProps> = ({
       return null;
     }
     
-    // Create steps array from step titles
+    // Create steps array from step titles matching the Step interface from StepProgressAnimation
     const steps = stepTitles.slice(0, -1).map((title, index) => ({
       id: index.toString(),
-      name: title,
+      title: title, // Changed from 'name' to 'title' to match StepProgressAnimation Step interface
+      description: `Step ${index + 1}`,
     }));
     
     // Calculate completed steps indices
