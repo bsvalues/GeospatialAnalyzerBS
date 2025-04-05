@@ -13,7 +13,7 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Progress } from "@/components/ui/progress";
 import { Checkbox } from "@/components/ui/checkbox";
-import StepProgressAnimation from "./WizardStepProgress";
+import { StepProgressAnimation } from "./StepProgressAnimation";
 import {
   ChevronRight,
   ChevronLeft,
@@ -771,14 +771,26 @@ const ETLProcessWizard: React.FC<ETLProcessWizardProps> = ({
       return null;
     }
     
+    // Create steps array from step titles
+    const steps = stepTitles.slice(0, -1).map((title, index) => ({
+      id: index.toString(),
+      name: title,
+    }));
+    
+    // Calculate completed steps indices
+    const completedStepsIndices = stepsCompleted
+      .map((isComplete, idx) => isComplete ? idx : -1)
+      .filter(idx => idx !== -1);
+      
     return (
       <div className="mb-6">
         <StepProgressAnimation 
+          steps={steps}
           currentStep={currentStep}
-          totalSteps={Object.keys(WizardStep).length / 2 - 1} // Exclude SUCCESS step
-          stepsCompleted={stepsCompleted}
-          showAnimation={processing || isSubmitting}
-          animationSpeed="normal"
+          completedSteps={completedStepsIndices}
+          vertical={false}
+          animated={processing || isSubmitting}
+          speed="normal"
         />
       </div>
     );
