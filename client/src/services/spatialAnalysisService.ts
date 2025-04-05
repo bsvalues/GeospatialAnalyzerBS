@@ -8,6 +8,13 @@ export interface Coordinate {
   longitude: number;
 }
 
+// Helper function to convert numeric strings to numbers when needed
+function toNumber(value: string | number | null | undefined): number {
+  if (value === null || value === undefined) return 0;
+  if (typeof value === 'number') return value;
+  return parseFloat(value) || 0;
+}
+
 /**
  * Interface representing a cluster of properties
  */
@@ -87,10 +94,10 @@ function getPropertyValueAsNumber(property: Property): number {
   
   // Handle string value (remove currency symbols, commas, etc.)
   if (typeof property.value === 'string') {
-    return parseFloat(property.value.replace(/[^0-9.-]+/g, ''));
+    return parseFloat(property.value.replace(/[^0-9.-]+/g, '')) || 0;
   }
   
-  return property.value as number;
+  return toNumber(property.value);
 }
 
 /**
@@ -110,7 +117,7 @@ function getNormalizedAttributeValue(
     // For location, we'll return a combined lat/lng value
     // This is just a placeholder - in real implementation we'd use proper 
     // geospatial distance measurements in the clustering algorithm
-    return (property.latitude + property.longitude) / 2;
+    return (toNumber(property.latitude) + toNumber(property.longitude)) / 2;
   }
   
   if (attribute === 'value') {
@@ -120,11 +127,13 @@ function getNormalizedAttributeValue(
   }
   
   if (attribute === 'squareFeet' && property.squareFeet) {
-    return max > min ? (property.squareFeet - min) / (max - min) : 0;
+    const value = toNumber(property.squareFeet);
+    return max > min ? (value - min) / (max - min) : 0;
   }
   
   if (attribute === 'yearBuilt' && property.yearBuilt) {
-    return max > min ? (property.yearBuilt - min) / (max - min) : 0;
+    const value = toNumber(property.yearBuilt);
+    return max > min ? (value - min) / (max - min) : 0;
   }
   
   if (attribute === 'propertyType' && property.propertyType) {
@@ -164,9 +173,9 @@ function calculateAttributeRanges(
       if (attribute === 'value') {
         value = getPropertyValueAsNumber(property);
       } else if (attribute === 'squareFeet') {
-        value = property.squareFeet;
+        value = toNumber(property.squareFeet);
       } else if (attribute === 'yearBuilt') {
-        value = property.yearBuilt;
+        value = toNumber(property.yearBuilt);
       }
       
       if (value !== undefined) {
@@ -227,23 +236,20 @@ export function performSpatialClustering(
   }
   
   // Initialize centroids with attribute values
-  const centroids: Array<Map<string, number>> = centroidIndices.map(index => {
+  const centroids: Array<Record<string, number>> = centroidIndices.map(index => {
     const property = validProperties[index];
-    const centroid = new Map<string, number>();
+    const centroid: Record<string, number> = {};
     
     options.attributes.forEach(attribute => {
-      const range = attributeRanges.get(attribute);
+      const range = attributeRanges[attribute];
       if (range) {
-        centroid.set(
-          attribute, 
-          getNormalizedAttributeValue(property, attribute, range.min, range.max)
-        );
+        centroid[attribute] = getNormalizedAttributeValue(property, attribute, range.min, range.max);
       }
       
       // Special handling for location
       if (attribute === 'location' && property.latitude && property.longitude) {
-        centroid.set('latitude', property.latitude);
-        centroid.set('longitude', property.longitude);
+        centroid['latitude'] = toNumber(property.latitude);
+        centroid['longitude'] = toNumber(property.longitude);
       }
     });
     
@@ -274,14 +280,14 @@ export function performSpatialClustering(
           if (attribute === 'location') {
             // Special handling for location using Haversine distance
             if (property.latitude && property.longitude && 
-                centroid.has('latitude') && centroid.has('longitude')) {
+                'latitude' in centroid && 'longitude' in centroid) {
               const coord1 = { 
-                latitude: property.latitude, 
-                longitude: property.longitude 
+                latitude: toNumber(property.latitude), 
+                longitude: toNumber(property.longitude) 
               };
               const coord2 = { 
-                latitude: centroid.get('latitude')!, 
-                longitude: centroid.get('longitude')! 
+                latitude: centroid['latitude'], 
+                longitude: centroid['longitude']
               };
               
               // Weight location more heavily than other attributes
@@ -289,12 +295,12 @@ export function performSpatialClustering(
             }
           } else {
             // For other attributes, use normalized Euclidean distance
-            const range = attributeRanges.get(attribute);
+            const range = attributeRanges[attribute];
             if (range) {
               const propertyValue = getNormalizedAttributeValue(
                 property, attribute, range.min, range.max
               );
-              const centroidValue = centroid.get(attribute) || 0;
+              const centroidValue = attribute in centroid ? centroid[attribute] : 0;
               
               distance += Math.pow(propertyValue - centroidValue, 2);
             }
@@ -316,7 +322,7 @@ export function performSpatialClustering(
     });
     
     // Recalculate centroids based on new assignments
-    const newCentroids: Array<Map<string, number>> = [];
+    const newCentroids: Array<Record<string, number>> = [];
     
     for (let i = 0; i < k; i++) {
       const clusterMembers = validProperties.filter((_, index) => 
@@ -325,11 +331,11 @@ export function performSpatialClustering(
       
       // Skip empty clusters
       if (clusterMembers.length === 0) {
-        newCentroids.push(centroids[i]);
+        newCentroids.push({...centroids[i]});
         continue;
       }
       
-      const newCentroid = new Map<string, number>();
+      const newCentroid: Record<string, number> = {};
       
       // For each attribute, calculate the average
       options.attributes.forEach(attribute => {
@@ -341,23 +347,23 @@ export function performSpatialClustering(
           
           clusterMembers.forEach(property => {
             if (property.latitude && property.longitude) {
-              sumLat += property.latitude;
-              sumLng += property.longitude;
+              sumLat += toNumber(property.latitude);
+              sumLng += toNumber(property.longitude);
               count++;
             }
           });
           
           if (count > 0) {
-            newCentroid.set('latitude', sumLat / count);
-            newCentroid.set('longitude', sumLng / count);
+            newCentroid['latitude'] = sumLat / count;
+            newCentroid['longitude'] = sumLng / count;
           } else {
             // Fallback if no valid coordinates
-            newCentroid.set('latitude', centroids[i].get('latitude') || 0);
-            newCentroid.set('longitude', centroids[i].get('longitude') || 0);
+            newCentroid['latitude'] = 'latitude' in centroids[i] ? centroids[i]['latitude'] : 0;
+            newCentroid['longitude'] = 'longitude' in centroids[i] ? centroids[i]['longitude'] : 0;
           }
         } else {
           // For other attributes, calculate the average normalized value
-          const range = attributeRanges.get(attribute);
+          const range = attributeRanges[attribute];
           if (range) {
             let sum = 0;
             let count = 0;
@@ -373,9 +379,9 @@ export function performSpatialClustering(
             });
             
             if (count > 0) {
-              newCentroid.set(attribute, sum / count);
+              newCentroid[attribute] = sum / count;
             } else {
-              newCentroid.set(attribute, centroids[i].get(attribute) || 0);
+              newCentroid[attribute] = attribute in centroids[i] ? centroids[i][attribute] : 0;
             }
           }
         }
@@ -411,16 +417,16 @@ export function performSpatialClustering(
     const max = values.length > 0 ? Math.max(...values) : 0;
     
     // Calculate dominant property type
-    const typeCount = new Map<string, number>();
+    const typeCount: Record<string, number> = {};
     clusterMembers.forEach(p => {
       if (p.propertyType) {
-        typeCount.set(p.propertyType, (typeCount.get(p.propertyType) || 0) + 1);
+        typeCount[p.propertyType] = (typeCount[p.propertyType] || 0) + 1;
       }
     });
     
     let dominantType = '';
     let maxTypeCount = 0;
-    typeCount.forEach((count, type) => {
+    Object.entries(typeCount).forEach(([type, count]) => {
       if (count > maxTypeCount) {
         maxTypeCount = count;
         dominantType = type;
@@ -428,19 +434,16 @@ export function performSpatialClustering(
     });
     
     // Calculate dominant neighborhood
-    const neighborhoodCount = new Map<string, number>();
+    const neighborhoodCount: Record<string, number> = {};
     clusterMembers.forEach(p => {
       if (p.neighborhood) {
-        neighborhoodCount.set(
-          p.neighborhood, 
-          (neighborhoodCount.get(p.neighborhood) || 0) + 1
-        );
+        neighborhoodCount[p.neighborhood] = (neighborhoodCount[p.neighborhood] || 0) + 1;
       }
     });
     
     let dominantNeighborhood = '';
     let maxNeighborhoodCount = 0;
-    neighborhoodCount.forEach((count, neighborhood) => {
+    Object.entries(neighborhoodCount).forEach(([neighborhood, count]) => {
       if (count > maxNeighborhoodCount) {
         maxNeighborhoodCount = count;
         dominantNeighborhood = neighborhood;
@@ -453,8 +456,8 @@ export function performSpatialClustering(
       propertyCount: clusterMembers.length,
       properties: clusterMembers.map(p => p.id as number),
       centroid: {
-        latitude: centroids[i].get('latitude') || 0,
-        longitude: centroids[i].get('longitude') || 0
+        latitude: 'latitude' in centroids[i] ? centroids[i]['latitude'] : 0,
+        longitude: 'longitude' in centroids[i] ? centroids[i]['longitude'] : 0
       },
       averageValue: average,
       valueRange: [min, max],
@@ -528,8 +531,8 @@ export function getOptimalClusterCount(
         if (property.latitude && property.longitude) {
           const distance = calculateDistance(
             {
-              latitude: property.latitude,
-              longitude: property.longitude
+              latitude: toNumber(property.latitude),
+              longitude: toNumber(property.longitude)
             },
             cluster.centroid
           );
@@ -658,8 +661,8 @@ export function analyzeSpatialPatterns(
       if (p.id === property.id || !p.latitude || !p.longitude) return false;
       
       const distance = calculateDistance(
-        { latitude: property.latitude, longitude: property.longitude },
-        { latitude: p.latitude, longitude: p.longitude }
+        { latitude: toNumber(property.latitude), longitude: toNumber(property.longitude) },
+        { latitude: toNumber(p.latitude), longitude: toNumber(p.longitude) }
       );
       
       return distance < 1.0; // 1km radius
@@ -677,14 +680,14 @@ export function analyzeSpatialPatterns(
     if (propertyValue > averageValue * 1.25 && neighborAverage > averageValue * 1.15) {
       // High value property surrounded by high value properties = hotspot
       hotspots.push({
-        latitude: property.latitude,
-        longitude: property.longitude
+        latitude: toNumber(property.latitude),
+        longitude: toNumber(property.longitude)
       });
     } else if (propertyValue < averageValue * 0.75 && neighborAverage < averageValue * 0.85) {
       // Low value property surrounded by low value properties = coldspot
       coldspots.push({
-        latitude: property.latitude,
-        longitude: property.longitude
+        latitude: toNumber(property.latitude),
+        longitude: toNumber(property.longitude)
       });
     }
   });
