@@ -1,3 +1,6 @@
+/* Import Benton County Theme */
+@import './styles/benton-county-theme.css';
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
