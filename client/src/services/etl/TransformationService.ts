@@ -115,7 +115,8 @@ class TransformationService {
         category: AlertCategory.TRANSFORMATION,
         title: `Transformation Error: ${rule.name}`,
         message: `Error applying transformation "${rule.name}": ${errorMessage}`,
-        entityId: rule.id
+        source: 'transformation-service',
+        relatedEntityId: rule.id
       });
       
       return {
@@ -297,7 +298,8 @@ class TransformationService {
         severity: AlertSeverity.LOW,
         category: AlertCategory.TRANSFORMATION,
         title: 'Join Transformation',
-        message: `Join transformation with right dataset "${config.rightDataset}" is not implemented in this demo`
+        message: `Join transformation with right dataset "${config.rightDataset}" is not implemented in this demo`,
+        source: 'transformation-service'
       });
       
       return {
@@ -474,7 +476,11 @@ class TransformationService {
               break;
               
             case 'REGEX':
-              isValid = new RegExp(params).test(String(value || ''));
+              if (params) {
+                isValid = new RegExp(params).test(String(value || ''));
+              } else {
+                isValid = true; // No pattern to test against
+              }
               break;
               
             case 'CUSTOM':
@@ -515,7 +521,8 @@ class TransformationService {
           severity: AlertSeverity.MEDIUM,
           category: AlertCategory.VALIDATION,
           title: 'Validation Issues',
-          message: `${rejected} records failed validation${failOnError ? ' and were rejected' : ''}`
+          message: `${rejected} records failed validation${failOnError ? ' and were rejected' : ''}`,
+          source: 'transformation-service'
         });
       }
       
@@ -596,7 +603,8 @@ class TransformationService {
         severity: AlertSeverity.LOW,
         category: AlertCategory.TRANSFORMATION,
         title: 'Enrichment Transformation',
-        message: `Enrichment transformation of type "${type}" is using mock data in this demo`
+        message: `Enrichment transformation of type "${type}" is using mock data in this demo`,
+        source: 'transformation-service'
       });
       
       return {
@@ -630,12 +638,14 @@ class TransformationService {
       // In a real app, we would execute a custom transformation function
       // For now, we'll just return the original data
       
+      const functionName = config.function || 'custom';
       alertService.createAlert({
         type: AlertType.INFO,
         severity: AlertSeverity.LOW,
         category: AlertCategory.TRANSFORMATION,
         title: 'Custom Transformation',
-        message: `Custom transformation function "${config.function}" is not implemented in this demo`
+        message: `Custom transformation function "${functionName}" is not implemented in this demo`,
+        source: 'transformation-service'
       });
       
       return {

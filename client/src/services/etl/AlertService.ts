@@ -15,10 +15,24 @@ export enum AlertCategory {
   SECURITY = 'security',
   VALIDATION = 'validation',
   PERFORMANCE = 'performance',
-  SYSTEM = 'system'
+  SYSTEM = 'system',
+  JOB = 'job',
+  DATA_SOURCE = 'data_source',
+  TRANSFORMATION = 'transformation'
 }
 
 export enum AlertSeverity {
+  LOW = 'low',
+  INFO = 'info',
+  SUCCESS = 'success',
+  WARNING = 'warning',
+  MEDIUM = 'medium',
+  ERROR = 'error',
+  HIGH = 'high',
+  CRITICAL = 'critical'
+}
+
+export enum AlertType {
   INFO = 'info',
   SUCCESS = 'success',
   WARNING = 'warning',
@@ -42,6 +56,32 @@ export interface Alert {
 class AlertService {
   private alerts: Alert[] = [];
   private listeners: Array<(alerts: Alert[]) => void> = [];
+  
+  /**
+   * Create a specific type of alert
+   * @param options Alert options
+   * @returns Created alert
+   */
+  createAlert(options: {
+    type: AlertType;
+    severity: AlertSeverity;
+    category: AlertCategory;
+    title: string;
+    message: string;
+    details?: string;
+    source?: string;
+    relatedEntityId?: string;
+  }): Alert {
+    return this.addAlert({
+      title: options.title,
+      message: options.message,
+      details: options.details,
+      category: options.category,
+      severity: options.severity,
+      source: options.source || 'system',
+      relatedEntityId: options.relatedEntityId
+    });
+  }
   
   /**
    * Create a success alert

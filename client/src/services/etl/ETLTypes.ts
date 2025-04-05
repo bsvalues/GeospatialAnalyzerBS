@@ -67,6 +67,81 @@ export interface DataSource {
   tags?: string[];
 }
 
+export interface FilterConfig {
+  conditions: {
+    field: string;
+    operator: FilterOperator;
+    value: any;
+  }[];
+  logic: FilterLogic;
+}
+
+export interface MapConfig {
+  mappings: {
+    source: string;
+    target: string;
+  }[];
+  includeOriginal: boolean;
+}
+
+export interface JoinConfig {
+  rightDataset: string;
+  joinType: 'inner' | 'left' | 'right' | 'full';
+  conditions: {
+    leftField: string;
+    rightField: string;
+  }[];
+  includeFields: {
+    dataset: 'left' | 'right';
+    field: string;
+    as?: string;
+  }[];
+}
+
+export interface AggregateConfig {
+  groupBy: string[];
+  aggregations: {
+    function: 'COUNT' | 'SUM' | 'AVG' | 'MIN' | 'MAX' | 'FIRST' | 'LAST' | 'ARRAY_AGG';
+    field: string;
+    as: string;
+  }[];
+}
+
+export interface ValidationConfig {
+  validations: {
+    field: string;
+    type: 'REQUIRED' | 'EMAIL' | 'URL' | 'NUMBER' | 'INTEGER' | 'FLOAT' | 'DATE' | 'REGEX' | 'CUSTOM';
+    params?: string;
+    message: string;
+  }[];
+  failOnError: boolean;
+}
+
+export interface EnrichmentConfig {
+  type: 'LOOKUP' | 'GEOCODE' | 'SENTIMENT' | 'CLASSIFY' | 'TRANSLATE' | 'CUSTOM';
+  fields: {
+    source: string;
+    target: string;
+  }[];
+  options?: Record<string, any>;
+}
+
+export interface CustomConfig {
+  code: string;
+  language: 'javascript' | 'python' | 'sql';
+  parameters?: Record<string, any>;
+  function?: string;
+}
+
+export interface TransformationRule {
+  id: string;
+  name: string;
+  description?: string;
+  type: TransformationType;
+  config: Record<string, any>;
+  enabled: boolean;
+}
+
 export interface Transformation {
   id: string;
   name: string;
@@ -181,5 +256,84 @@ export enum AlertCategory {
   SECURITY = 'security',
   VALIDATION = 'validation',
   PERFORMANCE = 'performance',
-  SYSTEM = 'system'
+  SYSTEM = 'system',
+  JOB = 'job',
+  DATA_SOURCE = 'data_source',
+  TRANSFORMATION = 'transformation'
+}
+
+export enum FilterOperator {
+  EQUALS = 'equals',
+  NOT_EQUALS = 'not_equals',
+  GREATER_THAN = 'greater_than',
+  LESS_THAN = 'less_than',
+  GREATER_THAN_OR_EQUALS = 'greater_than_or_equals',
+  LESS_THAN_OR_EQUALS = 'less_than_or_equals',
+  IN = 'in',
+  NOT_IN = 'not_in',
+  CONTAINS = 'contains',
+  NOT_CONTAINS = 'not_contains',
+  STARTS_WITH = 'starts_with',
+  ENDS_WITH = 'ends_with',
+  IS_NULL = 'is_null',
+  IS_NOT_NULL = 'is_not_null',
+  REGEX = 'regex'
+}
+
+export enum FilterLogic {
+  AND = 'and',
+  OR = 'or'
+}
+
+export enum TransformationType {
+  // Column operations
+  RENAME_COLUMN = 'rename_column',
+  DROP_COLUMN = 'drop_column',
+  REORDER_COLUMNS = 'reorder_columns',
+  
+  // Type conversions
+  CAST_TYPE = 'cast_type',
+  PARSE_DATE = 'parse_date',
+  PARSE_NUMBER = 'parse_number',
+  
+  // Value operations
+  REPLACE_VALUE = 'replace_value',
+  FILL_NULL = 'fill_null',
+  MAP_VALUES = 'map_values',
+  
+  // String operations
+  TO_UPPERCASE = 'to_uppercase',
+  TO_LOWERCASE = 'to_lowercase',
+  TRIM = 'trim',
+  SUBSTRING = 'substring',
+  CONCAT = 'concat',
+  SPLIT = 'split',
+  
+  // Numeric operations
+  ROUND = 'round',
+  ADD = 'add',
+  SUBTRACT = 'subtract',
+  MULTIPLY = 'multiply',
+  DIVIDE = 'divide',
+  
+  // Data transformation
+  FILTER = 'filter',
+  SORT = 'sort',
+  GROUP_BY = 'group_by',
+  AGGREGATE = 'aggregate',
+  JOIN = 'join',
+  UNION = 'union',
+  MAP = 'map',
+  
+  // Data quality
+  REMOVE_DUPLICATES = 'remove_duplicates',
+  VALIDATE = 'validate',
+  
+  // Advanced
+  CUSTOM = 'custom',
+  CUSTOM_FUNCTION = 'custom_function',
+  JAVASCRIPT = 'javascript',
+  SQL = 'sql',
+  FORMULA = 'formula',
+  ENRICH = 'enrich'
 }
