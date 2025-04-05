@@ -81,7 +81,145 @@ export const regressionModels = pgTable("regression_models", {
   configuration: jsonb("configuration")
 });
 
-// Income-related tables have been removed
+// Income Approach Tables
+export const incomeHotelMotel = pgTable("income_hotel_motel", {
+  incomeYear: numeric("income_yr", { precision: 4, scale: 0 }).notNull(),
+  supNum: integer("sup_num").notNull(),
+  incomeId: integer("income_id").notNull(),
+  sizeInSqft: numeric("size_in_sqft", { precision: 8, scale: 0 }).notNull().default("0"),
+  averageDailyRoomRate: numeric("average_daily_room_rate", { precision: 9, scale: 2 }).notNull().default("0"),
+  numberOfRooms: numeric("number_of_rooms", { precision: 4, scale: 0 }).notNull().default("0"),
+  numberOfRoomNights: numeric("number_of_room_nights", { precision: 8, scale: 0 }).notNull().default("0"),
+  incomeValueReconciled: numeric("income_value_reconciled", { precision: 9, scale: 0 }).notNull().default("0"),
+  incomeValuePerRoom: numeric("income_value_per_room", { precision: 14, scale: 2 }).notNull().default("0"),
+  assessmentValuePerRoom: numeric("assessment_value_per_room", { precision: 14, scale: 2 }).notNull().default("0"),
+  incomeValuePerSqft: numeric("income_value_per_sqft", { precision: 14, scale: 2 }).notNull().default("0"),
+  assessmentValuePerSqft: numeric("assessment_value_per_sqft", { precision: 14, scale: 2 }).notNull().default("0")
+}, (table) => {
+  return {
+    pk: primaryKey({ columns: [table.incomeYear, table.supNum, table.incomeId] })
+  };
+});
+
+export const incomeHotelMotelDetail = pgTable("income_hotel_motel_detail", {
+  incomeYear: numeric("income_yr", { precision: 4, scale: 0 }).notNull(),
+  supNum: integer("sup_num").notNull(),
+  incomeId: integer("income_id").notNull(),
+  valueType: varchar("value_type", { length: 1 }).notNull(),
+  roomRevenue: numeric("room_revenue", { precision: 9, scale: 0 }).notNull().default("0"),
+  roomRevenuePct: numeric("room_revenue_pct", { precision: 5, scale: 2 }).notNull().default("0"),
+  roomRevenueUpdate: varchar("room_revenue_update", { length: 1 }).notNull().default(""),
+  vacancyCollectionLoss: numeric("vacancy_collection_loss", { precision: 9, scale: 0 }).notNull().default("0"),
+  vacancyCollectionLossPct: numeric("vacancy_collection_loss_pct", { precision: 5, scale: 2 }).notNull().default("0"),
+  vacancyCollectionLossUpdate: varchar("vacancy_collection_loss_update", { length: 1 }).notNull().default(""),
+  foodBeverageIncome: numeric("food_beverage_income", { precision: 9, scale: 0 }).notNull().default("0"),
+  foodBeverageIncomePct: numeric("food_beverage_income_pct", { precision: 5, scale: 2 }).notNull().default("0"),
+  foodBeverageIncomeUpdate: varchar("food_beverage_income_update", { length: 1 }).notNull().default(""),
+  miscIncome: numeric("misc_income", { precision: 9, scale: 0 }).notNull().default("0"),
+  miscIncomePct: numeric("misc_income_pct", { precision: 5, scale: 2 }).notNull().default("0"),
+  miscIncomeUpdate: varchar("misc_income_update", { length: 1 }).notNull().default(""),
+  effectiveGrossIncome: numeric("effective_gross_income", { precision: 9, scale: 0 }).notNull().default("0"),
+  effectiveGrossIncomePct: numeric("effective_gross_income_pct", { precision: 5, scale: 2 }).notNull().default("0"),
+  utilities: numeric("utilities", { precision: 9, scale: 0 }).notNull().default("0"),
+  utilitiesPct: numeric("utilities_pct", { precision: 5, scale: 2 }).notNull().default("0"),
+  utilitiesUpdate: varchar("utilities_update", { length: 1 }).notNull().default(""),
+  maintenanceRepair: numeric("maintenance_repair", { precision: 9, scale: 0 }).notNull().default("0"),
+  maintenanceRepairPct: numeric("maintenance_repair_pct", { precision: 5, scale: 2 }).notNull().default("0"),
+  maintenanceRepairUpdate: varchar("maintenance_repair_update", { length: 1 }).notNull().default(""),
+  departmentExpenses: numeric("department_expenses", { precision: 9, scale: 0 }).notNull().default("0"),
+  departmentExpensesPct: numeric("department_expenses_pct", { precision: 5, scale: 2 }).notNull().default("0"),
+  departmentExpensesUpdate: varchar("department_expenses_update", { length: 1 }).notNull().default(""),
+  management: numeric("management", { precision: 9, scale: 0 }).notNull().default("0"),
+  managementPct: numeric("management_pct", { precision: 5, scale: 2 }).notNull().default("0"),
+  managementUpdate: varchar("management_update", { length: 1 }).notNull().default(""),
+  administrative: numeric("administrative", { precision: 9, scale: 0 }).notNull().default("0"),
+  administrativePct: numeric("administrative_pct", { precision: 5, scale: 2 }).notNull().default("0"),
+  administrativeUpdate: varchar("administrative_update", { length: 1 }).notNull().default(""),
+  payroll: numeric("payroll", { precision: 9, scale: 0 }).notNull().default("0"),
+  payrollPct: numeric("payroll_pct", { precision: 5, scale: 2 }).notNull().default("0"),
+  payrollUpdate: varchar("payroll_update", { length: 1 }).notNull().default(""),
+  insurance: numeric("insurance", { precision: 9, scale: 0 }).notNull().default("0"),
+  insurancePct: numeric("insurance_pct", { precision: 5, scale: 2 }).notNull().default("0"),
+  insuranceUpdate: varchar("insurance_update", { length: 1 }).notNull().default(""),
+  marketing: numeric("marketing", { precision: 9, scale: 0 }).notNull().default("0"),
+  marketingPct: numeric("marketing_pct", { precision: 5, scale: 2 }).notNull().default("0"),
+  marketingUpdate: varchar("marketing_update", { length: 1 }).notNull().default(""),
+  realEstateTax: numeric("real_estate_tax", { precision: 9, scale: 0 }).notNull().default("0"),
+  realEstateTaxPct: numeric("real_estate_tax_pct", { precision: 5, scale: 2 }).notNull().default("0"),
+  realEstateTaxUpdate: varchar("real_estate_tax_update", { length: 1 }).notNull().default(""),
+  franchiseFee: numeric("franchise_fee", { precision: 9, scale: 0 }).notNull().default("0"),
+  franchiseFeePct: numeric("franchise_fee_pct", { precision: 5, scale: 2 }).notNull().default("0"),
+  franchiseFeeUpdate: varchar("franchise_fee_update", { length: 1 }).notNull().default(""),
+  other: numeric("other", { precision: 9, scale: 0 }).notNull().default("0"),
+  otherPct: numeric("other_pct", { precision: 5, scale: 2 }).notNull().default("0"),
+  otherUpdate: varchar("other_update", { length: 1 }).notNull().default(""),
+  totalExpenses: numeric("total_expenses", { precision: 9, scale: 0 }).notNull().default("0"),
+  totalExpensesPct: numeric("total_expenses_pct", { precision: 5, scale: 2 }).notNull().default("0"),
+  totalExpensesUpdate: varchar("total_expenses_update", { length: 1 }).notNull().default(""),
+  netOperatingIncome: numeric("net_operating_income", { precision: 9, scale: 0 }).notNull().default("0"),
+  netOperatingIncomePct: numeric("net_operating_income_pct", { precision: 5, scale: 2 }).notNull().default("0"),
+  capRate: numeric("cap_rate", { precision: 4, scale: 2 }).notNull().default("0"),
+  capRateUpdate: varchar("cap_rate_update", { length: 1 }).notNull().default(""),
+  taxRate: numeric("tax_rate", { precision: 4, scale: 2 }).notNull().default("0"),
+  taxRateUpdate: varchar("tax_rate_update", { length: 1 }).notNull().default(""),
+  overallCapRate: numeric("overall_cap_rate", { precision: 4, scale: 2 }).notNull().default("0"),
+  incomeValue: numeric("income_value", { precision: 9, scale: 0 }).notNull().default("0"),
+  personalPropertyValue: numeric("personal_property_value", { precision: 9, scale: 0 }).notNull().default("0"),
+  personalPropertyValueUpdate: varchar("personal_property_value_update", { length: 1 }).notNull().default(""),
+  otherValue: numeric("other_value", { precision: 9, scale: 0 }).notNull().default("0"),
+  otherValueUpdate: varchar("other_value_update", { length: 1 }).notNull().default(""),
+  indicatedIncomeValue: numeric("indicated_income_value", { precision: 9, scale: 0 }).notNull().default("0"),
+}, (table) => {
+  return {
+    pk: primaryKey({ columns: [table.incomeYear, table.supNum, table.incomeId, table.valueType] })
+  };
+});
+
+export const incomeLeaseUp = pgTable("income_lease_up", {
+  incomeLeaseUpId: integer("income_lease_up_id").notNull().primaryKey(),
+  incomeYear: numeric("income_yr", { precision: 4, scale: 0 }).notNull(),
+  supNum: integer("sup_num").notNull(),
+  incomeId: integer("income_id").notNull(),
+  frequency: varchar("frequency", { length: 1 }).notNull().default("A"),
+  leaseType: varchar("lease_type", { length: 1 }),
+  unitOfMeasure: varchar("unit_of_measure", { length: 1 }),
+  rentLossAreaSqft: numeric("rent_loss_area_sqft", { precision: 14, scale: 0 }),
+  rentSqft: numeric("rent_sqft", { precision: 14, scale: 2 }),
+  rentNumberOfYears: numeric("rent_number_of_years", { precision: 5, scale: 2 }),
+  rentTotal: numeric("rent_total", { precision: 14, scale: 0 }),
+  leasePct: numeric("lease_pct", { precision: 5, scale: 2 }),
+  leaseTotal: numeric("lease_total", { precision: 14, scale: 0 }),
+  totalFinishOutSqft: numeric("total_finish_out_sqft", { precision: 14, scale: 2 }),
+  totalFinishOutTotal: numeric("total_finish_out_total", { precision: 14, scale: 0 }),
+  discountRate: numeric("discount_rate", { precision: 5, scale: 2 }),
+  numberOfYears: numeric("number_of_years", { precision: 5, scale: 2 }),
+  leaseUpCost: numeric("lease_up_cost", { precision: 14, scale: 0 }),
+  leaseUpCostOverride: boolean("lease_up_cost_override").notNull().default(false),
+  netRentableArea: numeric("net_rentable_area", { precision: 9, scale: 0 }).notNull().default("0"),
+  currentOccupancyPct: numeric("current_occupancy_pct", { precision: 5, scale: 2 }).notNull().default("100"),
+  stabilizedOccupancyPct: numeric("stabilized_occupancy_pct", { precision: 5, scale: 2 }).notNull().default("0"),
+  stabilizedOccupancy: numeric("stabilized_occupancy", { precision: 9, scale: 0 }).notNull().default("0"),
+  spaceToBeAbsorbed: numeric("space_to_be_absorbed", { precision: 9, scale: 0 }).notNull().default("0"),
+  absorptionPeriodInMonths: numeric("absorption_period_in_months", { precision: 2, scale: 0 }).notNull().default("0"),
+  estimatedAbsorptionPerYear: numeric("estimated_absorption_per_year", { precision: 9, scale: 0 }).notNull().default("0"),
+  estimatedAbsorptionPerMonth: numeric("estimated_absorption_per_month", { precision: 9, scale: 0 }).notNull().default("0"),
+  leasingCommissionsPct: numeric("leasing_commissions_pct", { precision: 2, scale: 0 }).notNull().default("0"),
+  grossRentLossPerSqft: numeric("gross_rent_loss_per_sqft", { precision: 7, scale: 2 }).notNull().default("0"),
+  tenantFinishAllowancePerSqft: numeric("tenant_finish_allowance_per_sqft", { precision: 7, scale: 2 }).notNull().default("0"),
+});
+
+export const incomeLeaseUpMonthListing = pgTable("income_lease_up_month_listing", {
+  incomeLeaseUpMonthListingId: integer("income_lease_up_month_listing_id").notNull().primaryKey(),
+  incomeLeaseUpId: integer("income_lease_up_id").notNull(),
+  yearNumber: integer("year_number").notNull(),
+  monthNumber: integer("month_number").notNull(),
+  available: numeric("available", { precision: 9, scale: 1 }).notNull().default("0"),
+  rentLoss: numeric("rent_loss", { precision: 14, scale: 2 }).notNull().default("0"),
+  finishAllowance: numeric("finish_allowance", { precision: 14, scale: 2 }).notNull().default("0"),
+  commissions: numeric("commissions", { precision: 14, scale: 0 }).notNull().default("0"),
+  presentValueFactor: numeric("present_value_factor", { precision: 14, scale: 8 }).notNull().default("0"),
+  presentValue: numeric("present_value", { precision: 14, scale: 2 }).notNull().default("0")
+});
 
 // ETL Data Sources table
 export const etlDataSources = pgTable("etl_data_sources", {
@@ -238,7 +376,137 @@ export const insertRegressionModelSchema = createInsertSchema(regressionModels).
   configuration: true
 });
 
-// Income-related insert schemas have been removed
+// Income Approach insert schemas
+export const insertIncomeHotelMotelSchema = createInsertSchema(incomeHotelMotel).pick({
+  incomeYear: true,
+  supNum: true,
+  incomeId: true,
+  sizeInSqft: true,
+  averageDailyRoomRate: true,
+  numberOfRooms: true,
+  numberOfRoomNights: true,
+  incomeValueReconciled: true,
+  incomeValuePerRoom: true,
+  assessmentValuePerRoom: true,
+  incomeValuePerSqft: true,
+  assessmentValuePerSqft: true
+});
+
+export const insertIncomeHotelMotelDetailSchema = createInsertSchema(incomeHotelMotelDetail).pick({
+  incomeYear: true,
+  supNum: true,
+  incomeId: true,
+  valueType: true,
+  roomRevenue: true,
+  roomRevenuePct: true,
+  roomRevenueUpdate: true,
+  vacancyCollectionLoss: true,
+  vacancyCollectionLossPct: true,
+  vacancyCollectionLossUpdate: true,
+  foodBeverageIncome: true,
+  foodBeverageIncomePct: true,
+  foodBeverageIncomeUpdate: true,
+  miscIncome: true,
+  miscIncomePct: true,
+  miscIncomeUpdate: true,
+  effectiveGrossIncome: true,
+  effectiveGrossIncomePct: true,
+  utilities: true,
+  utilitiesPct: true,
+  utilitiesUpdate: true,
+  maintenanceRepair: true,
+  maintenanceRepairPct: true,
+  maintenanceRepairUpdate: true,
+  departmentExpenses: true,
+  departmentExpensesPct: true,
+  departmentExpensesUpdate: true,
+  management: true,
+  managementPct: true,
+  managementUpdate: true,
+  administrative: true,
+  administrativePct: true,
+  administrativeUpdate: true,
+  payroll: true,
+  payrollPct: true,
+  payrollUpdate: true,
+  insurance: true,
+  insurancePct: true,
+  insuranceUpdate: true,
+  marketing: true,
+  marketingPct: true,
+  marketingUpdate: true,
+  realEstateTax: true,
+  realEstateTaxPct: true,
+  realEstateTaxUpdate: true,
+  franchiseFee: true,
+  franchiseFeePct: true,
+  franchiseFeeUpdate: true,
+  other: true,
+  otherPct: true,
+  otherUpdate: true,
+  totalExpenses: true,
+  totalExpensesPct: true,
+  totalExpensesUpdate: true,
+  netOperatingIncome: true,
+  netOperatingIncomePct: true,
+  capRate: true,
+  capRateUpdate: true,
+  taxRate: true,
+  taxRateUpdate: true,
+  overallCapRate: true,
+  incomeValue: true,
+  personalPropertyValue: true,
+  personalPropertyValueUpdate: true,
+  otherValue: true,
+  otherValueUpdate: true,
+  indicatedIncomeValue: true
+});
+
+export const insertIncomeLeaseUpSchema = createInsertSchema(incomeLeaseUp).pick({
+  incomeLeaseUpId: true,
+  incomeYear: true,
+  supNum: true,
+  incomeId: true,
+  frequency: true,
+  leaseType: true,
+  unitOfMeasure: true,
+  rentLossAreaSqft: true,
+  rentSqft: true,
+  rentNumberOfYears: true,
+  rentTotal: true,
+  leasePct: true,
+  leaseTotal: true,
+  totalFinishOutSqft: true,
+  totalFinishOutTotal: true,
+  discountRate: true,
+  numberOfYears: true,
+  leaseUpCost: true,
+  leaseUpCostOverride: true,
+  netRentableArea: true,
+  currentOccupancyPct: true,
+  stabilizedOccupancyPct: true,
+  stabilizedOccupancy: true,
+  spaceToBeAbsorbed: true,
+  absorptionPeriodInMonths: true,
+  estimatedAbsorptionPerYear: true,
+  estimatedAbsorptionPerMonth: true,
+  leasingCommissionsPct: true,
+  grossRentLossPerSqft: true,
+  tenantFinishAllowancePerSqft: true
+});
+
+export const insertIncomeLeaseUpMonthListingSchema = createInsertSchema(incomeLeaseUpMonthListing).pick({
+  incomeLeaseUpMonthListingId: true,
+  incomeLeaseUpId: true,
+  yearNumber: true,
+  monthNumber: true,
+  available: true,
+  rentLoss: true,
+  finishAllowance: true,
+  commissions: true,
+  presentValueFactor: true,
+  presentValue: true
+});
 
 // Export types
 export type InsertUser = z.infer<typeof insertUserSchema>;
@@ -259,7 +527,18 @@ export type ScriptGroup = typeof scriptGroups.$inferSelect;
 export type InsertRegressionModel = z.infer<typeof insertRegressionModelSchema>;
 export type RegressionModel = typeof regressionModels.$inferSelect;
 
-// Income-related types have been removed
+// Income Approach types
+export type InsertIncomeHotelMotel = z.infer<typeof insertIncomeHotelMotelSchema>;
+export type IncomeHotelMotel = typeof incomeHotelMotel.$inferSelect;
+
+export type InsertIncomeHotelMotelDetail = z.infer<typeof insertIncomeHotelMotelDetailSchema>;
+export type IncomeHotelMotelDetail = typeof incomeHotelMotelDetail.$inferSelect;
+
+export type InsertIncomeLeaseUp = z.infer<typeof insertIncomeLeaseUpSchema>;
+export type IncomeLeaseUp = typeof incomeLeaseUp.$inferSelect;
+
+export type InsertIncomeLeaseUpMonthListing = z.infer<typeof insertIncomeLeaseUpMonthListingSchema>;
+export type IncomeLeaseUpMonthListing = typeof incomeLeaseUpMonthListing.$inferSelect;
 
 // ETL insert schemas
 export const insertEtlDataSourceSchema = createInsertSchema(etlDataSources).pick({

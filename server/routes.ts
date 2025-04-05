@@ -13,6 +13,12 @@ import {
   getETLOnboardingTips,
   generateConnectionTroubleshooting
 } from "./services/openai";
+import {
+  insertIncomeHotelMotelSchema,
+  insertIncomeHotelMotelDetailSchema,
+  insertIncomeLeaseUpSchema,
+  insertIncomeLeaseUpMonthListingSchema
+} from "../shared/schema";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // API route for accessing whitelisted environment variables
@@ -1075,6 +1081,335 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Optimize JavaScript code
+  // Income Approach API Endpoints
+  // Hotel/Motel API endpoints
+  app.get('/api/income-hotel-motels', async (req, res) => {
+    try {
+      const incomeHotelMotels = await storage.getIncomeHotelMotels();
+      res.json(incomeHotelMotels);
+    } catch (error) {
+      console.error('Error getting hotel/motel data:', error);
+      res.status(500).json({ error: 'Failed to get hotel/motel data' });
+    }
+  });
+
+  app.get('/api/income-hotel-motel/:incomeYear/:supNum/:incomeId', async (req, res) => {
+    try {
+      const { incomeYear, supNum, incomeId } = req.params;
+      const hotelMotel = await storage.getIncomeHotelMotelById(
+        Number(incomeYear),
+        Number(supNum),
+        Number(incomeId)
+      );
+
+      if (!hotelMotel) {
+        return res.status(404).json({ error: 'Hotel/motel data not found' });
+      }
+
+      res.json(hotelMotel);
+    } catch (error) {
+      console.error('Error getting hotel/motel data by ID:', error);
+      res.status(500).json({ error: 'Failed to get hotel/motel data by ID' });
+    }
+  });
+
+  app.post('/api/income-hotel-motel', async (req, res) => {
+    try {
+      const hotelMotelData = req.body;
+      const result = await storage.createIncomeHotelMotel(hotelMotelData);
+      res.status(201).json(result);
+    } catch (error) {
+      console.error('Error creating hotel/motel data:', error);
+      res.status(500).json({ error: 'Failed to create hotel/motel data' });
+    }
+  });
+
+  app.put('/api/income-hotel-motel/:incomeYear/:supNum/:incomeId', async (req, res) => {
+    try {
+      const { incomeYear, supNum, incomeId } = req.params;
+      const hotelMotelData = req.body;
+      
+      const updatedHotelMotel = await storage.updateIncomeHotelMotel(
+        Number(incomeYear),
+        Number(supNum),
+        Number(incomeId),
+        hotelMotelData
+      );
+
+      if (!updatedHotelMotel) {
+        return res.status(404).json({ error: 'Hotel/motel data not found' });
+      }
+
+      res.json(updatedHotelMotel);
+    } catch (error) {
+      console.error('Error updating hotel/motel data:', error);
+      res.status(500).json({ error: 'Failed to update hotel/motel data' });
+    }
+  });
+
+  app.delete('/api/income-hotel-motel/:incomeYear/:supNum/:incomeId', async (req, res) => {
+    try {
+      const { incomeYear, supNum, incomeId } = req.params;
+      
+      const success = await storage.deleteIncomeHotelMotel(
+        Number(incomeYear),
+        Number(supNum),
+        Number(incomeId)
+      );
+
+      if (!success) {
+        return res.status(404).json({ error: 'Hotel/motel data not found' });
+      }
+
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Error deleting hotel/motel data:', error);
+      res.status(500).json({ error: 'Failed to delete hotel/motel data' });
+    }
+  });
+
+  // Hotel/Motel Detail API endpoints
+  app.get('/api/income-hotel-motel-details/:incomeYear/:supNum/:incomeId', async (req, res) => {
+    try {
+      const { incomeYear, supNum, incomeId } = req.params;
+      const details = await storage.getIncomeHotelMotelDetails(
+        Number(incomeYear),
+        Number(supNum),
+        Number(incomeId)
+      );
+
+      res.json(details);
+    } catch (error) {
+      console.error('Error getting hotel/motel details:', error);
+      res.status(500).json({ error: 'Failed to get hotel/motel details' });
+    }
+  });
+
+  app.get('/api/income-hotel-motel-detail/:incomeYear/:supNum/:incomeId/:valueType', async (req, res) => {
+    try {
+      const { incomeYear, supNum, incomeId, valueType } = req.params;
+      const detail = await storage.getIncomeHotelMotelDetailByType(
+        Number(incomeYear),
+        Number(supNum),
+        Number(incomeId),
+        valueType
+      );
+
+      if (!detail) {
+        return res.status(404).json({ error: 'Hotel/motel detail not found' });
+      }
+
+      res.json(detail);
+    } catch (error) {
+      console.error('Error getting hotel/motel detail by type:', error);
+      res.status(500).json({ error: 'Failed to get hotel/motel detail by type' });
+    }
+  });
+
+  app.post('/api/income-hotel-motel-detail', async (req, res) => {
+    try {
+      const detailData = req.body;
+      const result = await storage.createIncomeHotelMotelDetail(detailData);
+      res.status(201).json(result);
+    } catch (error) {
+      console.error('Error creating hotel/motel detail:', error);
+      res.status(500).json({ error: 'Failed to create hotel/motel detail' });
+    }
+  });
+
+  app.put('/api/income-hotel-motel-detail/:incomeYear/:supNum/:incomeId/:valueType', async (req, res) => {
+    try {
+      const { incomeYear, supNum, incomeId, valueType } = req.params;
+      const detailData = req.body;
+      
+      const updatedDetail = await storage.updateIncomeHotelMotelDetail(
+        Number(incomeYear),
+        Number(supNum),
+        Number(incomeId),
+        valueType,
+        detailData
+      );
+
+      if (!updatedDetail) {
+        return res.status(404).json({ error: 'Hotel/motel detail not found' });
+      }
+
+      res.json(updatedDetail);
+    } catch (error) {
+      console.error('Error updating hotel/motel detail:', error);
+      res.status(500).json({ error: 'Failed to update hotel/motel detail' });
+    }
+  });
+
+  app.delete('/api/income-hotel-motel-detail/:incomeYear/:supNum/:incomeId/:valueType', async (req, res) => {
+    try {
+      const { incomeYear, supNum, incomeId, valueType } = req.params;
+      
+      const success = await storage.deleteIncomeHotelMotelDetail(
+        Number(incomeYear),
+        Number(supNum),
+        Number(incomeId),
+        valueType
+      );
+
+      if (!success) {
+        return res.status(404).json({ error: 'Hotel/motel detail not found' });
+      }
+
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Error deleting hotel/motel detail:', error);
+      res.status(500).json({ error: 'Failed to delete hotel/motel detail' });
+    }
+  });
+
+  // Lease Up API endpoints
+  app.get('/api/income-lease-ups', async (req, res) => {
+    try {
+      const leaseUps = await storage.getIncomeLeaseUps();
+      res.json(leaseUps);
+    } catch (error) {
+      console.error('Error getting lease ups:', error);
+      res.status(500).json({ error: 'Failed to get lease ups' });
+    }
+  });
+
+  app.get('/api/income-lease-up/:id', async (req, res) => {
+    try {
+      const { id } = req.params;
+      const leaseUp = await storage.getIncomeLeaseUpById(Number(id));
+
+      if (!leaseUp) {
+        return res.status(404).json({ error: 'Lease up not found' });
+      }
+
+      res.json(leaseUp);
+    } catch (error) {
+      console.error('Error getting lease up by ID:', error);
+      res.status(500).json({ error: 'Failed to get lease up by ID' });
+    }
+  });
+
+  app.post('/api/income-lease-up', async (req, res) => {
+    try {
+      const leaseUpData = req.body;
+      const result = await storage.createIncomeLeaseUp(leaseUpData);
+      res.status(201).json(result);
+    } catch (error) {
+      console.error('Error creating lease up:', error);
+      res.status(500).json({ error: 'Failed to create lease up' });
+    }
+  });
+
+  app.put('/api/income-lease-up/:id', async (req, res) => {
+    try {
+      const { id } = req.params;
+      const leaseUpData = req.body;
+      
+      const updatedLeaseUp = await storage.updateIncomeLeaseUp(Number(id), leaseUpData);
+
+      if (!updatedLeaseUp) {
+        return res.status(404).json({ error: 'Lease up not found' });
+      }
+
+      res.json(updatedLeaseUp);
+    } catch (error) {
+      console.error('Error updating lease up:', error);
+      res.status(500).json({ error: 'Failed to update lease up' });
+    }
+  });
+
+  app.delete('/api/income-lease-up/:id', async (req, res) => {
+    try {
+      const { id } = req.params;
+      
+      const success = await storage.deleteIncomeLeaseUp(Number(id));
+
+      if (!success) {
+        return res.status(404).json({ error: 'Lease up not found' });
+      }
+
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Error deleting lease up:', error);
+      res.status(500).json({ error: 'Failed to delete lease up' });
+    }
+  });
+
+  // Lease Up Month Listing API endpoints
+  app.get('/api/income-lease-up/:leaseUpId/month-listings', async (req, res) => {
+    try {
+      const { leaseUpId } = req.params;
+      const monthListings = await storage.getIncomeLeaseUpMonthListings(Number(leaseUpId));
+      res.json(monthListings);
+    } catch (error) {
+      console.error('Error getting lease up month listings:', error);
+      res.status(500).json({ error: 'Failed to get lease up month listings' });
+    }
+  });
+
+  app.get('/api/income-lease-up-month-listing/:id', async (req, res) => {
+    try {
+      const { id } = req.params;
+      const monthListing = await storage.getIncomeLeaseUpMonthListingById(Number(id));
+
+      if (!monthListing) {
+        return res.status(404).json({ error: 'Lease up month listing not found' });
+      }
+
+      res.json(monthListing);
+    } catch (error) {
+      console.error('Error getting lease up month listing by ID:', error);
+      res.status(500).json({ error: 'Failed to get lease up month listing by ID' });
+    }
+  });
+
+  app.post('/api/income-lease-up-month-listing', async (req, res) => {
+    try {
+      const monthListingData = req.body;
+      const result = await storage.createIncomeLeaseUpMonthListing(monthListingData);
+      res.status(201).json(result);
+    } catch (error) {
+      console.error('Error creating lease up month listing:', error);
+      res.status(500).json({ error: 'Failed to create lease up month listing' });
+    }
+  });
+
+  app.put('/api/income-lease-up-month-listing/:id', async (req, res) => {
+    try {
+      const { id } = req.params;
+      const monthListingData = req.body;
+      
+      const updatedMonthListing = await storage.updateIncomeLeaseUpMonthListing(Number(id), monthListingData);
+
+      if (!updatedMonthListing) {
+        return res.status(404).json({ error: 'Lease up month listing not found' });
+      }
+
+      res.json(updatedMonthListing);
+    } catch (error) {
+      console.error('Error updating lease up month listing:', error);
+      res.status(500).json({ error: 'Failed to update lease up month listing' });
+    }
+  });
+
+  app.delete('/api/income-lease-up-month-listing/:id', async (req, res) => {
+    try {
+      const { id } = req.params;
+      
+      const success = await storage.deleteIncomeLeaseUpMonthListing(Number(id));
+
+      if (!success) {
+        return res.status(404).json({ error: 'Lease up month listing not found' });
+      }
+
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Error deleting lease up month listing:', error);
+      res.status(500).json({ error: 'Failed to delete lease up month listing' });
+    }
+  });
+
   app.post('/api/ai/optimize-code', async (req, res) => {
     try {
       const { code, instructions } = req.body;
@@ -3368,6 +3703,211 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       console.error('Error executing ETL job:', error);
       res.status(500).json({ error: error.message || 'Failed to execute ETL job' });
+    }
+  });
+
+  // Income Hotel/Motel routes
+  app.get('/api/income-hotel-motels', async (req, res) => {
+    try {
+      const hotelMotels = await storage.getAllIncomeHotelMotels();
+      res.json(hotelMotels);
+    } catch (error) {
+      console.error('Error fetching hotel/motel data:', error);
+      res.status(500).json({ error: 'Failed to fetch hotel/motel data' });
+    }
+  });
+
+  app.get('/api/income-hotel-motel/:incomeYear/:supNum/:incomeId', async (req, res) => {
+    const { incomeYear, supNum, incomeId } = req.params;
+    try {
+      const hotelMotel = await storage.getIncomeHotelMotel(incomeYear, parseInt(supNum), parseInt(incomeId));
+      if (!hotelMotel) {
+        return res.status(404).json({ error: 'Hotel/Motel data not found' });
+      }
+      res.json(hotelMotel);
+    } catch (error) {
+      console.error('Error fetching specific hotel/motel data:', error);
+      res.status(500).json({ error: 'Failed to fetch specific hotel/motel data' });
+    }
+  });
+
+  app.post('/api/income-hotel-motel', async (req, res) => {
+    try {
+      // Parse the input data using the insert schema
+      const parsedData = insertIncomeHotelMotelSchema.parse(req.body);
+      const newHotelMotel = await storage.insertIncomeHotelMotel(parsedData);
+      res.status(201).json(newHotelMotel);
+    } catch (error) {
+      console.error('Error creating hotel/motel data:', error);
+      if (error instanceof z.ZodError) {
+        res.status(400).json({ error: 'Invalid data format', details: error.errors });
+      } else {
+        res.status(500).json({ error: 'Failed to create hotel/motel data' });
+      }
+    }
+  });
+
+  app.delete('/api/income-hotel-motel/:incomeYear/:supNum/:incomeId', async (req, res) => {
+    const { incomeYear, supNum, incomeId } = req.params;
+    try {
+      await storage.deleteIncomeHotelMotel(incomeYear, parseInt(supNum), parseInt(incomeId));
+      res.status(200).json({ message: 'Hotel/Motel data deleted successfully' });
+    } catch (error) {
+      console.error('Error deleting hotel/motel data:', error);
+      res.status(500).json({ error: 'Failed to delete hotel/motel data' });
+    }
+  });
+
+  // Income Hotel/Motel Detail routes
+  app.get('/api/income-hotel-motel-details', async (req, res) => {
+    try {
+      const hotelMotelDetails = await storage.getAllIncomeHotelMotelDetails();
+      res.json(hotelMotelDetails);
+    } catch (error) {
+      console.error('Error fetching hotel/motel detail data:', error);
+      res.status(500).json({ error: 'Failed to fetch hotel/motel detail data' });
+    }
+  });
+
+  app.get('/api/income-hotel-motel-detail/:incomeYear/:supNum/:incomeId/:valueType', async (req, res) => {
+    const { incomeYear, supNum, incomeId, valueType } = req.params;
+    try {
+      const hotelMotelDetail = await storage.getIncomeHotelMotelDetail(
+        incomeYear,
+        parseInt(supNum),
+        parseInt(incomeId),
+        valueType
+      );
+      if (!hotelMotelDetail) {
+        return res.status(404).json({ error: 'Hotel/Motel detail data not found' });
+      }
+      res.json(hotelMotelDetail);
+    } catch (error) {
+      console.error('Error fetching specific hotel/motel detail data:', error);
+      res.status(500).json({ error: 'Failed to fetch specific hotel/motel detail data' });
+    }
+  });
+
+  app.post('/api/income-hotel-motel-detail', async (req, res) => {
+    try {
+      // Parse the input data using the insert schema
+      const parsedData = insertIncomeHotelMotelDetailSchema.parse(req.body);
+      const newHotelMotelDetail = await storage.insertIncomeHotelMotelDetail(parsedData);
+      res.status(201).json(newHotelMotelDetail);
+    } catch (error) {
+      console.error('Error creating hotel/motel detail data:', error);
+      if (error instanceof z.ZodError) {
+        res.status(400).json({ error: 'Invalid data format', details: error.errors });
+      } else {
+        res.status(500).json({ error: 'Failed to create hotel/motel detail data' });
+      }
+    }
+  });
+
+  app.delete('/api/income-hotel-motel-detail/:incomeYear/:supNum/:incomeId/:valueType', async (req, res) => {
+    const { incomeYear, supNum, incomeId, valueType } = req.params;
+    try {
+      await storage.deleteIncomeHotelMotelDetail(
+        incomeYear,
+        parseInt(supNum),
+        parseInt(incomeId),
+        valueType
+      );
+      res.status(200).json({ message: 'Hotel/Motel detail data deleted successfully' });
+    } catch (error) {
+      console.error('Error deleting hotel/motel detail data:', error);
+      res.status(500).json({ error: 'Failed to delete hotel/motel detail data' });
+    }
+  });
+
+  // Income Lease Up routes
+  app.get('/api/income-lease-ups', async (req, res) => {
+    try {
+      const leaseUps = await storage.getAllIncomeLeaseUps();
+      res.json(leaseUps);
+    } catch (error) {
+      console.error('Error fetching lease up data:', error);
+      res.status(500).json({ error: 'Failed to fetch lease up data' });
+    }
+  });
+
+  app.get('/api/income-lease-up/:id', async (req, res) => {
+    const { id } = req.params;
+    try {
+      const leaseUp = await storage.getIncomeLeaseUp(parseInt(id));
+      if (!leaseUp) {
+        return res.status(404).json({ error: 'Lease Up data not found' });
+      }
+      res.json(leaseUp);
+    } catch (error) {
+      console.error('Error fetching specific lease up data:', error);
+      res.status(500).json({ error: 'Failed to fetch specific lease up data' });
+    }
+  });
+
+  app.post('/api/income-lease-up', async (req, res) => {
+    try {
+      // Parse the input data using the insert schema
+      const parsedData = insertIncomeLeaseUpSchema.parse(req.body);
+      const newLeaseUp = await storage.insertIncomeLeaseUp(parsedData);
+      res.status(201).json(newLeaseUp);
+    } catch (error) {
+      console.error('Error creating lease up data:', error);
+      if (error instanceof z.ZodError) {
+        res.status(400).json({ error: 'Invalid data format', details: error.errors });
+      } else {
+        res.status(500).json({ error: 'Failed to create lease up data' });
+      }
+    }
+  });
+
+  app.delete('/api/income-lease-up/:id', async (req, res) => {
+    const { id } = req.params;
+    try {
+      await storage.deleteIncomeLeaseUp(parseInt(id));
+      res.status(200).json({ message: 'Lease Up data deleted successfully' });
+    } catch (error) {
+      console.error('Error deleting lease up data:', error);
+      res.status(500).json({ error: 'Failed to delete lease up data' });
+    }
+  });
+
+  // Income Lease Up Month Listing routes
+  app.get('/api/income-lease-up-month-listings/:leaseUpId', async (req, res) => {
+    const { leaseUpId } = req.params;
+    try {
+      const listings = await storage.getIncomeLeaseUpMonthListingsByLeaseUpId(parseInt(leaseUpId));
+      res.json(listings);
+    } catch (error) {
+      console.error('Error fetching lease up month listings:', error);
+      res.status(500).json({ error: 'Failed to fetch lease up month listings' });
+    }
+  });
+
+  app.post('/api/income-lease-up-month-listing', async (req, res) => {
+    try {
+      // Parse the input data using the insert schema
+      const parsedData = insertIncomeLeaseUpMonthListingSchema.parse(req.body);
+      const newListing = await storage.insertIncomeLeaseUpMonthListing(parsedData);
+      res.status(201).json(newListing);
+    } catch (error) {
+      console.error('Error creating lease up month listing:', error);
+      if (error instanceof z.ZodError) {
+        res.status(400).json({ error: 'Invalid data format', details: error.errors });
+      } else {
+        res.status(500).json({ error: 'Failed to create lease up month listing' });
+      }
+    }
+  });
+
+  app.delete('/api/income-lease-up-month-listing/:id', async (req, res) => {
+    const { id } = req.params;
+    try {
+      await storage.deleteIncomeLeaseUpMonthListing(parseInt(id));
+      res.status(200).json({ message: 'Lease Up month listing deleted successfully' });
+    } catch (error) {
+      console.error('Error deleting lease up month listing:', error);
+      res.status(500).json({ error: 'Failed to delete lease up month listing' });
     }
   });
 

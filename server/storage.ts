@@ -7,6 +7,10 @@ import {
   etlOptimizationSuggestions,
   etlBatchJobs,
   etlAlerts,
+  incomeHotelMotel,
+  incomeHotelMotelDetail,
+  incomeLeaseUp,
+  incomeLeaseUpMonthListing,
   type User, 
   type InsertUser, 
   type Property, 
@@ -22,7 +26,15 @@ import {
   type EtlBatchJob,
   type InsertEtlBatchJob,
   type EtlAlert,
-  type InsertEtlAlert
+  type InsertEtlAlert,
+  type IncomeHotelMotel,
+  type InsertIncomeHotelMotel,
+  type IncomeHotelMotelDetail,
+  type InsertIncomeHotelMotelDetail,
+  type IncomeLeaseUp,
+  type InsertIncomeLeaseUp,
+  type IncomeLeaseUpMonthListing,
+  type InsertIncomeLeaseUpMonthListing
 } from "@shared/schema";
 
 // modify the interface with any CRUD methods
@@ -56,7 +68,34 @@ export interface IStorage {
   bulkImportProperties(properties: InsertProperty[]): Promise<{ success: boolean; count: number; errors?: any[] }>;
   searchProperties(searchText: string): Promise<Property[]>;
   
-  // Income approach functionality was removed
+  // Income Approach operations
+  // Hotel/Motel Income Approach
+  getIncomeHotelMotels(): Promise<IncomeHotelMotel[]>;
+  getIncomeHotelMotelById(incomeYear: number, supNum: number, incomeId: number): Promise<IncomeHotelMotel | undefined>;
+  createIncomeHotelMotel(incomeHotelMotel: InsertIncomeHotelMotel): Promise<IncomeHotelMotel>;
+  updateIncomeHotelMotel(incomeYear: number, supNum: number, incomeId: number, incomeHotelMotel: Partial<InsertIncomeHotelMotel>): Promise<IncomeHotelMotel | undefined>;
+  deleteIncomeHotelMotel(incomeYear: number, supNum: number, incomeId: number): Promise<boolean>;
+  
+  // Hotel/Motel Detail
+  getIncomeHotelMotelDetails(incomeYear: number, supNum: number, incomeId: number): Promise<IncomeHotelMotelDetail[]>;
+  getIncomeHotelMotelDetailByType(incomeYear: number, supNum: number, incomeId: number, valueType: string): Promise<IncomeHotelMotelDetail | undefined>;
+  createIncomeHotelMotelDetail(incomeHotelMotelDetail: InsertIncomeHotelMotelDetail): Promise<IncomeHotelMotelDetail>;
+  updateIncomeHotelMotelDetail(incomeYear: number, supNum: number, incomeId: number, valueType: string, incomeHotelMotelDetail: Partial<InsertIncomeHotelMotelDetail>): Promise<IncomeHotelMotelDetail | undefined>;
+  deleteIncomeHotelMotelDetail(incomeYear: number, supNum: number, incomeId: number, valueType: string): Promise<boolean>;
+  
+  // Lease Up
+  getIncomeLeaseUps(): Promise<IncomeLeaseUp[]>;
+  getIncomeLeaseUpById(id: number): Promise<IncomeLeaseUp | undefined>;
+  createIncomeLeaseUp(incomeLeaseUp: InsertIncomeLeaseUp): Promise<IncomeLeaseUp>;
+  updateIncomeLeaseUp(id: number, incomeLeaseUp: Partial<InsertIncomeLeaseUp>): Promise<IncomeLeaseUp | undefined>;
+  deleteIncomeLeaseUp(id: number): Promise<boolean>;
+  
+  // Lease Up Month Listing
+  getIncomeLeaseUpMonthListings(incomeLeaseUpId: number): Promise<IncomeLeaseUpMonthListing[]>;
+  getIncomeLeaseUpMonthListingById(id: number): Promise<IncomeLeaseUpMonthListing | undefined>;
+  createIncomeLeaseUpMonthListing(incomeLeaseUpMonthListing: InsertIncomeLeaseUpMonthListing): Promise<IncomeLeaseUpMonthListing>;
+  updateIncomeLeaseUpMonthListing(id: number, incomeLeaseUpMonthListing: Partial<InsertIncomeLeaseUpMonthListing>): Promise<IncomeLeaseUpMonthListing | undefined>;
+  deleteIncomeLeaseUpMonthListing(id: number): Promise<boolean>;
 
   // ETL Data Source operations
   getEtlDataSources(): Promise<EtlDataSource[]>;
@@ -113,6 +152,13 @@ export class MemStorage implements IStorage {
   private etlOptimizationSuggestionsMap: Record<number, EtlOptimizationSuggestion>;
   private etlBatchJobsMap: Record<number, EtlBatchJob>;
   private etlAlertsMap: Record<number, EtlAlert>;
+  
+  // Income approach storage
+  private incomeHotelMotelMap: Record<string, IncomeHotelMotel>;
+  private incomeHotelMotelDetailMap: Record<string, IncomeHotelMotelDetail>;
+  private incomeLeaseUpMap: Record<number, IncomeLeaseUp>;
+  private incomeLeaseUpMonthListingMap: Record<number, IncomeLeaseUpMonthListing>;
+  
   private userCurrentId: number;
   private propertyCurrentId: number;
   private etlDataSourceCurrentId: number;
@@ -121,6 +167,8 @@ export class MemStorage implements IStorage {
   private etlOptimizationSuggestionCurrentId: number;
   private etlBatchJobCurrentId: number;
   private etlAlertCurrentId: number;
+  private incomeLeaseUpCurrentId: number;
+  private incomeLeaseUpMonthListingCurrentId: number;
 
   constructor() {
     this.users = {};
@@ -131,6 +179,13 @@ export class MemStorage implements IStorage {
     this.etlOptimizationSuggestionsMap = {};
     this.etlBatchJobsMap = {};
     this.etlAlertsMap = {};
+    
+    // Initialize income approach maps
+    this.incomeHotelMotelMap = {};
+    this.incomeHotelMotelDetailMap = {};
+    this.incomeLeaseUpMap = {};
+    this.incomeLeaseUpMonthListingMap = {};
+    
     this.userCurrentId = 1;
     this.propertyCurrentId = 1;
     this.etlDataSourceCurrentId = 1;
@@ -139,6 +194,9 @@ export class MemStorage implements IStorage {
     this.etlOptimizationSuggestionCurrentId = 1;
     this.etlBatchJobCurrentId = 1;
     this.etlAlertCurrentId = 1;
+    this.incomeLeaseUpCurrentId = 1;
+    this.incomeLeaseUpMonthListingCurrentId = 1;
+    
     this.initializeSampleProperties();
     this.initializeSampleEtlData();
   }
@@ -361,8 +419,7 @@ export class MemStorage implements IStorage {
               const updatedProperty: Property = {
                 ...existingProperty,
                 ...property,
-                id: existingId,
-                updatedAt: new Date().toISOString()
+                id: existingId
               };
               
               this.properties[existingId] = updatedProperty;
@@ -438,7 +495,432 @@ export class MemStorage implements IStorage {
     });
   }
 
-  // Income approach functionality was removed
+  // Income approach operations
+  // Hotel/Motel
+  async getIncomeHotelMotels(): Promise<IncomeHotelMotel[]> {
+    return Object.values(this.incomeHotelMotelMap);
+  }
+
+  async getIncomeHotelMotelById(incomeYear: number, supNum: number, incomeId: number): Promise<IncomeHotelMotel | undefined> {
+    const key = `${incomeYear}-${supNum}-${incomeId}`;
+    return this.incomeHotelMotelMap[key];
+  }
+  
+  // Alias for routes.ts to use
+  async getAllIncomeHotelMotels(): Promise<IncomeHotelMotel[]> {
+    return this.getIncomeHotelMotels();
+  }
+  
+  // Alias for routes.ts to use
+  async getIncomeHotelMotel(incomeYear: string, supNum: number, incomeId: number): Promise<IncomeHotelMotel | undefined> {
+    return this.getIncomeHotelMotelById(Number(incomeYear), supNum, incomeId);
+  }
+  
+  // Alias for routes.ts to use
+  async insertIncomeHotelMotel(incomeHotelMotel: InsertIncomeHotelMotel): Promise<IncomeHotelMotel> {
+    return this.createIncomeHotelMotel(incomeHotelMotel);
+  }
+
+  async createIncomeHotelMotel(incomeHotelMotel: InsertIncomeHotelMotel): Promise<IncomeHotelMotel> {
+    // Create a composite key for storage
+    const key = `${incomeHotelMotel.incomeYear}-${incomeHotelMotel.supNum}-${incomeHotelMotel.incomeId}`;
+    
+    // Convert or ensure values are strings as required by the schema
+    const hotelMotel: IncomeHotelMotel = {
+      incomeYear: incomeHotelMotel.incomeYear.toString(),
+      supNum: incomeHotelMotel.supNum,
+      incomeId: incomeHotelMotel.incomeId,
+      sizeInSqft: (incomeHotelMotel.sizeInSqft || "0").toString(),
+      averageDailyRoomRate: (incomeHotelMotel.averageDailyRoomRate || "0").toString(),
+      numberOfRooms: (incomeHotelMotel.numberOfRooms || "0").toString(),
+      numberOfRoomNights: (incomeHotelMotel.numberOfRoomNights || "0").toString(),
+      incomeValueReconciled: (incomeHotelMotel.incomeValueReconciled || "0").toString(),
+      incomeValuePerRoom: (incomeHotelMotel.incomeValuePerRoom || "0").toString(),
+      assessmentValuePerRoom: (incomeHotelMotel.assessmentValuePerRoom || "0").toString(),
+      incomeValuePerSqft: (incomeHotelMotel.incomeValuePerSqft || "0").toString(),
+      assessmentValuePerSqft: (incomeHotelMotel.assessmentValuePerSqft || "0").toString()
+    };
+    
+    this.incomeHotelMotelMap[key] = hotelMotel;
+    return hotelMotel;
+  }
+
+  async updateIncomeHotelMotel(incomeYear: number, supNum: number, incomeId: number, incomeHotelMotel: Partial<InsertIncomeHotelMotel>): Promise<IncomeHotelMotel | undefined> {
+    const key = `${incomeYear}-${supNum}-${incomeId}`;
+    const existingHotelMotel = this.incomeHotelMotelMap[key];
+    
+    if (!existingHotelMotel) {
+      return undefined;
+    }
+    
+    // Update only the provided fields, ensuring string representation for schema compatibility
+    const updatedHotelMotel: IncomeHotelMotel = {
+      ...existingHotelMotel,
+      sizeInSqft: incomeHotelMotel.sizeInSqft !== undefined ? incomeHotelMotel.sizeInSqft.toString() : existingHotelMotel.sizeInSqft,
+      averageDailyRoomRate: incomeHotelMotel.averageDailyRoomRate !== undefined ? incomeHotelMotel.averageDailyRoomRate.toString() : existingHotelMotel.averageDailyRoomRate,
+      numberOfRooms: incomeHotelMotel.numberOfRooms !== undefined ? incomeHotelMotel.numberOfRooms.toString() : existingHotelMotel.numberOfRooms,
+      numberOfRoomNights: incomeHotelMotel.numberOfRoomNights !== undefined ? incomeHotelMotel.numberOfRoomNights.toString() : existingHotelMotel.numberOfRoomNights,
+      incomeValueReconciled: incomeHotelMotel.incomeValueReconciled !== undefined ? incomeHotelMotel.incomeValueReconciled.toString() : existingHotelMotel.incomeValueReconciled,
+      incomeValuePerRoom: incomeHotelMotel.incomeValuePerRoom !== undefined ? incomeHotelMotel.incomeValuePerRoom.toString() : existingHotelMotel.incomeValuePerRoom,
+      assessmentValuePerRoom: incomeHotelMotel.assessmentValuePerRoom !== undefined ? incomeHotelMotel.assessmentValuePerRoom.toString() : existingHotelMotel.assessmentValuePerRoom,
+      incomeValuePerSqft: incomeHotelMotel.incomeValuePerSqft !== undefined ? incomeHotelMotel.incomeValuePerSqft.toString() : existingHotelMotel.incomeValuePerSqft,
+      assessmentValuePerSqft: incomeHotelMotel.assessmentValuePerSqft !== undefined ? incomeHotelMotel.assessmentValuePerSqft.toString() : existingHotelMotel.assessmentValuePerSqft
+    };
+    
+    this.incomeHotelMotelMap[key] = updatedHotelMotel;
+    return updatedHotelMotel;
+  }
+
+  async deleteIncomeHotelMotel(incomeYear: number, supNum: number, incomeId: number): Promise<boolean> {
+    const key = `${incomeYear}-${supNum}-${incomeId}`;
+    
+    if (this.incomeHotelMotelMap[key]) {
+      delete this.incomeHotelMotelMap[key];
+      return true;
+    }
+    
+    return false;
+  }
+  
+  // Hotel/Motel Detail
+  async getIncomeHotelMotelDetails(incomeYear: number, supNum: number, incomeId: number): Promise<IncomeHotelMotelDetail[]> {
+    const prefix = `${incomeYear}-${supNum}-${incomeId}-`;
+    return Object.entries(this.incomeHotelMotelDetailMap)
+      .filter(([key]) => key.startsWith(prefix))
+      .map(([, detail]) => detail);
+  }
+  
+  // Alias for routes.ts to use
+  async getAllIncomeHotelMotelDetails(): Promise<IncomeHotelMotelDetail[]> {
+    return Object.values(this.incomeHotelMotelDetailMap);
+  }
+  
+  // Alias for routes.ts to use
+  async getIncomeHotelMotelDetail(incomeYear: string, supNum: number, incomeId: number, valueType: string): Promise<IncomeHotelMotelDetail | undefined> {
+    return this.getIncomeHotelMotelDetailByType(Number(incomeYear), supNum, incomeId, valueType);
+  }
+  
+  // Alias for routes.ts to use
+  async insertIncomeHotelMotelDetail(incomeHotelMotelDetail: InsertIncomeHotelMotelDetail): Promise<IncomeHotelMotelDetail> {
+    return this.createIncomeHotelMotelDetail(incomeHotelMotelDetail);
+  }
+
+  async getIncomeHotelMotelDetailByType(incomeYear: number, supNum: number, incomeId: number, valueType: string): Promise<IncomeHotelMotelDetail | undefined> {
+    const key = `${incomeYear}-${supNum}-${incomeId}-${valueType}`;
+    return this.incomeHotelMotelDetailMap[key];
+  }
+
+  async createIncomeHotelMotelDetail(incomeHotelMotelDetail: InsertIncomeHotelMotelDetail): Promise<IncomeHotelMotelDetail> {
+    const key = `${incomeHotelMotelDetail.incomeYear}-${incomeHotelMotelDetail.supNum}-${incomeHotelMotelDetail.incomeId}-${incomeHotelMotelDetail.valueType}`;
+    
+    // Convert numeric fields
+    const detail: IncomeHotelMotelDetail = {
+      incomeYear: Number(incomeHotelMotelDetail.incomeYear),
+      supNum: Number(incomeHotelMotelDetail.supNum),
+      incomeId: Number(incomeHotelMotelDetail.incomeId),
+      valueType: incomeHotelMotelDetail.valueType,
+      roomRevenue: Number(incomeHotelMotelDetail.roomRevenue || 0),
+      roomRevenuePct: Number(incomeHotelMotelDetail.roomRevenuePct || 0),
+      roomRevenueUpdate: incomeHotelMotelDetail.roomRevenueUpdate || "",
+      vacancyCollectionLoss: Number(incomeHotelMotelDetail.vacancyCollectionLoss || 0),
+      vacancyCollectionLossPct: Number(incomeHotelMotelDetail.vacancyCollectionLossPct || 0),
+      vacancyCollectionLossUpdate: incomeHotelMotelDetail.vacancyCollectionLossUpdate || "",
+      foodBeverageIncome: Number(incomeHotelMotelDetail.foodBeverageIncome || 0),
+      foodBeverageIncomePct: Number(incomeHotelMotelDetail.foodBeverageIncomePct || 0),
+      foodBeverageIncomeUpdate: incomeHotelMotelDetail.foodBeverageIncomeUpdate || "",
+      miscIncome: Number(incomeHotelMotelDetail.miscIncome || 0),
+      miscIncomePct: Number(incomeHotelMotelDetail.miscIncomePct || 0),
+      miscIncomeUpdate: incomeHotelMotelDetail.miscIncomeUpdate || "",
+      effectiveGrossIncome: Number(incomeHotelMotelDetail.effectiveGrossIncome || 0),
+      effectiveGrossIncomePct: Number(incomeHotelMotelDetail.effectiveGrossIncomePct || 0),
+      utilities: Number(incomeHotelMotelDetail.utilities || 0),
+      utilitiesPct: Number(incomeHotelMotelDetail.utilitiesPct || 0),
+      utilitiesUpdate: incomeHotelMotelDetail.utilitiesUpdate || "",
+      maintenanceRepair: Number(incomeHotelMotelDetail.maintenanceRepair || 0),
+      maintenanceRepairPct: Number(incomeHotelMotelDetail.maintenanceRepairPct || 0),
+      maintenanceRepairUpdate: incomeHotelMotelDetail.maintenanceRepairUpdate || "",
+      departmentExpenses: Number(incomeHotelMotelDetail.departmentExpenses || 0),
+      departmentExpensesPct: Number(incomeHotelMotelDetail.departmentExpensesPct || 0),
+      departmentExpensesUpdate: incomeHotelMotelDetail.departmentExpensesUpdate || "",
+      management: Number(incomeHotelMotelDetail.management || 0),
+      managementPct: Number(incomeHotelMotelDetail.managementPct || 0),
+      managementUpdate: incomeHotelMotelDetail.managementUpdate || "",
+      administrative: Number(incomeHotelMotelDetail.administrative || 0),
+      administrativePct: Number(incomeHotelMotelDetail.administrativePct || 0),
+      administrativeUpdate: incomeHotelMotelDetail.administrativeUpdate || "",
+      payroll: Number(incomeHotelMotelDetail.payroll || 0),
+      payrollPct: Number(incomeHotelMotelDetail.payrollPct || 0),
+      payrollUpdate: incomeHotelMotelDetail.payrollUpdate || "",
+      insurance: Number(incomeHotelMotelDetail.insurance || 0),
+      insurancePct: Number(incomeHotelMotelDetail.insurancePct || 0),
+      insuranceUpdate: incomeHotelMotelDetail.insuranceUpdate || "",
+      marketing: Number(incomeHotelMotelDetail.marketing || 0),
+      marketingPct: Number(incomeHotelMotelDetail.marketingPct || 0),
+      marketingUpdate: incomeHotelMotelDetail.marketingUpdate || "",
+      realEstateTax: Number(incomeHotelMotelDetail.realEstateTax || 0),
+      realEstateTaxPct: Number(incomeHotelMotelDetail.realEstateTaxPct || 0),
+      realEstateTaxUpdate: incomeHotelMotelDetail.realEstateTaxUpdate || "",
+      franchiseFee: Number(incomeHotelMotelDetail.franchiseFee || 0),
+      franchiseFeePct: Number(incomeHotelMotelDetail.franchiseFeePct || 0),
+      franchiseFeeUpdate: incomeHotelMotelDetail.franchiseFeeUpdate || "",
+      other: Number(incomeHotelMotelDetail.other || 0),
+      otherPct: Number(incomeHotelMotelDetail.otherPct || 0),
+      otherUpdate: incomeHotelMotelDetail.otherUpdate || "",
+      totalExpenses: Number(incomeHotelMotelDetail.totalExpenses || 0),
+      totalExpensesPct: Number(incomeHotelMotelDetail.totalExpensesPct || 0),
+      totalExpensesUpdate: incomeHotelMotelDetail.totalExpensesUpdate || "",
+      netOperatingIncome: Number(incomeHotelMotelDetail.netOperatingIncome || 0),
+      netOperatingIncomePct: Number(incomeHotelMotelDetail.netOperatingIncomePct || 0),
+      capRate: Number(incomeHotelMotelDetail.capRate || 0),
+      capRateUpdate: incomeHotelMotelDetail.capRateUpdate || "",
+      taxRate: Number(incomeHotelMotelDetail.taxRate || 0),
+      taxRateUpdate: incomeHotelMotelDetail.taxRateUpdate || "",
+      overallCapRate: Number(incomeHotelMotelDetail.overallCapRate || 0),
+      incomeValue: Number(incomeHotelMotelDetail.incomeValue || 0),
+      personalPropertyValue: Number(incomeHotelMotelDetail.personalPropertyValue || 0),
+      personalPropertyValueUpdate: incomeHotelMotelDetail.personalPropertyValueUpdate || "",
+      otherValue: Number(incomeHotelMotelDetail.otherValue || 0),
+      otherValueUpdate: incomeHotelMotelDetail.otherValueUpdate || "",
+      indicatedIncomeValue: Number(incomeHotelMotelDetail.indicatedIncomeValue || 0)
+    };
+    
+    this.incomeHotelMotelDetailMap[key] = detail;
+    return detail;
+  }
+
+  async updateIncomeHotelMotelDetail(
+    incomeYear: number, 
+    supNum: number, 
+    incomeId: number, 
+    valueType: string, 
+    incomeHotelMotelDetail: Partial<InsertIncomeHotelMotelDetail>
+  ): Promise<IncomeHotelMotelDetail | undefined> {
+    const key = `${incomeYear}-${supNum}-${incomeId}-${valueType}`;
+    const existingDetail = this.incomeHotelMotelDetailMap[key];
+    
+    if (!existingDetail) {
+      return undefined;
+    }
+    
+    // Only update fields that were passed in
+    const updatedDetail: IncomeHotelMotelDetail = { ...existingDetail };
+    
+    // Process each field that's present in the update
+    Object.keys(incomeHotelMotelDetail).forEach(field => {
+      const value = incomeHotelMotelDetail[field as keyof InsertIncomeHotelMotelDetail];
+      if (value !== undefined) {
+        // For numeric fields, convert to number
+        if (typeof existingDetail[field as keyof IncomeHotelMotelDetail] === 'number') {
+          (updatedDetail as any)[field] = Number(value);
+        } else {
+          (updatedDetail as any)[field] = value;
+        }
+      }
+    });
+    
+    this.incomeHotelMotelDetailMap[key] = updatedDetail;
+    return updatedDetail;
+  }
+
+  async deleteIncomeHotelMotelDetail(incomeYear: number, supNum: number, incomeId: number, valueType: string): Promise<boolean> {
+    const key = `${incomeYear}-${supNum}-${incomeId}-${valueType}`;
+    
+    if (this.incomeHotelMotelDetailMap[key]) {
+      delete this.incomeHotelMotelDetailMap[key];
+      return true;
+    }
+    
+    return false;
+  }
+  
+  // Lease Up
+  async getIncomeLeaseUps(): Promise<IncomeLeaseUp[]> {
+    return Object.values(this.incomeLeaseUpMap);
+  }
+  
+  // Alias for routes.ts to use
+  async getAllIncomeLeaseUps(): Promise<IncomeLeaseUp[]> {
+    return this.getIncomeLeaseUps();
+  }
+  
+  // Alias for routes.ts to use
+  async getIncomeLeaseUp(id: number): Promise<IncomeLeaseUp | undefined> {
+    return this.getIncomeLeaseUpById(id);
+  }
+  
+  // Alias for routes.ts to use
+  async insertIncomeLeaseUp(incomeLeaseUp: InsertIncomeLeaseUp): Promise<IncomeLeaseUp> {
+    return this.createIncomeLeaseUp(incomeLeaseUp);
+  }
+
+  async getIncomeLeaseUpById(id: number): Promise<IncomeLeaseUp | undefined> {
+    return this.incomeLeaseUpMap[id];
+  }
+
+  async createIncomeLeaseUp(incomeLeaseUp: InsertIncomeLeaseUp): Promise<IncomeLeaseUp> {
+    const id = this.incomeLeaseUpCurrentId++;
+    
+    const newLeaseUp: IncomeLeaseUp = {
+      incomeLeaseUpId: id,
+      incomeYear: Number(incomeLeaseUp.incomeYear),
+      supNum: Number(incomeLeaseUp.supNum),
+      incomeId: Number(incomeLeaseUp.incomeId),
+      frequency: incomeLeaseUp.frequency || "A",
+      leaseType: incomeLeaseUp.leaseType || null,
+      unitOfMeasure: incomeLeaseUp.unitOfMeasure || null,
+      rentLossAreaSqft: incomeLeaseUp.rentLossAreaSqft !== undefined ? Number(incomeLeaseUp.rentLossAreaSqft) : null,
+      rentSqft: incomeLeaseUp.rentSqft !== undefined ? Number(incomeLeaseUp.rentSqft) : null,
+      rentNumberOfYears: incomeLeaseUp.rentNumberOfYears !== undefined ? Number(incomeLeaseUp.rentNumberOfYears) : null,
+      rentTotal: incomeLeaseUp.rentTotal !== undefined ? Number(incomeLeaseUp.rentTotal) : null,
+      leasePct: incomeLeaseUp.leasePct !== undefined ? Number(incomeLeaseUp.leasePct) : null,
+      leaseTotal: incomeLeaseUp.leaseTotal !== undefined ? Number(incomeLeaseUp.leaseTotal) : null,
+      totalFinishOutSqft: incomeLeaseUp.totalFinishOutSqft !== undefined ? Number(incomeLeaseUp.totalFinishOutSqft) : null,
+      totalFinishOutTotal: incomeLeaseUp.totalFinishOutTotal !== undefined ? Number(incomeLeaseUp.totalFinishOutTotal) : null,
+      discountRate: incomeLeaseUp.discountRate !== undefined ? Number(incomeLeaseUp.discountRate) : null,
+      numberOfYears: incomeLeaseUp.numberOfYears !== undefined ? Number(incomeLeaseUp.numberOfYears) : null,
+      leaseUpCost: incomeLeaseUp.leaseUpCost !== undefined ? Number(incomeLeaseUp.leaseUpCost) : null,
+      leaseUpCostOverride: incomeLeaseUp.leaseUpCostOverride || false,
+      netRentableArea: Number(incomeLeaseUp.netRentableArea || 0),
+      currentOccupancyPct: Number(incomeLeaseUp.currentOccupancyPct || 100),
+      stabilizedOccupancyPct: Number(incomeLeaseUp.stabilizedOccupancyPct || 0),
+      stabilizedOccupancy: Number(incomeLeaseUp.stabilizedOccupancy || 0),
+      spaceToBeAbsorbed: Number(incomeLeaseUp.spaceToBeAbsorbed || 0),
+      absorptionPeriodInMonths: Number(incomeLeaseUp.absorptionPeriodInMonths || 0),
+      estimatedAbsorptionPerYear: Number(incomeLeaseUp.estimatedAbsorptionPerYear || 0),
+      estimatedAbsorptionPerMonth: Number(incomeLeaseUp.estimatedAbsorptionPerMonth || 0),
+      leasingCommissionsPct: Number(incomeLeaseUp.leasingCommissionsPct || 0),
+      grossRentLossPerSqft: Number(incomeLeaseUp.grossRentLossPerSqft || 0),
+      tenantFinishAllowancePerSqft: Number(incomeLeaseUp.tenantFinishAllowancePerSqft || 0)
+    };
+    
+    this.incomeLeaseUpMap[id] = newLeaseUp;
+    return newLeaseUp;
+  }
+
+  async updateIncomeLeaseUp(id: number, incomeLeaseUp: Partial<InsertIncomeLeaseUp>): Promise<IncomeLeaseUp | undefined> {
+    const existingLeaseUp = this.incomeLeaseUpMap[id];
+    
+    if (!existingLeaseUp) {
+      return undefined;
+    }
+    
+    // Only update fields that were passed in
+    const updatedLeaseUp: IncomeLeaseUp = { ...existingLeaseUp };
+    
+    // Process each field that's present in the update
+    Object.keys(incomeLeaseUp).forEach(field => {
+      const value = incomeLeaseUp[field as keyof InsertIncomeLeaseUp];
+      if (value !== undefined) {
+        // Special handling for boolean fields
+        if (field === 'leaseUpCostOverride') {
+          updatedLeaseUp.leaseUpCostOverride = Boolean(value);
+        } 
+        // For numeric fields, convert to number
+        else if (typeof existingLeaseUp[field as keyof IncomeLeaseUp] === 'number') {
+          (updatedLeaseUp as any)[field] = Number(value);
+        } 
+        // For other fields, assign directly
+        else {
+          (updatedLeaseUp as any)[field] = value;
+        }
+      }
+    });
+    
+    this.incomeLeaseUpMap[id] = updatedLeaseUp;
+    return updatedLeaseUp;
+  }
+
+  async deleteIncomeLeaseUp(id: number): Promise<boolean> {
+    if (this.incomeLeaseUpMap[id]) {
+      delete this.incomeLeaseUpMap[id];
+      
+      // Also delete any associated month listings
+      Object.keys(this.incomeLeaseUpMonthListingMap).forEach(key => {
+        const monthListing = this.incomeLeaseUpMonthListingMap[Number(key)];
+        if (monthListing && monthListing.incomeLeaseUpId === id) {
+          delete this.incomeLeaseUpMonthListingMap[Number(key)];
+        }
+      });
+      
+      return true;
+    }
+    
+    return false;
+  }
+  
+  // Lease Up Month Listing
+  async getIncomeLeaseUpMonthListings(incomeLeaseUpId: number): Promise<IncomeLeaseUpMonthListing[]> {
+    return Object.values(this.incomeLeaseUpMonthListingMap)
+      .filter(listing => listing.incomeLeaseUpId === incomeLeaseUpId);
+  }
+  
+  // Alias for routes.ts to use
+  async getIncomeLeaseUpMonthListingsByLeaseUpId(incomeLeaseUpId: number): Promise<IncomeLeaseUpMonthListing[]> {
+    return this.getIncomeLeaseUpMonthListings(incomeLeaseUpId);
+  }
+  
+  // Alias for routes.ts to use
+  async insertIncomeLeaseUpMonthListing(incomeLeaseUpMonthListing: InsertIncomeLeaseUpMonthListing): Promise<IncomeLeaseUpMonthListing> {
+    return this.createIncomeLeaseUpMonthListing(incomeLeaseUpMonthListing);
+  }
+
+  async getIncomeLeaseUpMonthListingById(id: number): Promise<IncomeLeaseUpMonthListing | undefined> {
+    return this.incomeLeaseUpMonthListingMap[id];
+  }
+
+  async createIncomeLeaseUpMonthListing(incomeLeaseUpMonthListing: InsertIncomeLeaseUpMonthListing): Promise<IncomeLeaseUpMonthListing> {
+    const id = this.incomeLeaseUpMonthListingCurrentId++;
+    
+    const newMonthListing: IncomeLeaseUpMonthListing = {
+      incomeLeaseUpMonthListingId: id,
+      incomeLeaseUpId: Number(incomeLeaseUpMonthListing.incomeLeaseUpId),
+      yearNumber: Number(incomeLeaseUpMonthListing.yearNumber),
+      monthNumber: Number(incomeLeaseUpMonthListing.monthNumber),
+      available: Number(incomeLeaseUpMonthListing.available || 0),
+      rentLoss: Number(incomeLeaseUpMonthListing.rentLoss || 0),
+      finishAllowance: Number(incomeLeaseUpMonthListing.finishAllowance || 0),
+      commissions: Number(incomeLeaseUpMonthListing.commissions || 0),
+      presentValueFactor: Number(incomeLeaseUpMonthListing.presentValueFactor || 0),
+      presentValue: Number(incomeLeaseUpMonthListing.presentValue || 0)
+    };
+    
+    this.incomeLeaseUpMonthListingMap[id] = newMonthListing;
+    return newMonthListing;
+  }
+
+  async updateIncomeLeaseUpMonthListing(id: number, incomeLeaseUpMonthListing: Partial<InsertIncomeLeaseUpMonthListing>): Promise<IncomeLeaseUpMonthListing | undefined> {
+    const existingMonthListing = this.incomeLeaseUpMonthListingMap[id];
+    
+    if (!existingMonthListing) {
+      return undefined;
+    }
+    
+    // Update only the provided fields, converting numeric values as needed
+    const updatedMonthListing: IncomeLeaseUpMonthListing = {
+      ...existingMonthListing,
+      incomeLeaseUpId: incomeLeaseUpMonthListing.incomeLeaseUpId !== undefined ? Number(incomeLeaseUpMonthListing.incomeLeaseUpId) : existingMonthListing.incomeLeaseUpId,
+      yearNumber: incomeLeaseUpMonthListing.yearNumber !== undefined ? Number(incomeLeaseUpMonthListing.yearNumber) : existingMonthListing.yearNumber,
+      monthNumber: incomeLeaseUpMonthListing.monthNumber !== undefined ? Number(incomeLeaseUpMonthListing.monthNumber) : existingMonthListing.monthNumber,
+      available: incomeLeaseUpMonthListing.available !== undefined ? Number(incomeLeaseUpMonthListing.available) : existingMonthListing.available,
+      rentLoss: incomeLeaseUpMonthListing.rentLoss !== undefined ? Number(incomeLeaseUpMonthListing.rentLoss) : existingMonthListing.rentLoss,
+      finishAllowance: incomeLeaseUpMonthListing.finishAllowance !== undefined ? Number(incomeLeaseUpMonthListing.finishAllowance) : existingMonthListing.finishAllowance,
+      commissions: incomeLeaseUpMonthListing.commissions !== undefined ? Number(incomeLeaseUpMonthListing.commissions) : existingMonthListing.commissions,
+      presentValueFactor: incomeLeaseUpMonthListing.presentValueFactor !== undefined ? Number(incomeLeaseUpMonthListing.presentValueFactor) : existingMonthListing.presentValueFactor,
+      presentValue: incomeLeaseUpMonthListing.presentValue !== undefined ? Number(incomeLeaseUpMonthListing.presentValue) : existingMonthListing.presentValue
+    };
+    
+    this.incomeLeaseUpMonthListingMap[id] = updatedMonthListing;
+    return updatedMonthListing;
+  }
+
+  async deleteIncomeLeaseUpMonthListing(id: number): Promise<boolean> {
+    if (this.incomeLeaseUpMonthListingMap[id]) {
+      delete this.incomeLeaseUpMonthListingMap[id];
+      return true;
+    }
+    
+    return false;
+  }
   
   // ETL Data Source operations
   async getEtlDataSources(): Promise<EtlDataSource[]> {
