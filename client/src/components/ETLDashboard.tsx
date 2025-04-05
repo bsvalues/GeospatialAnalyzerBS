@@ -532,21 +532,21 @@ const ETLDashboard: React.FC = () => {
               <div className="space-y-2">
                 <div className="flex justify-between">
                   <span>Extracted:</span>
-                  <span>{systemStatus.recordCounts.extracted}</span>
+                  <span>{systemStatus.recordCounts?.extracted || 0}</span>
                 </div>
-                <Progress value={(systemStatus.recordCounts.extracted / Math.max(1, systemStatus.recordCounts.extracted + systemStatus.recordCounts.rejected)) * 100} />
+                <Progress value={(systemStatus.recordCounts?.extracted || 0) / Math.max(1, (systemStatus.recordCounts?.extracted || 0) + (systemStatus.recordCounts?.rejected || 0)) * 100} />
               </div>
               <div className="space-y-2">
                 <div className="flex justify-between">
                   <span>Transformed:</span>
-                  <span>{systemStatus.recordCounts.transformed}</span>
+                  <span>{systemStatus.recordCounts?.transformed || 0}</span>
                 </div>
-                <Progress value={(systemStatus.recordCounts.transformed / Math.max(1, systemStatus.recordCounts.extracted)) * 100} />
+                <Progress value={(systemStatus.recordCounts?.transformed || 0) / Math.max(1, (systemStatus.recordCounts?.extracted || 0)) * 100} />
               </div>
               <div className="space-y-2">
                 <div className="flex justify-between">
                   <span>Loaded:</span>
-                  <span>{systemStatus.recordCounts.loaded}</span>
+                  <span>{systemStatus.recordCounts?.loaded || 0}</span>
                 </div>
                 <Progress value={(systemStatus.recordCounts.loaded / Math.max(1, systemStatus.recordCounts.transformed)) * 100} />
               </div>
