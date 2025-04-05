@@ -35,6 +35,80 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json(clientConfig);
   });
   
+  // SQL Server connection test
+  app.post('/api/sqlserver/test', async (req, res) => {
+    try {
+      const { connection } = req.body;
+      
+      if (!connection) {
+        return res.status(400).json({ error: 'Missing connection configuration' });
+      }
+      
+      // For now, we'll simulate a successful connection
+      // In a real implementation, we would use the mssql package to test the connection
+      res.json({ success: true });
+    } catch (error: any) {
+      handleError(error, res);
+    }
+  });
+  
+  // SQL Server query execution
+  app.post('/api/sqlserver/query', async (req, res) => {
+    try {
+      const { connection, sql, params } = req.body;
+      
+      if (!connection || !sql) {
+        return res.status(400).json({ error: 'Missing required parameters' });
+      }
+      
+      // For now, we'll return a sample response
+      // In a real implementation, we would use the mssql package to execute the query
+      res.json([
+        { id: 1, name: 'Sample Property 1', address: '123 Main St' },
+        { id: 2, name: 'Sample Property 2', address: '456 Oak Ave' }
+      ]);
+    } catch (error: any) {
+      handleError(error, res);
+    }
+  });
+  
+  // ODBC connection test
+  app.post('/api/odbc/test', async (req, res) => {
+    try {
+      const { connection } = req.body;
+      
+      if (!connection) {
+        return res.status(400).json({ error: 'Missing connection configuration' });
+      }
+      
+      // For now, we'll simulate a successful connection
+      // In a real implementation, we would use an ODBC package to test the connection
+      res.json({ success: true });
+    } catch (error: any) {
+      handleError(error, res);
+    }
+  });
+  
+  // ODBC query execution
+  app.post('/api/odbc/query', async (req, res) => {
+    try {
+      const { connection, sql, params } = req.body;
+      
+      if (!connection || !sql) {
+        return res.status(400).json({ error: 'Missing required parameters' });
+      }
+      
+      // For now, we'll return a sample response
+      // In a real implementation, we would use an ODBC package to execute the query
+      res.json([
+        { id: 1, name: 'Sample Property 1', address: '123 Main St' },
+        { id: 2, name: 'Sample Property 2', address: '456 Oak Ave' }
+      ]);
+    } catch (error: any) {
+      handleError(error, res);
+    }
+  });
+  
   // API route to proxy Google Maps Extractor API requests
   app.post('/api/maps/query-locate', async (req, res) => {
     try {

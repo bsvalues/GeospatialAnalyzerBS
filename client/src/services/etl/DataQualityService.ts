@@ -1,4 +1,4 @@
-import { alertService, AlertType, AlertCategory, AlertSeverity } from './AlertService';
+import { alertService, AlertCategory, AlertSeverity } from './AlertService';
 
 /**
  * Data quality issue severity enum
@@ -302,19 +302,16 @@ class DataQualityService {
     // Send alerts for critical issues
     issues.forEach(issue => {
       if (issue.severity === DataQualityIssueSeverity.CRITICAL) {
-        alertService.createAlert({
-          type: AlertType.ERROR,
-          category: AlertCategory.VALIDATION,
-          severity: AlertSeverity.HIGH,
-          title: `Data Quality Issue: ${issue.field}`,
-          message: `Critical data quality issue: ${issue.description}`,
-          data: {
+        alertService.error(
+          `Critical data quality issue: ${issue.description}`,
+          `Data Quality: ${issue.field}`,
+          {
             field: issue.field,
             type: issue.type,
             recordCount: issue.recordCount,
             percentage: issue.percentage
           }
-        });
+        );
       }
     });
     

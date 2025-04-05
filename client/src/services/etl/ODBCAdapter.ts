@@ -1,121 +1,176 @@
 /**
  * ODBCAdapter.ts
  * 
- * Browser-compatible adapter for ODBC connections
- * This wrapper avoids direct imports from node-specific modules that cause browser compatibility issues
+ * A client-side adapter for connecting to ODBC data sources
+ * Uses the REST API to proxy the connection to avoid browser limitations
  */
 
-// Import EventEmitter polyfill
-import '../../polyfill';
+import { DatabaseAdapter, ODBCConnectionConfig } from './ETLTypes';
+import { alertService } from './AlertService';
 
-// Interfaces for ODBC connection
-import { ODBCConnectionConfig } from './ETLTypes';
+export class ODBCAdapter implements DatabaseAdapter {
+  private config: ODBCConnectionConfig;
+  private connected: boolean = false;
+  
+  constructor(config: ODBCConnectionConfig) {
+    this.config = config;
+  }
 
-// Define result types
-export interface QueryResult {
-  recordset: any[];
-  recordsets: any[][];
-  rowsAffected: number[];
-  output?: any;
-}
-
-/**
- * Execute a SQL query against an ODBC data source
- * This function uses a browser-compatible approach to connect to ODBC
- */
-export async function executeQuery(
-  config: ODBCConnectionConfig,
-  query: string,
-  parameters?: Record<string, any>
-): Promise<QueryResult> {
-  try {
-    // We'll need to use a server endpoint to execute the query
-    // Direct connection to ODBC from browser is not possible
-    const response = await fetch('/api/odbc/query', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        config,
-        query,
-        parameters,
-      }),
-    });
-
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(`ODBC query failed: ${error.message || response.statusText}`);
+  /**
+   * Connect to the database
+   * Note: This is a client-side adapter, so there's no actual connection.
+   * It just validates the configuration.
+   */
+  async connect(): Promise<void> {
+    try {
+      const result = await this.testConnection();
+      if (!result) {
+        throw new Error('Connection test failed');
+      }
+      this.connected = true;
+    } catch (error: any) {
+      alertService.error(`Failed to connect to ODBC source: ${error.message}`, 'ODBCAdapter');
+      throw error;
     }
-
-    return await response.json();
-  } catch (error) {
-    console.error('ODBC query error:', error);
-    throw error;
   }
-}
-
-/**
- * Get list of tables from an ODBC data source
- */
-export async function getTables(config: ODBCConnectionConfig): Promise<string[]> {
-  try {
-    // This query works for most ODBC drivers but may need adjustments
-    // based on the specific database system
-    const result = await executeQuery(
-      config,
-      'SELECT table_name FROM information_schema.tables WHERE table_type = \'BASE TABLE\' ORDER BY table_name'
-    );
+  
+  /**
+   * Disconnect from the database
+   */
+  async disconnect(): Promise<void> {
+    this.connected = false;
+  }
+  
+  /**
+   * Execute a SQL query
+   * @param sql SQL query to execute
+   * @param params Query parameters
+   * @returns Query results
+   */
+  async query(sql: string, params?: any[]): Promise<any> {
+    if (!this.connected) {
+      throw new Error('Not connected to database');
+    }
     
-    return result.recordset.map(row => row.table_name || row.TABLE_NAME);
-  } catch (error) {
-    console.error('Error getting tables:', error);
-    throw error;
+    try {
+      const response = await fetch('/api/odbc/query', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          connection: this.config,
+          sql,
+          params
+        })
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Query failed');
+      }
+      
+      return response.json();
+    } catch (error: any) {
+      alertService.error(`ODBC query failed: ${error.message}`, 'ODBCAdapter');
+      throw error;
+    }
   }
-}
-
-/**
- * Get schema information for a table
- */
-export async function getTableSchema(
-  config: ODBCConnectionConfig,
-  tableName: string
-): Promise<Array<{ name: string; type: string; nullable: boolean }>> {
-  try {
-    // This query works for most ODBC drivers but may need adjustments
-    // based on the specific database system
-    const result = await executeQuery(
-      config,
-      `SELECT 
-        column_name, 
-        data_type, 
-        is_nullable 
-      FROM information_schema.columns 
-      WHERE table_name = ?
-      ORDER BY ordinal_position`,
-      [tableName]
-    );
+  
+  /**
+   * Get the schema of a table
+   * @param tableName Table name
+   * @returns Table schema
+   */
+  async getTableSchema(tableName: string): Promise<any> {
+    if (!this.connected) {
+      throw new Error('Not connected to database');
+    }
     
-    return result.recordset.map(row => ({
-      name: row.column_name || row.COLUMN_NAME,
-      type: row.data_type || row.DATA_TYPE,
-      nullable: (row.is_nullable || row.IS_NULLABLE) === 'YES',
-    }));
-  } catch (error) {
-    console.error('Error getting table schema:', error);
-    throw error;
+    try {
+      // This is a generic SQL that should work with most ODBC sources
+      // Specific data sources might need custom implementation
+      const sql = `
+        SELECT 
+          COLUMN_NAME,
+          DATA_TYPE,
+          IS_NULLABLE,
+          CHARACTER_MAXIMUM_LENGTH,
+          NUMERIC_PRECISION,
+          NUMERIC_SCALE,
+          COLUMN_DEFAULT
+        FROM 
+          INFORMATION_SCHEMA.COLUMNS
+        WHERE 
+          TABLE_NAME = ?
+        ORDER BY 
+          ORDINAL_POSITION;
+      `;
+      
+      return this.query(sql, [tableName]);
+    } catch (error: any) {
+      alertService.error(`Failed to get table schema: ${error.message}`, 'ODBCAdapter');
+      throw error;
+    }
   }
-}
-
-/**
- * Test connection to ODBC data source
- */
-export async function testConnection(config: ODBCConnectionConfig): Promise<boolean> {
-  try {
-    await executeQuery(config, 'SELECT 1 AS test');
-    return true;
-  } catch (error) {
-    console.error('Connection test failed:', error);
-    return false;
+  
+  /**
+   * Get a list of all tables in the database
+   * @returns List of table names
+   */
+  async getTableList(): Promise<string[]> {
+    if (!this.connected) {
+      throw new Error('Not connected to database');
+    }
+    
+    try {
+      // Generic SQL for ODBC sources
+      const sql = `
+        SELECT 
+          TABLE_SCHEMA,
+          TABLE_NAME
+        FROM 
+          INFORMATION_SCHEMA.TABLES
+        WHERE 
+          TABLE_TYPE = 'BASE TABLE'
+        ORDER BY 
+          TABLE_SCHEMA, TABLE_NAME;
+      `;
+      
+      const result = await this.query(sql);
+      return result.map((row: any) => `${row.TABLE_SCHEMA}.${row.TABLE_NAME}`);
+    } catch (error: any) {
+      alertService.error(`Failed to get table list: ${error.message}`, 'ODBCAdapter');
+      throw error;
+    }
+  }
+  
+  /**
+   * Test the database connection
+   * @returns True if connection is successful, false otherwise
+   */
+  async testConnection(): Promise<boolean> {
+    try {
+      const response = await fetch('/api/odbc/test', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          connection: this.config
+        })
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Connection test failed');
+      }
+      
+      const result = await response.json();
+      return result.success === true;
+    } catch (error: any) {
+      alertService.error(`Connection test failed: ${error.message}`, 'ODBCAdapter');
+      return false;
+    }
   }
 }

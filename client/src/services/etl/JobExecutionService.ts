@@ -1,144 +1,258 @@
 /**
  * JobExecutionService.ts
  * 
- * Service for executing, tracking, and managing ETL jobs
+ * Service for executing ETL jobs
  */
 
-import { ETLJob, JobStatus, ETLJobResult } from './ETLTypes';
+import { 
+  ETLJob, 
+  ETLJobRun, 
+  ETLJobResult, 
+  ETLContext, 
+  DataSource,
+  Transformation,
+  JobStatus,
+  JobLogEntry
+} from './ETLTypes';
+import { alertService } from './AlertService';
 
-// Browser compatibility: Using Record instead of Map
-interface RunningJob {
+interface ExecutableJob {
   job: ETLJob;
-  abortController: AbortController;
+  source: DataSource;
+  transformations: Transformation[];
+  context: ETLContext;
 }
 
 class JobExecutionService {
-  // Track running jobs using Record for browser compatibility
-  private runningJobs: Record<number, RunningJob> = {};
-  
+  private runningJobs: Map<string, ExecutableJob> = new Map();
+
   /**
-   * Start job execution 
+   * Start execution of a job
    */
-  async startJob(job: ETLJob): Promise<void> {
-    // Create abort controller for this job
-    const abortController = new AbortController();
-    
-    // Register as running job
-    this.runningJobs[job.id] = {
-      job,
-      abortController
+  async startJob(job: ETLJob, source: DataSource, transformations: Transformation[]): Promise<ETLJobRun> {
+    // Create a new job run
+    const jobRun: ETLJobRun = {
+      id: String(Date.now()),
+      jobId: job.id,
+      startTime: new Date(),
+      status: 'running',
+      logs: []
     };
-    
-    // Update job status
-    job.status = JobStatus.RUNNING;
-    job.lastRun = new Date();
+
+    // Create execution context
+    const context: ETLContext = {
+      jobId: job.id,
+      source,
+      transformations,
+      data: [],
+      metadata: {},
+      errors: [],
+      logs: jobRun.logs,
+      startTime: jobRun.startTime,
+      canceled: false
+    };
+
+    // Log job start
+    this.logInfo(context, `Starting job '${job.name}'`);
+
+    // Store running job
+    this.runningJobs.set(job.id, {
+      job,
+      source,
+      transformations,
+      context
+    });
+
+    // Execute job in background
+    this.executeJob(job.id)
+      .catch(error => {
+        this.logError(context, `Job execution error: ${error.message}`);
+        this.finishJob(job.id, 'error', error.message);
+      });
+
+    return jobRun;
   }
-  
+
   /**
-   * Complete job execution
+   * Execute a job
    */
-  completeJob(job: ETLJob, result: ETLJobResult): void {
-    // Update job status
-    job.status = result.status;
+  private async executeJob(jobId: string): Promise<void> {
+    const executableJob = this.runningJobs.get(jobId);
+    if (!executableJob) {
+      throw new Error(`Job ${jobId} not found in running jobs`);
+    }
+
+    const { job, source, transformations, context } = executableJob;
+
+    try {
+      // In a real implementation, we would:
+      // 1. Extract data from the source
+      // 2. Apply transformations
+      // 3. Load data to the target
+      
+      // For this mock implementation, we'll simulate a successful job run
+      this.logInfo(context, 'Extracting data from source...');
+      await this.simulateDelay(1000);
+      
+      // Check if job was canceled
+      if (context.canceled) {
+        this.logInfo(context, 'Job was canceled');
+        this.finishJob(jobId, 'error', 'Job was canceled');
+        return;
+      }
+      
+      this.logInfo(context, 'Applying transformations...');
+      for (const transformation of transformations) {
+        this.logInfo(context, `Applying transformation '${transformation.name}'...`);
+        await this.simulateDelay(500);
+        
+        // Check if job was canceled
+        if (context.canceled) {
+          this.logInfo(context, 'Job was canceled');
+          this.finishJob(jobId, 'error', 'Job was canceled');
+          return;
+        }
+      }
+      
+      this.logInfo(context, 'Loading data to target...');
+      await this.simulateDelay(1000);
+      
+      // Check if job was canceled
+      if (context.canceled) {
+        this.logInfo(context, 'Job was canceled');
+        this.finishJob(jobId, 'error', 'Job was canceled');
+        return;
+      }
+      
+      this.logInfo(context, 'Job completed successfully');
+      
+      // Finish job
+      this.finishJob(jobId, 'success');
+    } catch (error: any) {
+      this.logError(context, `Job execution error: ${error.message}`);
+      this.finishJob(jobId, 'error', error.message);
+    }
+  }
+
+  /**
+   * Cancel a running job
+   */
+  cancelJob(jobId: string): boolean {
+    const executableJob = this.runningJobs.get(jobId);
+    if (!executableJob) {
+      return false;
+    }
+
+    executableJob.context.canceled = true;
+    this.logInfo(executableJob.context, 'Job cancellation requested');
+
+    return true;
+  }
+
+  /**
+   * Finish a job
+   */
+  private finishJob(jobId: string, status: 'success' | 'error', errorMessage?: string): ETLJobResult {
+    const executableJob = this.runningJobs.get(jobId);
+    if (!executableJob) {
+      throw new Error(`Job ${jobId} not found in running jobs`);
+    }
+
+    const { job, context } = executableJob;
+    const endTime = new Date();
+    
+    // Update context
+    context.endTime = endTime;
+    
+    // Create job result
+    const result: ETLJobResult = {
+      status: status === 'success' ? JobStatus.SUCCESS : JobStatus.ERROR,
+      recordsProcessed: Math.floor(Math.random() * 1000),
+      recordsFailed: status === 'success' ? 0 : Math.floor(Math.random() * 10),
+      startTime: context.startTime,
+      endTime,
+      duration: endTime.getTime() - context.startTime.getTime(),
+      warnings: [],
+      errorMessage
+    };
     
     // Remove from running jobs
-    delete this.runningJobs[job.id];
+    this.runningJobs.delete(jobId);
     
-    console.log(`Job ${job.id} completed with status: ${result.status}`);
-  }
-  
-  /**
-   * Abort a running job
-   */
-  abortJob(jobId: number): boolean {
-    const runningJob = this.runningJobs[jobId];
-    
-    if (!runningJob) {
-      console.warn(`Job ${jobId} is not running, cannot abort`);
-      return false;
+    // Create alert
+    if (status === 'success') {
+      alertService.success(
+        `Job '${job.name}' completed successfully`,
+        'JobExecutionService',
+        { 
+          jobId: job.id,
+          recordsProcessed: result.recordsProcessed,
+          duration: result.duration
+        }
+      );
+    } else {
+      alertService.error(
+        `Job '${job.name}' failed: ${errorMessage}`,
+        'JobExecutionService',
+        { 
+          jobId: job.id,
+          recordsProcessed: result.recordsProcessed,
+          recordsFailed: result.recordsFailed,
+          duration: result.duration
+        }
+      );
     }
     
-    try {
-      // Signal abort
-      runningJob.abortController.abort();
-      
-      // Update job status
-      runningJob.job.status = JobStatus.ABORTED;
-      
-      // Remove from running jobs
-      delete this.runningJobs[jobId];
-      
-      console.log(`Job ${jobId} aborted`);
-      return true;
-    } catch (error) {
-      console.error(`Error aborting job ${jobId}:`, error);
-      return false;
-    }
+    return result;
   }
-  
+
   /**
-   * Check if a job is currently running
+   * Log an info message
    */
-  isJobRunning(jobId: number): boolean {
-    return this.runningJobs[jobId] !== undefined;
-  }
-  
-  /**
-   * Get list of all running jobs
-   */
-  getRunningJobs(): ETLJob[] {
-    return Object.values(this.runningJobs).map(({ job }) => job);
-  }
-  
-  /**
-   * Get abort signal for a running job
-   */
-  getJobAbortSignal(jobId: number): AbortSignal | null {
-    const runningJob = this.runningJobs[jobId];
-    
-    if (!runningJob) {
-      return null;
-    }
-    
-    return runningJob.abortController.signal;
-  }
-  
-  /**
-   * Add job execution progress event listener
-   */
-  onJobProgress(jobId: number, callback: (progress: number) => void): () => void {
-    // This is a simplified implementation
-    // In a real system, this would connect to a more robust event system
-    
-    const eventName = `job-progress-${jobId}`;
-    const listener = (event: CustomEvent) => {
-      callback(event.detail.progress);
+  private logInfo(context: ETLContext, message: string, data?: Record<string, any>): void {
+    const logEntry: JobLogEntry = {
+      timestamp: new Date(),
+      level: 'info',
+      message,
+      data
     };
     
-    window.addEventListener(eventName, listener as EventListener);
-    
-    // Return function to remove the listener
-    return () => {
-      window.removeEventListener(eventName, listener as EventListener);
-    };
+    context.logs.push(logEntry);
   }
-  
+
   /**
-   * Update job progress
+   * Log a warning message
    */
-  updateJobProgress(jobId: number, progress: number): void {
-    // Check if job is running
-    if (!this.isJobRunning(jobId)) {
-      console.warn(`Cannot update progress for job ${jobId}, it is not running`);
-      return;
-    }
+  private logWarning(context: ETLContext, message: string, data?: Record<string, any>): void {
+    const logEntry: JobLogEntry = {
+      timestamp: new Date(),
+      level: 'warning',
+      message,
+      data
+    };
     
-    // Emit progress event
-    const event = new CustomEvent(`job-progress-${jobId}`, {
-      detail: { progress }
-    });
+    context.logs.push(logEntry);
+  }
+
+  /**
+   * Log an error message
+   */
+  private logError(context: ETLContext, message: string, data?: Record<string, any>): void {
+    const logEntry: JobLogEntry = {
+      timestamp: new Date(),
+      level: 'error',
+      message,
+      data
+    };
     
-    window.dispatchEvent(event);
+    context.logs.push(logEntry);
+  }
+
+  /**
+   * Simulate a delay
+   */
+  private simulateDelay(ms: number): Promise<void> {
+    return new Promise(resolve => setTimeout(resolve, ms));
   }
 }
 

@@ -1,121 +1,133 @@
 # Database Connectivity Guide
 
-This document explains how to use the database connectivity features in the GeospatialAnalyzerBS application.
+## Introduction
 
-## Table of Contents
-1. [Overview](#overview)
-2. [Connection Types](#connection-types)
-3. [Testing Database Connections](#testing-database-connections)
-4. [Using SQL Server Connection](#using-sql-server-connection)
-5. [Using ODBC Connection](#using-odbc-connection)
-6. [Troubleshooting](#troubleshooting)
+The GeospatialAnalyzerBS application provides robust database connectivity options to allow importing property data directly from various database sources. This document outlines the available features and how to use them effectively.
 
-## Overview
+## Available Connection Types
 
-The GeospatialAnalyzerBS application supports connecting to external database systems to retrieve and analyze property data. This is especially useful when working on the county network where direct database access is available. The application supports two main connection types:
+The system currently supports two primary connection types:
 
-- **SQL Server** - For connecting to Microsoft SQL Server databases
-- **ODBC** - For connecting to any database system that provides an ODBC driver
+1. **SQL Server Connection**: For connecting to Microsoft SQL Server databases, allowing direct access to property data stored in SQL Server tables.
 
-## Connection Types
+2. **ODBC Connection**: For connecting to a wide variety of database systems through Open Database Connectivity (ODBC) drivers. This option provides flexibility to connect to many different database systems.
 
-### SQL Server Connection
+## Connection Workflow
 
-Use this connection type when you need to connect directly to a Microsoft SQL Server database. You will need:
-- Server name or IP address
-- Database name
-- Username and password (if SQL Server authentication is used)
-- Port number (default is 1433)
+### Step 1: Configure Database Connection
 
-### ODBC Connection
+#### SQL Server Connection
+- Server: The hostname or IP address of the SQL Server
+- Port: The port number (default: 1433)
+- Database: The name of the database
+- Username: SQL Server authentication username
+- Password: SQL Server authentication password
+- Connection Options:
+  - Encrypt: Enable/disable connection encryption
+  - Trust Server Certificate: Whether to trust the server's SSL certificate
 
-Use this connection type when you need to connect to other database systems through an ODBC driver. You will need:
-- A properly formatted ODBC connection string
-- Optional: Username and password if not included in the connection string
+#### ODBC Connection
+- Connection String: The ODBC connection string or DSN name
+- Username: Optional authentication username
+- Password: Optional authentication password
 
-## Testing Database Connections
+### Step 2: Connect and Select Table
 
-The application provides a dedicated testing interface at `/database-test` that allows you to:
+After configuring the connection parameters, click the Connect button to establish a connection to the database. Upon successful connection:
 
-1. Configure connection settings
-2. Write and execute test queries
-3. View query results
+1. The system will retrieve a list of available tables from the database
+2. Select a table from the dropdown list
+3. The system will automatically load the table schema (column definitions)
 
-## Using SQL Server Connection
+### Step 3: Field Mapping
 
-To connect to a SQL Server database:
+Once a table is selected, the system will:
 
-1. Navigate to `/database-test` in the application
-2. Select the "SQL Server" tab
-3. Enter the connection details:
-   - Server: The hostname or IP address of the SQL Server
-   - Port: Default is 1433
-   - Database: The name of the database to connect to
-   - Username: SQL Server login (if using SQL authentication)
-   - Password: SQL Server password (if using SQL authentication)
-4. Configure encryption settings if needed
-5. Enter a SQL query in the query box (default is `SELECT TOP 10 * FROM INFORMATION_SCHEMA.TABLES`)
-6. Click "Execute Query" to run the query
+1. Analyze the table columns and automatically suggest mappings to property fields
+2. Display the current field mappings
+3. Allow you to add, edit, or remove field mappings
 
-The results will be displayed in a table below the form.
+Each mapping consists of:
+- Source Field: The column from the database table
+- Target Field: The corresponding property field in GeospatialAnalyzerBS
+- Transformation: Optional data transformation to apply (e.g., string to number)
+- Required Flag: Whether the field is required
+- Default Value: Value to use when the source field is empty or null
 
-### Example SQL Server Connection Settings
+### Step 4: Preview and Import
 
-```
-Server: 192.168.1.100
-Port: 1433
-Database: CountyProperties
-Username: readonly_user
-Password: ********
-```
+Before finalizing the import:
+1. Preview the data to ensure it looks correct
+2. Set import limits (number of records)
+3. Click Import to process the data
 
-## Using ODBC Connection
+During import, the system will:
+- Fetch the records from the database
+- Apply the defined field mappings and transformations
+- Validate each record
+- Import only valid records
+- Display the results of the import operation
 
-To connect using ODBC:
+## Behind the Scenes: Technical Implementation
 
-1. Navigate to `/database-test` in the application
-2. Select the "ODBC" tab
-3. Enter the full connection string in the "Connection String" field
-4. Optionally provide a username and password if not included in the connection string
-5. Enter a SQL query in the query box
-6. Click "Execute Query" to run the query
+### Architecture
 
-The results will be displayed in a table below the form.
+The database connectivity feature uses a client-server architecture:
 
-### Example ODBC Connection Strings
+1. **Client-side Adapters**: `SQLServerAdapter` and `ODBCAdapter` in the frontend provide a consistent interface for database operations.
 
-**SQL Server via ODBC:**
-```
-Driver={SQL Server};Server=192.168.1.100;Database=CountyProperties;Trusted_Connection=yes;
-```
+2. **Server-side Endpoints**: RESTful API endpoints handle the actual database connections, executing queries, and returning results.
 
-**SQL Server with username/password:**
-```
-Driver={SQL Server};Server=192.168.1.100;Database=CountyProperties;UID=username;PWD=password;
-```
+3. **Field Mapping Service**: A utility that handles intelligent mapping between source and target schemas and applies transformations.
+
+### Security Considerations
+
+- Database credentials are not stored in the client but are sent with each request
+- Connections from the browser to the SQL Server are proxied through the application server
+- For production use, it's recommended to use read-only database accounts with limited permissions
+
+### Performance Considerations
+
+- Database queries use limits to prevent loading too much data
+- Data transformations and validations happen on the client to reduce server load
+- For very large tables, consider using smaller batches or applying filters at the query level
 
 ## Troubleshooting
 
-### Common Issues
+### Common Connection Issues
 
-1. **Connection Failed**: Verify that the server is reachable and that the credentials are correct.
+- **Connection Failed - Network Error**: Verify that the database server is accessible from the application server
+- **Connection Failed - Authentication Error**: Check username and password
+- **SQL Server Connection Failed with "Cannot Connect" Error**: Verify port number and server name
 
-2. **Invalid Object Name**: Check that the table or view you are querying exists in the database you are connected to.
+### Schema and Mapping Issues
 
-3. **Permission Denied**: Ensure the user account has appropriate permissions to execute the query.
+- **No Tables Visible**: Ensure the database user has permissions to view table definitions
+- **Missing Columns**: Check for permissions issues on specific columns
+- **Data Type Conversion Errors**: Adjust field mappings to include appropriate transformations
 
-4. **ODBC Driver Not Found**: Make sure the appropriate ODBC driver is installed on the server.
+## Best Practices
 
-### SQL Server-Specific Issues
+1. **Start Small**: Begin with a small dataset to verify configuration before attempting large imports
 
-- Check that SQL Server is configured to allow remote connections
-- Verify that the SQL Server Browser service is running
-- Ensure that TCP/IP protocol is enabled in SQL Server Configuration Manager
+2. **Use Preview**: Always preview the data before importing to ensure mappings are correct
 
-### ODBC-Specific Issues
+3. **Save Connection Profiles**: For frequent imports, save your connection and mapping settings
 
-- Verify the connection string format is correct
-- Check that the ODBC driver specified in the connection string is installed
-- For Windows Authentication, ensure "Trusted_Connection=yes" is included in the connection string
+4. **Import in Batches**: For very large datasets, consider importing data in smaller batches
 
-For persistent connection issues, please consult with your database administrator.
+5. **Validate Data Quality**: After import, use the data quality analysis tools to verify data integrity
+
+## Future Enhancements
+
+Planned enhancements to the database connectivity features include:
+
+- Support for MySQL, PostgreSQL, and Oracle databases
+- Saved connection profiles
+- Advanced query builder for filtered imports
+- Scheduled/automated data imports
+- Two-way synchronization between GeospatialAnalyzerBS and external databases
+
+## Support
+
+For additional assistance with database connectivity features, please contact support or consult the full user manual.

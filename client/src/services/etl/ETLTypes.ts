@@ -1,216 +1,185 @@
 /**
  * ETLTypes.ts
  * 
- * Common types and interfaces for ETL pipeline components
+ * Type definitions for ETL (Extract, Transform, Load) operations
  */
 
-// Job status enum
 export enum JobStatus {
   PENDING = 'pending',
   RUNNING = 'running',
-  COMPLETED = 'completed',
-  FAILED = 'failed',
-  ABORTED = 'aborted',
-  SCHEDULED = 'scheduled',
-  IDLE = 'idle',
-  SUCCEEDED = 'succeeded'
+  SUCCESS = 'success',
+  ERROR = 'error',
+  CANCELLED = 'cancelled'
 }
 
-// Filter Logic Types
-export enum FilterLogic {
-  AND = 'and',
-  OR = 'or'
+export enum JobFrequency {
+  ONCE = 'once',
+  HOURLY = 'hourly',
+  DAILY = 'daily',
+  WEEKLY = 'weekly',
+  MONTHLY = 'monthly',
+  CUSTOM = 'custom'
 }
 
-// Filter Operator Types
-export enum FilterOperator {
-  EQUALS = 'equals',
-  NOT_EQUALS = 'not_equals',
-  GREATER_THAN = 'greater_than',
-  LESS_THAN = 'less_than',
-  CONTAINS = 'contains',
-  NOT_CONTAINS = 'not_contains',
-  STARTS_WITH = 'starts_with',
-  ENDS_WITH = 'ends_with',
-  IN = 'in',
-  NOT_IN = 'not_in',
-  BETWEEN = 'between',
-  NULL = 'null',
-  NOT_NULL = 'not_null'
-}
-
-// ETL Job interface
-export interface ETLJob {
-  id: number;
-  name: string;
-  description?: string;
-  sourceId: string;
-  targetId: string;
-  transformationIds: string[];
-  status: JobStatus;
-  lastRun?: Date;
-  createdAt: Date;
-  updatedAt: Date;
-  scheduleId?: string;
-  enabled?: boolean;
-  sources?: DataSource[];
-  destinations?: DataSource[];
-  transformations?: TransformationRule[];
-}
-
-// Data Source interface
-export interface DataSource {
-  id: string;
-  name: string;
-  type: DataSourceType;
-  config: Record<string, any>;
-}
-
-// Transformation Rule interface
-export interface TransformationRule {
-  id: string;
-  name: string;
-  type: TransformationType;
-  config: Record<string, any>;
-}
-
-// Record Counts interface
-export interface RecordCounts {
-  extracted: number;
-  processed: number;
-  loaded: number;
-  failed: number;
-}
-
-// System Status enum
-export enum SystemStatus {
-  HEALTHY = 'healthy',
-  DEGRADED = 'degraded',
-  DOWN = 'down',
-  MAINTENANCE = 'maintenance'
-}
-
-// ETL Job Result interface
-export interface ETLJobResult {
-  jobId: number;
-  status: JobStatus; 
-  startTime: Date;
-  endTime: Date;
-  extractedRecords: number;
-  processedRecords: number;
-  failedRecords: number;
-  errorMessages: string[];
-  warnings: string[];
-}
-
-// Job Metrics interface
-export interface JobMetrics {
-  startTime: Date;
-  endTime: Date;
-  duration: number;
-  extractTime: number;
-  transformTime: number; 
-  loadTime: number;
-  recordsProcessed: number;
-  recordsValid: number;
-  recordsInvalid: number;
-  throughput: number;
-  cpuUsage?: number;
-  memoryUsage?: number;
-}
-
-// Data Source Type enum
 export enum DataSourceType {
   DATABASE = 'database',
-  FILE = 'file',
   API = 'api',
+  FILE = 'file',
   FTP = 'ftp',
   MEMORY = 'memory',
-  SQLSERVER = 'sqlserver',
-  ODBC = 'odbc',
-  POSTGRESQL = 'postgresql',
-  MYSQL = 'mysql',
-  REST_API = 'rest_api',
-  GRAPHQL_API = 'graphql_api',
-  FILE_CSV = 'file_csv',
-  FILE_JSON = 'file_json',
-  FILE_XML = 'file_xml',
-  FILE_EXCEL = 'file_excel'
+  SQL_SERVER = 'sqlServer',
+  ODBC = 'odbc'
 }
 
-// Transformation Type enum
-export enum TransformationType {
-  MAPPING = 'mapping',
-  FILTER = 'filter',
-  AGGREGATION = 'aggregation',
-  ENRICHMENT = 'enrichment',
-  VALIDATION = 'validation',
-  CUSTOM = 'custom',
-  MAP = 'map',
-  JOIN = 'join',
-  AGGREGATE = 'aggregate',
-  VALIDATE = 'validate',
-  ENRICH = 'enrich'
-}
-
-// Data Connection interface
-export interface DataConnection {
-  id: string;
-  name: string;
-  type: DataSourceType;
-  config: Record<string, any>;
-  createdAt: Date;
-  updatedAt: Date;
-}
-
-// Transformation interface
-export interface Transformation {
-  id: string;
-  name: string;
-  description?: string;
-  type: TransformationType;
-  config: Record<string, any>;
-  createdAt: Date;
-  updatedAt: Date;
-}
-
-// ETL Pipeline interface
-export interface ETLPipeline {
-  id: string;
-  name: string;
-  description?: string;
-  sourceConnection: DataConnection;
-  targetConnection: DataConnection;
-  transformations: Transformation[];
-  createdAt: Date;
-  updatedAt: Date;
-  lastRun?: Date;
-  status: JobStatus;
-}
-
-// Database specific connection types
 export interface SQLServerConnectionConfig {
   server: string;
+  port: number;
   database: string;
   username: string;
   password: string;
-  port: number;
   encrypt: boolean;
   trustServerCertificate: boolean;
 }
 
 export interface ODBCConnectionConfig {
   connectionString: string;
-  username?: string;
-  password?: string;
-}
-
-// FTP connection config
-export interface FTPConnectionConfig {
-  host: string;
-  port: number;
   username: string;
   password: string;
-  secure: boolean;
-  timeout: number;
+}
+
+export interface DatabaseAdapter {
+  connect(): Promise<void>;
+  disconnect(): Promise<void>;
+  query(sql: string, params?: any[]): Promise<any>;
+  getTableSchema(tableName: string): Promise<any>;
+  getTableList(): Promise<string[]>;
+  testConnection(): Promise<boolean>;
+}
+
+export interface DataSource {
+  id: string;
+  name: string;
+  description?: string;
+  type: DataSourceType;
+  config: Record<string, any>;
+  lastSyncDate?: Date;
+  enabled: boolean;
+  tags?: string[];
+}
+
+export interface Transformation {
+  id: string;
+  name: string;
+  description?: string;
+  code: string;
+  inputSchema?: Record<string, any>;
+  outputSchema?: Record<string, any>;
+  enabled: boolean;
+  tags?: string[];
+}
+
+export interface ETLJob {
+  id: string;
+  name: string;
+  description?: string;
+  source: DataSource | string;
+  transformations: Array<Transformation | string>;
+  destination: DataSource | string;
+  schedule?: {
+    frequency: JobFrequency;
+    startDate?: Date;
+    endDate?: Date;
+    cronExpression?: string;
+  };
+  settings?: {
+    batchSize?: number;
+    timeout?: number;
+    maxRetries?: number;
+    alertOnSuccess?: boolean;
+    alertOnFailure?: boolean;
+    validateData?: boolean;
+    truncateDestination?: boolean;
+  };
+  enabled: boolean;
+  tags?: string[];
+}
+
+export interface ETLJobRun {
+  id: string;
+  jobId: string;
+  startTime: Date;
+  endTime?: Date;
+  status: JobStatus;
+  recordsProcessed: number;
+  recordsFailed: number;
+  duration: number;
+  error?: string;
+  logs: JobLogEntry[];
+}
+
+export interface ETLJobResult {
+  status: JobStatus;
+  recordsProcessed: number;
+  recordsFailed: number;
+  startTime: Date;
+  endTime: Date;
+  duration: number;
+  warnings: string[];
+  errorMessage?: string;
+}
+
+export interface JobLogEntry {
+  timestamp: Date;
+  level: 'info' | 'warning' | 'error';
+  message: string;
+  data?: Record<string, any>;
+}
+
+export interface ETLContext {
+  jobId: string;
+  startTime: Date;
+  endTime?: Date;
+  sourceData?: any[];
+  transformedData?: any[];
+  variables: Record<string, any>;
+  logs: JobLogEntry[];
+  batch?: number;
+  batchIndex?: number;
+}
+
+export interface ETLMetrics {
+  jobsCount: number;
+  completedJobsCount: number;
+  failedJobsCount: number;
+  averageJobDuration: number;
+  recordsProcessedTotal: number;
+  recordsFailedTotal: number;
+  lastJobCompletionDate?: Date;
+  topFailingJobs: Array<{ jobId: string; jobName: string; failureCount: number }>;
+  recentRuns: ETLJobRun[];
+}
+
+export interface ExecutableETLJob {
+  job: ETLJob;
+  context: ETLContext;
+}
+
+export enum AlertType {
+  INFO = 'info',
+  SUCCESS = 'success',
+  WARNING = 'warning',
+  ERROR = 'error',
+  CRITICAL = 'critical'
+}
+
+export enum AlertCategory {
+  IMPORT = 'import',
+  EXPORT = 'export',
+  DATA_QUALITY = 'data_quality',
+  CONNECTION = 'connection',
+  TRANSFORM = 'transform',
+  SECURITY = 'security',
+  VALIDATION = 'validation',
+  PERFORMANCE = 'performance',
+  SYSTEM = 'system'
 }

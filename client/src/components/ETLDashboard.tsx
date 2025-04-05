@@ -69,7 +69,6 @@ import {
 
 import { 
   JobStatus, 
-  AlertType, 
   DataSourceType, 
   TransformationType,
   FilterLogic,
@@ -87,7 +86,7 @@ import type {
 
 // Use direct imports to avoid circular dependencies
 import { etlPipelineManager as etlManager } from '../services/etl/ETLPipelineManager';
-import { alertService as alertSvc } from '../services/etl/AlertService';
+import { alertService as alertSvc, AlertSeverity } from '../services/etl/AlertService';
 
 /**
  * Status badge component
@@ -158,17 +157,17 @@ const TransformationTypeBadge: React.FC<{ type: TransformationType }> = ({ type 
 };
 
 /**
- * Alert type icon component
+ * Alert severity icon component
  */
-const AlertTypeIcon: React.FC<{ type: AlertType }> = ({ type }) => {
+const AlertTypeIcon: React.FC<{ type: AlertSeverity }> = ({ type }) => {
   switch (type) {
-    case AlertType.INFO:
+    case AlertSeverity.INFO:
       return <Info className="h-4 w-4 text-blue-500" />;
-    case AlertType.SUCCESS:
+    case AlertSeverity.SUCCESS:
       return <CheckCircle2 className="h-4 w-4 text-green-500" />;
-    case AlertType.WARNING:
+    case AlertSeverity.WARNING:
       return <AlertTriangle className="h-4 w-4 text-yellow-500" />;
-    case AlertType.ERROR:
+    case AlertSeverity.ERROR:
       return <XCircle className="h-4 w-4 text-red-500" />;
     default:
       return <HelpCircle className="h-4 w-4" />;
@@ -238,20 +237,20 @@ const ETLDashboard: React.FC = () => {
     setDataSources(etlManager.getAllDataSources());
     setTransformationRules(etlManager.getAllTransformationRules());
     setJobRuns(etlManager.getAllJobRuns());
-    setAlerts(alertSvc.getAllAlerts());
+    setAlerts(alertSvc.getAlerts());
     setSystemStatus(etlManager.getSystemStatus());
   }, [refreshCounter]);
   
   // Set up alert listener
   useEffect(() => {
     const handleAlertCreated = () => {
-      setAlerts(alertSvc.getAllAlerts());
+      setAlerts(alertSvc.getAlerts());
     };
     
-    alertSvc.addListener(handleAlertCreated);
+    const unsubscribe = alertSvc.registerListener(handleAlertCreated);
     
     return () => {
-      alertSvc.removeListener(handleAlertCreated);
+      unsubscribe();
     };
   }, []);
   
@@ -571,13 +570,13 @@ const ETLDashboard: React.FC = () => {
             <div className="space-y-4">
               {alerts.slice(0, 5).map(alert => (
                 <Alert key={alert.id} variant={
-                  alert.type === AlertType.ERROR ? "destructive" :
-                  alert.type === AlertType.WARNING ? "default" :
-                  alert.type === AlertType.SUCCESS ? "default" :
+                  alert.severity === AlertSeverity.ERROR ? "destructive" :
+                  alert.severity === AlertSeverity.WARNING ? "default" :
+                  alert.severity === AlertSeverity.SUCCESS ? "default" :
                   "default"
                 }>
                   <div className="flex items-start">
-                    <AlertTypeIcon type={alert.type} />
+                    <AlertTypeIcon type={alert.severity} />
                     <div className="ml-2">
                       <AlertTitle>{alert.title}</AlertTitle>
                       <AlertDescription>{alert.message}</AlertDescription>
@@ -1308,9 +1307,9 @@ const ETLDashboard: React.FC = () => {
                 <TableRow key={alert.id}>
                   <TableCell>
                     <div className="flex items-center">
-                      <AlertTypeIcon type={alert.type} />
+                      <AlertTypeIcon type={alert.severity} />
                       <span className="ml-2">
-                        {alert.type}
+                        {alert.severity}
                       </span>
                     </div>
                   </TableCell>
