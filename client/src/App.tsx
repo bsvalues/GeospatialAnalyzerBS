@@ -41,6 +41,7 @@ import IncomeApproachPage from './pages/IncomeApproachPage';
 import AnimationDemo from './pages/AnimationDemo';
 import ETLWizardPage from './pages/ETLWizardPage';
 import ETLAnimationDemo from './pages/ETLAnimationDemo';
+import StepProgressDemo from './pages/StepProgressDemo';
 
 function Router() {
   const [location] = useLocation();
@@ -80,6 +81,7 @@ function Router() {
         <Route path="/animation-demo" component={AnimationDemo} />
         <Route path="/etl-wizard" component={ETLWizardPage} />
         <Route path="/etl-animation-demo" component={ETLAnimationDemo} />
+        <Route path="/step-progress-demo" component={StepProgressDemo} />
         <Route component={NotFound} />
       </Switch>
     </>

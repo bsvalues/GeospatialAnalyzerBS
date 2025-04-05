@@ -13,7 +13,7 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Progress } from "@/components/ui/progress";
 import { Checkbox } from "@/components/ui/checkbox";
-import StepProgressAnimation from "./StepProgressAnimation";
+import StepProgressAnimation from "./WizardStepProgress";
 import {
   ChevronRight,
   ChevronLeft,
