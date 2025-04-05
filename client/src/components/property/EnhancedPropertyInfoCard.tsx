@@ -123,9 +123,9 @@ const EnhancedPropertyInfoCard: React.FC<EnhancedPropertyInfoCardProps> = ({
   }
   
   return (
-    <div className={cn("h-full overflow-auto", className)}>
+    <div className={cn("h-full overflow-auto relative z-10", className)}>
       {/* Property header with close button */}
-      <div className="sticky top-0 bg-white z-10 border-b px-4 pt-3 pb-2 flex justify-between">
+      <div className="sticky top-0 bg-white z-20 border-b px-4 pt-3 pb-2 flex justify-between">
         <div>
           <h3 className="font-medium text-base truncate pr-4">{property.address}</h3>
           <div className="text-sm text-gray-500 flex items-center">

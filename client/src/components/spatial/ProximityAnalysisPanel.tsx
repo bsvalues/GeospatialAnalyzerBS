@@ -151,7 +151,7 @@ export function ProximityAnalysisPanel({
   }
   
   return (
-    <div className={`space-y-6 ${className}`}>
+    <div className={`space-y-6 ${className} relative z-10`}>
       <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
         {/* Left column - Map and Controls */}
         <div className="md:col-span-7 space-y-6">

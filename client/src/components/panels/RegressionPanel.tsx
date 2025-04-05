@@ -168,7 +168,7 @@ export function RegressionPanel({ properties }: RegressionPanelProps) {
   };
   
   return (
-    <div className="p-4 space-y-4 w-full h-full overflow-auto">
+    <div className="p-4 space-y-4 w-full h-full overflow-auto relative z-10">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <h2 className="text-2xl font-bold tracking-tight">Regression Analysis</h2>
