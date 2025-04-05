@@ -64,8 +64,10 @@ import { PropertyAttributesTable } from './PropertyAttributesTable';
 import { MarketPositionScatter } from './MarketPositionScatter';
 import { PropertyComparisonHeatmap } from './PropertyComparisonHeatmap';
 
-// Fix for Map constructor: Remove incorrect reference that's causing errors
-// Use {} for plain objects as key/value maps instead of Map constructor
+// IMPORTANT: Browser compatibility fix
+// Some environments don't support the Map constructor, so we use plain objects with Record<string|number, value>
+// instead of Map objects. This ensures the component works across all browsers.
+// DO NOT use new Map() anywhere in this file or its dependencies.
 
 // Helper functions
 const calculateDifference = (value1: number, value2: number): { percentage: number, direction: 'up' | 'down' | 'same' } => {

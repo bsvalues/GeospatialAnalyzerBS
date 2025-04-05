@@ -296,8 +296,17 @@ class DataConnector {
       // Mock extract process
       // In a real app, we would fetch the data source by ID and then extract data
       
+      // Define a type for our mock data
+      interface MockDataItem {
+        id: number;
+        name: string;
+        email: string;
+        age: number;
+        [key: string]: any; // Allow indexing with string
+      }
+      
       // Mock data
-      const mockData = [
+      const mockData: MockDataItem[] = [
         { id: 1, name: 'John Doe', email: 'john@example.com', age: 30 },
         { id: 2, name: 'Jane Smith', email: 'jane@example.com', age: 25 },
         { id: 3, name: 'Bob Johnson', email: 'bob@example.com', age: 40 },
@@ -329,7 +338,7 @@ class DataConnector {
             }
           }
           
-          return result;
+          return result as MockDataItem;
         });
       }
       

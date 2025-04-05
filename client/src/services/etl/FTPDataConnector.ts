@@ -1,4 +1,68 @@
-import { Client, FileInfo } from 'basic-ftp';
+// Using a browser-compatible mock for FTP client
+// The actual implementation would need a server-side proxy to work with FTP
+// since browsers can't directly connect to FTP servers
+
+// Mock types to match basic-ftp
+interface FileInfo {
+  name: string;
+  isDirectory: boolean;
+  size: number;
+  rawModifiedAt?: string;
+}
+
+// Mock FTP client for browser compatibility
+class Client {
+  ftp = { verbose: false };
+  closed = false;
+  
+  async access(_config: any): Promise<void> {
+    // Mock implementation
+    console.log('Mock FTP client connected');
+    return Promise.resolve();
+  }
+  
+  close(): void {
+    this.closed = true;
+    console.log('Mock FTP client closed');
+  }
+  
+  async list(_path?: string): Promise<FileInfo[]> {
+    // Return mock data
+    return Promise.resolve([
+      { name: 'properties.csv', isDirectory: false, size: 1024, rawModifiedAt: new Date().toISOString() },
+      { name: 'images', isDirectory: true, size: 0, rawModifiedAt: new Date().toISOString() },
+      { name: 'tax_data.csv', isDirectory: false, size: 2048, rawModifiedAt: new Date().toISOString() }
+    ]);
+  }
+  
+  async cd(_path: string): Promise<void> {
+    // Mock implementation
+    return Promise.resolve();
+  }
+  
+  async downloadTo(writable: any, _remotePath: string): Promise<void> {
+    // Create mock CSV data
+    const mockData = `id,address,city,state,zipCode,price,bedrooms,bathrooms,sqft
+1,123 Main St,Springfield,IL,62701,250000,3,2,1800
+2,456 Elm St,Springfield,IL,62702,180000,2,1,1200
+3,789 Oak St,Springfield,IL,62703,320000,4,3,2400
+4,101 Pine St,Springfield,IL,62704,210000,3,2,1600
+5,202 Maple St,Springfield,IL,62705,275000,3,2.5,2000`;
+    
+    // Convert string to UTF-8 encoded Uint8Array
+    const encoder = new TextEncoder();
+    const uint8Array = encoder.encode(mockData);
+    
+    // Write to the writable stream
+    writable.write(uint8Array);
+    
+    return Promise.resolve();
+  }
+  
+  async pwd(): Promise<string> {
+    return Promise.resolve('/data');
+  }
+}
 
 export interface FTPConnectionConfig {
   host: string;

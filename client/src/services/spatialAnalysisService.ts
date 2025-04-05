@@ -141,13 +141,13 @@ function getNormalizedAttributeValue(
  * Calculate attribute ranges for normalization
  * @param properties Array of properties
  * @param attributes Array of attribute names
- * @returns Map of attribute ranges
+ * @returns Record of attribute ranges
  */
 function calculateAttributeRanges(
   properties: Property[], 
   attributes: string[]
-): Map<string, { min: number, max: number }> {
-  const ranges = new Map<string, { min: number, max: number }>();
+): Record<string, { min: number, max: number }> {
+  const ranges: Record<string, { min: number, max: number }> = {};
   
   attributes.forEach(attribute => {
     if (attribute === 'location') {
@@ -175,7 +175,7 @@ function calculateAttributeRanges(
       }
     });
     
-    ranges.set(attribute, { min, max });
+    ranges[attribute] = { min, max };
   });
   
   return ranges;

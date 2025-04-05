@@ -174,7 +174,7 @@ type AlertListener = () => void;
  */
 class AlertService {
   private nextId = 1;
-  private alerts = new Map<string, Alert>();
+  private alerts: Record<string, Alert> = {};
   private listeners: AlertListener[] = [];
   private maxAlerts = 1000;
   
@@ -194,18 +194,19 @@ class AlertService {
       ...payload
     };
     
-    // Add alert to map
-    this.alerts.set(id, alert);
+    // Add alert to record
+    this.alerts[id] = alert;
     
     // If we have too many alerts, remove the oldest ones
-    if (this.alerts.size > this.maxAlerts) {
-      const alertsToDelete = [...this.alerts.entries()]
-        .sort((a, b) => a[1].timestamp.getTime() - b[1].timestamp.getTime())
-        .slice(0, this.alerts.size - this.maxAlerts)
+    const alertCount = Object.keys(this.alerts).length;
+    if (alertCount > this.maxAlerts) {
+      const alertsToDelete = Object.entries(this.alerts)
+        .sort(([, a], [, b]) => a.timestamp.getTime() - b.timestamp.getTime())
+        .slice(0, alertCount - this.maxAlerts)
         .map(([id]) => id);
         
       for (const id of alertsToDelete) {
-        this.alerts.delete(id);
+        delete this.alerts[id];
       }
     }
     
@@ -224,14 +225,14 @@ class AlertService {
    * Get an alert by ID
    */
   getAlert(id: string): Alert | undefined {
-    return this.alerts.get(id);
+    return this.alerts[id];
   }
   
   /**
    * Get all alerts
    */
   getAllAlerts(): Alert[] {
-    return Array.from(this.alerts.values())
+    return Object.values(this.alerts)
       .sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
   }
   
@@ -321,7 +322,7 @@ class AlertService {
    * Mark an alert as read
    */
   markAsRead(id: string): boolean {
-    const alert = this.alerts.get(id);
+    const alert = this.alerts[id];
     
     if (!alert || alert.read) {
       return false;
@@ -337,7 +338,7 @@ class AlertService {
    * Mark an alert as unread
    */
   markAsUnread(id: string): boolean {
-    const alert = this.alerts.get(id);
+    const alert = this.alerts[id];
     
     if (!alert || !alert.read) {
       return false;
@@ -355,7 +356,7 @@ class AlertService {
   markAllAsRead(): number {
     let count = 0;
     
-    for (const alert of this.alerts.values()) {
+    for (const alert of Object.values(this.alerts)) {
       if (!alert.read) {
         alert.read = true;
         count++;
@@ -373,7 +374,7 @@ class AlertService {
    * Mark an alert as acknowledged
    */
   acknowledge(id: string): boolean {
-    const alert = this.alerts.get(id);
+    const alert = this.alerts[id];
     
     if (!alert || alert.acknowledged) {
       return false;
@@ -389,23 +390,24 @@ class AlertService {
    * Delete an alert
    */
   deleteAlert(id: string): boolean {
-    const result = this.alerts.delete(id);
+    const alertExists = id in this.alerts;
     
-    if (result) {
+    if (alertExists) {
+      delete this.alerts[id];
       this.notifyListeners();
     }
     
-    return result;
+    return alertExists;
   }
   
   /**
    * Delete all alerts
    */
   clearAlerts(): number {
-    const count = this.alerts.size;
+    const count = Object.keys(this.alerts).length;
     
     if (count > 0) {
-      this.alerts.clear();
+      this.alerts = {};
       this.notifyListeners();
     }
     
@@ -423,7 +425,7 @@ class AlertService {
     }
     
     for (const alert of alertsToDelete) {
-      this.alerts.delete(alert.id);
+      delete this.alerts[alert.id];
     }
     
     this.notifyListeners();
@@ -435,8 +437,10 @@ class AlertService {
    * Get alert statistics
    */
   getStats(): AlertStats {
+    const alertCount = Object.keys(this.alerts).length;
+    
     const stats: AlertStats = {
-      total: this.alerts.size,
+      total: alertCount,
       unread: 0,
       unacknowledged: 0,
       byType: {
@@ -462,7 +466,7 @@ class AlertService {
       }
     };
     
-    for (const alert of this.alerts.values()) {
+    for (const alert of Object.values(this.alerts)) {
       if (!alert.read) {
         stats.unread++;
       }

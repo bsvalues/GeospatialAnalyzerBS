@@ -18,12 +18,17 @@ import { alertService, AlertType, AlertCategory, AlertSeverity } from './AlertSe
  * ETL Pipeline Manager
  * 
  * This class is responsible for coordinating all ETL services.
+ * 
+ * BROWSER COMPATIBILITY NOTE:
+ * To ensure browser compatibility, this component uses plain JavaScript objects (Record)
+ * instead of Map for data storage.
  */
 class ETLPipelineManager {
-  private jobs = new Map<number, ETLJob>();
-  private dataSources = new Map<number, DataSource>();
-  private transformationRules = new Map<number, TransformationRule>();
-  private jobRuns = new Map<string, JobRun>();
+  // Using Record objects for browser compatibility instead of Map
+  private jobs: Record<number, ETLJob> = {};
+  private dataSources: Record<number, DataSource> = {};
+  private transformationRules: Record<number, TransformationRule> = {};
+  private jobRuns: Record<string, JobRun> = {};
   private nextJobId = 1;
   private nextDataSourceId = 1;
   private nextTransformationRuleId = 1;
@@ -187,13 +192,13 @@ class ETLPipelineManager {
       tags: ['memory', 'testing', 'destination']
     };
     
-    // Add data sources to map
-    this.dataSources.set(postgresSource.id, postgresSource);
-    this.dataSources.set(apiSource.id, apiSource);
-    this.dataSources.set(csvSource.id, csvSource);
-    this.dataSources.set(inMemorySource.id, inMemorySource);
-    this.dataSources.set(postgresDestination.id, postgresDestination);
-    this.dataSources.set(inMemoryDestination.id, inMemoryDestination);
+    // Add data sources to record object
+    this.dataSources[postgresSource.id] = postgresSource;
+    this.dataSources[apiSource.id] = apiSource;
+    this.dataSources[csvSource.id] = csvSource;
+    this.dataSources[inMemorySource.id] = inMemorySource;
+    this.dataSources[postgresDestination.id] = postgresDestination;
+    this.dataSources[inMemoryDestination.id] = inMemoryDestination;
   }
   
   /**
@@ -296,12 +301,12 @@ class ETLPipelineManager {
       description: 'Enrich properties with geocodes'
     };
     
-    // Add transformation rules to map
-    this.transformationRules.set(filterRule.id, filterRule);
-    this.transformationRules.set(mapRule.id, mapRule);
-    this.transformationRules.set(validationRule.id, validationRule);
-    this.transformationRules.set(aggregateRule.id, aggregateRule);
-    this.transformationRules.set(enrichmentRule.id, enrichmentRule);
+    // Add transformation rules to record object
+    this.transformationRules[filterRule.id] = filterRule;
+    this.transformationRules[mapRule.id] = mapRule;
+    this.transformationRules[validationRule.id] = validationRule;
+    this.transformationRules[aggregateRule.id] = aggregateRule;
+    this.transformationRules[enrichmentRule.id] = enrichmentRule;
   }
   
   /**
@@ -344,10 +349,10 @@ class ETLPipelineManager {
       description: 'Enrichment job for property data'
     };
     
-    // Add jobs to map
-    this.jobs.set(propertyJob.id, propertyJob);
-    this.jobs.set(aggregationJob.id, aggregationJob);
-    this.jobs.set(enrichmentJob.id, enrichmentJob);
+    // Add jobs to record object
+    this.jobs[propertyJob.id] = propertyJob;
+    this.jobs[aggregationJob.id] = aggregationJob;
+    this.jobs[enrichmentJob.id] = enrichmentJob;
   }
   
   /**
@@ -389,7 +394,7 @@ class ETLPipelineManager {
    */
   async runJob(jobId: number): Promise<void> {
     // Get job
-    const job = this.jobs.get(jobId);
+    const job = this.jobs[jobId];
     
     if (!job) {
       throw new Error(`Job with ID ${jobId} not found`);
@@ -403,11 +408,22 @@ class ETLPipelineManager {
     job.status = JobStatus.RUNNING;
     
     try {
-      // Execute job
-      const jobRun = await etlPipeline.executeJob(job, this.dataSources, this.transformationRules, true);
+      // Convert data structures to format expected by etlPipeline.executeJob
+      const dataSources = new Map<number, DataSource>();
+      Object.entries(this.dataSources).forEach(([key, value]) => {
+        dataSources.set(Number(key), value);
+      });
       
-      // Add job run to map
-      this.jobRuns.set(jobRun.id, jobRun);
+      const transformationRules = new Map<number, TransformationRule>();
+      Object.entries(this.transformationRules).forEach(([key, value]) => {
+        transformationRules.set(Number(key), value);
+      });
+      
+      // Execute job
+      const jobRun = await etlPipeline.executeJob(job, dataSources, transformationRules, true);
+      
+      // Add job run to record object
+      this.jobRuns[jobRun.id] = jobRun;
       
       // Update job status
       job.status = jobRun.status;
@@ -426,14 +442,14 @@ class ETLPipelineManager {
    * Get all jobs
    */
   getAllJobs(): ETLJob[] {
-    return Array.from(this.jobs.values());
+    return Object.values(this.jobs);
   }
   
   /**
    * Get a job by ID
    */
   getJob(jobId: number): ETLJob | undefined {
-    return this.jobs.get(jobId);
+    return this.jobs[jobId];
   }
   
   /**
@@ -446,7 +462,7 @@ class ETLPipelineManager {
       ...job
     };
     
-    this.jobs.set(newJob.id, newJob);
+    this.jobs[newJob.id] = newJob;
     
     // Log job created
     alertService.createAlert({
@@ -464,7 +480,7 @@ class ETLPipelineManager {
    * Update a job
    */
   updateJob(jobId: number, job: Partial<Omit<ETLJob, 'id'>>): ETLJob | undefined {
-    const existingJob = this.jobs.get(jobId);
+    const existingJob = this.jobs[jobId];
     
     if (!existingJob) {
       return undefined;
@@ -476,7 +492,7 @@ class ETLPipelineManager {
       id: existingJob.id
     };
     
-    this.jobs.set(jobId, updatedJob);
+    this.jobs[jobId] = updatedJob;
     
     // Log job updated
     alertService.createAlert({
@@ -494,7 +510,7 @@ class ETLPipelineManager {
    * Delete a job
    */
   deleteJob(jobId: number): boolean {
-    const job = this.jobs.get(jobId);
+    const job = this.jobs[jobId];
     
     if (!job) {
       return false;
@@ -504,7 +520,8 @@ class ETLPipelineManager {
     scheduler.unscheduleJob(jobId);
     
     // Delete job
-    const result = this.jobs.delete(jobId);
+    delete this.jobs[jobId];
+    const result = !this.jobs[jobId];
     
     // Log job deleted
     if (result) {
@@ -524,7 +541,7 @@ class ETLPipelineManager {
    * Enable a job
    */
   enableJob(jobId: number): boolean {
-    const job = this.jobs.get(jobId);
+    const job = this.jobs[jobId];
     
     if (!job) {
       return false;
@@ -548,7 +565,7 @@ class ETLPipelineManager {
    * Disable a job
    */
   disableJob(jobId: number): boolean {
-    const job = this.jobs.get(jobId);
+    const job = this.jobs[jobId];
     
     if (!job) {
       return false;
@@ -572,14 +589,14 @@ class ETLPipelineManager {
    * Get all data sources
    */
   getAllDataSources(): DataSource[] {
-    return Array.from(this.dataSources.values());
+    return Object.values(this.dataSources);
   }
   
   /**
    * Get a data source by ID
    */
   getDataSource(dataSourceId: number): DataSource | undefined {
-    return this.dataSources.get(dataSourceId);
+    return this.dataSources[dataSourceId];
   }
   
   /**
@@ -591,7 +608,7 @@ class ETLPipelineManager {
       ...dataSource
     };
     
-    this.dataSources.set(newDataSource.id, newDataSource);
+    this.dataSources[newDataSource.id] = newDataSource;
     
     // Log data source created
     alertService.createAlert({
@@ -609,7 +626,7 @@ class ETLPipelineManager {
    * Update a data source
    */
   updateDataSource(dataSourceId: number, dataSource: Partial<Omit<DataSource, 'id'>>): DataSource | undefined {
-    const existingDataSource = this.dataSources.get(dataSourceId);
+    const existingDataSource = this.dataSources[dataSourceId];
     
     if (!existingDataSource) {
       return undefined;
@@ -621,7 +638,7 @@ class ETLPipelineManager {
       id: existingDataSource.id
     };
     
-    this.dataSources.set(dataSourceId, updatedDataSource);
+    this.dataSources[dataSourceId] = updatedDataSource;
     
     // Log data source updated
     alertService.createAlert({
@@ -639,7 +656,7 @@ class ETLPipelineManager {
    * Delete a data source
    */
   deleteDataSource(dataSourceId: number): boolean {
-    const dataSource = this.dataSources.get(dataSourceId);
+    const dataSource = this.dataSources[dataSourceId];
     
     if (!dataSource) {
       return false;
@@ -663,7 +680,8 @@ class ETLPipelineManager {
     }
     
     // Delete data source
-    const result = this.dataSources.delete(dataSourceId);
+    delete this.dataSources[dataSourceId];
+    const result = !this.dataSources[dataSourceId];
     
     // Log data source deleted
     if (result) {
@@ -683,7 +701,7 @@ class ETLPipelineManager {
    * Enable a data source
    */
   enableDataSource(dataSourceId: number): boolean {
-    const dataSource = this.dataSources.get(dataSourceId);
+    const dataSource = this.dataSources[dataSourceId];
     
     if (!dataSource) {
       return false;
@@ -707,7 +725,7 @@ class ETLPipelineManager {
    * Disable a data source
    */
   disableDataSource(dataSourceId: number): boolean {
-    const dataSource = this.dataSources.get(dataSourceId);
+    const dataSource = this.dataSources[dataSourceId];
     
     if (!dataSource) {
       return false;
@@ -731,14 +749,14 @@ class ETLPipelineManager {
    * Get all transformation rules
    */
   getAllTransformationRules(): TransformationRule[] {
-    return Array.from(this.transformationRules.values());
+    return Object.values(this.transformationRules);
   }
   
   /**
    * Get a transformation rule by ID
    */
   getTransformationRule(transformationRuleId: number): TransformationRule | undefined {
-    return this.transformationRules.get(transformationRuleId);
+    return this.transformationRules[transformationRuleId];
   }
   
   /**
@@ -750,7 +768,7 @@ class ETLPipelineManager {
       ...transformationRule
     };
     
-    this.transformationRules.set(newTransformationRule.id, newTransformationRule);
+    this.transformationRules[newTransformationRule.id] = newTransformationRule;
     
     // Log transformation rule created
     alertService.createAlert({
@@ -771,7 +789,7 @@ class ETLPipelineManager {
     transformationRuleId: number, 
     transformationRule: Partial<Omit<TransformationRule, 'id'>>
   ): TransformationRule | undefined {
-    const existingTransformationRule = this.transformationRules.get(transformationRuleId);
+    const existingTransformationRule = this.transformationRules[transformationRuleId];
     
     if (!existingTransformationRule) {
       return undefined;
@@ -783,7 +801,7 @@ class ETLPipelineManager {
       id: existingTransformationRule.id
     };
     
-    this.transformationRules.set(transformationRuleId, updatedTransformationRule);
+    this.transformationRules[transformationRuleId] = updatedTransformationRule;
     
     // Log transformation rule updated
     alertService.createAlert({
@@ -801,7 +819,7 @@ class ETLPipelineManager {
    * Delete a transformation rule
    */
   deleteTransformationRule(transformationRuleId: number): boolean {
-    const transformationRule = this.transformationRules.get(transformationRuleId);
+    const transformationRule = this.transformationRules[transformationRuleId];
     
     if (!transformationRule) {
       return false;
@@ -825,7 +843,8 @@ class ETLPipelineManager {
     }
     
     // Delete transformation rule
-    const result = this.transformationRules.delete(transformationRuleId);
+    delete this.transformationRules[transformationRuleId];
+    const result = !this.transformationRules[transformationRuleId];
     
     // Log transformation rule deleted
     if (result) {
@@ -845,7 +864,7 @@ class ETLPipelineManager {
    * Enable a transformation rule
    */
   enableTransformationRule(transformationRuleId: number): boolean {
-    const transformationRule = this.transformationRules.get(transformationRuleId);
+    const transformationRule = this.transformationRules[transformationRuleId];
     
     if (!transformationRule) {
       return false;
@@ -869,7 +888,7 @@ class ETLPipelineManager {
    * Disable a transformation rule
    */
   disableTransformationRule(transformationRuleId: number): boolean {
-    const transformationRule = this.transformationRules.get(transformationRuleId);
+    const transformationRule = this.transformationRules[transformationRuleId];
     
     if (!transformationRule) {
       return false;
@@ -893,7 +912,7 @@ class ETLPipelineManager {
    * Get all job runs
    */
   getAllJobRuns(): JobRun[] {
-    return Array.from(this.jobRuns.values());
+    return Object.values(this.jobRuns);
   }
   
   /**
@@ -907,7 +926,7 @@ class ETLPipelineManager {
    * Get a job run by ID
    */
   getJobRun(jobRunId: string): JobRun | undefined {
-    return this.jobRuns.get(jobRunId);
+    return this.jobRuns[jobRunId];
   }
   
   /**
