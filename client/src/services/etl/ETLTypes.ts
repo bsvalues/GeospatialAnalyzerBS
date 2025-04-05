@@ -328,12 +328,16 @@ export enum TransformationType {
   // Data quality
   REMOVE_DUPLICATES = 'remove_duplicates',
   VALIDATE = 'validate',
+  VALIDATION = 'validation',    // Alias for VALIDATE for better readability
+  
+  // Data enrichment
+  ENRICH = 'enrich',
+  ENRICHMENT = 'enrichment',    // Alias for ENRICH for better readability
   
   // Advanced
   CUSTOM = 'custom',
   CUSTOM_FUNCTION = 'custom_function',
   JAVASCRIPT = 'javascript',
   SQL = 'sql',
-  FORMULA = 'formula',
-  ENRICH = 'enrich'
+  FORMULA = 'formula'
 }
