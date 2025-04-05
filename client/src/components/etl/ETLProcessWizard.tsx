@@ -13,6 +13,7 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Progress } from "@/components/ui/progress";
 import { Checkbox } from "@/components/ui/checkbox";
+import StepProgressAnimation from "./StepProgressAnimation";
 import {
   ChevronRight,
   ChevronLeft,
@@ -65,7 +66,7 @@ interface ETLProcessWizardProps {
 }
 
 // Steps in the wizard
-enum WizardStep {
+export enum WizardStep {
   BASIC_INFO = 0,
   DATA_SOURCES = 1,
   TRANSFORMATIONS = 2,
@@ -770,61 +771,15 @@ const ETLProcessWizard: React.FC<ETLProcessWizardProps> = ({
       return null;
     }
     
-    const steps = [
-      { name: "Basic Info", icon: Settings },
-      { name: "Data Sources", icon: Database },
-      { name: "Transformations", icon: Filter },
-      { name: "Destination", icon: Table },
-      { name: "Scheduling", icon: Calendar },
-      { name: "Review", icon: CheckCircle }
-    ];
-
     return (
       <div className="mb-6">
-        <div className="relative">
-          <div className="overflow-hidden">
-            <div className="flex">
-              {steps.map((step, index) => {
-                const StepIcon = step.icon;
-                const isActive = index === currentStep;
-                const isCompleted = stepsCompleted[index];
-                
-                return (
-                  <div 
-                    key={index} 
-                    className={`flex-1 ${index !== steps.length - 1 ? 'pr-2' : ''}`}
-                  >
-                    <div className="relative flex flex-col items-center">
-                      <div className={`
-                        w-8 h-8 rounded-full flex items-center justify-center z-10
-                        ${isActive ? 'bg-blue-600 text-white' : 
-                          isCompleted ? 'bg-green-500 text-white' : 'bg-gray-200 text-gray-500'}
-                      `}>
-                        {isCompleted ? (
-                          <Check className="h-4 w-4" />
-                        ) : (
-                          <StepIcon className="h-4 w-4" />
-                        )}
-                      </div>
-                      <div className="text-xs mt-1 text-center">
-                        {step.name}
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-            
-            {/* Progress bar */}
-            <div className="absolute top-4 h-0.5 transform -translate-y-1/2 left-0 right-0">
-              <div className="absolute h-0.5 bg-gray-200 left-0 right-0"></div>
-              <div 
-                className="absolute h-0.5 bg-blue-600 left-0"
-                style={{ width: `${calculateProgress()}%` }}
-              ></div>
-            </div>
-          </div>
-        </div>
+        <StepProgressAnimation 
+          currentStep={currentStep}
+          totalSteps={Object.keys(WizardStep).length / 2 - 1} // Exclude SUCCESS step
+          stepsCompleted={stepsCompleted}
+          showAnimation={processing || isSubmitting}
+          animationSpeed="normal"
+        />
       </div>
     );
   };
