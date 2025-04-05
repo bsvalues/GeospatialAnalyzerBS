@@ -141,7 +141,7 @@ const stepDescVariants = cva(
  * Supports both horizontal and vertical layouts and multiple size options.
  */
 export const StepProgressAnimation: React.FC<StepProgressAnimationProps> = ({
-  steps,
+  steps = [],
   currentStep = 0,
   completedSteps = [],
   failedSteps = [],
@@ -382,7 +382,7 @@ export const StepProgressAnimation: React.FC<StepProgressAnimationProps> = ({
       className
     )}>
       {steps.map((step, index) => (
-        <React.Fragment key={step.id}>
+        <React.Fragment key={step.id || index}>
           {/* Step content */}
           <div className={`flex ${vertical ? "flex-row items-start space-x-3" : "flex-col items-center"}`}>
             {/* Step icon */}

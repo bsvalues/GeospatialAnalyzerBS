@@ -118,7 +118,7 @@ export function App() {
                 <div className="fixed inset-0 z-0 bg-[radial-gradient(circle_at_center,rgba(255,255,255,0)_0%,rgba(255,255,255,0.8)_50%,rgba(255,255,255,0.9)_100%)]" />
                 
                 {/* Main content area - with higher z-index */}
-                <div className="flex-grow relative z-10 overflow-y-auto">
+                <div className="flex-grow relative z-10 overflow-visible w-full h-full">
                   <Router />
                 </div>
               </div>
