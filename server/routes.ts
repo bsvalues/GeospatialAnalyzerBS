@@ -4170,7 +4170,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Import the mssql package dynamically to avoid browser compatibility issues
-      const sql = await import('mssql');
+      const mssql = await import('mssql');
 
       // Create a connection configuration
       const sqlConfig = {
@@ -4188,7 +4188,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       };
 
       // Connect to the database
-      const pool = await sql.connect(sqlConfig);
+      const pool = await new mssql.ConnectionPool(sqlConfig).connect();
       
       // Create the request
       const request = pool.request();
@@ -4235,7 +4235,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Import the mssql package dynamically to avoid browser compatibility issues
       // We'll use mssql for ODBC connections too, as it supports ODBC through connection strings
-      const sql = await import('mssql');
+      const mssql = await import('mssql');
 
       // Create a connection configuration using ODBC driver
       const sqlConfig: any = {
@@ -4254,7 +4254,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (config.password) sqlConfig.password = config.password;
 
       // Connect to the database
-      const pool = await sql.connect(sqlConfig);
+      const pool = await new mssql.ConnectionPool(sqlConfig).connect();
       
       // Create the request
       const request = pool.request();
