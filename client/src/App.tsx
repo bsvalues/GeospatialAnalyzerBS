@@ -36,6 +36,7 @@ import { ProjectTrackerPage } from '@/pages/ProjectTrackerPage';
 import IncomeTestPage from '@/pages/income-test';
 import FTPDataMigrationPage from '@/pages/FTPDataMigrationPage';
 import DatabaseConnectionPage from './pages/DatabaseConnectionPage';
+import DatabaseTestPage from './pages/DatabaseTestPage';
 
 function Router() {
   const [location] = useLocation();
@@ -70,6 +71,7 @@ function Router() {
         <Route path="/income-test" component={IncomeTestPage} />
         <Route path="/ftp-data-migration" component={FTPDataMigrationPage} />
         <Route path="/database-connection" component={DatabaseConnectionPage} />
+        <Route path="/database-test" component={DatabaseTestPage} />
         <Route component={NotFound} />
       </Switch>
     </>

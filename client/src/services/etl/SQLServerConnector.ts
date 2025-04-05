@@ -1,205 +1,168 @@
-import * as sql from 'mssql';
-import { IDataConnector, ConnectionConfig } from './DataConnector';
-import { DataSource, DataSourceType } from './ETLTypes';
+/**
+ * SQLServerConnector.ts
+ * 
+ * Connector for SQL Server databases
+ * Uses browser-compatible SQLServerAdapter to avoid node:events issues
+ */
 
-export interface SQLServerConfig extends ConnectionConfig {
+import { DataSourceType, SQLServerConnectionConfig } from './ETLTypes';
+import * as sqlServerAdapter from './SQLServerAdapter';
+
+// Configuration interface for SQL Server connections
+export interface SQLServerConnectorConfig {
   server: string;
   port: number;
   database: string;
   user: string;
   password: string;
   domain?: string;
-  trustServerCertificate?: boolean;
   useWindowsAuth?: boolean;
+  trustServerCertificate?: boolean;
   connectionTimeout?: number;
   requestTimeout?: number;
 }
 
-export class SQLServerConnector implements IDataConnector {
-  private config: SQLServerConfig;
-  private pool: sql.ConnectionPool | null = null;
+export class SQLServerConnector {
+  private config: SQLServerConnectionConfig;
   private connectionError: Error | null = null;
-  private connected: boolean = false;
-  private sourceId: string;
-
-  constructor(config: SQLServerConfig) {
-    this.config = config;
-    this.sourceId = `sql-server-${config.server}-${config.database}`;
+  private isConnected = false;
+  
+  constructor(config: SQLServerConnectorConfig) {
+    this.config = {
+      server: config.server,
+      database: config.database,
+      username: config.user,
+      password: config.password,
+      port: config.port,
+      encrypt: !config.trustServerCertificate,
+      trustServerCertificate: !!config.trustServerCertificate,
+    };
   }
-
+  
+  /**
+   * Connect to the database
+   */
   async connect(): Promise<boolean> {
     try {
-      // Create a basic configuration object
-      const sqlConfig: any = {
-        server: this.config.server,
-        port: this.config.port,
-        database: this.config.database,
-        user: this.config.user,
-        password: this.config.password,
-        options: {
-          trustServerCertificate: this.config.trustServerCertificate || false,
-          connectTimeout: this.config.connectionTimeout || 15000,
-          requestTimeout: this.config.requestTimeout || 15000,
-        },
-      };
-
-      // Handle Windows Authentication if enabled
-      if (this.config.useWindowsAuth) {
-        sqlConfig.options = {
-          ...sqlConfig.options,
-          trustedConnection: true,
-        };
-        
-        // Add domain if provided
-        if (this.config.domain) {
-          sqlConfig.domain = this.config.domain;
-        }
-      }
-
-      this.pool = await new sql.ConnectionPool(sqlConfig).connect();
-      this.connected = true;
-      this.connectionError = null;
-      console.log(`Connected to SQL Server: ${this.config.server}/${this.config.database}`);
-      return true;
-    } catch (err) {
-      this.connectionError = err as Error;
-      this.connected = false;
-      console.error('SQL Server connection error:', err);
+      // Test the connection
+      const result = await sqlServerAdapter.testConnection(this.config);
+      this.isConnected = result;
+      return result;
+    } catch (error) {
+      this.connectionError = error instanceof Error 
+        ? error 
+        : new Error(String(error));
+      this.isConnected = false;
       return false;
     }
   }
-
-  async disconnect(): Promise<boolean> {
-    try {
-      if (this.pool) {
-        await this.pool.close();
-        this.pool = null;
-        this.connected = false;
-        console.log(`Disconnected from SQL Server: ${this.config.server}/${this.config.database}`);
-      }
-      return true;
-    } catch (err) {
-      console.error('SQL Server disconnect error:', err);
-      return false;
-    }
+  
+  /**
+   * Disconnect from the database
+   */
+  async disconnect(): Promise<void> {
+    this.isConnected = false;
   }
-
-  isConnected(): boolean {
-    return this.connected;
+  
+  /**
+   * Check if connected
+   */
+  isConnectedToDatabase(): boolean {
+    return this.isConnected;
   }
-
+  
+  /**
+   * Get connection error
+   */
   getConnectionError(): Error | null {
     return this.connectionError;
   }
-
-  getDataSource(): DataSource {
-    return {
-      id: this.sourceId.length, // Convert string ID to numeric ID for compatibility
-      name: `${this.config.server}/${this.config.database}`,
-      type: DataSourceType.SQL_SERVER,
-      config: this.config,
-      enabled: this.connected,
-      description: `SQL Server connection to ${this.config.server}/${this.config.database}`
-    };
+  
+  /**
+   * Get the data source type
+   */
+  getDataSourceType(): string {
+    return DataSourceType.SQLSERVER;
   }
-
+  
+  /**
+   * List available tables
+   */
   async listTables(): Promise<string[]> {
-    if (!this.connected || !this.pool) {
-      throw new Error('Not connected to SQL Server');
+    if (!this.isConnected) {
+      throw new Error('Not connected to database');
     }
-
-    try {
-      const result = await this.pool.request().query(`
-        SELECT TABLE_NAME 
-        FROM INFORMATION_SCHEMA.TABLES 
-        WHERE TABLE_TYPE = 'BASE TABLE'
-        ORDER BY TABLE_NAME
-      `);
-      
-      return result.recordset.map(record => record.TABLE_NAME);
-    } catch (err) {
-      console.error('Error listing tables:', err);
-      throw err;
-    }
-  }
-
-  async listColumns(tableName: string): Promise<{ name: string; type: string }[]> {
-    if (!this.connected || !this.pool) {
-      throw new Error('Not connected to SQL Server');
-    }
-
-    try {
-      const result = await this.pool.request()
-        .input('tableName', sql.VarChar, tableName)
-        .query(`
-          SELECT COLUMN_NAME, DATA_TYPE 
-          FROM INFORMATION_SCHEMA.COLUMNS 
-          WHERE TABLE_NAME = @tableName
-          ORDER BY ORDINAL_POSITION
-        `);
-      
-      return result.recordset.map(record => ({
-        name: record.COLUMN_NAME,
-        type: record.DATA_TYPE
-      }));
-    } catch (err) {
-      console.error(`Error listing columns for table ${tableName}:`, err);
-      throw err;
-    }
-  }
-
-  async executeQuery(query: string, params?: Record<string, any>): Promise<any[]> {
-    if (!this.connected || !this.pool) {
-      throw new Error('Not connected to SQL Server');
-    }
-
-    try {
-      const request = this.pool.request();
-      
-      // Add parameters to the request if provided
-      if (params) {
-        for (const [key, value] of Object.entries(params)) {
-          // Attempt to determine the SQL data type based on JavaScript type
-          let sqlType;
-          if (typeof value === 'number') {
-            sqlType = Number.isInteger(value) ? sql.Int : sql.Float;
-          } else if (typeof value === 'boolean') {
-            sqlType = sql.Bit;
-          } else if (value instanceof Date) {
-            sqlType = sql.DateTime;
-          } else {
-            sqlType = sql.VarChar;
-          }
-          
-          request.input(key, sqlType, value);
-        }
-      }
-      
-      const result = await request.query(query);
-      return result.recordset;
-    } catch (err) {
-      console.error('Query execution error:', err);
-      throw err;
-    }
-  }
-
-  async fetchTableData(tableName: string, limit: number = 1000): Promise<any[]> {
-    return this.executeQuery(`SELECT TOP ${limit} * FROM ${tableName}`);
-  }
-
-  // Special method for retrieving property data specifically formatted for our application
-  async fetchPropertyData(tableName: string, limit: number = 1000): Promise<any[]> {
-    const query = `
-      SELECT TOP ${limit} 
-        *,
-        CONCAT(PropertyNumber, ' ', StreetName) AS address,
-        CAST(Latitude AS FLOAT) AS latitude,
-        CAST(Longitude AS FLOAT) AS longitude,
-        PropertyClass AS propertyType
-      FROM ${tableName}
-      WHERE Latitude IS NOT NULL AND Longitude IS NOT NULL
-    `;
     
-    return this.executeQuery(query);
+    try {
+      return await sqlServerAdapter.getTables(this.config);
+    } catch (error) {
+      this.connectionError = error instanceof Error 
+        ? error 
+        : new Error(String(error));
+      throw this.connectionError;
+    }
+  }
+  
+  /**
+   * List columns for a table
+   */
+  async listColumns(tableName: string): Promise<Array<{ name: string; type: string }>> {
+    if (!this.isConnected) {
+      throw new Error('Not connected to database');
+    }
+    
+    try {
+      const schema = await sqlServerAdapter.getTableSchema(this.config, tableName);
+      return schema.map(column => ({
+        name: column.name,
+        type: column.type
+      }));
+    } catch (error) {
+      this.connectionError = error instanceof Error 
+        ? error 
+        : new Error(String(error));
+      throw this.connectionError;
+    }
+  }
+  
+  /**
+   * Fetch table data
+   */
+  async fetchTableData(tableName: string, limit: number = 100): Promise<any[]> {
+    if (!this.isConnected) {
+      throw new Error('Not connected to database');
+    }
+    
+    try {
+      const result = await sqlServerAdapter.executeQuery(
+        this.config,
+        `SELECT TOP ${limit} * FROM [${tableName}]`
+      );
+      
+      return result.recordset;
+    } catch (error) {
+      this.connectionError = error instanceof Error 
+        ? error 
+        : new Error(String(error));
+      throw this.connectionError;
+    }
+  }
+  
+  /**
+   * Execute a custom query
+   */
+  async executeQuery(query: string, parameters: Record<string, any> = {}): Promise<any> {
+    if (!this.isConnected) {
+      throw new Error('Not connected to database');
+    }
+    
+    try {
+      return await sqlServerAdapter.executeQuery(this.config, query, parameters);
+    } catch (error) {
+      this.connectionError = error instanceof Error 
+        ? error 
+        : new Error(String(error));
+      throw this.connectionError;
+    }
   }
 }

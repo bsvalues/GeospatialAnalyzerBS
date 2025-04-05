@@ -6,12 +6,15 @@
 
 import { ETLJob, JobStatus, ETLJobResult } from './ETLTypes';
 
+// Browser compatibility: Using Record instead of Map
+interface RunningJob {
+  job: ETLJob;
+  abortController: AbortController;
+}
+
 class JobExecutionService {
-  // Track running jobs
-  private runningJobs: Map<number, {
-    job: ETLJob;
-    abortController: AbortController;
-  }> = new Map();
+  // Track running jobs using Record for browser compatibility
+  private runningJobs: Record<number, RunningJob> = {};
   
   /**
    * Start job execution 
@@ -21,10 +24,10 @@ class JobExecutionService {
     const abortController = new AbortController();
     
     // Register as running job
-    this.runningJobs.set(job.id, {
+    this.runningJobs[job.id] = {
       job,
       abortController
-    });
+    };
     
     // Update job status
     job.status = JobStatus.RUNNING;
@@ -39,7 +42,7 @@ class JobExecutionService {
     job.status = result.status;
     
     // Remove from running jobs
-    this.runningJobs.delete(job.id);
+    delete this.runningJobs[job.id];
     
     console.log(`Job ${job.id} completed with status: ${result.status}`);
   }
@@ -48,7 +51,7 @@ class JobExecutionService {
    * Abort a running job
    */
   abortJob(jobId: number): boolean {
-    const runningJob = this.runningJobs.get(jobId);
+    const runningJob = this.runningJobs[jobId];
     
     if (!runningJob) {
       console.warn(`Job ${jobId} is not running, cannot abort`);
@@ -63,7 +66,7 @@ class JobExecutionService {
       runningJob.job.status = JobStatus.ABORTED;
       
       // Remove from running jobs
-      this.runningJobs.delete(jobId);
+      delete this.runningJobs[jobId];
       
       console.log(`Job ${jobId} aborted`);
       return true;
@@ -77,21 +80,21 @@ class JobExecutionService {
    * Check if a job is currently running
    */
   isJobRunning(jobId: number): boolean {
-    return this.runningJobs.has(jobId);
+    return this.runningJobs[jobId] !== undefined;
   }
   
   /**
    * Get list of all running jobs
    */
   getRunningJobs(): ETLJob[] {
-    return Array.from(this.runningJobs.values()).map(({ job }) => job);
+    return Object.values(this.runningJobs).map(({ job }) => job);
   }
   
   /**
    * Get abort signal for a running job
    */
   getJobAbortSignal(jobId: number): AbortSignal | null {
-    const runningJob = this.runningJobs.get(jobId);
+    const runningJob = this.runningJobs[jobId];
     
     if (!runningJob) {
       return null;

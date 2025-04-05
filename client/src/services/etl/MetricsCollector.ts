@@ -6,26 +6,29 @@
 
 import { JobMetrics } from './ETLTypes';
 
+// Define metric record type for browser compatibility
+interface JobMetricRecord {
+  startTime: Date;
+  endTime?: Date;
+  extractStartTime?: Date;
+  extractEndTime?: Date;
+  transformStartTime?: Date;
+  transformEndTime?: Date;
+  loadStartTime?: Date;
+  loadEndTime?: Date;
+  recordsProcessed: number;
+  recordsValid: number;
+  recordsInvalid: number;
+  cpuSamples: number[];
+  memorySamples: number[];
+}
+
 class MetricsCollector {
-  // Store job metrics by job ID
-  private jobMetrics: Map<number, {
-    startTime: Date;
-    endTime?: Date;
-    extractStartTime?: Date;
-    extractEndTime?: Date;
-    transformStartTime?: Date;
-    transformEndTime?: Date;
-    loadStartTime?: Date;
-    loadEndTime?: Date;
-    recordsProcessed: number;
-    recordsValid: number;
-    recordsInvalid: number;
-    cpuSamples: number[];
-    memorySamples: number[];
-  }> = new Map();
+  // Store job metrics by job ID using Record for browser compatibility
+  private jobMetrics: Record<number, JobMetricRecord> = {};
   
   // Timer IDs for performance sampling
-  private performanceSamplers: Map<number, NodeJS.Timeout> = new Map();
+  private performanceSamplers: Record<number, ReturnType<typeof setInterval>> = {};
   
   /**
    * Start metrics collection for a job
@@ -34,14 +37,14 @@ class MetricsCollector {
     console.log(`Starting metrics collection for job ${jobId}`);
     
     // Initialize metrics for this job
-    this.jobMetrics.set(jobId, {
+    this.jobMetrics[jobId] = {
       startTime: new Date(),
       recordsProcessed: 0,
       recordsValid: 0,
       recordsInvalid: 0,
       cpuSamples: [],
       memorySamples: []
-    });
+    };
     
     // Start performance sampling
     this.startPerformanceSampling(jobId);
@@ -51,7 +54,7 @@ class MetricsCollector {
    * Start extract phase metrics
    */
   startExtractPhase(jobId: number): void {
-    const metrics = this.jobMetrics.get(jobId);
+    const metrics = this.jobMetrics[jobId];
     
     if (!metrics) {
       console.warn(`No metrics found for job ${jobId}`);
@@ -65,7 +68,7 @@ class MetricsCollector {
    * End extract phase metrics
    */
   endExtractPhase(jobId: number): void {
-    const metrics = this.jobMetrics.get(jobId);
+    const metrics = this.jobMetrics[jobId];
     
     if (!metrics) {
       console.warn(`No metrics found for job ${jobId}`);
@@ -79,7 +82,7 @@ class MetricsCollector {
    * Start transform phase metrics
    */
   startTransformPhase(jobId: number): void {
-    const metrics = this.jobMetrics.get(jobId);
+    const metrics = this.jobMetrics[jobId];
     
     if (!metrics) {
       console.warn(`No metrics found for job ${jobId}`);
@@ -93,7 +96,7 @@ class MetricsCollector {
    * End transform phase metrics
    */
   endTransformPhase(jobId: number): void {
-    const metrics = this.jobMetrics.get(jobId);
+    const metrics = this.jobMetrics[jobId];
     
     if (!metrics) {
       console.warn(`No metrics found for job ${jobId}`);
@@ -107,7 +110,7 @@ class MetricsCollector {
    * Start load phase metrics
    */
   startLoadPhase(jobId: number): void {
-    const metrics = this.jobMetrics.get(jobId);
+    const metrics = this.jobMetrics[jobId];
     
     if (!metrics) {
       console.warn(`No metrics found for job ${jobId}`);
@@ -121,7 +124,7 @@ class MetricsCollector {
    * End load phase metrics
    */
   endLoadPhase(jobId: number): void {
-    const metrics = this.jobMetrics.get(jobId);
+    const metrics = this.jobMetrics[jobId];
     
     if (!metrics) {
       console.warn(`No metrics found for job ${jobId}`);
@@ -135,7 +138,7 @@ class MetricsCollector {
    * Update records processed count
    */
   updateRecordsProcessed(jobId: number, count: number): void {
-    const metrics = this.jobMetrics.get(jobId);
+    const metrics = this.jobMetrics[jobId];
     
     if (!metrics) {
       console.warn(`No metrics found for job ${jobId}`);
@@ -149,7 +152,7 @@ class MetricsCollector {
    * Update records valid/invalid counts
    */
   updateValidationCounts(jobId: number, valid: number, invalid: number): void {
-    const metrics = this.jobMetrics.get(jobId);
+    const metrics = this.jobMetrics[jobId];
     
     if (!metrics) {
       console.warn(`No metrics found for job ${jobId}`);
@@ -166,7 +169,7 @@ class MetricsCollector {
   endJobMetrics(jobId: number): JobMetrics {
     console.log(`Ending metrics collection for job ${jobId}`);
     
-    const metrics = this.jobMetrics.get(jobId);
+    const metrics = this.jobMetrics[jobId];
     
     if (!metrics) {
       console.warn(`No metrics found for job ${jobId}`);
@@ -206,11 +209,11 @@ class MetricsCollector {
     
     // Calculate average CPU and memory usage
     const avgCpuUsage = metrics.cpuSamples.length > 0
-      ? metrics.cpuSamples.reduce((sum, sample) => sum + sample, 0) / metrics.cpuSamples.length
+      ? metrics.cpuSamples.reduce((sum: number, sample: number) => sum + sample, 0) / metrics.cpuSamples.length
       : undefined;
       
     const avgMemoryUsage = metrics.memorySamples.length > 0
-      ? metrics.memorySamples.reduce((sum, sample) => sum + sample, 0) / metrics.memorySamples.length
+      ? metrics.memorySamples.reduce((sum: number, sample: number) => sum + sample, 0) / metrics.memorySamples.length
       : undefined;
     
     // Compile final metrics
@@ -234,7 +237,7 @@ class MetricsCollector {
     // In a real implementation, these would likely be stored in a database
     
     // Remove from active job metrics
-    this.jobMetrics.delete(jobId);
+    delete this.jobMetrics[jobId];
     
     return finalMetrics;
   }
@@ -243,7 +246,7 @@ class MetricsCollector {
    * Get current job metrics (snapshot)
    */
   getJobMetrics(jobId: number): JobMetrics | null {
-    const metrics = this.jobMetrics.get(jobId);
+    const metrics = this.jobMetrics[jobId];
     
     if (!metrics) {
       return null;
@@ -273,11 +276,11 @@ class MetricsCollector {
     
     // Calculate average CPU and memory usage
     const avgCpuUsage = metrics.cpuSamples.length > 0
-      ? metrics.cpuSamples.reduce((sum, sample) => sum + sample, 0) / metrics.cpuSamples.length
+      ? metrics.cpuSamples.reduce((sum: number, sample: number) => sum + sample, 0) / metrics.cpuSamples.length
       : undefined;
       
     const avgMemoryUsage = metrics.memorySamples.length > 0
-      ? metrics.memorySamples.reduce((sum, sample) => sum + sample, 0) / metrics.memorySamples.length
+      ? metrics.memorySamples.reduce((sum: number, sample: number) => sum + sample, 0) / metrics.memorySamples.length
       : undefined;
     
     return {
@@ -301,12 +304,12 @@ class MetricsCollector {
    */
   clearAllMetrics(): void {
     // Stop all performance samplers
-    for (const [jobId] of this.performanceSamplers) {
-      this.stopPerformanceSampling(jobId);
-    }
+    Object.keys(this.performanceSamplers).forEach(jobIdStr => {
+      this.stopPerformanceSampling(parseInt(jobIdStr, 10));
+    });
     
     // Clear all metrics
-    this.jobMetrics.clear();
+    this.jobMetrics = {};
   }
   
   /**
@@ -314,7 +317,7 @@ class MetricsCollector {
    */
   private startPerformanceSampling(jobId: number): void {
     // Check if already sampling
-    if (this.performanceSamplers.has(jobId)) {
+    if (this.performanceSamplers[jobId] !== undefined) {
       return;
     }
     
@@ -327,18 +330,18 @@ class MetricsCollector {
       this.samplePerformanceMetrics(jobId);
     }, samplingInterval);
     
-    this.performanceSamplers.set(jobId, timerId);
+    this.performanceSamplers[jobId] = timerId;
   }
   
   /**
    * Stop performance sampling for a job
    */
   private stopPerformanceSampling(jobId: number): void {
-    const timerId = this.performanceSamplers.get(jobId);
+    const timerId = this.performanceSamplers[jobId];
     
     if (timerId) {
       clearInterval(timerId);
-      this.performanceSamplers.delete(jobId);
+      delete this.performanceSamplers[jobId];
     }
   }
   
@@ -346,7 +349,7 @@ class MetricsCollector {
    * Sample performance metrics for a job
    */
   private samplePerformanceMetrics(jobId: number): void {
-    const metrics = this.jobMetrics.get(jobId);
+    const metrics = this.jobMetrics[jobId];
     
     if (!metrics) {
       this.stopPerformanceSampling(jobId);

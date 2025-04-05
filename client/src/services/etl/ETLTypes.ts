@@ -1,445 +1,216 @@
 /**
- * Job status enum
+ * ETLTypes.ts
+ * 
+ * Common types and interfaces for ETL pipeline components
  */
+
+// Job status enum
 export enum JobStatus {
-  IDLE = 'IDLE',
-  RUNNING = 'RUNNING',
-  SUCCEEDED = 'SUCCEEDED',
-  FAILED = 'FAILED'
+  PENDING = 'pending',
+  RUNNING = 'running',
+  COMPLETED = 'completed',
+  FAILED = 'failed',
+  ABORTED = 'aborted',
+  SCHEDULED = 'scheduled',
+  IDLE = 'idle',
+  SUCCEEDED = 'succeeded'
 }
 
-/**
- * Data source type enum
- */
-export enum DataSourceType {
-  POSTGRESQL = 'POSTGRESQL',
-  MYSQL = 'MYSQL',
-  SQL_SERVER = 'SQL_SERVER',
-  ODBC = 'ODBC',
-  REST_API = 'REST_API',
-  GRAPHQL_API = 'GRAPHQL_API',
-  FILE_CSV = 'FILE_CSV',
-  FILE_JSON = 'FILE_JSON',
-  FILE_XML = 'FILE_XML',
-  FILE_EXCEL = 'FILE_EXCEL',
-  MEMORY = 'MEMORY'
-}
-
-/**
- * Filter operator enum
- */
-export enum FilterOperator {
-  EQUALS = 'EQUALS',
-  NOT_EQUALS = 'NOT_EQUALS',
-  GREATER_THAN = 'GREATER_THAN',
-  LESS_THAN = 'LESS_THAN',
-  GREATER_THAN_OR_EQUALS = 'GREATER_THAN_OR_EQUALS',
-  LESS_THAN_OR_EQUALS = 'LESS_THAN_OR_EQUALS',
-  IN = 'IN',
-  NOT_IN = 'NOT_IN',
-  CONTAINS = 'CONTAINS',
-  NOT_CONTAINS = 'NOT_CONTAINS',
-  STARTS_WITH = 'STARTS_WITH',
-  ENDS_WITH = 'ENDS_WITH',
-  IS_NULL = 'IS_NULL',
-  IS_NOT_NULL = 'IS_NOT_NULL',
-  REGEX = 'REGEX',
-  BETWEEN = 'BETWEEN',
-  NOT_BETWEEN = 'NOT_BETWEEN'
-}
-
-/**
- * Filter logic enum
- */
+// Filter Logic Types
 export enum FilterLogic {
-  AND = 'AND',
-  OR = 'OR'
+  AND = 'and',
+  OR = 'or'
 }
 
-/**
- * Transformation type enum
- */
-export enum TransformationType {
-  FILTER = 'FILTER',
-  MAP = 'MAP',
-  JOIN = 'JOIN',
-  AGGREGATE = 'AGGREGATE',
-  VALIDATE = 'VALIDATE',
-  ENRICH = 'ENRICH',
-  CUSTOM = 'CUSTOM'
+// Filter Operator Types
+export enum FilterOperator {
+  EQUALS = 'equals',
+  NOT_EQUALS = 'not_equals',
+  GREATER_THAN = 'greater_than',
+  LESS_THAN = 'less_than',
+  CONTAINS = 'contains',
+  NOT_CONTAINS = 'not_contains',
+  STARTS_WITH = 'starts_with',
+  ENDS_WITH = 'ends_with',
+  IN = 'in',
+  NOT_IN = 'not_in',
+  BETWEEN = 'between',
+  NULL = 'null',
+  NOT_NULL = 'not_null'
 }
 
-/**
- * Validation type
- */
-export type ValidationType = 
-  'REQUIRED' | 
-  'EMAIL' | 
-  'URL' | 
-  'NUMBER' | 
-  'INTEGER' | 
-  'FLOAT' | 
-  'DATE' | 
-  'REGEX' | 
-  'CUSTOM';
-
-/**
- * Aggregation function
- */
-export type AggregationFunction = 
-  'COUNT' | 
-  'SUM' | 
-  'AVG' | 
-  'MIN' | 
-  'MAX' | 
-  'FIRST' | 
-  'LAST' | 
-  'ARRAY_AGG';
-
-/**
- * Enrichment type
- */
-export type EnrichmentType = 
-  'LOOKUP' | 
-  'GEOCODE' | 
-  'TRANSLATE' | 
-  'CUSTOM';
-
-/**
- * Record counts interface
- */
-export interface RecordCounts {
-  /** Number of records extracted */
-  extracted: number;
-  
-  /** Number of records transformed */
-  transformed: number;
-  
-  /** Number of records loaded */
-  loaded: number;
-  
-  /** Number of records rejected */
-  rejected: number;
-}
-
-/**
- * ETL job interface
- */
+// ETL Job interface
 export interface ETLJob {
-  /** Job ID */
   id: number;
-  
-  /** Job name */
   name: string;
-  
-  /** Data source IDs */
-  sources: number[];
-  
-  /** Data destination IDs */
-  destinations: number[];
-  
-  /** Transformation rule IDs in order of execution */
-  transformations: number[];
-  
-  /** Job status */
+  description?: string;
+  sourceId: string;
+  targetId: string;
+  transformationIds: string[];
   status: JobStatus;
-  
-  /** Whether the job is enabled */
-  enabled: boolean;
-  
-  /** Job description */
-  description?: string;
+  lastRun?: Date;
+  createdAt: Date;
+  updatedAt: Date;
+  scheduleId?: string;
+  enabled?: boolean;
+  sources?: DataSource[];
+  destinations?: DataSource[];
+  transformations?: TransformationRule[];
 }
 
-/**
- * Data source config interface
- */
-export interface DataSourceConfig {
-  /** Host for database connections */
-  host?: string;
-  
-  /** Port for database connections */
-  port?: number;
-  
-  /** Database name for database connections */
-  database?: string;
-  
-  /** Username for database connections */
-  user?: string;
-  
-  /** Password for database connections */
-  password?: string;
-  
-  /** URL for API connections */
-  url?: string;
-  
-  /** HTTP method for API connections */
-  method?: string;
-  
-  /** HTTP headers for API connections */
-  headers?: Record<string, string>;
-  
-  /** File path for file connections */
-  filePath?: string;
-  
-  /** Delimiter for CSV files */
-  delimiter?: string;
-  
-  /** Whether the CSV file has a header */
-  hasHeader?: boolean;
-  
-  /** In-memory data for testing */
-  data?: any[];
-  
-  /** Additional options */
-  options?: Record<string, any>;
-}
-
-/**
- * Data source interface
- */
+// Data Source interface
 export interface DataSource {
-  /** Data source ID */
-  id: number;
-  
-  /** Data source name */
+  id: string;
   name: string;
-  
-  /** Data source type */
   type: DataSourceType;
-  
-  /** Data source config */
-  config: DataSourceConfig;
-  
-  /** Whether the data source is enabled */
-  enabled: boolean;
-  
-  /** Data source description */
-  description?: string;
-  
-  /** Data source tags */
-  tags?: string[];
+  config: Record<string, any>;
 }
 
-/**
- * Filter condition interface
- */
-export interface FilterCondition {
-  /** Field name */
-  field: string;
-  
-  /** Filter operator */
-  operator: FilterOperator;
-  
-  /** Filter value */
-  value: any;
-  
-  /** Second value for BETWEEN operator */
-  valueEnd?: any;
-}
-
-/**
- * Filter config interface
- */
-export interface FilterConfig {
-  /** Filter conditions */
-  conditions: FilterCondition[];
-  
-  /** Filter logic */
-  logic: FilterLogic;
-}
-
-/**
- * Field mapping interface
- */
-export interface FieldMapping {
-  /** Source field */
-  source: string;
-  
-  /** Target field */
-  target: string;
-}
-
-/**
- * Map config interface
- */
-export interface MapConfig {
-  /** Field mappings */
-  mappings: FieldMapping[];
-  
-  /** Whether to include original fields */
-  includeOriginal: boolean;
-}
-
-/**
- * Join config interface
- */
-export interface JoinConfig {
-  /** Right dataset */
-  rightDataset: string;
-  
-  /** Join type */
-  joinType: 'INNER' | 'LEFT' | 'RIGHT' | 'FULL';
-  
-  /** Left join field */
-  leftField: string;
-  
-  /** Right join field */
-  rightField: string;
-}
-
-/**
- * Aggregation interface
- */
-export interface Aggregation {
-  /** Field to aggregate */
-  field: string;
-  
-  /** Aggregation function */
-  function: AggregationFunction;
-  
-  /** Output field */
-  as: string;
-}
-
-/**
- * Aggregate config interface
- */
-export interface AggregateConfig {
-  /** Fields to group by */
-  groupBy: string[];
-  
-  /** Aggregations to apply */
-  aggregations: Aggregation[];
-}
-
-/**
- * Validation interface
- */
-export interface Validation {
-  /** Field to validate */
-  field: string;
-  
-  /** Validation type */
-  type: ValidationType;
-  
-  /** Validation params (for REGEX, etc.) */
-  params?: any;
-  
-  /** Validation message */
-  message: string;
-}
-
-/**
- * Validation config interface
- */
-export interface ValidationConfig {
-  /** Validations to apply */
-  validations: Validation[];
-  
-  /** Whether to fail on error */
-  failOnError: boolean;
-}
-
-/**
- * Enrichment field interface
- */
-export interface EnrichmentField {
-  /** Source field */
-  source: string;
-  
-  /** Target field */
-  target: string;
-}
-
-/**
- * Enrichment config interface
- */
-export interface EnrichmentConfig {
-  /** Enrichment type */
-  type: EnrichmentType;
-  
-  /** Fields to enrich */
-  fields: EnrichmentField[];
-  
-  /** Additional params */
-  params?: Record<string, any>;
-}
-
-/**
- * Custom config interface
- */
-export interface CustomConfig {
-  /** Function name */
-  function: string;
-  
-  /** Function parameters */
-  params?: Record<string, any>;
-}
-
-/**
- * Transformation rule interface
- */
+// Transformation Rule interface
 export interface TransformationRule {
-  /** Rule ID */
-  id: number;
-  
-  /** Rule name */
+  id: string;
   name: string;
-  
-  /** Transformation type */
   type: TransformationType;
-  
-  /** Transformation config */
-  config: FilterConfig | MapConfig | JoinConfig | AggregateConfig | ValidationConfig | EnrichmentConfig | CustomConfig;
-  
-  /** Execution order */
-  order: number;
-  
-  /** Whether the rule is enabled */
-  enabled: boolean;
-  
-  /** Rule description */
-  description?: string;
+  config: Record<string, any>;
 }
 
-/**
- * System status interface
- */
-export interface SystemStatus {
-  /** Number of jobs */
-  jobCount: number;
-  
-  /** Number of enabled jobs */
-  enabledJobCount: number;
-  
-  /** Number of running jobs */
-  runningJobCount: number;
-  
-  /** Number of data sources */
-  dataSourceCount: number;
-  
-  /** Number of enabled data sources */
-  enabledDataSourceCount: number;
-  
-  /** Number of transformation rules */
-  transformationRuleCount: number;
-  
-  /** Number of enabled transformation rules */
-  enabledTransformationRuleCount: number;
-  
-  /** Scheduler status */
-  schedulerStatus: Record<JobStatus, number>;
-  
-  /** Number of recent job runs */
-  recentJobRuns: number;
-  
-  /** Number of failed job runs */
-  failedJobRuns: number;
-  
-  /** Number of successful job runs */
-  successJobRuns: number;
-  
-  /** Record counts */
-  recordCounts: RecordCounts;
+// Record Counts interface
+export interface RecordCounts {
+  extracted: number;
+  processed: number;
+  loaded: number;
+  failed: number;
+}
+
+// System Status enum
+export enum SystemStatus {
+  HEALTHY = 'healthy',
+  DEGRADED = 'degraded',
+  DOWN = 'down',
+  MAINTENANCE = 'maintenance'
+}
+
+// ETL Job Result interface
+export interface ETLJobResult {
+  jobId: number;
+  status: JobStatus; 
+  startTime: Date;
+  endTime: Date;
+  extractedRecords: number;
+  processedRecords: number;
+  failedRecords: number;
+  errorMessages: string[];
+  warnings: string[];
+}
+
+// Job Metrics interface
+export interface JobMetrics {
+  startTime: Date;
+  endTime: Date;
+  duration: number;
+  extractTime: number;
+  transformTime: number; 
+  loadTime: number;
+  recordsProcessed: number;
+  recordsValid: number;
+  recordsInvalid: number;
+  throughput: number;
+  cpuUsage?: number;
+  memoryUsage?: number;
+}
+
+// Data Source Type enum
+export enum DataSourceType {
+  DATABASE = 'database',
+  FILE = 'file',
+  API = 'api',
+  FTP = 'ftp',
+  MEMORY = 'memory',
+  SQLSERVER = 'sqlserver',
+  ODBC = 'odbc',
+  POSTGRESQL = 'postgresql',
+  MYSQL = 'mysql',
+  REST_API = 'rest_api',
+  GRAPHQL_API = 'graphql_api',
+  FILE_CSV = 'file_csv',
+  FILE_JSON = 'file_json',
+  FILE_XML = 'file_xml',
+  FILE_EXCEL = 'file_excel'
+}
+
+// Transformation Type enum
+export enum TransformationType {
+  MAPPING = 'mapping',
+  FILTER = 'filter',
+  AGGREGATION = 'aggregation',
+  ENRICHMENT = 'enrichment',
+  VALIDATION = 'validation',
+  CUSTOM = 'custom',
+  MAP = 'map',
+  JOIN = 'join',
+  AGGREGATE = 'aggregate',
+  VALIDATE = 'validate',
+  ENRICH = 'enrich'
+}
+
+// Data Connection interface
+export interface DataConnection {
+  id: string;
+  name: string;
+  type: DataSourceType;
+  config: Record<string, any>;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+// Transformation interface
+export interface Transformation {
+  id: string;
+  name: string;
+  description?: string;
+  type: TransformationType;
+  config: Record<string, any>;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+// ETL Pipeline interface
+export interface ETLPipeline {
+  id: string;
+  name: string;
+  description?: string;
+  sourceConnection: DataConnection;
+  targetConnection: DataConnection;
+  transformations: Transformation[];
+  createdAt: Date;
+  updatedAt: Date;
+  lastRun?: Date;
+  status: JobStatus;
+}
+
+// Database specific connection types
+export interface SQLServerConnectionConfig {
+  server: string;
+  database: string;
+  username: string;
+  password: string;
+  port: number;
+  encrypt: boolean;
+  trustServerCertificate: boolean;
+}
+
+export interface ODBCConnectionConfig {
+  connectionString: string;
+  username?: string;
+  password?: string;
+}
+
+// FTP connection config
+export interface FTPConnectionConfig {
+  host: string;
+  port: number;
+  username: string;
+  password: string;
+  secure: boolean;
+  timeout: number;
 }

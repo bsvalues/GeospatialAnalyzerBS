@@ -4155,5 +4155,141 @@ export async function registerRoutes(app: Express): Promise<Server> {
     return property;
   }
 
+  // Route for SQL Server query execution
+  app.post('/api/sqlserver/query', async (req, res) => {
+    try {
+      const { config, query, parameters } = req.body;
+
+      if (!config || !query) {
+        return res.status(400).json({ error: 'Missing required parameters: config and query' });
+      }
+
+      // Validate SQL Server connection config
+      if (!config.server || !config.database) {
+        return res.status(400).json({ error: 'Invalid SQL Server connection configuration' });
+      }
+
+      // Import the mssql package dynamically to avoid browser compatibility issues
+      const sql = await import('mssql');
+
+      // Create a connection configuration
+      const sqlConfig = {
+        user: config.username,
+        password: config.password,
+        server: config.server,
+        database: config.database,
+        port: config.port || 1433,
+        options: {
+          encrypt: config.encrypt ?? true,
+          trustServerCertificate: config.trustServerCertificate ?? false,
+          connectionTimeout: 30000,
+          requestTimeout: 30000
+        }
+      };
+
+      // Connect to the database
+      const pool = await sql.connect(sqlConfig);
+      
+      // Create the request
+      const request = pool.request();
+      
+      // Add parameters if they exist
+      if (parameters && typeof parameters === 'object') {
+        Object.entries(parameters).forEach(([key, value]) => {
+          request.input(key, value);
+        });
+      }
+
+      // Execute the query
+      const result = await request.query(query);
+      
+      // Close the connection
+      await pool.close();
+      
+      // Return the result
+      res.json({
+        recordset: result.recordset,
+        recordsets: result.recordsets,
+        rowsAffected: result.rowsAffected,
+        output: result.output
+      });
+    } catch (error) {
+      console.error('SQL Server query error:', error);
+      handleError(error, res);
+    }
+  });
+
+  // Route for ODBC query execution
+  app.post('/api/odbc/query', async (req, res) => {
+    try {
+      const { config, query, parameters } = req.body;
+
+      if (!config || !query) {
+        return res.status(400).json({ error: 'Missing required parameters: config and query' });
+      }
+
+      // Validate ODBC connection config
+      if (!config.connectionString) {
+        return res.status(400).json({ error: 'Invalid ODBC connection configuration: connectionString is required' });
+      }
+
+      // Import the mssql package dynamically to avoid browser compatibility issues
+      // We'll use mssql for ODBC connections too, as it supports ODBC through connection strings
+      const sql = await import('mssql');
+
+      // Create a connection configuration using ODBC driver
+      const sqlConfig: any = {
+        server: 'localhost', // Required by mssql, but will be overridden by connection string
+        database: 'master',  // Required by mssql, but will be overridden by connection string
+        options: {
+          encrypt: false,
+          trustServerCertificate: true,
+          connectionString: config.connectionString,
+          trustedConnection: true
+        }
+      };
+
+      // Add username and password if provided (for connection methods that need them separately)
+      if (config.username) sqlConfig.user = config.username;
+      if (config.password) sqlConfig.password = config.password;
+
+      // Connect to the database
+      const pool = await sql.connect(sqlConfig);
+      
+      // Create the request
+      const request = pool.request();
+      
+      // Add parameters if they exist
+      if (parameters && Array.isArray(parameters)) {
+        // For positional parameters (common in ODBC)
+        parameters.forEach((value, index) => {
+          request.input(`param${index}`, value);
+        });
+      } else if (parameters && typeof parameters === 'object') {
+        // For named parameters
+        Object.entries(parameters).forEach(([key, value]) => {
+          request.input(key, value);
+        });
+      }
+
+      // Execute the query
+      const result = await request.query(query);
+      
+      // Close the connection
+      await pool.close();
+      
+      // Return the result
+      res.json({
+        recordset: result.recordset,
+        recordsets: result.recordsets,
+        rowsAffected: result.rowsAffected,
+        output: result.output
+      });
+    } catch (error) {
+      console.error('ODBC query error:', error);
+      handleError(error, res);
+    }
+  });
+
   return httpServer;
 }
