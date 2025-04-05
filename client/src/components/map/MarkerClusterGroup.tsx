@@ -133,7 +133,10 @@ const MarkerClusterGroup: React.FC<MarkerClusterGroupProps> = ({
     // Add markers for each property
     properties.forEach(property => {
       // Skip properties without coordinates
-      if (!property.latitude || !property.longitude) return;
+      if (!property.latitude || !property.longitude) {
+        console.log('Property missing coordinates:', property.parcelId);
+        return;
+      }
       
       // Create marker for this property
       const isSelected = selectedProperty && selectedProperty.id === property.id;
@@ -163,8 +166,8 @@ const MarkerClusterGroup: React.FC<MarkerClusterGroupProps> = ({
       // Add tooltip
       marker.bindTooltip(`
         <div class="property-tooltip">
-          <div class="font-medium">${property.address}</div>
-          <div>${property.value || 'No value'}</div>
+          <div class="font-medium">${property.address || 'Unknown Address'}</div>
+          <div>${property.propertyType ? property.propertyType + ' - ' : ''}${property.value || 'No value'}</div>
         </div>
       `, { 
         direction: 'top',

@@ -23,8 +23,8 @@ interface MapComponentProps {
  */
 export const MapComponent: React.FC<MapComponentProps> = ({ 
   properties, 
-  center = [47.123, -122.456], // Default center (Benton County, WA)
-  zoom = 12,
+  center = [46.26, -119.28], // Default center (Benton County, WA)
+  zoom = 10,
   children 
 }) => {
   // State for active visualization layers
