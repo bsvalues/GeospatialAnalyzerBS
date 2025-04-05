@@ -259,6 +259,15 @@ export const Header: React.FC<HeaderProps> = ({ taxYear, onTaxYearChange }) => {
               <span className="text-sm font-medium">AI Prediction</span>
             </div>
           </Link>
+          <Link href="/income-approach">
+            <div className={cn(
+              "flex items-center px-3 py-1.5 rounded-md hover:bg-gray-200/50 transition-all duration-200 cursor-pointer",
+              currentLocation === "/income-approach" ? "bg-primary/10 text-primary" : ""
+            )}>
+              <Calculator className="h-4 w-4 mr-1.5" />
+              <span className="text-sm font-medium">Income Approach</span>
+            </div>
+          </Link>
         </div>
         
         <div className="mr-4 border-r border-gray-200 pr-4 hidden sm:block">
@@ -573,6 +582,19 @@ export const Header: React.FC<HeaderProps> = ({ taxYear, onTaxYearChange }) => {
                 >
                   <Brain className="h-5 w-5 mr-3" />
                   <span className="font-medium">AI Prediction</span>
+                </div>
+              </Link>
+              
+              <Link href="/income-approach">
+                <div 
+                  className={cn(
+                    "flex items-center rounded-md py-3 px-3 transition-colors",
+                    currentLocation === "/income-approach" ? "bg-primary/10 text-primary" : "hover:bg-gray-100 text-gray-700"
+                  )}
+                  onClick={() => setIsMobileMenuOpen(false)}
+                >
+                  <Calculator className="h-5 w-5 mr-3" />
+                  <span className="font-medium">Income Approach</span>
                 </div>
               </Link>
             </nav>

@@ -211,6 +211,7 @@ class FieldMappingService {
             } catch (error) {
               console.error(`Transformation error for field ${mapping.sourceField} -> ${mapping.targetField}:`, error);
               alertService.addAlert({
+                title: 'Transformation Error',
                 message: `Error transforming field ${mapping.sourceField} -> ${mapping.targetField}`,
                 details: (error as Error).message,
                 category: AlertCategory.TRANSFORM,
@@ -228,6 +229,7 @@ class FieldMappingService {
             } catch (error) {
               console.error(`Transformation error for field ${mapping.sourceField} -> ${mapping.targetField}:`, error);
               alertService.addAlert({
+                title: 'Transformation Error',
                 message: `Error transforming field ${mapping.sourceField} -> ${mapping.targetField}`,
                 details: (error as Error).message,
                 category: AlertCategory.TRANSFORM,
