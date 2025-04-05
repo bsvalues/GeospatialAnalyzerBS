@@ -35,7 +35,7 @@ export function BCPageLayout({
       />
       
       <main className={cn("bc-page-content", className)}>
-        <div className="container mx-auto py-6 max-w-7xl">
+        <div className="container mx-auto py-6 px-4 sm:px-6 lg:px-8 max-w-7xl w-full">
           {children}
         </div>
       </main>

@@ -154,12 +154,18 @@
   padding: var(--bc-spacing-xl) 0;
   margin-bottom: var(--bc-spacing-xl);
   position: relative;
+  width: 100%;
+  max-width: 100%;
+  overflow: hidden;
 }
 
 .bc-page-header-image {
   background-size: cover;
   background-position: center;
   position: relative;
+  width: 100%;
+  max-width: 100%;
+  overflow: hidden;
 }
 
 .bc-page-header-image::before {
@@ -177,6 +183,7 @@
   position: relative;
   z-index: 2;
   padding: var(--bc-spacing-xl);
+  width: 100%;
 }
 
 /* Scroll Fixing Styles */
@@ -186,12 +193,17 @@
   min-height: 0;
   height: 100vh;
   overflow: hidden;
+  max-width: 100vw;
+  width: 100%;
 }
 
 .bc-page-content {
   flex: 1;
   overflow-y: auto;
   padding-bottom: var(--bc-spacing-xl);
+  width: 100%;
+  margin: 0 auto;
+  max-width: 100%;
 }
 
 /* Navigation Styles */

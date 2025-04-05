@@ -26,7 +26,7 @@ export function BCPageHeader({
   );
 
   const contentClasses = cn(
-    'container max-w-7xl mx-auto relative',
+    'container max-w-7xl mx-auto relative px-4 sm:px-6 lg:px-8 w-full',
     backgroundImage ? 'bc-page-header-content text-white z-10' : 'text-white'
   );
 
