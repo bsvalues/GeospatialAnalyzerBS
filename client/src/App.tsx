@@ -43,6 +43,7 @@ import ETLWizardPage from './pages/ETLWizardPage';
 import ETLAnimationDemo from './pages/ETLAnimationDemo';
 import StepProgressDemo from './pages/StepProgressDemo';
 import ETLJobSimulationDemo from './pages/ETLJobSimulationDemo';
+import { SchemaValidationPage } from './pages/SchemaValidationPage';
 
 function Router() {
   const [location] = useLocation();
@@ -84,6 +85,7 @@ function Router() {
         <Route path="/etl-animation-demo" component={ETLAnimationDemo} />
         <Route path="/step-progress-demo" component={StepProgressDemo} />
         <Route path="/etl-job-simulation" component={ETLJobSimulationDemo} />
+        <Route path="/schema-validation" component={SchemaValidationPage} />
         <Route component={NotFound} />
       </Switch>
     </>
