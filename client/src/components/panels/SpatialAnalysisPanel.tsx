@@ -27,25 +27,25 @@ export const SpatialAnalysisPanel: React.FC<SpatialAnalysisPanelProps> = ({
   };
   
   return (
-    <Card className={`shadow-md ${className}`}>
+    <Card className={`shadow-md overflow-visible ${className}`}>
       <CardHeader>
         <CardTitle>Spatial Analysis</CardTitle>
         <CardDescription>
           Analyze spatial patterns and relationships in property data
         </CardDescription>
       </CardHeader>
-      <CardContent>
+      <CardContent className="overflow-visible">
         <Tabs defaultValue="clustering" value={activeTab} onValueChange={handleTabChange}>
           <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger value="clustering">Clustering</TabsTrigger>
             <TabsTrigger value="temporal">Temporal Analysis</TabsTrigger>
           </TabsList>
           
-          <TabsContent value="clustering">
+          <TabsContent value="clustering" className="overflow-visible">
             <ClusteringPanel properties={properties} />
           </TabsContent>
           
-          <TabsContent value="temporal">
+          <TabsContent value="temporal" className="overflow-visible">
             <TemporalAnalysisPanel properties={properties} />
           </TabsContent>
         </Tabs>

@@ -12,7 +12,7 @@ interface PropertyComparisonPanelProps {
  */
 export function PropertyComparisonPanel({ properties }: PropertyComparisonPanelProps) {
   return (
-    <div className="h-full p-6 overflow-auto">
+    <div className="h-full p-6 overflow-visible">
       <div className="mb-6">
         <h2 className="text-2xl font-bold text-gray-800 mb-2">Property Comparison</h2>
         <p className="text-gray-600">
@@ -22,7 +22,9 @@ export function PropertyComparisonPanel({ properties }: PropertyComparisonPanelP
       </div>
       
       <PropertyComparisonProvider>
-        <PropertyComparison properties={properties} />
+        <div className="overflow-visible relative z-10">
+          <PropertyComparison properties={properties} />
+        </div>
       </PropertyComparisonProvider>
     </div>
   );

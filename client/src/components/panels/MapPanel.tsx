@@ -17,11 +17,11 @@ export const MapPanel: React.FC<MapPanelProps> = ({
   className = '' 
 }) => {
   return (
-    <Card className={`shadow-md overflow-hidden ${className}`}>
+    <Card className={`shadow-md overflow-visible ${className}`}>
       <CardHeader className="py-3">
         <CardTitle>Property Map</CardTitle>
       </CardHeader>
-      <CardContent className="p-0 h-[calc(100%-4rem)]">
+      <CardContent className="p-0 h-[calc(100%-4rem)] overflow-visible">
         <MapComponent properties={properties} />
       </CardContent>
     </Card>

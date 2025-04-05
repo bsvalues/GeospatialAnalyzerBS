@@ -135,7 +135,7 @@ export function TimeSeriesAnalysisPanel({
   };
   
   return (
-    <div className={`h-full flex flex-col bg-white ${className}`}>
+    <div className={`h-full flex flex-col bg-white overflow-visible relative z-10 ${className}`}>
       <div className="border-b p-4">
         <h2 className="text-xl font-semibold flex items-center">
           <LineChart className="h-5 w-5 mr-2 text-primary" />

@@ -541,17 +541,61 @@ const Dashboard: React.FC<DashboardProps> = ({ className }) => {
           </div>
         )}
 
-        {activeTab === 'map' && <MapPanel properties={properties} />}
-        {activeTab === 'analysis' && <SpatialAnalysisPanel properties={properties} />}
-        {activeTab === 'comparison' && <PropertyComparisonPanel properties={properties} />}
-        {activeTab === 'regression' && <RegressionPanel properties={properties} />}
-        {activeTab === 'modeling' && <PredictiveModelingPanel properties={properties} />}
-        {activeTab === 'timeseries' && <TimeSeriesAnalysisPanel properties={properties} />}
-        {activeTab === 'scripts' && <ScriptPanel properties={properties} />}
-        {activeTab === 'reporting' && <ReportGenerator properties={properties} />}
-        {activeTab === 'kpi' && <KPIDashboardPanel taxYear="2025" />}
-        {activeTab === 'analytics' && <AdvancedAnalyticsPanel allProperties={properties} />}
-        {activeTab === 'settings' && <SettingsPanel />}
+        {activeTab === 'map' && (
+          <div className="h-full p-4 overflow-visible relative z-10">
+            <MapPanel properties={properties} />
+          </div>
+        )}
+        {activeTab === 'analysis' && (
+          <div className="h-full p-4 overflow-visible relative z-10">
+            <SpatialAnalysisPanel properties={properties} />
+          </div>
+        )}
+        {activeTab === 'comparison' && (
+          <div className="h-full p-4 overflow-visible relative z-10">
+            <PropertyComparisonPanel properties={properties} />
+          </div>
+        )}
+        {activeTab === 'regression' && (
+          <div className="h-full p-4 overflow-visible relative z-10">
+            <RegressionPanel properties={properties} />
+          </div>
+        )}
+        {activeTab === 'modeling' && (
+          <div className="h-full p-4 overflow-visible relative z-10">
+            <PredictiveModelingPanel properties={properties} />
+          </div>
+        )}
+        {activeTab === 'timeseries' && (
+          <div className="h-full p-4 overflow-visible relative z-10">
+            <TimeSeriesAnalysisPanel properties={properties} />
+          </div>
+        )}
+        {activeTab === 'scripts' && (
+          <div className="h-full p-4 overflow-visible relative z-10">
+            <ScriptPanel properties={properties} />
+          </div>
+        )}
+        {activeTab === 'reporting' && (
+          <div className="h-full p-4 overflow-visible relative z-10">
+            <ReportGenerator properties={properties} />
+          </div>
+        )}
+        {activeTab === 'kpi' && (
+          <div className="h-full p-4 overflow-visible relative z-10">
+            <KPIDashboardPanel taxYear="2025" />
+          </div>
+        )}
+        {activeTab === 'analytics' && (
+          <div className="h-full p-4 overflow-visible relative z-10">
+            <AdvancedAnalyticsPanel allProperties={properties} />
+          </div>
+        )}
+        {activeTab === 'settings' && (
+          <div className="h-full p-4 overflow-visible relative z-10">
+            <SettingsPanel />
+          </div>
+        )}
       </div>
 
       {/* Import Data Dialog */}
