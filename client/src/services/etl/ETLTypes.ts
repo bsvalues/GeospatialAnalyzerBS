@@ -13,6 +13,7 @@ export enum JobStatus {
 }
 
 export enum JobFrequency {
+  MANUAL = 'manual',
   ONCE = 'once',
   HOURLY = 'hourly',
   DAILY = 'daily',
@@ -25,10 +26,17 @@ export enum DataSourceType {
   DATABASE = 'database',
   API = 'api',
   FILE = 'file',
+  FILE_CSV = 'file_csv',
+  FILE_JSON = 'file_json',
+  FILE_XML = 'file_xml',
+  FILE_EXCEL = 'file_excel',
   FTP = 'ftp',
   MEMORY = 'memory',
   SQL_SERVER = 'sqlServer',
-  ODBC = 'odbc'
+  ODBC = 'odbc',
+  GEOSPATIAL = 'geospatial',
+  SHAPEFILE = 'shapefile',
+  POSTGIS = 'postgis'
 }
 
 export interface SQLServerConnectionConfig {
@@ -147,6 +155,9 @@ export interface Transformation {
   name: string;
   description?: string;
   code: string;
+  type?: TransformationType;
+  config?: Record<string, any>;
+  order?: number;
   inputSchema?: Record<string, any>;
   outputSchema?: Record<string, any>;
   enabled: boolean;
@@ -157,14 +168,20 @@ export interface ETLJob {
   id: string;
   name: string;
   description?: string;
-  source: DataSource | string;
+  // Support both single source and multiple sources
+  source?: DataSource | string;
+  sources?: Array<string>;
   transformations: Array<Transformation | string>;
-  destination: DataSource | string;
+  // Support both single destination and multiple destinations
+  destination?: DataSource | string;
+  destinations?: Array<string>;
   schedule?: {
     frequency: JobFrequency;
     startDate?: Date;
     endDate?: Date;
     cronExpression?: string;
+    startTime?: string; // Time in HH:MM format
+    daysOfWeek?: number[]; // 0-6 for Sunday-Saturday
   };
   settings?: {
     batchSize?: number;
@@ -339,5 +356,18 @@ export enum TransformationType {
   CUSTOM_FUNCTION = 'custom_function',
   JAVASCRIPT = 'javascript',
   SQL = 'sql',
-  FORMULA = 'formula'
+  FORMULA = 'formula',
+  
+  // Special categories for wizard-based flows
+  CLEAN = 'clean',
+  STANDARDIZE = 'standardize',
+  NORMALIZE = 'normalize',
+  GEOCODE = 'geocode',
+  COORDINATE_TRANSFORM = 'coordinate_transform',
+  PROPERTY_SPECIFIC = 'property_specific',
+  TEXT_EXTRACTION = 'text_extraction',
+  CLASSIFICATION = 'classification',
+  OUTLIER_DETECTION = 'outlier_detection',
+  ANOMALY_DETECTION = 'anomaly_detection',
+  MISSING_VALUE_PREDICTION = 'missing_value_prediction'
 }

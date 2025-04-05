@@ -39,6 +39,7 @@ import DatabaseConnectionPage from './pages/DatabaseConnectionPage';
 import DatabaseTestPage from './pages/DatabaseTestPage';
 import IncomeApproachPage from './pages/IncomeApproachPage';
 import AnimationDemo from './pages/AnimationDemo';
+import ETLWizardPage from './pages/ETLWizardPage';
 
 function Router() {
   const [location] = useLocation();
@@ -76,6 +77,7 @@ function Router() {
         <Route path="/database-test" component={DatabaseTestPage} />
         <Route path="/income-approach" component={IncomeApproachPage} />
         <Route path="/animation-demo" component={AnimationDemo} />
+        <Route path="/etl-wizard" component={ETLWizardPage} />
         <Route component={NotFound} />
       </Switch>
     </>
