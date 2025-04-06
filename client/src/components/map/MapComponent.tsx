@@ -6,6 +6,7 @@ import PropertyInfoPopup from './PropertyInfoPopup';
 import { Property } from '@shared/schema';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
+import MarkerClusterGroup from './MarkerClusterGroup';
 
 // Fix the Leaflet default icon issue - crucial for marker display
 // Use direct CDN URLs for marker icons
@@ -131,14 +132,12 @@ export const MapComponent: React.FC<MapComponentProps> = ({
         </Overlay>
       </LayersControl>
       
-      {/* Real property markers - display all properties */}
-      {properties.map(property => (
-        <PropertyMarker
-          key={property.id}
-          property={property}
-          onClick={handlePropertySelect}
-        />
-      ))}
+      {/* Use MarkerClusterGroup for efficient marker management */}
+      <MarkerClusterGroup 
+        properties={properties}
+        onPropertySelect={handlePropertySelect}
+        selectedProperty={selectedProperty}
+      />
       
       {/* Selected property popup */}
       {selectedProperty && popupPosition && (
