@@ -6,10 +6,9 @@ import PropertyInfoPopup from './PropertyInfoPopup';
 import { Property } from '@shared/schema';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-import MarkerClusterGroup from './MarkerClusterGroup';
 
 // Fix the Leaflet default icon issue - crucial for marker display
-// Use direct CDN URLs for marker icons
+delete L.Icon.Default.prototype._getIconUrl;
 L.Icon.Default.mergeOptions({
   iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png',
   iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png',
@@ -59,7 +58,16 @@ const PropertyMarker = ({ property, onClick }: { property: Property; onClick: (p
   }
 };
 
-// No test markers, using real data only
+// Display test markers at known coordinates
+const TestMarkers = () => {
+  return (
+    <>
+      <Marker position={[46.2, -119.2]} />
+      <Marker position={[46.3, -119.1]} />
+      <Marker position={[46.4, -119.0]} />
+    </>
+  );
+};
 
 /**
  * Main map component that handles various visualization layers
@@ -122,22 +130,19 @@ export const MapComponent: React.FC<MapComponentProps> = ({
             attribution='&copy; <a href="https://www.esri.com/">Esri</a>'
           />
         </BaseLayer>
-        
-        <Overlay name="Heat Map">
-          <HeatmapVisualization properties={properties} />
-        </Overlay>
-        
-        <Overlay name="Hotspot Analysis">
-          <HotspotVisualization properties={properties} />
-        </Overlay>
       </LayersControl>
       
-      {/* Use MarkerClusterGroup for efficient marker management */}
-      <MarkerClusterGroup 
-        properties={properties}
-        onPropertySelect={handlePropertySelect}
-        selectedProperty={selectedProperty}
-      />
+      {/* Test markers at fixed coordinates */}
+      <TestMarkers />
+      
+      {/* Real property markers */}
+      {properties.slice(0, 10).map(property => (
+        <PropertyMarker
+          key={property.id}
+          property={property}
+          onClick={handlePropertySelect}
+        />
+      ))}
       
       {/* Selected property popup */}
       {selectedProperty && popupPosition && (
