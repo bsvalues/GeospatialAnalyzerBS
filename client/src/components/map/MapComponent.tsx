@@ -1,19 +1,12 @@
-import React, { useState, useEffect } from 'react';
-import { MapContainer, TileLayer, ZoomControl, LayersControl, Popup, useMap, Marker } from 'react-leaflet';
+import React, { useState, useRef, useEffect } from 'react';
+import { MapContainer, TileLayer, ZoomControl, LayersControl, Popup, useMap } from 'react-leaflet';
 import { HeatmapVisualization } from '../analysis/HeatmapVisualization';
 import { HotspotVisualization } from '../analysis/HotspotVisualization';
+import MarkerClusterGroup from './MarkerClusterGroup';
 import PropertyInfoPopup from './PropertyInfoPopup';
 import { Property } from '@shared/schema';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-
-// Fix the Leaflet default icon issue - crucial for marker display
-delete L.Icon.Default.prototype._getIconUrl;
-L.Icon.Default.mergeOptions({
-  iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png',
-  iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png',
-  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png'
-});
 
 const { BaseLayer, Overlay } = LayersControl;
 
@@ -25,50 +18,6 @@ interface MapComponentProps {
   children?: React.ReactNode;
 }
 
-// Simple marker component to display a single property marker
-const PropertyMarker = ({ property, onClick }: { property: Property; onClick: (property: Property) => void }) => {
-  if (!property.latitude || !property.longitude) {
-    return null;
-  }
-  
-  try {
-    // Parse latitude and longitude to numbers
-    const lat = typeof property.latitude === 'string' ? parseFloat(property.latitude) : Number(property.latitude);
-    const lng = typeof property.longitude === 'string' ? parseFloat(property.longitude) : Number(property.longitude);
-    
-    // Validate coordinates
-    if (isNaN(lat) || isNaN(lng) || lat < -90 || lat > 90 || lng < -180 || lng > 180) {
-      console.error('Invalid coordinates for property:', property.parcelId, lat, lng);
-      return null;
-    }
-    
-    console.log(`Creating marker for ${property.parcelId} at ${lat}, ${lng}`);
-    
-    return (
-      <Marker 
-        position={[lat, lng]} 
-        eventHandlers={{
-          click: () => onClick(property)
-        }}
-      />
-    );
-  } catch (error) {
-    console.error('Error creating marker for property:', property.parcelId, error);
-    return null;
-  }
-};
-
-// Display test markers at known coordinates
-const TestMarkers = () => {
-  return (
-    <>
-      <Marker position={[46.2, -119.2]} />
-      <Marker position={[46.3, -119.1]} />
-      <Marker position={[46.4, -119.0]} />
-    </>
-  );
-};
-
 /**
  * Main map component that handles various visualization layers
  */
@@ -78,31 +27,28 @@ export const MapComponent: React.FC<MapComponentProps> = ({
   zoom = 10,
   children 
 }) => {
-  console.log('MapComponent loaded with properties:', properties?.length, 'items');
+  // State for active visualization layers
+  const [showHeatmap, setShowHeatmap] = useState<boolean>(false);
+  const [showHotspots, setShowHotspots] = useState<boolean>(false);
   
-  // Log sample property data for debugging
-  if (properties?.length > 0) {
-    console.log('Sample property data:', properties[0]);
-  }
-  
-  // State for property selection and popup
+  // State for property selection and popup position
   const [selectedProperty, setSelectedProperty] = useState<Property | null>(null);
   const [popupPosition, setPopupPosition] = useState<[number, number] | null>(null);
   
-  // Handle property selection
-  const handlePropertySelect = (property: Property) => {
-    console.log('Selected property:', property);
+  // Handler for property selection from cluster
+  const handlePropertySelect = (property: any) => {
     setSelectedProperty(property);
+    console.log('Selected property:', property);
     
-    // Set popup position
+    // Set popup position if coordinates are available
     if (property.latitude && property.longitude) {
-      const lat = typeof property.latitude === 'string' ? parseFloat(property.latitude) : Number(property.latitude);
-      const lng = typeof property.longitude === 'string' ? parseFloat(property.longitude) : Number(property.longitude);
-      setPopupPosition([lat, lng]);
+      setPopupPosition([Number(property.latitude), Number(property.longitude)]);
+    } else {
+      setPopupPosition(null);
     }
   };
   
-  // Handle closing the popup
+  // Handler to close the popup
   const handleClosePopup = () => {
     setSelectedProperty(null);
     setPopupPosition(null);
@@ -112,7 +58,7 @@ export const MapComponent: React.FC<MapComponentProps> = ({
     <MapContainer 
       center={center} 
       zoom={zoom} 
-      style={{ height: '100%', width: '100%', zIndex: 0 }}
+      style={{ height: '100%', width: '100%' }}
       zoomControl={false}
     >
       <ZoomControl position="bottomright" />
@@ -130,25 +76,37 @@ export const MapComponent: React.FC<MapComponentProps> = ({
             attribution='&copy; <a href="https://www.esri.com/">Esri</a>'
           />
         </BaseLayer>
+        <BaseLayer name="Topographic">
+          <TileLayer
+            url="https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png"
+            attribution='&copy; <a href="https://opentopomap.org">OpenTopoMap</a> contributors'
+          />
+        </BaseLayer>
+        
+        <Overlay name="Heat Map">
+          <HeatmapVisualization properties={properties} />
+        </Overlay>
+        
+        <Overlay name="Hotspot Analysis">
+          <HotspotVisualization properties={properties} />
+        </Overlay>
       </LayersControl>
       
-      {/* Test markers at fixed coordinates */}
-      <TestMarkers />
-      
-      {/* Real property markers */}
-      {properties.slice(0, 10).map(property => (
-        <PropertyMarker
-          key={property.id}
-          property={property}
-          onClick={handlePropertySelect}
-        />
-      ))}
+      {/* Property markers with clustering */}
+      <MarkerClusterGroup 
+        properties={properties} 
+        onPropertySelect={handlePropertySelect}
+        selectedProperty={selectedProperty}
+      />
       
       {/* Selected property popup */}
       {selectedProperty && popupPosition && (
         <Popup 
           position={popupPosition}
-          eventHandlers={{ remove: handleClosePopup }}
+          eventHandlers={{ 
+            remove: handleClosePopup 
+          }}
+          className="property-detail-popup"
         >
           <PropertyInfoPopup 
             property={selectedProperty} 
@@ -157,6 +115,7 @@ export const MapComponent: React.FC<MapComponentProps> = ({
         </Popup>
       )}
       
+      {/* Additional map elements passed as children */}
       {children}
     </MapContainer>
   );
